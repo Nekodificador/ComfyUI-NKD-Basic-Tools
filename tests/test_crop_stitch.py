@@ -6,8 +6,9 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from helpers import (_alpha_hardness, _crop_by_mask, _mask_fill_holes, _mask_grow,
-                     _megapixels_to_pixels, _post_blend, _uncrop, _VAE_MULTIPLE)
+from helpers import (_alpha_hardness, _box_preview, _crop_by_mask, _mask_fill_holes,
+                     _mask_grow, _megapixels_to_pixels, _post_blend, _uncrop,
+                     _VAE_MULTIPLE)
 
 
 def demo():
@@ -53,6 +54,12 @@ def demo():
     assert torch.equal(_alpha_hardness(soft, 0.0), soft)
     hard = _alpha_hardness(soft, 0.8)
     assert hard[1] == 0.0 and hard[-2] == 1.0 and abs(hard[5] - soft[5]) < 1e-5
+
+    # Box preview: right shape, downscaled, border painted in the accent color.
+    prev = _box_preview(image, processed, box, max_side=400)
+    assert prev.shape[0] == 1 and prev.shape[-1] == 3
+    assert max(prev.shape[1], prev.shape[2]) <= 400
+    assert prev.min() >= 0.0 and prev.max() <= 1.0
 
     # Simulate "inpainting": paint the patch solid red, composite back.
     patch = torch.zeros_like(crop)

@@ -11,11 +11,12 @@ from dataclasses import dataclass
 from typing import Optional, Tuple
 import torch
 from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import ComfyExtension, io, ui
 from comfy_api.latest._io import comfytype, ComfyTypeIO
 
 from .helpers import (
     _HAS_CV2,
+    _box_preview,
     _crop_by_mask,
     _mask_fill_holes,
     _mask_grow,
@@ -157,7 +158,9 @@ class NKDInpaintCrop(io.ComfyNode):
             original_size=orig_size,
             mask=processed.cpu(),
         )
-        return io.NodeOutput(patched_model, crop_img, crop_mask, latent, data)
+        preview = _box_preview(image, processed, crop_box)
+        return io.NodeOutput(patched_model, crop_img, crop_mask, latent, data,
+                             ui=ui.PreviewImage(preview, cls=cls))
 
 
 class NKDInpaintStitch(io.ComfyNode):

@@ -323,6 +323,37 @@ def _crop_by_mask(
     return cropped, cm, (x1, y1, x2, y2), (oh, ow)
 
 
+def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
+                 box: Tuple[int, int, int, int], max_side: int = 768) -> torch.Tensor:
+    """Render an in-node preview: original with the mask tinted in the NKD
+    accent color, everything outside the crop box dimmed, and the box outlined.
+    First batch item only, downscaled to keep the payload small."""
+    x1, y1, x2, y2 = box
+    img = image[:1, :, :, :3].clone()
+    _, h, w, _ = img.shape
+    accent = torch.tensor([0.29, 0.706, 1.0], device=img.device, dtype=img.dtype)
+
+    if mask is not None:
+        m = mask if mask.dim() == 3 else mask.unsqueeze(0)
+        a = (m[0].to(img.device, img.dtype).clamp(0, 1) * 0.35).unsqueeze(-1)
+        img[0] = img[0] * (1.0 - a) + accent * a
+
+    dim = torch.full((h, w, 1), 0.45, device=img.device, dtype=img.dtype)
+    dim[y1:y2, x1:x2] = 1.0
+    img[0] = img[0] * dim
+
+    t = max(2, min(h, w) // 300)
+    img[0, y1:min(y1 + t, h), x1:x2] = accent
+    img[0, max(y2 - t, 0):y2, x1:x2] = accent
+    img[0, y1:y2, x1:min(x1 + t, w)] = accent
+    img[0, y1:y2, max(x2 - t, 0):x2] = accent
+
+    if max(h, w) > max_side:
+        scale = max_side / max(h, w)
+        img = _resize_auto(img, max(1, int(w * scale)), max(1, int(h * scale)))
+    return img
+
+
 def _alpha_hardness(alpha: torch.Tensor, hardness: float) -> torch.Tensor:
     """Histogram remap on the alpha (LayerStyle-style black/white point):
     raises the black point and lowers the white point symmetrically, collapsing
