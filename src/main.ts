@@ -14,6 +14,12 @@ const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
 const MIN_EDITOR_H = 190;
 
+// ComfyUI wraps every DOM widget in an element with ~20px of its own
+// margin/padding, so the content box our `height:100%` root fills is that
+// much shorter than the height we reserve via getHeight. Add it back or the
+// bottom bar of every widget clips. Measured at 20px; 24 leaves a cushion.
+const DOM_WIDGET_CHROME = 24;
+
 // Autogrow rebuilds its dynamic slots on load, dropping custom labels of every
 // socket after the first. Mirror renames into node.properties (which DOES
 // serialize with the workflow) and restore them onto rebuilt slots.
@@ -90,8 +96,8 @@ comfyApp.registerExtension({
         },
         serialize: false,
         hideOnZoom: false,
-        getMinHeight: () => MIN_EDITOR_H,
-        getHeight: () => MIN_EDITOR_H,
+        getMinHeight: () => MIN_EDITOR_H + DOM_WIDGET_CHROME,
+        getHeight: () => MIN_EDITOR_H + DOM_WIDGET_CHROME,
       });
 
       const origResize = this.onResize;
@@ -190,7 +196,8 @@ comfyApp.registerExtension({
       instance = vueApp.mount(container) as any;
 
       const PREVIEW_AR = 200 / 320;
-      const heightFor = (width: number) => Math.round(width * PREVIEW_AR) + barH;
+      const heightFor = (width: number) =>
+        Math.round(width * PREVIEW_AR) + barH + DOM_WIDGET_CHROME;
 
       this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
         getValue: () => "",
@@ -302,7 +309,8 @@ comfyApp.registerExtension({
       instance = vueApp.mount(container) as any;
 
       const PREVIEW_AR = 210 / 320;
-      const heightFor = (width: number) => Math.round(width * PREVIEW_AR) + barH;
+      const heightFor = (width: number) =>
+        Math.round(width * PREVIEW_AR) + barH + DOM_WIDGET_CHROME;
 
       this.addDOMWidget("preview_editor", "NKD_GRADIENT_PREVIEW", container, {
         getValue: () => handlesWidget.value,
@@ -412,7 +420,8 @@ comfyApp.registerExtension({
       });
       instance = vueApp.mount(container) as any;
 
-      const heightFor = (width: number) => Math.round(width * RAMP_CANVAS_AR) + barH;
+      const heightFor = (width: number) =>
+        Math.round(width * RAMP_CANVAS_AR) + barH + DOM_WIDGET_CHROME;
 
       this.addDOMWidget("ramp_editor", "NKD_RAMP_EDITOR", container, {
         getValue: () => rampWidget.value,

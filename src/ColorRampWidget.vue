@@ -461,8 +461,11 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
 }
 .nkd-canvas {
   width: 100%;
+  aspect-ratio: 380 / 64;
+  height: auto;
   display: block;
   cursor: crosshair;
+  flex: 0 0 auto;
 }
 .nkd-color-input {
   position: absolute;
@@ -472,6 +475,7 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
   pointer-events: none;
 }
 .nkd-bar {
+  flex: 1 0 auto;
   background: var(--comfy-menu-bg, #1a1c22);
   border-top: 1px solid var(--border-color, #2a2d36);
 }

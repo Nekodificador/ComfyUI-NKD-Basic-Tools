@@ -413,10 +413,14 @@ defineExpose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
 }
 .nkd-canvas {
   width: 100%;
+  aspect-ratio: 320 / 210;
+  height: auto;
   display: block;
   cursor: default;
+  flex: 0 0 auto;
 }
 .nkd-bar {
+  flex: 1 0 auto;
   background: var(--comfy-menu-bg, #1a1c22);
   border-top: 1px solid var(--border-color, #2a2d36);
 }
