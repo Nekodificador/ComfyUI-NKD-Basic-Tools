@@ -32,15 +32,25 @@ const MODE_WIDGETS = {
 };
 const ALL_MODE_WIDGETS = [...new Set(Object.values(MODE_WIDGETS).flat())];
 
+const REGION_WIDGETS = ["region_min_area", "max_regions", "region_order"];
+
 function updateVisibility(node) {
   const mode = node.widgets?.find((w) => w.name === "resize_mode")?.value;
   const visible = MODE_WIDGETS[mode] ?? MODE_WIDGETS["Automatic"];
+  const separate = node.widgets?.find((w) => w.name === "separate_regions")?.value;
   let found = false;
   for (const name of ALL_MODE_WIDGETS) {
     const w = node.widgets?.find((x) => x.name === name);
     if (!w) continue;
     found = true;
     if (visible.includes(name)) showWidget(w);
+    else hideWidget(w);
+  }
+  for (const name of REGION_WIDGETS) {
+    const w = node.widgets?.find((x) => x.name === name);
+    if (!w) continue;
+    found = true;
+    if (separate) showWidget(w);
     else hideWidget(w);
   }
   if (found) refreshNode(node);
@@ -67,6 +77,7 @@ app.registerExtension({
     nodeType.prototype.onNodeCreated = function () {
       const r = origCreated?.apply(this, arguments);
       wrapCb(this, "resize_mode", updateVisibility);
+      wrapCb(this, "separate_regions", updateVisibility);
       requestAnimationFrame(() => updateVisibility(this));
       const origConfigure = this.onConfigure;
       // Saved workflows restore widget values after creation — re-apply there.

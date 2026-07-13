@@ -7,8 +7,8 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from helpers import (_alpha_hardness, _box_preview, _crop_by_mask, _mask_fill_holes,
-                     _mask_grow, _megapixels_to_pixels, _post_blend, _uncrop,
-                     _VAE_MULTIPLE)
+                     _mask_grow, _megapixels_to_pixels, _post_blend, _separate_regions,
+                     _uncrop, _VAE_MULTIPLE)
 
 
 def demo():
@@ -108,6 +108,45 @@ def demo():
     err_before = (comp[region] - image[region]).abs().sum()
     err_after = (matched[region] - image[region]).abs().sum()
     assert err_after < err_before
+
+    # --- Region separation + chained stitch ---
+    multi = torch.zeros(1, H, W)
+    multi[:, 100:300, 100:400] = 1.0    # big blob, left
+    multi[:, 400:480, 600:700] = 1.0    # small blob, right
+    multi[:, 10:12, 10:12] = 1.0        # speck → filtered by min_area
+
+    regs = _separate_regions(multi, 0.001, 8, "Largest First")
+    assert len(regs) == 2                                    # speck dropped
+    assert regs[0].sum() > regs[1].sum()                     # largest first
+    regs_lr = _separate_regions(multi, 0.001, 8, "Left to Right")
+    assert regs_lr[0][200, 200] > 0.5                        # left blob first
+    assert len(_separate_regions(multi, 0.001, 1, "Largest First")) == 1  # cap
+
+    # Pre-separated batch input passes through filter/sort.
+    pre = torch.stack([regs[1], regs[0]], dim=0)
+    regs_pre = _separate_regions(pre, 0.001, 8, "Largest First")
+    assert len(regs_pre) == 2 and regs_pre[0].sum() > regs_pre[1].sum()
+
+    # Chain: crop each region, paint solid, stitch sequentially onto one image.
+    grown = _mask_grow(torch.stack(regs, dim=0), 10, 8)
+    out_chain = image.clone()
+    for i in range(grown.shape[0]):
+        rm = grown[i:i + 1]
+        rcrop, _, rbox, rorig = _crop_by_mask(image, rm, 30, _megapixels_to_pixels(0.25))
+        rpatch = torch.zeros_like(rcrop)
+        rpatch[..., 1] = 1.0  # green
+        rx1, ry1, rx2, ry2 = rbox
+        rmask_sliced = rm[:, ry1:ry2, rx1:rx2]  # region-sized mask, as the node bundles it
+        out_chain, _ = _uncrop(rpatch, out_chain, rbox, rorig, rmask_sliced, feather=5)
+    assert out_chain.shape == image.shape
+    assert out_chain[0, 200, 250, 1] > 0.9    # big blob detailed
+    assert out_chain[0, 440, 650, 1] > 0.9    # small blob detailed
+    assert torch.equal(out_chain[:, 550:, :50, :], image[:, 550:, :50, :])  # rest intact
+
+    # Region-sized mask must equal full-res mask path in _uncrop.
+    a1, _ = _uncrop(rpatch, image, rbox, rorig, rm, feather=5)
+    a2, _ = _uncrop(rpatch, image, rbox, rorig, rmask_sliced, feather=5)
+    assert torch.allclose(a1, a2)
 
     print("crop/stitch self-check OK — box:", box, "crop:", tuple(crop.shape))
 

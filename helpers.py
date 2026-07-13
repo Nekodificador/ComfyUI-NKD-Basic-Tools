@@ -100,6 +100,47 @@ def _mask_grow(mask: torch.Tensor, expand: int, blur: int) -> torch.Tensor:
     return m.squeeze(1).to(orig_device)
 
 
+def _separate_regions(mask: torch.Tensor, min_area_frac: float, max_regions: int,
+                      order: str) -> list:
+    """Split a mask into individual region masks for chained detailing.
+
+    mask [B, H, W]: B > 1 is treated as pre-separated regions (e.g. the
+    per-object batch from NKD Segment Map); B == 1 is split by 8-connected
+    components. Soft values are preserved within each component. Regions
+    smaller than min_area_frac (fraction of image area) are dropped; the rest
+    are sorted by `order` and capped at max_regions."""
+    if mask.shape[0] > 1:
+        comps = [mask[i] for i in range(mask.shape[0])]
+    else:
+        from scipy.ndimage import label  # ships with ComfyUI core
+        binary = (mask[0] > 0.5).cpu().numpy()
+        labeled, n = label(binary, structure=np.ones((3, 3)))
+        comps = []
+        for i in range(1, n + 1):
+            comp = torch.from_numpy(labeled == i).to(mask.device)
+            comps.append(mask[0] * comp)
+
+    h, w = mask.shape[1], mask.shape[2]
+    min_px = max(1.0, min_area_frac * h * w)
+    stats = []
+    for c in comps:
+        binary = c > 0.5
+        area = int(binary.sum().item())
+        if area < min_px:
+            continue
+        ys, xs = torch.nonzero(binary, as_tuple=True)
+        stats.append((c, area, float(xs.float().mean()), float(ys.float().mean())))
+    if not stats:
+        return []
+    if order == "Left to Right":
+        stats.sort(key=lambda s: s[2])
+    elif order == "Top to Bottom":
+        stats.sort(key=lambda s: s[3])
+    else:  # Largest First
+        stats.sort(key=lambda s: -s[1])
+    return [s[0] for s in stats[:max_regions]]
+
+
 def _mask_fill_holes(mask: torch.Tensor) -> torch.Tensor:
     """Fill fully-enclosed holes in the mask (regions of 0 not connected to the
     border). Soft edge values are preserved — only the holes are set to 1."""
@@ -386,11 +427,12 @@ def _crop_by_mask(
 
 
 def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
-                 box: Tuple[int, int, int, int], max_side: int = 768) -> torch.Tensor:
+                 boxes, max_side: int = 768) -> torch.Tensor:
     """Render an in-node preview: original with the mask tinted in the NKD
-    accent color, everything outside the crop box dimmed, and the box outlined.
-    First batch item only, downscaled to keep the payload small."""
-    x1, y1, x2, y2 = box
+    accent color, everything outside the crop box(es) dimmed, and each box
+    outlined. First batch item only, downscaled to keep the payload small."""
+    if isinstance(boxes, tuple):
+        boxes = [boxes]
     img = image[:1, :, :, :3].clone()
     _, h, w, _ = img.shape
     accent = torch.tensor([0.29, 0.706, 1.0], device=img.device, dtype=img.dtype)
@@ -401,14 +443,16 @@ def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
         img[0] = img[0] * (1.0 - a) + accent * a
 
     dim = torch.full((h, w, 1), 0.45, device=img.device, dtype=img.dtype)
-    dim[y1:y2, x1:x2] = 1.0
+    for x1, y1, x2, y2 in boxes:
+        dim[y1:y2, x1:x2] = 1.0
     img[0] = img[0] * dim
 
     t = max(2, min(h, w) // 300)
-    img[0, y1:min(y1 + t, h), x1:x2] = accent
-    img[0, max(y2 - t, 0):y2, x1:x2] = accent
-    img[0, y1:y2, x1:min(x1 + t, w)] = accent
-    img[0, y1:y2, max(x2 - t, 0):x2] = accent
+    for x1, y1, x2, y2 in boxes:
+        img[0, y1:min(y1 + t, h), x1:x2] = accent
+        img[0, max(y2 - t, 0):y2, x1:x2] = accent
+        img[0, y1:y2, x1:min(x1 + t, w)] = accent
+        img[0, y1:y2, max(x2 - t, 0):x2] = accent
 
     if max(h, w) > max_side:
         scale = max_side / max(h, w)
@@ -452,11 +496,15 @@ def _uncrop(
 
     if mask is not None:
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
-        # The mask is already in background coords — slice directly and avoid a
-        # second resize. Only resize if the slice shape disagrees (defensive).
-        region_mask = m[:, y1:y2, x1:x2]
-        if region_mask.shape[1] != crop_h or region_mask.shape[2] != crop_w:
-            region_mask = _resize_mask(region_mask, crop_w, crop_h)
+        # The mask can arrive already region-sized (chained detail bundles) or
+        # in background coords — slice only in the latter case, and resize only
+        # if the shapes still disagree (defensive).
+        if m.shape[1] == crop_h and m.shape[2] == crop_w:
+            region_mask = m
+        else:
+            region_mask = m[:, y1:y2, x1:x2]
+            if region_mask.shape[1] != crop_h or region_mask.shape[2] != crop_w:
+                region_mask = _resize_mask(region_mask, crop_w, crop_h)
         if feather > 0:
             region_mask = _mask_grow(region_mask, 0, feather)
         region_mask = _alpha_hardness(region_mask, hardness)

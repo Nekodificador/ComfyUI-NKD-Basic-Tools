@@ -35,6 +35,16 @@ Load Image ─┬─▶ 😺NKD Inpaint Crop ─▶ image/mask ─▶ (your samp
   are matched exactly, so the restore is a single symmetric scale — no drift,
   no sub-pixel bevel on the composite.
 
+**Chained detailing (`separate_regions`)**
+
+Turn on `separate_regions` and the mask is split into individual regions
+(connected components — or one region per mask when a mask batch, e.g. from a
+segmentation node, is connected). Crop then emits **one crop per region as a
+list**: your sampler nodes run once per region automatically (no extra wiring),
+and Stitch composites every detailed region back onto the original in a single
+pass. `region_min_area`, `max_regions` and `region_order` (largest first /
+left-to-right / top-to-bottom) control the chain.
+
 **Stitch**
 
 - `feather` — extra edge feathering on composite.
