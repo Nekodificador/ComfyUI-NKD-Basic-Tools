@@ -79,6 +79,7 @@ class NKDInpaintCrop(io.ComfyNode):
                 "resample the crop to a megapixel budget for sampling. "
                 "Connect crop_data to 😺NKD Inpaint Stitch to composite back."
             ),
+            is_output_node=True,
             inputs=[
                 io.Model.Input("model", optional=True,
                                tooltip="Optional. When connected, the model output comes back "
