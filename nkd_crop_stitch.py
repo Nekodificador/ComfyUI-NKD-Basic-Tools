@@ -115,12 +115,12 @@ class NKDInpaintCrop(io.ComfyNode):
                 io.Model.Output(display_name="model",
                                 tooltip="Model patched with Differential Diffusion. "
                                         "Requires model."),
-                io.Latent.Output(display_name="latent",
-                                 tooltip="Encoded crop with noise_mask set. Requires vae."),
                 io.Image.Output(display_name="image",
                                 tooltip="Cropped region, resampled to the megapixel budget."),
                 io.Mask.Output(display_name="mask",
                                tooltip="Processed mask cropped to the same region."),
+                io.Latent.Output(display_name="latent",
+                                 tooltip="Encoded crop with noise_mask set. Requires vae."),
                 NKDCropDataType.Output("crop_data",
                                        tooltip="Everything Stitch needs to composite back."),
             ],
@@ -157,7 +157,7 @@ class NKDInpaintCrop(io.ComfyNode):
             original_size=orig_size,
             mask=processed.cpu(),
         )
-        return io.NodeOutput(patched_model, latent, crop_img, crop_mask, data)
+        return io.NodeOutput(patched_model, crop_img, crop_mask, latent, data)
 
 
 class NKDInpaintStitch(io.ComfyNode):
