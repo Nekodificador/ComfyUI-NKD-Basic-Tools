@@ -5,6 +5,7 @@ import { app as comfyApp } from "../../scripts/app.js";
 import { createApp } from "vue";
 import PromptVariablesWidget from "./PromptVariablesWidget.vue";
 import ColorRampWidget from "./ColorRampWidget.vue";
+import GradientPreviewWidget from "./GradientPreviewWidget.vue";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -138,6 +139,123 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(varsTimer);
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Gradient Generate — interactive on-canvas gradient handles (Photoshop-
+// style drag), registered BEFORE the color-ramp extension below so its widget
+// ends up wrapping the raw onNodeCreated first — the ramp bar's addDOMWidget
+// call then runs after, placing the preview visually ABOVE the ramp bar.
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.GradientPreview.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDGradientGenerate") return;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const handlesWidget = this.widgets?.find((w: any) => w.name === "handles");
+      if (!handlesWidget) return result;
+      handlesWidget.type = "hidden";
+      handlesWidget.hidden = true;
+      if (handlesWidget.options) handlesWidget.options.hidden = true;
+      handlesWidget.computedHeight = 0;
+      handlesWidget.computeSize = () => [0, -4];
+
+      const container = document.createElement("div");
+      let barH = 34;
+
+      const getRamp = () => this.widgets?.find((w: any) => w.name === "ramp")?.value ?? "{}";
+      const getShape = () => this.widgets?.find((w: any) => w.name === "shape")?.value ?? "Linear";
+      const getSize = (): [number, number] => [
+        Number(this.widgets?.find((w: any) => w.name === "width")?.value) || 1024,
+        Number(this.widgets?.find((w: any) => w.name === "height")?.value) || 1024,
+      ];
+
+      let instance: any = null;
+      const vueApp = createApp(GradientPreviewWidget, {
+        onChange: (json: string) => {
+          if (handlesWidget.value !== json) handlesWidget.value = json;
+        },
+        getRamp,
+        getShape,
+        getSize,
+      });
+      instance = vueApp.mount(container) as any;
+
+      const PREVIEW_AR = 210 / 320;
+      const heightFor = (width: number) => Math.round(width * PREVIEW_AR) + barH;
+
+      this.addDOMWidget("preview_editor", "NKD_GRADIENT_PREVIEW", container, {
+        getValue: () => handlesWidget.value,
+        setValue: (v: string) => {
+          handlesWidget.value = v;
+          instance?.deserialise(v ?? "");
+        },
+        serialize: false,
+        hideOnZoom: false,
+        getMinHeight: () => heightFor(this.size?.[0] || 320),
+        getMaxHeight: () => heightFor(this.size?.[0] || 320),
+        getHeight: () => heightFor(this.size?.[0] || 320),
+      });
+
+      const origResize = this.onResize;
+      this.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < 320) size[0] = 320;
+        size[1] = this.computeSize(size[0])[1];
+      };
+
+      const origComputeSize = this.computeSize.bind(this);
+      this.computeSize = function (_w?: number) {
+        const sz = origComputeSize();
+        const width = sz[0] || this.size[0];
+        const needed = heightFor(width);
+        if (sz[1] < needed) sz[1] = needed;
+        return sz;
+      };
+
+      let v1NeedsInit = true;
+      const origDrawBg = this.onDrawBackground;
+      this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
+        origDrawBg?.apply(this, arguments);
+        if (v1NeedsInit && instance?.forceResize?.()) v1NeedsInit = false;
+      };
+      // Poll for ramp edits (other widget) and shape-combo changes.
+      const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 400);
+
+      requestAnimationFrame(() => {
+        const barEl = container.querySelector(".nkd-bar");
+        const measured = barEl ? Math.ceil((barEl as HTMLElement).getBoundingClientRect().height) : 0;
+        if (measured > 0) barH = measured;
+        instance?.deserialise(handlesWidget.value ?? "");
+        if (instance?.forceResize?.()) v1NeedsInit = false;
+        const sz = this.computeSize(this.size[0]);
+        this.setSize(sz);
+        this.setDirtyCanvas(true, true);
+      });
+
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        requestAnimationFrame(() => {
+          instance?.deserialise(handlesWidget.value ?? "");
+          if (instance?.forceResize?.()) v1NeedsInit = false;
+        });
+        return r;
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        window.clearInterval(refreshTimer);
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);

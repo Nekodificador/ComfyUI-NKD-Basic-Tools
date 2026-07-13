@@ -79,8 +79,11 @@ ramp, lights on the other — the classic duotone / color-grading look, with an
 `Invert` toggle and a `Strength` slider to dial it back.
 
 **Gradient Generate** creates a gradient image from scratch — Linear, Radial,
-Angular (conic) or Diamond — with angle and center controls. No reference
-image needed; wire its output anywhere an image is expected.
+Angular (conic) or Diamond — with a Photoshop-style on-canvas gizmo: drag the
+two handles directly on the live preview to set direction, center and extent
+instead of dialing in numbers. Switching shape resets the handles to a sensible
+default for that shape. No reference image needed; wire its output anywhere an
+image is expected.
 
 Both draw a live preview in the node as you edit the ramp.
 

@@ -6357,9 +6357,9 @@ function normalizeContainer(container) {
   }
   return container;
 }
-const _hoisted_1$1 = { class: "nkd-pv-bar" };
-const _hoisted_2$1 = ["title", "onClick"];
-const _sfc_main$1 = /* @__PURE__ */ defineComponent({
+const _hoisted_1$2 = { class: "nkd-pv-bar" };
+const _hoisted_2$2 = ["title", "onClick"];
+const _sfc_main$2 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function }
@@ -6585,14 +6585,14 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$1, [
+        createBaseVNode("div", _hoisted_1$2, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
               class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
-            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$1);
+            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$2);
           }), 128))
         ])
       ], 32);
@@ -6606,27 +6606,27 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-56fcf56b"]]);
-const _hoisted_1 = { class: "nkd-bar" };
-const _hoisted_2 = { class: "nkd-row nkd-row--controls" };
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-56fcf56b"]]);
+const _hoisted_1$1 = { class: "nkd-bar" };
+const _hoisted_2$1 = { class: "nkd-row nkd-row--controls" };
 const _hoisted_3 = { class: "nkd-row nkd-row--presets" };
 const _hoisted_4 = ["value"];
 const _hoisted_5 = ["value"];
 const _hoisted_6 = ["disabled"];
 const CW = 380, CH = 64;
-const HIT_R = 10;
-const MIN_RENDER_SCALE = 2;
-const _sfc_main = /* @__PURE__ */ defineComponent({
+const HIT_R$1 = 10;
+const MIN_RENDER_SCALE$1 = 2;
+const _sfc_main$1 = /* @__PURE__ */ defineComponent({
   __name: "ColorRampWidget",
   props: {
     onChange: { type: Function }
   },
   setup(__props, { expose: __expose }) {
     const props = __props;
-    const PAD = { top: 12, right: 16, bottom: 12, left: 16 };
-    const IW = CW - PAD.left - PAD.right;
-    const BAR_Y = PAD.top;
-    const BAR_H = CH - PAD.top - PAD.bottom;
+    const PAD2 = { top: 12, right: 16, bottom: 12, left: 16 };
+    const IW = CW - PAD2.left - PAD2.right;
+    const BAR_Y = PAD2.top;
+    const BAR_H = CH - PAD2.top - PAD2.bottom;
     const BAR_MID = BAR_Y + BAR_H / 2;
     const C = {
       bg: "#111318",
@@ -6652,10 +6652,10 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       return /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : "#000000";
     }
     function toCanvasX(pos) {
-      return PAD.left + pos * IW;
+      return PAD2.left + pos * IW;
     }
     function fromCanvasX(x) {
-      return clamp01((x - PAD.left) / IW);
+      return clamp01((x - PAD2.left) / IW);
     }
     function eventToLogical(e) {
       const rect = canvas.value.getBoundingClientRect();
@@ -6666,7 +6666,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     }
     function stopAt(x) {
       let best = null;
-      let bestDist = HIT_R;
+      let bestDist = HIT_R$1;
       for (const s of stops.value) {
         const d = Math.abs(toCanvasX(s.pos) - x);
         if (d <= bestDist) {
@@ -6681,8 +6681,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE);
-      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE);
+      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$1);
+      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$1);
       const newW = Math.round(CW * sx), newH = Math.round(CH * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -6698,14 +6698,14 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       ctx.clearRect(0, 0, CW, CH);
       ctx.fillStyle = C.bg;
       ctx.fillRect(0, 0, CW, CH);
-      const grad = ctx.createLinearGradient(PAD.left, 0, PAD.left + IW, 0);
+      const grad = ctx.createLinearGradient(PAD2.left, 0, PAD2.left + IW, 0);
       for (const s of stops.value) grad.addColorStop(s.pos, s.color);
       ctx.fillStyle = grad;
-      roundRectPath(PAD.left, BAR_Y, IW, BAR_H, 5);
+      roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.fill();
       ctx.strokeStyle = C.gridBorder;
       ctx.lineWidth = 0.75;
-      roundRectPath(PAD.left, BAR_Y, IW, BAR_H, 5);
+      roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.stroke();
       for (const s of stops.value) {
         const x = toCanvasX(s.pos);
@@ -6782,7 +6782,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         activeStop = hit;
         dragOffsetX = hit.pos - fromCanvasX(x);
         dragging = true;
-      } else if (y >= BAR_Y - HIT_R && y <= BAR_Y + BAR_H + HIT_R) {
+      } else if (y >= BAR_Y - HIT_R$1 && y <= BAR_Y + BAR_H + HIT_R$1) {
         const pos = fromCanvasX(x);
         const newStop = { pos, color: sampleColorAt(pos) };
         stops.value.push(newStop);
@@ -6968,8 +6968,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onLeave, ["stop"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1, [
-          createBaseVNode("div", _hoisted_2, [
+        createBaseVNode("div", _hoisted_1$1, [
+          createBaseVNode("div", _hoisted_2$1, [
             _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: pick color · Shift+click: delete · drag: move", -1)),
             _cache[6] || (_cache[6] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("button", {
@@ -7014,7 +7014,352 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-f2c94812"]]);
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-f2c94812"]]);
+const _hoisted_1 = { class: "nkd-bar" };
+const _hoisted_2 = { class: "nkd-hint" };
+const BOX_W = 320, BOX_H = 210, PAD = 14;
+const HIT_R = 11;
+const MIN_RENDER_SCALE = 2;
+const DIAMOND_RES = 96;
+const _sfc_main = /* @__PURE__ */ defineComponent({
+  __name: "GradientPreviewWidget",
+  props: {
+    onChange: { type: Function },
+    getRamp: { type: Function },
+    getShape: { type: Function },
+    getSize: { type: Function }
+  },
+  setup(__props, { expose: __expose }) {
+    const props = __props;
+    const SHAPE_DEFAULTS = {
+      Linear: { p0: [0, 0.5], p1: [1, 0.5] },
+      Radial: { p0: [0.5, 0.5], p1: [1, 0.5] },
+      Angular: { p0: [0.5, 0.5], p1: [1, 0.5] },
+      Diamond: { p0: [0.5, 0.5], p1: [1, 1] }
+      // diagonal — a horizontal drag degenerates to a sliver
+    };
+    const HANDLE_LABELS = {
+      Linear: ["Start", "End"],
+      Radial: ["Center", "Edge"],
+      Angular: ["Center", "Angle"],
+      Diamond: ["Center", "Edge"]
+    };
+    const canvas = /* @__PURE__ */ ref(null);
+    let ctx = null;
+    let ro = null;
+    let dpr = window.devicePixelRatio || 1;
+    const p0 = /* @__PURE__ */ ref([0, 0.5]);
+    const p1 = /* @__PURE__ */ ref([1, 0.5]);
+    const hintText = /* @__PURE__ */ ref("Drag the handles to set direction");
+    let lastShape = null;
+    let dragging = null;
+    let hover = null;
+    let fitX = PAD, fitY = PAD, fitW = BOX_W - PAD * 2, fitH = BOX_H - PAD * 2;
+    function toPx(pt) {
+      return [fitX + pt[0] * fitW, fitY + pt[1] * fitH];
+    }
+    function fromPx(x, y) {
+      return [
+        Math.max(0, Math.min(1, (x - fitX) / fitW)),
+        Math.max(0, Math.min(1, (y - fitY) / fitH))
+      ];
+    }
+    function eventToLogical(e) {
+      const rect = canvas.value.getBoundingClientRect();
+      return [(e.clientX - rect.left) * (BOX_W / rect.width), (e.clientY - rect.top) * (BOX_H / rect.height)];
+    }
+    function parseRamp() {
+      try {
+        const data = JSON.parse(props.getRamp());
+        if (Array.isArray(data.stops) && data.stops.length >= 2) {
+          return [...data.stops].sort((a, b) => a.pos - b.pos);
+        }
+      } catch {
+      }
+      return [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
+    }
+    function syncCanvasSize() {
+      const c = canvas.value;
+      if (!c) return false;
+      const rect = c.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return false;
+      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE);
+      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE);
+      const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
+      if (c.width !== newW || c.height !== newH) {
+        c.width = newW;
+        c.height = newH;
+        ctx = c.getContext("2d");
+        ctx == null ? void 0 : ctx.setTransform(sx, 0, 0, sy, 0, 0);
+      }
+      redraw();
+      return true;
+    }
+    function computeFitRect() {
+      const [w, h] = props.getSize();
+      const aspect = w > 0 && h > 0 ? w / h : 1;
+      const maxW = BOX_W - PAD * 2, maxH = BOX_H - PAD * 2;
+      let fw = maxW, fh = maxW / aspect;
+      if (fh > maxH) {
+        fh = maxH;
+        fw = maxH * aspect;
+      }
+      fitX = PAD + (maxW - fw) / 2;
+      fitY = PAD + (maxH - fh) / 2;
+      fitW = fw;
+      fitH = fh;
+    }
+    function buildFill(shape, stops, a, b) {
+      if (!ctx) return null;
+      if (shape === "Radial") {
+        const r = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), 1);
+        const g2 = ctx.createRadialGradient(a[0], a[1], 0, a[0], a[1], r);
+        stops.forEach((s) => g2.addColorStop(s.pos, s.color));
+        return g2;
+      }
+      if (shape === "Angular" && "createConicGradient" in ctx) {
+        const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+        const g2 = ctx.createConicGradient(angle, a[0], a[1]);
+        stops.forEach((s) => g2.addColorStop(s.pos, s.color));
+        return g2;
+      }
+      if (shape === "Diamond") return null;
+      const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
+      stops.forEach((s) => g.addColorStop(s.pos, s.color));
+      return g;
+    }
+    function hexToRgb(hex) {
+      return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    }
+    function sampleRamp(stops, t) {
+      t = Math.max(0, Math.min(1, t));
+      if (t <= stops[0].pos) return hexToRgb(stops[0].color);
+      const last = stops[stops.length - 1];
+      if (t >= last.pos) return hexToRgb(last.color);
+      for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i], b = stops[i + 1];
+        if (t >= a.pos && t <= b.pos) {
+          const f = (t - a.pos) / Math.max(1e-6, b.pos - a.pos);
+          const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+          return [r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f];
+        }
+      }
+      return hexToRgb(stops[0].color);
+    }
+    let diamondCanvas = null;
+    function drawDiamond(stops, a, b) {
+      if (!ctx) return;
+      const aspect = fitW / fitH;
+      const dw = DIAMOND_RES, dh = Math.max(1, Math.round(DIAMOND_RES / aspect));
+      if (!diamondCanvas) diamondCanvas = document.createElement("canvas");
+      diamondCanvas.width = dw;
+      diamondCanvas.height = dh;
+      const dctx = diamondCanvas.getContext("2d");
+      const img = dctx.createImageData(dw, dh);
+      const p0n = [(a[0] - fitX) / fitW, (a[1] - fitY) / fitH];
+      const p1n = [(b[0] - fitX) / fitW, (b[1] - fitY) / fitH];
+      const ex = Math.max(Math.abs(p1n[0] - p0n[0]), 1e-4);
+      const ey = Math.max(Math.abs(p1n[1] - p0n[1]), 1e-4);
+      for (let py = 0; py < dh; py++) {
+        const ny = (py + 0.5) / dh;
+        for (let px = 0; px < dw; px++) {
+          const nx = (px + 0.5) / dw;
+          const t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
+          const [r, g, bch] = sampleRamp(stops, t);
+          const i = (py * dw + px) * 4;
+          img.data[i] = r;
+          img.data[i + 1] = g;
+          img.data[i + 2] = bch;
+          img.data[i + 3] = 255;
+        }
+      }
+      dctx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(diamondCanvas, fitX, fitY, fitW, fitH);
+    }
+    function redraw() {
+      if (!ctx) return;
+      computeFitRect();
+      ctx.clearRect(0, 0, BOX_W, BOX_H);
+      ctx.fillStyle = "#111318";
+      ctx.fillRect(0, 0, BOX_W, BOX_H);
+      const shape = props.getShape() || "Linear";
+      const stops = parseRamp();
+      const a = toPx(p0.value), b = toPx(p1.value);
+      const fill = buildFill(shape, stops, a, b);
+      if (fill) {
+        ctx.fillStyle = fill;
+        ctx.fillRect(fitX, fitY, fitW, fitH);
+      } else {
+        drawDiamond(stops, a, b);
+      }
+      ctx.strokeStyle = "rgba(255,255,255,0.16)";
+      ctx.lineWidth = 0.75;
+      ctx.strokeRect(fitX + 0.5, fitY + 0.5, fitW - 1, fitH - 1);
+      ctx.beginPath();
+      ctx.moveTo(a[0], a[1]);
+      ctx.lineTo(b[0], b[1]);
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = "rgba(255,255,255,0.55)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const labels = HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear;
+      drawHandle(a, "p0", labels[0]);
+      drawHandle(b, "p1", labels[1]);
+    }
+    function drawHandle(pos, which, label) {
+      if (!ctx) return;
+      const isDrag = dragging === which;
+      const isHover = hover === which;
+      const r = isDrag ? 7 : isHover ? 6 : 5;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 5;
+      ctx.shadowOffsetY = 1;
+      ctx.beginPath();
+      ctx.arc(pos[0], pos[1], r, 0, Math.PI * 2);
+      ctx.fillStyle = which === "p0" ? "#4ab4ff" : "#ffd166";
+      ctx.fill();
+      ctx.restore();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(0,0,0,0.65)";
+      ctx.stroke();
+      ctx.font = "9px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      ctx.textAlign = pos[0] > BOX_W - 40 ? "right" : "left";
+      ctx.fillText(label, pos[0] + (ctx.textAlign === "right" ? -r - 4 : r + 4), pos[1] + 3);
+    }
+    function hitTest(x, y) {
+      const a = toPx(p0.value), b = toPx(p1.value);
+      const da = Math.hypot(a[0] - x, a[1] - y);
+      const db = Math.hypot(b[0] - x, b[1] - y);
+      if (da <= HIT_R && da <= db) return "p0";
+      if (db <= HIT_R) return "p1";
+      return null;
+    }
+    function onDown(e) {
+      const [x, y] = eventToLogical(e);
+      dragging = hitTest(x, y);
+      redraw();
+    }
+    function onMove(e) {
+      const [x, y] = eventToLogical(e);
+      if (dragging) {
+        const target = dragging === "p0" ? p0 : p1;
+        target.value = fromPx(x, y);
+        emitChange();
+        redraw();
+        return;
+      }
+      const prevHover = hover;
+      hover = hitTest(x, y);
+      if (hover !== prevHover) redraw();
+      if (canvas.value) canvas.value.style.cursor = hover ? "grab" : "default";
+    }
+    function onUp() {
+      dragging = null;
+      redraw();
+    }
+    function onLeave() {
+      dragging = null;
+      hover = null;
+      redraw();
+    }
+    function resetHandles() {
+      const shape = props.getShape() || "Linear";
+      const def2 = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
+      p0.value = [...def2.p0];
+      p1.value = [...def2.p1];
+      emitChange();
+      redraw();
+    }
+    let debounceTimer;
+    function emitChange() {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => {
+        props.onChange(JSON.stringify({ p0: p0.value, p1: p1.value }));
+      }, 40);
+    }
+    function serialise() {
+      return JSON.stringify({ p0: p0.value, p1: p1.value });
+    }
+    function deserialise(json) {
+      try {
+        const data = JSON.parse(json);
+        if (Array.isArray(data.p0) && Array.isArray(data.p1)) {
+          p0.value = [Number(data.p0[0]), Number(data.p0[1])];
+          p1.value = [Number(data.p1[0]), Number(data.p1[1])];
+          lastShape = props.getShape();
+          redraw();
+          return;
+        }
+      } catch {
+      }
+      lastShape = props.getShape();
+    }
+    function refreshExternal() {
+      const shape = props.getShape();
+      if (lastShape !== null && shape !== lastShape) {
+        const def2 = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
+        p0.value = [...def2.p0];
+        p1.value = [...def2.p1];
+        emitChange();
+      }
+      lastShape = shape;
+      hintText.value = `Drag ${(HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear).join(" / ")}`;
+      redraw();
+    }
+    function forceResize() {
+      return syncCanvasSize();
+    }
+    function cleanup() {
+      window.clearTimeout(debounceTimer);
+      ro == null ? void 0 : ro.disconnect();
+    }
+    onMounted(() => {
+      var _a;
+      ctx = ((_a = canvas.value) == null ? void 0 : _a.getContext("2d")) ?? null;
+      ro = new ResizeObserver(() => syncCanvasSize());
+      if (canvas.value) ro.observe(canvas.value);
+      syncCanvasSize();
+    });
+    onBeforeUnmount(cleanup);
+    __expose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
+    return (_ctx, _cache) => {
+      return openBlock(), createElementBlock("div", {
+        class: "nkd-root",
+        onMousedown: _cache[0] || (_cache[0] = withModifiers(() => {
+        }, ["stop"])),
+        onMouseup: _cache[1] || (_cache[1] = withModifiers(() => {
+        }, ["stop"])),
+        onMousemove: _cache[2] || (_cache[2] = withModifiers(() => {
+        }, ["stop"])),
+        onContextmenu: _cache[3] || (_cache[3] = withModifiers(() => {
+        }, ["prevent"]))
+      }, [
+        createBaseVNode("canvas", {
+          ref_key: "canvas",
+          ref: canvas,
+          class: "nkd-canvas",
+          onMousedown: withModifiers(onDown, ["stop", "prevent"]),
+          onMousemove: withModifiers(onMove, ["stop"]),
+          onMouseup: withModifiers(onUp, ["stop"]),
+          onMouseleave: withModifiers(onLeave, ["stop"])
+        }, null, 544),
+        createBaseVNode("div", _hoisted_1, [
+          createBaseVNode("span", _hoisted_2, toDisplayString(hintText.value), 1),
+          _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+          createBaseVNode("button", {
+            class: "nkd-btn",
+            onClick: withModifiers(resetHandles, ["stop"])
+          }, "Reset")
+        ])
+      ], 32);
+    };
+  }
+});
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-a6c8c95d"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -7120,6 +7465,129 @@ app.registerExtension({
       this.onRemoved = function() {
         var _a2;
         window.clearInterval(varsTimer);
+        (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
+        vueApp.unmount();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
+app.registerExtension({
+  name: "NKD.BasicTools.GradientPreview.Vue",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDGradientGenerate") return;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      var _a;
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const handlesWidget = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "handles");
+      if (!handlesWidget) return result;
+      handlesWidget.type = "hidden";
+      handlesWidget.hidden = true;
+      if (handlesWidget.options) handlesWidget.options.hidden = true;
+      handlesWidget.computedHeight = 0;
+      handlesWidget.computeSize = () => [0, -4];
+      const container = document.createElement("div");
+      let barH = 34;
+      const getRamp = () => {
+        var _a2, _b;
+        return ((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "ramp")) == null ? void 0 : _b.value) ?? "{}";
+      };
+      const getShape = () => {
+        var _a2, _b;
+        return ((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "shape")) == null ? void 0 : _b.value) ?? "Linear";
+      };
+      const getSize = () => {
+        var _a2, _b, _c, _d;
+        return [
+          Number((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "width")) == null ? void 0 : _b.value) || 1024,
+          Number((_d = (_c = this.widgets) == null ? void 0 : _c.find((w) => w.name === "height")) == null ? void 0 : _d.value) || 1024
+        ];
+      };
+      let instance = null;
+      const vueApp = createApp(GradientPreviewWidget, {
+        onChange: (json) => {
+          if (handlesWidget.value !== json) handlesWidget.value = json;
+        },
+        getRamp,
+        getShape,
+        getSize
+      });
+      instance = vueApp.mount(container);
+      const PREVIEW_AR = 210 / 320;
+      const heightFor = (width) => Math.round(width * PREVIEW_AR) + barH;
+      this.addDOMWidget("preview_editor", "NKD_GRADIENT_PREVIEW", container, {
+        getValue: () => handlesWidget.value,
+        setValue: (v) => {
+          handlesWidget.value = v;
+          instance == null ? void 0 : instance.deserialise(v ?? "");
+        },
+        serialize: false,
+        hideOnZoom: false,
+        getMinHeight: () => {
+          var _a2;
+          return heightFor(((_a2 = this.size) == null ? void 0 : _a2[0]) || 320);
+        },
+        getMaxHeight: () => {
+          var _a2;
+          return heightFor(((_a2 = this.size) == null ? void 0 : _a2[0]) || 320);
+        },
+        getHeight: () => {
+          var _a2;
+          return heightFor(((_a2 = this.size) == null ? void 0 : _a2[0]) || 320);
+        }
+      });
+      const origResize = this.onResize;
+      this.onResize = function(size) {
+        origResize == null ? void 0 : origResize.apply(this, arguments);
+        if (size[0] < 320) size[0] = 320;
+        size[1] = this.computeSize(size[0])[1];
+      };
+      const origComputeSize = this.computeSize.bind(this);
+      this.computeSize = function(_w) {
+        const sz = origComputeSize();
+        const width = sz[0] || this.size[0];
+        const needed = heightFor(width);
+        if (sz[1] < needed) sz[1] = needed;
+        return sz;
+      };
+      let v1NeedsInit = true;
+      const origDrawBg = this.onDrawBackground;
+      this.onDrawBackground = function(ctx) {
+        var _a2;
+        origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
+        if (v1NeedsInit && ((_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance))) v1NeedsInit = false;
+      };
+      const refreshTimer = window.setInterval(() => {
+        var _a2;
+        return (_a2 = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a2.call(instance);
+      }, 400);
+      requestAnimationFrame(() => {
+        var _a2;
+        const barEl = container.querySelector(".nkd-bar");
+        const measured = barEl ? Math.ceil(barEl.getBoundingClientRect().height) : 0;
+        if (measured > 0) barH = measured;
+        instance == null ? void 0 : instance.deserialise(handlesWidget.value ?? "");
+        if ((_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance)) v1NeedsInit = false;
+        const sz = this.computeSize(this.size[0]);
+        this.setSize(sz);
+        this.setDirtyCanvas(true, true);
+      });
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        requestAnimationFrame(() => {
+          var _a2;
+          instance == null ? void 0 : instance.deserialise(handlesWidget.value ?? "");
+          if ((_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance)) v1NeedsInit = false;
+        });
+        return r;
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        var _a2;
+        window.clearInterval(refreshTimer);
         (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
         vueApp.unmount();
         origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
@@ -7236,7 +7704,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-f2c94812] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n}\n.nkd-canvas[data-v-f2c94812] {\n  width: 100%;\n  display: block;\n  cursor: crosshair;\n}\n.nkd-color-input[data-v-f2c94812] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-f2c94812] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f2c94812] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f2c94812] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-f2c94812]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-f2c94812] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f2c94812] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-f2c94812] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-f2c94812] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-f2c94812], .nkd-select[data-v-f2c94812] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-f2c94812]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-f2c94812] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n}\n.nkd-canvas[data-v-f2c94812] {\n  width: 100%;\n  display: block;\n  cursor: crosshair;\n}\n.nkd-color-input[data-v-f2c94812] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-f2c94812] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f2c94812] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f2c94812] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-f2c94812]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-f2c94812] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f2c94812] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-f2c94812] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-f2c94812] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-f2c94812], .nkd-select[data-v-f2c94812] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-f2c94812]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-a6c8c95d] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n}\n.nkd-canvas[data-v-a6c8c95d] {\n  width: 100%;\n  display: block;\n  cursor: default;\n}\n.nkd-bar[data-v-a6c8c95d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-spacer[data-v-a6c8c95d] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-a6c8c95d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  white-space: nowrap;\n}\n.nkd-btn[data-v-a6c8c95d] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-a6c8c95d]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

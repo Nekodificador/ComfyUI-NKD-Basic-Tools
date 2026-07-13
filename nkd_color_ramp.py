@@ -6,6 +6,7 @@ works in the other.
 """
 from __future__ import annotations
 import json
+import math
 import os
 import re
 from typing import List, Tuple
@@ -57,6 +58,58 @@ def _sample_ramp(stops: List[Tuple[float, float, float, float]],
     span = (p_hi - p_lo).clamp_min(1e-6)
     frac = ((tc - p_lo) / span).clamp(0.0, 1.0).unsqueeze(-1)
     return colors[lo] + (colors[hi] - colors[lo]) * frac
+
+
+# ---------------------------------------------------------------------------
+# Gradient handles — two points in normalised [0,1] image space, dragged
+# directly on the preview (used by 😺NKD Gradient Generate). Meaning depends
+# on shape:
+#   Linear:  p0 = gradient start, p1 = gradient end
+#   Radial:  p0 = center,         p1 = point where the ramp reaches its end
+#   Angular: p0 = center,         p1 = zero-angle reference direction
+#   Diamond: p0 = center,         p1 = point where the ramp reaches its end
+# ---------------------------------------------------------------------------
+
+_DEFAULT_HANDLES = json.dumps({"p0": [0.0, 0.5], "p1": [1.0, 0.5]})
+
+
+def _parse_handles(handles_json: str):
+    try:
+        data = json.loads(handles_json) if handles_json else {}
+        p0, p1 = data["p0"], data["p1"]
+        return (float(p0[0]), float(p0[1])), (float(p1[0]), float(p1[1]))
+    except (ValueError, KeyError, TypeError, IndexError, json.JSONDecodeError):
+        return (0.0, 0.5), (1.0, 0.5)
+
+
+def _position_field(shape: str, width: int, height: int, p0, p1, device) -> torch.Tensor:
+    """Returns a [H, W] tensor in [0, 1] describing where each pixel falls
+    along the gradient defined by handles p0->p1, per shape."""
+    ys = torch.linspace(0.0, 1.0, height, device=device).view(height, 1).expand(height, width)
+    xs = torch.linspace(0.0, 1.0, width, device=device).view(1, width).expand(height, width)
+    dx, dy = xs - p0[0], ys - p0[1]
+    ex, ey = p1[0] - p0[0], p1[1] - p0[1]
+
+    if shape == "Radial":
+        radius = max(math.hypot(ex, ey), 1e-4)
+        return (torch.hypot(dx, dy) / radius).clamp(0.0, 1.0)
+
+    if shape == "Angular":
+        ref = math.atan2(ey, ex)
+        theta = torch.atan2(dy, dx) - ref
+        return (theta / (2 * math.pi)) % 1.0
+
+    if shape == "Diamond":
+        aex, aey = max(abs(ex), 1e-4), max(abs(ey), 1e-4)
+        return (0.5 * (dx.abs() / aex + dy.abs() / aey)).clamp(0.0, 1.0)
+
+    # Linear (default): project every pixel onto the p0->p1 axis; the
+    # segment's own length sets the extent, exactly like dragging a line in
+    # Photoshop's gradient tool.
+    length = max(math.hypot(ex, ey), 1e-4)
+    ux, uy = ex / length, ey / length
+    proj = dx * ux + dy * uy
+    return (proj / length).clamp(0.0, 1.0)
 
 
 # ---------------------------------------------------------------------------
