@@ -25,19 +25,25 @@ function refreshNode(node) {
   node.setDirtyCanvas(true, true);
 }
 
+const MODE_WIDGETS = {
+  "Automatic": ["min_resolution", "max_resolution"],
+  "Megapixels": ["megapixels"],
+  "Longest Side": ["longest_side"],
+};
+const ALL_MODE_WIDGETS = [...new Set(Object.values(MODE_WIDGETS).flat())];
+
 function updateVisibility(node) {
   const mode = node.widgets?.find((w) => w.name === "resize_mode")?.value;
-  const mp = node.widgets?.find((w) => w.name === "megapixels");
-  const ls = node.widgets?.find((w) => w.name === "longest_side");
-  if (!mp || !ls) return;
-  if (mode === "Longest Side") {
-    hideWidget(mp);
-    showWidget(ls);
-  } else {
-    showWidget(mp);
-    hideWidget(ls);
+  const visible = MODE_WIDGETS[mode] ?? MODE_WIDGETS["Automatic"];
+  let found = false;
+  for (const name of ALL_MODE_WIDGETS) {
+    const w = node.widgets?.find((x) => x.name === name);
+    if (!w) continue;
+    found = true;
+    if (visible.includes(name)) showWidget(w);
+    else hideWidget(w);
   }
-  refreshNode(node);
+  if (found) refreshNode(node);
 }
 
 // widget.callback is the ONLY hook that fires in both renderers.

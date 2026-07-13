@@ -62,6 +62,15 @@ def demo():
     lx1, ly1, lx2, ly2 = lbox
     assert abs((lcrop.shape[2] / lcrop.shape[1]) - ((lx2 - lx1) / (ly2 - ly1))) < 0.05
 
+    # Automatic mode: native inside [min,max], scale up/down outside, AR capped.
+    acrop, _, abox, _ = _crop_by_mask(image, processed, 50, 0, min_side=64, max_side=2048)
+    ax1, ay1, ax2, ay2 = abox
+    assert torch.equal(acrop, image[:, ay1:ay2, ax1:ax2, :])       # in range → native
+    acrop, _, _, _ = _crop_by_mask(image, processed, 50, 0, min_side=512, max_side=2048)
+    assert min(acrop.shape[1], acrop.shape[2]) >= 512               # too small → upscaled
+    acrop, _, _, _ = _crop_by_mask(image, processed, 50, 0, min_side=64, max_side=128)
+    assert max(acrop.shape[1], acrop.shape[2]) <= 128               # too big → downscaled
+
     # Box preview: right shape, downscaled, border painted in the accent color.
     prev = _box_preview(image, processed, box, max_side=400)
     assert prev.shape[0] == 1 and prev.shape[-1] == 3

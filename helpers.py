@@ -215,6 +215,35 @@ def _pick_render_dims_longest(
     return render_w, render_h
 
 
+def _pick_render_dims_auto(
+    bbox_w: int, bbox_h: int, min_side: int, max_side: int,
+    multiple: int = _VAE_MULTIPLE,
+) -> Tuple[int, int]:
+    """Only rescale when needed: native 1:1 while the bbox fits inside
+    [min_side, max_side]; upscale the short side to min_side or downscale the
+    long side to max_side otherwise. Extreme aspect ratios are capped to
+    max×min (the caller grows the bbox to match, adding context)."""
+    if bbox_w <= 0 or bbox_h <= 0:
+        return multiple, multiple
+    lo = max(multiple, int(round(min_side / multiple)) * multiple)
+    hi = max(lo, int(round(max_side / multiple)) * multiple)
+
+    aspect = bbox_w / bbox_h
+    limit = hi / lo
+    if aspect > limit:
+        return hi, lo
+    if aspect < 1.0 / limit:
+        return lo, hi
+
+    short, long = min(bbox_w, bbox_h), max(bbox_w, bbox_h)
+    if short >= lo and long <= hi:
+        return bbox_w, bbox_h  # native — no resample
+    scale = (lo / short) if short < lo else (hi / long)
+    render_w = max(multiple, int(round(bbox_w * scale / multiple)) * multiple)
+    render_h = max(multiple, int(round(bbox_h * scale / multiple)) * multiple)
+    return render_w, render_h
+
+
 def _grow_bbox_to_aspect(
     x1: int, y1: int, x2: int, y2: int,
     target_aspect: float,
@@ -281,6 +310,8 @@ def _crop_by_mask(
     padding: int,
     target_pixels: int,
     longest_side: int = 0,
+    min_side: int = 0,
+    max_side: int = 0,
 ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[int, int, int, int], Tuple[int, int]]:
     """Crop image+mask around the mask bbox and resample to the MP budget.
 
@@ -316,10 +347,12 @@ def _crop_by_mask(
 
     # Native mode: no resample at all — the bbox is taken 1:1 (already /multiple),
     # guaranteeing the composite fast path (pixel-perfect restore).
-    if target_pixels <= 0 and longest_side <= 0:
+    if target_pixels <= 0 and longest_side <= 0 and max_side <= 0:
         return image[:, y1:y2, x1:x2, :], full_mask[:, y1:y2, x1:x2], (x1, y1, x2, y2), (oh, ow)
 
     def _render_dims(bw: int, bh: int) -> Tuple[int, int]:
+        if max_side > 0:
+            return _pick_render_dims_auto(bw, bh, min_side, max_side)
         if longest_side > 0:
             return _pick_render_dims_longest(bw, bh, longest_side)
         return _pick_render_dims(bw, bh, target_pixels)

@@ -108,11 +108,13 @@ class NKDInpaintCrop(io.ComfyNode):
                 io.Int.Input("padding", default=50, min=0, max=2048,
                              tooltip="Context around the mask included in the crop, in pixels."),
                 io.Combo.Input("resize_mode",
-                               options=["Megapixels", "Longest Side"],
-                               default="Megapixels",
-                               tooltip="How the crop's sampling resolution is chosen: by a "
-                                       "megapixel budget or by the exact size of its longest "
-                                       "side."),
+                               options=["Automatic", "Megapixels", "Longest Side"],
+                               default="Automatic",
+                               tooltip="How the crop's sampling resolution is chosen. "
+                                       "Automatic: keep native resolution while the crop fits "
+                                       "between min/max, only rescaling when it falls outside. "
+                                       "Megapixels: fixed pixel budget. Longest Side: exact "
+                                       "size of the longest side."),
                 io.Float.Input("megapixels", default=1.0, min=0.0, max=16.0, step=0.05,
                                tooltip="Resolution budget for the cropped region, in megapixels "
                                        "(1.0 = 1024×1024). The crop is resampled to this size "
@@ -121,6 +123,13 @@ class NKDInpaintCrop(io.ComfyNode):
                 io.Int.Input("longest_side", default=1024, min=16, max=8192, step=16,
                              tooltip="Exact size of the crop's longest side after resampling, "
                                      "in pixels."),
+                io.Int.Input("min_resolution", default=768, min=64, max=4096, step=16,
+                             tooltip="Automatic mode: if the crop's short side is smaller than "
+                                     "this, it is scaled up to reach it."),
+                io.Int.Input("max_resolution", default=2048, min=64, max=16384, step=16,
+                             tooltip="Automatic mode: if the crop's long side is larger than "
+                                     "this, it is scaled down to fit it. Crops between min and "
+                                     "max keep their native resolution (pixel-perfect restore)."),
             ],
             outputs=[
                 io.Model.Output(display_name="model",
@@ -140,7 +149,7 @@ class NKDInpaintCrop(io.ComfyNode):
     @classmethod
     def execute(cls, image, mask, invert_mask, fill_holes, mask_expand, mask_blur,
                 inpaint_blend, padding, resize_mode, megapixels, longest_side,
-                model=None, vae=None) -> io.NodeOutput:
+                min_resolution, max_resolution, model=None, vae=None) -> io.NodeOutput:
         _, ih, iw, _ = image.shape
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
         m = _resize_mask(m, iw, ih)
@@ -150,12 +159,16 @@ class NKDInpaintCrop(io.ComfyNode):
             m = _mask_fill_holes(m)
         processed = _mask_grow(m, mask_expand, mask_blur)
 
-        if resize_mode == "Longest Side":
-            target_pixels, longest = 0, longest_side
+        target_pixels = longest = min_side = max_side = 0
+        if resize_mode == "Automatic":
+            min_side, max_side = min_resolution, max_resolution
+        elif resize_mode == "Longest Side":
+            longest = longest_side
         else:
-            target_pixels, longest = _megapixels_to_pixels(megapixels), 0
+            target_pixels = _megapixels_to_pixels(megapixels)
         crop_img, crop_mask, crop_box, orig_size = _crop_by_mask(
-            image, processed, padding, target_pixels, longest_side=longest
+            image, processed, padding, target_pixels, longest_side=longest,
+            min_side=min_side, max_side=max_side
         )
 
         latent = None
