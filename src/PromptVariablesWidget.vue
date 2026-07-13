@@ -12,6 +12,8 @@
       @blur="saveSelection"
       @keyup="saveSelection"
       @mouseup="saveSelection"
+      @dragover.prevent="onDragOver"
+      @drop.prevent="onDrop"
       @contextmenu.stop
     ></div>
     <div class="nkd-pv-bar">
@@ -47,7 +49,11 @@ let debounceTimer: number | undefined;
 
 const TOKEN_RE = /\{(variable_\d+)\}/g;
 
+let draggedChip: HTMLElement | null = null;
+
 function labelFor(name: string): string {
+  const v = vars.value.find((x) => x.name === name);
+  if (v) return v.label;
   const m = name.match(/_(\d+)$/);
   return `Variable ${m ? Number(m[1]) + 1 : "?"}`;
 }
@@ -57,6 +63,15 @@ function chipEl(name: string): HTMLSpanElement {
   span.className = "nkd-pv-chip";
   span.contentEditable = "false";
   span.dataset.var = name;
+  span.draggable = true;
+  span.addEventListener("dragstart", (e: DragEvent) => {
+    draggedChip = span;
+    e.dataTransfer?.setData("text/plain", "");
+    if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+  });
+  span.addEventListener("dragend", () => {
+    draggedChip = null;
+  });
   const dot = document.createElement("i");
   dot.className = "nkd-pv-dot";
   span.appendChild(dot);
@@ -64,6 +79,38 @@ function chipEl(name: string): HTMLSpanElement {
   const v = vars.value.find((x) => x.name === name);
   if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
   return span;
+}
+
+function rangeFromPoint(x: number, y: number): Range | null {
+  const doc = document as any;
+  if (doc.caretRangeFromPoint) return doc.caretRangeFromPoint(x, y);
+  const pos = doc.caretPositionFromPoint?.(x, y);
+  if (!pos) return null;
+  const r = document.createRange();
+  r.setStart(pos.offsetNode, pos.offset);
+  r.collapse(true);
+  return r;
+}
+
+function onDragOver(e: DragEvent) {
+  if (draggedChip && e.dataTransfer) e.dataTransfer.dropEffect = "move";
+}
+
+function onDrop(e: DragEvent) {
+  const el = editor.value;
+  if (!draggedChip || !el) return;
+  const range = rangeFromPoint(e.clientX, e.clientY);
+  if (!range || !el.contains(range.startContainer)) return;
+  if (draggedChip.contains(range.startContainer)) return; // dropped on itself
+  range.insertNode(draggedChip); // moves the existing element
+  range.setStartAfter(draggedChip);
+  range.collapse(true);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+  savedRange = range.cloneRange();
+  draggedChip = null;
+  emitChange();
 }
 
 // --- text <-> DOM ----------------------------------------------------------
@@ -175,10 +222,14 @@ function setVariables(list: VarInfo[]) {
   const changed = JSON.stringify(list) !== JSON.stringify(vars.value);
   if (!changed) return;
   vars.value = list;
-  // Refresh connection styling on existing chips in place.
+  // Refresh connection styling AND labels on existing chips in place
+  // (renamed sockets propagate to their chips).
   editor.value?.querySelectorAll<HTMLElement>(".nkd-pv-chip").forEach((chip) => {
     const v = list.find((x) => x.name === chip.dataset.var);
     chip.classList.toggle("nkd-pv-chip-off", !(v && v.connected));
+    if (v && chip.lastChild && chip.lastChild.textContent !== v.label) {
+      chip.lastChild.textContent = v.label;
+    }
   });
 }
 
@@ -268,9 +319,12 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
   line-height: 17px;
   vertical-align: text-bottom;
   user-select: none;
-  cursor: default;
+  cursor: grab;
   white-space: nowrap;
   transform: translateY(-1px);
+}
+.nkd-pv-chip:active {
+  cursor: grabbing;
 }
 .nkd-pv-chip::selection,
 .nkd-pv-chip *::selection {

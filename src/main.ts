@@ -18,9 +18,14 @@ function readVariables(node: any) {
     // local name, which is also what the backend receives as dict keys.
     const m = /(?:^|\.)variable_(\d+)$/.exec(inp.name);
     if (!m) continue;
+    const local = `variable_${m[1]}`;
+    // A renamed socket keeps its canonical name and gets a label — chips and
+    // buttons adopt it. Unrenamed sockets carry a default label equal to the
+    // raw name, which we swap for the friendly form.
+    const renamed = inp.label && inp.label !== local && inp.label !== inp.name;
     list.push({
-      name: `variable_${m[1]}`,
-      label: `Variable ${Number(m[1]) + 1}`,
+      name: local,
+      label: renamed ? inp.label : `Variable ${Number(m[1]) + 1}`,
       connected: inp.link != null,
     });
   }

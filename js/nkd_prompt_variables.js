@@ -6371,7 +6371,10 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     let savedRange = null;
     let debounceTimer;
     const TOKEN_RE = /\{(variable_\d+)\}/g;
+    let draggedChip = null;
     function labelFor(name) {
+      const v = vars.value.find((x) => x.name === name);
+      if (v) return v.label;
       const m = name.match(/_(\d+)$/);
       return `Variable ${m ? Number(m[1]) + 1 : "?"}`;
     }
@@ -6380,6 +6383,16 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       span.className = "nkd-pv-chip";
       span.contentEditable = "false";
       span.dataset.var = name;
+      span.draggable = true;
+      span.addEventListener("dragstart", (e) => {
+        var _a;
+        draggedChip = span;
+        (_a = e.dataTransfer) == null ? void 0 : _a.setData("text/plain", "");
+        if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
+      });
+      span.addEventListener("dragend", () => {
+        draggedChip = null;
+      });
       const dot = document.createElement("i");
       dot.className = "nkd-pv-dot";
       span.appendChild(dot);
@@ -6387,6 +6400,36 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       const v = vars.value.find((x) => x.name === name);
       if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
       return span;
+    }
+    function rangeFromPoint(x, y) {
+      var _a;
+      const doc2 = document;
+      if (doc2.caretRangeFromPoint) return doc2.caretRangeFromPoint(x, y);
+      const pos = (_a = doc2.caretPositionFromPoint) == null ? void 0 : _a.call(doc2, x, y);
+      if (!pos) return null;
+      const r = document.createRange();
+      r.setStart(pos.offsetNode, pos.offset);
+      r.collapse(true);
+      return r;
+    }
+    function onDragOver(e) {
+      if (draggedChip && e.dataTransfer) e.dataTransfer.dropEffect = "move";
+    }
+    function onDrop(e) {
+      const el = editor.value;
+      if (!draggedChip || !el) return;
+      const range = rangeFromPoint(e.clientX, e.clientY);
+      if (!range || !el.contains(range.startContainer)) return;
+      if (draggedChip.contains(range.startContainer)) return;
+      range.insertNode(draggedChip);
+      range.setStartAfter(draggedChip);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel == null ? void 0 : sel.removeAllRanges();
+      sel == null ? void 0 : sel.addRange(range);
+      savedRange = range.cloneRange();
+      draggedChip = null;
+      emitChange();
     }
     function renderText(text) {
       const el = editor.value;
@@ -6486,6 +6529,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-chip").forEach((chip) => {
         const v = list.find((x) => x.name === chip.dataset.var);
         chip.classList.toggle("nkd-pv-chip-off", !(v && v.connected));
+        if (v && chip.lastChild && chip.lastChild.textContent !== v.label) {
+          chip.lastChild.textContent = v.label;
+        }
       });
     }
     function cleanup() {
@@ -6517,6 +6563,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           onBlur: saveSelection,
           onKeyup: saveSelection,
           onMouseup: saveSelection,
+          onDragover: withModifiers(onDragOver, ["prevent"]),
+          onDrop: withModifiers(onDrop, ["prevent"]),
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
@@ -6541,7 +6589,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-b29e004c"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-412356eb"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -6551,9 +6599,11 @@ function readVariables(node) {
   for (const inp of node.inputs ?? []) {
     const m = /(?:^|\.)variable_(\d+)$/.exec(inp.name);
     if (!m) continue;
+    const local = `variable_${m[1]}`;
+    const renamed = inp.label && inp.label !== local && inp.label !== inp.name;
     list.push({
-      name: `variable_${m[1]}`,
-      label: `Variable ${Number(m[1]) + 1}`,
+      name: local,
+      label: renamed ? inp.label : `Variable ${Number(m[1]) + 1}`,
       connected: inp.link != null
     });
   }
@@ -6643,7 +6693,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-b29e004c] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-b29e004c] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-b29e004c]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-b29e004c]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-b29e004c] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-b29e004c] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-b29e004c]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-b29e004c] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: default;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}"));
+      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-412356eb] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-412356eb] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-412356eb]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-412356eb]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-412356eb] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-412356eb] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-412356eb]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-412356eb] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}"));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
