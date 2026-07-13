@@ -140,20 +140,29 @@ function buildFill(shape: string, stops: Pt[], a: Vec, b: Vec): CanvasGradient |
 function hexToRgb(hex: string): [number, number, number] {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 }
-function sampleRamp(stops: Pt[], t: number): [number, number, number] {
-  t = Math.max(0, Math.min(1, t));
-  if (t <= stops[0].pos) return hexToRgb(stops[0].color);
-  const last = stops[stops.length - 1];
-  if (t >= last.pos) return hexToRgb(last.color);
-  for (let i = 0; i < stops.length - 1; i++) {
-    const a = stops[i], b = stops[i + 1];
-    if (t >= a.pos && t <= b.pos) {
-      const f = (t - a.pos) / Math.max(1e-6, b.pos - a.pos);
-      const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-      return [r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f];
-    }
+// 256-entry ramp LUT, rebuilt only when the ramp string changes — the Diamond
+// pixel loop then indexes it instead of searching the stops per pixel.
+let rampLut: Uint8ClampedArray | null = null;
+let lutKey = "";
+function buildLut(stops: Pt[]): Uint8ClampedArray {
+  const lut = new Uint8ClampedArray(256 * 3);
+  let si = 0;
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
+    const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
+    const f = Math.max(0, Math.min(1, (t - a.pos) / Math.max(1e-6, b.pos - a.pos)));
+    const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+    lut[i * 3] = r1 + (r2 - r1) * f;
+    lut[i * 3 + 1] = g1 + (g2 - g1) * f;
+    lut[i * 3 + 2] = b1 + (b2 - b1) * f;
   }
-  return hexToRgb(stops[0].color);
+  return lut;
+}
+function rampLutFor(stops: Pt[]): Uint8ClampedArray {
+  const key = JSON.stringify(stops);
+  if (key !== lutKey) { rampLut = buildLut(stops); lutKey = key; }
+  return rampLut!;
 }
 
 // Diamond has no native canvas gradient — render at a small fixed
@@ -161,15 +170,21 @@ function sampleRamp(stops: Pt[], t: number): [number, number, number] {
 // at full resolution in Python; this is a preview only.
 const DIAMOND_RES = 96;
 let diamondCanvas: HTMLCanvasElement | null = null;
+let diamondCtx: CanvasRenderingContext2D | null = null;
+let diamondImg: ImageData | null = null;
 
 function drawDiamond(stops: Pt[], a: Vec, b: Vec) {
   if (!ctx) return;
   const aspect = fitW / fitH;
   const dw = DIAMOND_RES, dh = Math.max(1, Math.round(DIAMOND_RES / aspect));
-  if (!diamondCanvas) diamondCanvas = document.createElement("canvas");
-  diamondCanvas.width = dw; diamondCanvas.height = dh;
-  const dctx = diamondCanvas.getContext("2d")!;
-  const img = dctx.createImageData(dw, dh);
+  if (!diamondCanvas || diamondCanvas.width !== dw || diamondCanvas.height !== dh) {
+    if (!diamondCanvas) diamondCanvas = document.createElement("canvas");
+    diamondCanvas.width = dw; diamondCanvas.height = dh;
+    diamondCtx = diamondCanvas.getContext("2d");
+    diamondImg = diamondCtx!.createImageData(dw, dh);
+  }
+  const lut = rampLutFor(stops);
+  const data = diamondImg!.data;
   const p0n: Vec = [(a[0] - fitX) / fitW, (a[1] - fitY) / fitH];
   const p1n: Vec = [(b[0] - fitX) / fitW, (b[1] - fitY) / fitH];
   const ex = Math.max(Math.abs(p1n[0] - p0n[0]), 1e-4);
@@ -179,12 +194,14 @@ function drawDiamond(stops: Pt[], a: Vec, b: Vec) {
     for (let px = 0; px < dw; px++) {
       const nx = (px + 0.5) / dw;
       const t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
-      const [r, g, bch] = sampleRamp(stops, t);
+      let idx = (t * 255) | 0;
+      if (idx > 255) idx = 255;
+      const li = idx * 3;
       const i = (py * dw + px) * 4;
-      img.data[i] = r; img.data[i + 1] = g; img.data[i + 2] = bch; img.data[i + 3] = 255;
+      data[i] = lut[li]; data[i + 1] = lut[li + 1]; data[i + 2] = lut[li + 2]; data[i + 3] = 255;
     }
   }
-  dctx.putImageData(img, 0, 0);
+  diamondCtx!.putImageData(diamondImg!, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(diamondCanvas, fitX, fitY, fitW, fitH);
 }
@@ -376,8 +393,14 @@ function refreshExternal() {
   }
   lastShape = shape;
   hintText.value = `Drag ${(HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear).join(" / ")}`;
-  redraw();
+  // Dirty-check: only repaint if the ramp (edited on the sibling widget) or the
+  // shape actually changed. Handle drags repaint through onMove directly, so the
+  // idle poll costs a string compare, not a full gradient fill.
+  const sz = props.getSize();
+  const sig = `${shape}|${props.getRamp()}|${sz[0]}x${sz[1]}`;
+  if (sig !== lastExtSig) { lastExtSig = sig; redraw(); }
 }
+let lastExtSig = "";
 
 function forceResize(): boolean {
   return syncCanvasSize();

@@ -41,6 +41,17 @@ let cacheLuma: Float32Array | null = null;
 let lastSrc: string | null = null;
 let offscreen: HTMLCanvasElement | null = null;
 
+// Reusable output surface + a 256-entry ramp lookup table. Rebuilding these
+// per redraw (new canvas, per-pixel ramp search) was what made the preview
+// crawl; now each redraw is a flat pass of LUT lookups into a persistent
+// ImageData.
+let outCanvas: HTMLCanvasElement | null = null;
+let outCtx: CanvasRenderingContext2D | null = null;
+let outImg: ImageData | null = null;
+let rampLut: Uint8ClampedArray | null = null;
+let lutKey = "";
+let lastSig = "";  // dirty-check so the idle poll doesn't recompute the map
+
 const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
 
 function hexToRgb(hex: string): [number, number, number] {
@@ -55,20 +66,24 @@ function parseRamp(): Stop[] {
   } catch { /* fall through */ }
   return [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
 }
-function sampleRamp(stops: Stop[], t: number): [number, number, number] {
-  t = Math.max(0, Math.min(1, t));
-  if (t <= stops[0].pos) return hexToRgb(stops[0].color);
-  const last = stops[stops.length - 1];
-  if (t >= last.pos) return hexToRgb(last.color);
-  for (let i = 0; i < stops.length - 1; i++) {
-    const a = stops[i], b = stops[i + 1];
-    if (t >= a.pos && t <= b.pos) {
-      const f = (t - a.pos) / Math.max(1e-6, b.pos - a.pos);
-      const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-      return [r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f];
-    }
+
+// Build a 256×RGB LUT once per ramp change: sample the ramp at 256 evenly
+// spaced positions. Per-pixel work then collapses to a single array index.
+function buildLut(stops: Stop[]): Uint8ClampedArray {
+  const lut = new Uint8ClampedArray(256 * 3);
+  let si = 0;
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
+    const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
+    const span = Math.max(1e-6, b.pos - a.pos);
+    const f = Math.max(0, Math.min(1, (t - a.pos) / span));
+    const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+    lut[i * 3] = r1 + (r2 - r1) * f;
+    lut[i * 3 + 1] = g1 + (g2 - g1) * f;
+    lut[i * 3 + 2] = b1 + (b2 - b1) * f;
   }
-  return hexToRgb(stops[0].color);
+  return lut;
 }
 
 function decodeSource(img: HTMLImageElement) {
@@ -129,26 +144,34 @@ function redraw() {
   if (fh > maxH) { fh = maxH; fw = maxH * aspect; }
   const fitX = PAD + (maxW - fw) / 2, fitY = PAD + (maxH - fh) / 2;
 
-  const stops = parseRamp();
+  const rampStr = props.getRamp();
   const invert = props.getInvert();
   const strength = Math.max(0, Math.min(1, props.getStrength()));
 
-  if (!offscreen) return;
-  const outCanvas = document.createElement("canvas");
-  outCanvas.width = cacheW; outCanvas.height = cacheH;
-  const octx = outCanvas.getContext("2d")!;
-  const img = octx.createImageData(cacheW, cacheH);
-  for (let p = 0, i = 0; p < cacheW * cacheH; p++, i += 4) {
-    let t = cacheLuma[p];
-    if (invert) t = 1 - t;
-    const [rr, gg, bb] = sampleRamp(stops, t);
-    const r0 = cacheRgb[i], g0 = cacheRgb[i + 1], b0 = cacheRgb[i + 2];
-    img.data[i] = r0 * (1 - strength) + rr * strength;
-    img.data[i + 1] = g0 * (1 - strength) + gg * strength;
-    img.data[i + 2] = b0 * (1 - strength) + bb * strength;
-    img.data[i + 3] = 255;
+  // Rebuild the LUT only when the ramp string changes.
+  if (rampStr !== lutKey) { rampLut = buildLut(parseRamp()); lutKey = rampStr; }
+  const lut = rampLut!;
+
+  // Reuse the output canvas + ImageData; only reallocate on cache-size change.
+  if (!outCanvas || outCanvas.width !== cacheW || outCanvas.height !== cacheH) {
+    outCanvas = document.createElement("canvas");
+    outCanvas.width = cacheW; outCanvas.height = cacheH;
+    outCtx = outCanvas.getContext("2d");
+    outImg = outCtx!.createImageData(cacheW, cacheH);
   }
-  octx.putImageData(img, 0, 0);
+  const data = outImg!.data;
+  const invStrength = 1 - strength;
+  for (let p = 0, i = 0; p < cacheW * cacheH; p++, i += 4) {
+    let idx = (cacheLuma[p] * 255) | 0;
+    if (idx < 0) idx = 0; else if (idx > 255) idx = 255;
+    if (invert) idx = 255 - idx;
+    const li = idx * 3;
+    data[i] = cacheRgb[i] * invStrength + lut[li] * strength;
+    data[i + 1] = cacheRgb[i + 1] * invStrength + lut[li + 1] * strength;
+    data[i + 2] = cacheRgb[i + 2] * invStrength + lut[li + 2] * strength;
+    data[i + 3] = 255;
+  }
+  outCtx!.putImageData(outImg!, 0, 0);
   ctx.imageSmoothingEnabled = true;
   ctx.drawImage(outCanvas, fitX, fitY, fw, fh);
   ctx.strokeStyle = "rgba(255,255,255,0.16)";
@@ -166,7 +189,10 @@ function refreshExternal() {
     cacheRgb = null; cacheLuma = null; lastSrc = null;
   }
   hintText.value = cacheRgb ? "Live preview" : "Connect an image";
-  redraw();
+  // Dirty-check: skip the (heavy) remap unless something the preview depends on
+  // actually changed. This is what keeps the idle poll from pegging the CPU.
+  const sig = `${lastSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+  if (sig !== lastSig) { lastSig = sig; redraw(); }
 }
 
 function forceResize(): boolean {

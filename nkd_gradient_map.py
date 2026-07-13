@@ -2,7 +2,7 @@
 from __future__ import annotations
 import torch
 from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io, ui
+from comfy_api.latest import ComfyExtension, io
 
 from .nkd_color_ramp import _DEFAULT_RAMP, _parse_ramp, _sample_ramp
 
@@ -21,7 +21,6 @@ class NKDGradientMap(io.ComfyNode):
                 "the ramp, lights the other. Classic duotone / color-grading "
                 "look, drawn live as you edit the ramp."
             ),
-            is_output_node=True,
             inputs=[
                 io.Image.Input("image"),
                 io.String.Input("ramp", multiline=False, default=_DEFAULT_RAMP,
@@ -53,7 +52,7 @@ class NKDGradientMap(io.ComfyNode):
         out = rgb * (1.0 - strength) + mapped * strength
         if image.shape[-1] > 3:
             out = torch.cat([out, image[..., 3:]], dim=-1)
-        return io.NodeOutput(out, ui=ui.PreviewImage(out, cls=cls))
+        return io.NodeOutput(out)
 
 
 class NKDGradientMapExtension(ComfyExtension):

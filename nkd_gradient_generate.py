@@ -4,7 +4,7 @@ on-canvas handles."""
 from __future__ import annotations
 import torch
 from typing_extensions import override
-from comfy_api.latest import ComfyExtension, io, ui
+from comfy_api.latest import ComfyExtension, io
 
 from .nkd_color_ramp import (
     _DEFAULT_HANDLES,
@@ -28,7 +28,6 @@ class NKDGradientGenerate(io.ComfyNode):
                 "radial, angular (conic) or diamond. Drag the handles on the "
                 "preview to set direction and extent; edit the ramp below."
             ),
-            is_output_node=True,
             inputs=[
                 io.Int.Input("width", default=1024, min=8, max=8192, step=8),
                 io.Int.Input("height", default=1024, min=8, max=8192, step=8),
@@ -54,7 +53,7 @@ class NKDGradientGenerate(io.ComfyNode):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         t = _position_field(shape, width, height, p0, p1, device)
         out = _sample_ramp(stops, t).unsqueeze(0).cpu()
-        return io.NodeOutput(out, ui=ui.PreviewImage(out, cls=cls))
+        return io.NodeOutput(out)
 
 
 class NKDGradientGenerateExtension(ComfyExtension):

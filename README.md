@@ -87,7 +87,8 @@ instead of dialing in numbers. Switching shape resets the handles to a sensible
 default for that shape. No reference image needed; wire its output anywhere an
 image is expected.
 
-Both draw a live preview in the node as you edit the ramp.
+Both draw the live preview right in the node as you edit — no separate output
+preview, and edits repaint instantly (client-side, no run needed).
 
 ## License
 

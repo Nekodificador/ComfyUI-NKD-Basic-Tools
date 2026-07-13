@@ -7161,31 +7161,47 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     function hexToRgb(hex) {
       return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
     }
-    function sampleRamp(stops, t) {
-      t = Math.max(0, Math.min(1, t));
-      if (t <= stops[0].pos) return hexToRgb(stops[0].color);
-      const last = stops[stops.length - 1];
-      if (t >= last.pos) return hexToRgb(last.color);
-      for (let i = 0; i < stops.length - 1; i++) {
-        const a = stops[i], b = stops[i + 1];
-        if (t >= a.pos && t <= b.pos) {
-          const f = (t - a.pos) / Math.max(1e-6, b.pos - a.pos);
-          const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-          return [r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f];
-        }
+    let rampLut = null;
+    let lutKey = "";
+    function buildLut(stops) {
+      const lut = new Uint8ClampedArray(256 * 3);
+      let si = 0;
+      for (let i = 0; i < 256; i++) {
+        const t = i / 255;
+        while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
+        const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
+        const f = Math.max(0, Math.min(1, (t - a.pos) / Math.max(1e-6, b.pos - a.pos)));
+        const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+        lut[i * 3] = r1 + (r2 - r1) * f;
+        lut[i * 3 + 1] = g1 + (g2 - g1) * f;
+        lut[i * 3 + 2] = b1 + (b2 - b1) * f;
       }
-      return hexToRgb(stops[0].color);
+      return lut;
+    }
+    function rampLutFor(stops) {
+      const key = JSON.stringify(stops);
+      if (key !== lutKey) {
+        rampLut = buildLut(stops);
+        lutKey = key;
+      }
+      return rampLut;
     }
     let diamondCanvas = null;
+    let diamondCtx = null;
+    let diamondImg = null;
     function drawDiamond(stops, a, b) {
       if (!ctx) return;
       const aspect = fitW / fitH;
       const dw = DIAMOND_RES, dh = Math.max(1, Math.round(DIAMOND_RES / aspect));
-      if (!diamondCanvas) diamondCanvas = document.createElement("canvas");
-      diamondCanvas.width = dw;
-      diamondCanvas.height = dh;
-      const dctx = diamondCanvas.getContext("2d");
-      const img = dctx.createImageData(dw, dh);
+      if (!diamondCanvas || diamondCanvas.width !== dw || diamondCanvas.height !== dh) {
+        if (!diamondCanvas) diamondCanvas = document.createElement("canvas");
+        diamondCanvas.width = dw;
+        diamondCanvas.height = dh;
+        diamondCtx = diamondCanvas.getContext("2d");
+        diamondImg = diamondCtx.createImageData(dw, dh);
+      }
+      const lut = rampLutFor(stops);
+      const data = diamondImg.data;
       const p0n = [(a[0] - fitX) / fitW, (a[1] - fitY) / fitH];
       const p1n = [(b[0] - fitX) / fitW, (b[1] - fitY) / fitH];
       const ex = Math.max(Math.abs(p1n[0] - p0n[0]), 1e-4);
@@ -7195,15 +7211,17 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         for (let px = 0; px < dw; px++) {
           const nx = (px + 0.5) / dw;
           const t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
-          const [r, g, bch] = sampleRamp(stops, t);
+          let idx = t * 255 | 0;
+          if (idx > 255) idx = 255;
+          const li = idx * 3;
           const i = (py * dw + px) * 4;
-          img.data[i] = r;
-          img.data[i + 1] = g;
-          img.data[i + 2] = bch;
-          img.data[i + 3] = 255;
+          data[i] = lut[li];
+          data[i + 1] = lut[li + 1];
+          data[i + 2] = lut[li + 2];
+          data[i + 3] = 255;
         }
       }
-      dctx.putImageData(img, 0, 0);
+      diamondCtx.putImageData(diamondImg, 0, 0);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(diamondCanvas, fitX, fitY, fitW, fitH);
     }
@@ -7373,8 +7391,14 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       }
       lastShape = shape;
       hintText.value = `Drag ${(HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear).join(" / ")}`;
-      redraw();
+      const sz = props.getSize();
+      const sig = `${shape}|${props.getRamp()}|${sz[0]}x${sz[1]}`;
+      if (sig !== lastExtSig) {
+        lastExtSig = sig;
+        redraw();
+      }
     }
+    let lastExtSig = "";
     function forceResize() {
       return syncCanvasSize();
     }
@@ -7426,7 +7450,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-5cbcc096"]]);
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-d6708ca8"]]);
 const _hoisted_1 = { class: "nkd-root" };
 const _hoisted_2 = { class: "nkd-bar" };
 const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
@@ -7455,6 +7479,12 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     let cacheLuma = null;
     let lastSrc = null;
     let offscreen = null;
+    let outCanvas = null;
+    let outCtx = null;
+    let outImg = null;
+    let rampLut = null;
+    let lutKey = "";
+    let lastSig = "";
     function hexToRgb(hex) {
       return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
     }
@@ -7468,20 +7498,21 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       }
       return [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
     }
-    function sampleRamp(stops, t) {
-      t = Math.max(0, Math.min(1, t));
-      if (t <= stops[0].pos) return hexToRgb(stops[0].color);
-      const last = stops[stops.length - 1];
-      if (t >= last.pos) return hexToRgb(last.color);
-      for (let i = 0; i < stops.length - 1; i++) {
-        const a = stops[i], b = stops[i + 1];
-        if (t >= a.pos && t <= b.pos) {
-          const f = (t - a.pos) / Math.max(1e-6, b.pos - a.pos);
-          const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-          return [r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f];
-        }
+    function buildLut(stops) {
+      const lut = new Uint8ClampedArray(256 * 3);
+      let si = 0;
+      for (let i = 0; i < 256; i++) {
+        const t = i / 255;
+        while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
+        const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
+        const span = Math.max(1e-6, b.pos - a.pos);
+        const f = Math.max(0, Math.min(1, (t - a.pos) / span));
+        const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+        lut[i * 3] = r1 + (r2 - r1) * f;
+        lut[i * 3 + 1] = g1 + (g2 - g1) * f;
+        lut[i * 3 + 2] = b1 + (b2 - b1) * f;
       }
-      return hexToRgb(stops[0].color);
+      return lut;
     }
     function decodeSource(img) {
       const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -7541,26 +7572,35 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         fw = maxH * aspect;
       }
       const fitX = PAD + (maxW - fw) / 2, fitY = PAD + (maxH - fh) / 2;
-      const stops = parseRamp();
+      const rampStr = props.getRamp();
       const invert = props.getInvert();
       const strength = Math.max(0, Math.min(1, props.getStrength()));
-      if (!offscreen) return;
-      const outCanvas = document.createElement("canvas");
-      outCanvas.width = cacheW;
-      outCanvas.height = cacheH;
-      const octx = outCanvas.getContext("2d");
-      const img = octx.createImageData(cacheW, cacheH);
-      for (let p2 = 0, i = 0; p2 < cacheW * cacheH; p2++, i += 4) {
-        let t = cacheLuma[p2];
-        if (invert) t = 1 - t;
-        const [rr, gg, bb] = sampleRamp(stops, t);
-        const r0 = cacheRgb[i], g0 = cacheRgb[i + 1], b0 = cacheRgb[i + 2];
-        img.data[i] = r0 * (1 - strength) + rr * strength;
-        img.data[i + 1] = g0 * (1 - strength) + gg * strength;
-        img.data[i + 2] = b0 * (1 - strength) + bb * strength;
-        img.data[i + 3] = 255;
+      if (rampStr !== lutKey) {
+        rampLut = buildLut(parseRamp());
+        lutKey = rampStr;
       }
-      octx.putImageData(img, 0, 0);
+      const lut = rampLut;
+      if (!outCanvas || outCanvas.width !== cacheW || outCanvas.height !== cacheH) {
+        outCanvas = document.createElement("canvas");
+        outCanvas.width = cacheW;
+        outCanvas.height = cacheH;
+        outCtx = outCanvas.getContext("2d");
+        outImg = outCtx.createImageData(cacheW, cacheH);
+      }
+      const data = outImg.data;
+      const invStrength = 1 - strength;
+      for (let p2 = 0, i = 0; p2 < cacheW * cacheH; p2++, i += 4) {
+        let idx = cacheLuma[p2] * 255 | 0;
+        if (idx < 0) idx = 0;
+        else if (idx > 255) idx = 255;
+        if (invert) idx = 255 - idx;
+        const li = idx * 3;
+        data[i] = cacheRgb[i] * invStrength + lut[li] * strength;
+        data[i + 1] = cacheRgb[i + 1] * invStrength + lut[li + 1] * strength;
+        data[i + 2] = cacheRgb[i + 2] * invStrength + lut[li + 2] * strength;
+        data[i + 3] = 255;
+      }
+      outCtx.putImageData(outImg, 0, 0);
       ctx.imageSmoothingEnabled = true;
       ctx.drawImage(outCanvas, fitX, fitY, fw, fh);
       ctx.strokeStyle = "rgba(255,255,255,0.16)";
@@ -7579,7 +7619,11 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         lastSrc = null;
       }
       hintText.value = cacheRgb ? "Live preview" : "Connect an image";
-      redraw();
+      const sig = `${lastSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+      if (sig !== lastSig) {
+        lastSig = sig;
+        redraw();
+      }
     }
     function forceResize() {
       return syncCanvasSize();
@@ -7612,7 +7656,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-d773677a"]]);
+const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-824a5b9c"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -8074,7 +8118,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-410377c5] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-410377c5] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-410377c5] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-410377c5] {\n  flex: 1 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-410377c5] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-410377c5] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-410377c5]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-410377c5] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-410377c5] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-410377c5] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-410377c5] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-410377c5], .nkd-select[data-v-410377c5] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-410377c5]:hover, .nkd-select[data-v-410377c5]:hover, .nkd-select[data-v-410377c5]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-410377c5]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-5cbcc096] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-5cbcc096] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-5cbcc096] {\n  flex: 1 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-5cbcc096] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-5cbcc096] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-5cbcc096] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-5cbcc096] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-5cbcc096] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-5cbcc096]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-d773677a] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-d773677a] {\n  width: 100%;\n  aspect-ratio: 320 / 200;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-d773677a] {\n  flex: 1 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-d773677a] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-d773677a] { padding: 5px 8px;\n}\n.nkd-hint[data-v-d773677a] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-410377c5] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-410377c5] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-410377c5] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-410377c5] {\n  flex: 1 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-410377c5] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-410377c5] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-410377c5]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-410377c5] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-410377c5] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-410377c5] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-410377c5] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-410377c5], .nkd-select[data-v-410377c5] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-410377c5]:hover, .nkd-select[data-v-410377c5]:hover, .nkd-select[data-v-410377c5]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-410377c5]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-d6708ca8] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-d6708ca8] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-d6708ca8] {\n  flex: 1 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-d6708ca8] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-d6708ca8] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-d6708ca8] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-d6708ca8] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-d6708ca8] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-d6708ca8]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-824a5b9c] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-824a5b9c] {\n  width: 100%;\n  aspect-ratio: 320 / 200;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-824a5b9c] {\n  flex: 1 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-824a5b9c] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-824a5b9c] { padding: 5px 8px;\n}\n.nkd-hint[data-v-824a5b9c] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
