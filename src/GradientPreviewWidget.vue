@@ -9,9 +9,11 @@
       @mouseleave.stop="onLeave"
     ></canvas>
     <div class="nkd-bar">
-      <span class="nkd-hint">{{ hintText }}</span>
-      <span class="nkd-spacer"></span>
-      <button class="nkd-btn" @click.stop="resetHandles">Reset</button>
+      <div class="nkd-row nkd-row--controls">
+        <span class="nkd-hint">{{ hintText }}</span>
+        <span class="nkd-spacer"></span>
+        <button class="nkd-btn" @click.stop="resetHandles">Reset</button>
+      </div>
     </div>
   </div>
 </template>
@@ -222,13 +224,50 @@ function redraw() {
   const labels = HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear;
   drawHandle(a, "p0", labels[0]);
   drawHandle(b, "p1", labels[1]);
+
+  const tipWhich = dragging ?? hover;
+  if (tipWhich) {
+    const pos = tipWhich === "p0" ? p0.value : p1.value;
+    const label = tipWhich === "p0" ? labels[0] : labels[1];
+    drawTooltip(tipWhich === "p0" ? a : b, `${label}  ${pos[0].toFixed(2)}, ${pos[1].toFixed(2)}`);
+  }
+}
+
+function drawTooltip(at: Vec, text: string) {
+  if (!ctx) return;
+  ctx.font = "10px monospace";
+  const textW = ctx.measureText(text).width;
+  const padX = 6, h = 16;
+  const w = textW + padX * 2;
+  let tx = at[0] - w / 2;
+  tx = Math.max(2, Math.min(BOX_W - w - 2, tx));
+  let ty = at[1] - 12 - h;
+  if (ty < 2) ty = at[1] + 12; // flip below if too close to the top
+  ctx.fillStyle = "rgba(15,18,26,0.88)";
+  ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : "rgba(74,180,255,0.5)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(tx + 4, ty);
+  ctx.arcTo(tx + w, ty, tx + w, ty + h, 4);
+  ctx.arcTo(tx + w, ty + h, tx, ty + h, 4);
+  ctx.arcTo(tx, ty + h, tx, ty, 4);
+  ctx.arcTo(tx, ty, tx + w, ty, 4);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#e8eef8";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(text, tx + w / 2, ty + h / 2 + 0.5);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 }
 
 function drawHandle(pos: Vec, which: "p0" | "p1", label: string) {
   if (!ctx) return;
   const isDrag = dragging === which;
   const isHover = hover === which;
-  const r = isDrag ? 7 : isHover ? 6 : 5;
+  const r = isDrag ? 7 : isHover ? 6 : 4.5;
   ctx.save();
   ctx.shadowColor = "rgba(0,0,0,0.6)";
   ctx.shadowBlur = 5;
@@ -370,6 +409,7 @@ defineExpose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
   border: 1px solid var(--border-color, #2a2d36);
   border-radius: 6px;
   overflow: hidden;
+  font: 11px Inter, sans-serif;
 }
 .nkd-canvas {
   width: 100%;
@@ -377,17 +417,20 @@ defineExpose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
   cursor: default;
 }
 .nkd-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 8px;
   background: var(--comfy-menu-bg, #1a1c22);
   border-top: 1px solid var(--border-color, #2a2d36);
 }
+.nkd-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.nkd-row--controls { padding: 5px 8px; }
 .nkd-spacer { flex: 1 1 auto; }
 .nkd-hint {
   font-size: 9.5px;
   color: rgba(255,255,255,0.32);
+  opacity: 0.7;
   white-space: nowrap;
 }
 .nkd-btn {
@@ -398,7 +441,7 @@ defineExpose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
   padding: 2px 8px;
   font-size: 11px;
   cursor: pointer;
-  transition: border-color 0.12s, color 0.12s;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
 .nkd-btn:hover {
   border-color: #4ab4ff;

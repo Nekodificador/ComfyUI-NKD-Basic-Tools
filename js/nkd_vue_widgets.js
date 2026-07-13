@@ -6357,9 +6357,9 @@ function normalizeContainer(container) {
   }
   return container;
 }
-const _hoisted_1$2 = { class: "nkd-pv-bar" };
-const _hoisted_2$2 = ["title", "onClick"];
-const _sfc_main$2 = /* @__PURE__ */ defineComponent({
+const _hoisted_1$3 = { class: "nkd-pv-bar" };
+const _hoisted_2$3 = ["title", "onClick"];
+const _sfc_main$3 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function }
@@ -6585,14 +6585,14 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$2, [
+        createBaseVNode("div", _hoisted_1$3, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
               class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
-            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$2);
+            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$3);
           }), 128))
         ])
       ], 32);
@@ -6606,17 +6606,17 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-56fcf56b"]]);
-const _hoisted_1$1 = { class: "nkd-bar" };
-const _hoisted_2$1 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3 = { class: "nkd-row nkd-row--presets" };
-const _hoisted_4 = ["value"];
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-56fcf56b"]]);
+const _hoisted_1$2 = { class: "nkd-bar" };
+const _hoisted_2$2 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$2 = { class: "nkd-row nkd-row--presets" };
+const _hoisted_4$1 = ["value"];
 const _hoisted_5 = ["value"];
 const _hoisted_6 = ["disabled"];
 const CW = 380, CH = 64;
 const HIT_R$1 = 10;
-const MIN_RENDER_SCALE$1 = 2;
-const _sfc_main$1 = /* @__PURE__ */ defineComponent({
+const MIN_RENDER_SCALE$2 = 2;
+const _sfc_main$2 = /* @__PURE__ */ defineComponent({
   __name: "ColorRampWidget",
   props: {
     onChange: { type: Function }
@@ -6632,7 +6632,10 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       bg: "#111318",
       gridBorder: "rgba(255,255,255,0.16)",
       ptStroke: "rgba(0,0,0,0.65)",
-      active: "rgba(74,180,255,0.65)"
+      active: "rgba(74,180,255,0.65)",
+      tooltipBg: "rgba(15,18,26,0.88)",
+      tooltipBorder: "rgba(74,180,255,0.5)",
+      tooltipText: "#e8eef8"
     };
     const canvas = /* @__PURE__ */ ref(null);
     const colorInput = /* @__PURE__ */ ref(null);
@@ -6681,8 +6684,8 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$1);
-      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$1);
+      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$2);
+      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$2);
       const newW = Math.round(CW * sx), newH = Math.round(CH * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -6711,7 +6714,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         const x = toCanvasX(s.pos);
         const isActive = s === activeStop;
         const isHover = s === hoverStop;
-        const r = isActive ? 7 : isHover ? 6 : 5;
+        const r = isActive ? 7 : isHover ? 6 : 4.5;
         if (isActive) {
           ctx.beginPath();
           ctx.arc(x, BAR_MID, r + 3.5, 0, Math.PI * 2);
@@ -6732,6 +6735,32 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         ctx.strokeStyle = C.ptStroke;
         ctx.stroke();
       }
+      const tip = dragging ? activeStop : hoverStop;
+      if (tip) drawTooltip(tip);
+    }
+    function drawTooltip(stop) {
+      if (!ctx) return;
+      const x = toCanvasX(stop.pos);
+      const label = `${Math.round(stop.pos * 100)}%  ${stop.color}`;
+      ctx.font = "10px monospace";
+      const textW = ctx.measureText(label).width;
+      const padX = 6, h = 16;
+      const w = textW + padX * 2;
+      let tx = x - w / 2;
+      tx = Math.max(2, Math.min(CW - w - 2, tx));
+      const ty = BAR_MID - 5 - h - 6;
+      ctx.fillStyle = C.tooltipBg;
+      ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : C.tooltipBorder;
+      ctx.lineWidth = 1;
+      roundRectPath(tx, ty, w, h, 4);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = C.tooltipText;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(label, tx + w / 2, ty + h / 2 + 0.5);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
     }
     function roundRectPath(x, y, w, h, r) {
       if (!ctx) return;
@@ -6968,8 +6997,8 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onLeave, ["stop"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$1, [
-          createBaseVNode("div", _hoisted_2$1, [
+        createBaseVNode("div", _hoisted_1$2, [
+          createBaseVNode("div", _hoisted_2$2, [
             _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: pick color · Shift+click: delete · drag: move", -1)),
             _cache[6] || (_cache[6] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("button", {
@@ -6977,7 +7006,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
               onClick: withModifiers(reset, ["stop"])
             }, "Reset")
           ]),
-          createBaseVNode("div", _hoisted_3, [
+          createBaseVNode("div", _hoisted_3$2, [
             _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-label" }, "Preset", -1)),
             createBaseVNode("select", {
               class: "nkd-select nkd-select--preset",
@@ -6991,7 +7020,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
                   value: p2.name
                 }, toDisplayString(p2.name), 9, _hoisted_5);
               }), 128))
-            ], 40, _hoisted_4),
+            ], 40, _hoisted_4$1),
             createBaseVNode("button", {
               class: "nkd-btn nkd-btn--preset",
               onClick: withModifiers(saveCurrentAsPreset, ["stop"])
@@ -7014,14 +7043,15 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-f2c94812"]]);
-const _hoisted_1 = { class: "nkd-bar" };
-const _hoisted_2 = { class: "nkd-hint" };
-const BOX_W = 320, BOX_H = 210, PAD = 14;
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-8cb034cc"]]);
+const _hoisted_1$1 = { class: "nkd-bar" };
+const _hoisted_2$1 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$1 = { class: "nkd-hint" };
+const BOX_W$1 = 320, BOX_H$1 = 210, PAD$1 = 14;
 const HIT_R = 11;
-const MIN_RENDER_SCALE = 2;
+const MIN_RENDER_SCALE$1 = 2;
 const DIAMOND_RES = 96;
-const _sfc_main = /* @__PURE__ */ defineComponent({
+const _sfc_main$1 = /* @__PURE__ */ defineComponent({
   __name: "GradientPreviewWidget",
   props: {
     onChange: { type: Function },
@@ -7054,7 +7084,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     let lastShape = null;
     let dragging = null;
     let hover = null;
-    let fitX = PAD, fitY = PAD, fitW = BOX_W - PAD * 2, fitH = BOX_H - PAD * 2;
+    let fitX = PAD$1, fitY = PAD$1, fitW = BOX_W$1 - PAD$1 * 2, fitH = BOX_H$1 - PAD$1 * 2;
     function toPx(pt) {
       return [fitX + pt[0] * fitW, fitY + pt[1] * fitH];
     }
@@ -7066,7 +7096,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     }
     function eventToLogical(e) {
       const rect = canvas.value.getBoundingClientRect();
-      return [(e.clientX - rect.left) * (BOX_W / rect.width), (e.clientY - rect.top) * (BOX_H / rect.height)];
+      return [(e.clientX - rect.left) * (BOX_W$1 / rect.width), (e.clientY - rect.top) * (BOX_H$1 / rect.height)];
     }
     function parseRamp() {
       try {
@@ -7083,9 +7113,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE);
-      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE);
-      const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
+      const sx = Math.max(rect.width / BOX_W$1 * dpr, MIN_RENDER_SCALE$1);
+      const sy = Math.max(rect.height / BOX_H$1 * dpr, MIN_RENDER_SCALE$1);
+      const newW = Math.round(BOX_W$1 * sx), newH = Math.round(BOX_H$1 * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
         c.height = newH;
@@ -7098,14 +7128,14 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     function computeFitRect() {
       const [w, h] = props.getSize();
       const aspect = w > 0 && h > 0 ? w / h : 1;
-      const maxW = BOX_W - PAD * 2, maxH = BOX_H - PAD * 2;
+      const maxW = BOX_W$1 - PAD$1 * 2, maxH = BOX_H$1 - PAD$1 * 2;
       let fw = maxW, fh = maxW / aspect;
       if (fh > maxH) {
         fh = maxH;
         fw = maxH * aspect;
       }
-      fitX = PAD + (maxW - fw) / 2;
-      fitY = PAD + (maxH - fh) / 2;
+      fitX = PAD$1 + (maxW - fw) / 2;
+      fitY = PAD$1 + (maxH - fh) / 2;
       fitW = fw;
       fitH = fh;
     }
@@ -7180,9 +7210,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     function redraw() {
       if (!ctx) return;
       computeFitRect();
-      ctx.clearRect(0, 0, BOX_W, BOX_H);
+      ctx.clearRect(0, 0, BOX_W$1, BOX_H$1);
       ctx.fillStyle = "#111318";
-      ctx.fillRect(0, 0, BOX_W, BOX_H);
+      ctx.fillRect(0, 0, BOX_W$1, BOX_H$1);
       const shape = props.getShape() || "Linear";
       const stops = parseRamp();
       const a = toPx(p0.value), b = toPx(p1.value);
@@ -7207,12 +7237,47 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       const labels = HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear;
       drawHandle(a, "p0", labels[0]);
       drawHandle(b, "p1", labels[1]);
+      const tipWhich = dragging ?? hover;
+      if (tipWhich) {
+        const pos = tipWhich === "p0" ? p0.value : p1.value;
+        const label = tipWhich === "p0" ? labels[0] : labels[1];
+        drawTooltip(tipWhich === "p0" ? a : b, `${label}  ${pos[0].toFixed(2)}, ${pos[1].toFixed(2)}`);
+      }
+    }
+    function drawTooltip(at, text) {
+      if (!ctx) return;
+      ctx.font = "10px monospace";
+      const textW = ctx.measureText(text).width;
+      const padX = 6, h = 16;
+      const w = textW + padX * 2;
+      let tx = at[0] - w / 2;
+      tx = Math.max(2, Math.min(BOX_W$1 - w - 2, tx));
+      let ty = at[1] - 12 - h;
+      if (ty < 2) ty = at[1] + 12;
+      ctx.fillStyle = "rgba(15,18,26,0.88)";
+      ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : "rgba(74,180,255,0.5)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(tx + 4, ty);
+      ctx.arcTo(tx + w, ty, tx + w, ty + h, 4);
+      ctx.arcTo(tx + w, ty + h, tx, ty + h, 4);
+      ctx.arcTo(tx, ty + h, tx, ty, 4);
+      ctx.arcTo(tx, ty, tx + w, ty, 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#e8eef8";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, tx + w / 2, ty + h / 2 + 0.5);
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
     }
     function drawHandle(pos, which, label) {
       if (!ctx) return;
       const isDrag = dragging === which;
       const isHover = hover === which;
-      const r = isDrag ? 7 : isHover ? 6 : 5;
+      const r = isDrag ? 7 : isHover ? 6 : 4.5;
       ctx.save();
       ctx.shadowColor = "rgba(0,0,0,0.6)";
       ctx.shadowBlur = 5;
@@ -7227,7 +7292,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       ctx.stroke();
       ctx.font = "9px monospace";
       ctx.fillStyle = "rgba(255,255,255,0.55)";
-      ctx.textAlign = pos[0] > BOX_W - 40 ? "right" : "left";
+      ctx.textAlign = pos[0] > BOX_W$1 - 40 ? "right" : "left";
       ctx.fillText(label, pos[0] + (ctx.textAlign === "right" ? -r - 4 : r + 4), pos[1] + 3);
     }
     function hitTest(x, y) {
@@ -7347,19 +7412,207 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onLeave, ["stop"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1, [
-          createBaseVNode("span", _hoisted_2, toDisplayString(hintText.value), 1),
-          _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
-          createBaseVNode("button", {
-            class: "nkd-btn",
-            onClick: withModifiers(resetHandles, ["stop"])
-          }, "Reset")
+        createBaseVNode("div", _hoisted_1$1, [
+          createBaseVNode("div", _hoisted_2$1, [
+            createBaseVNode("span", _hoisted_3$1, toDisplayString(hintText.value), 1),
+            _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+            createBaseVNode("button", {
+              class: "nkd-btn",
+              onClick: withModifiers(resetHandles, ["stop"])
+            }, "Reset")
+          ])
         ])
       ], 32);
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-a6c8c95d"]]);
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-282f0288"]]);
+const _hoisted_1 = { class: "nkd-root" };
+const _hoisted_2 = { class: "nkd-bar" };
+const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4 = { class: "nkd-hint" };
+const BOX_W = 320, BOX_H = 200, PAD = 10;
+const MIN_RENDER_SCALE = 2;
+const CACHE_RES = 220;
+const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
+const _sfc_main = /* @__PURE__ */ defineComponent({
+  __name: "GradientMapPreviewWidget",
+  props: {
+    getRamp: { type: Function },
+    getInvert: { type: Function },
+    getStrength: { type: Function },
+    getSourceImg: { type: Function }
+  },
+  setup(__props, { expose: __expose }) {
+    const props = __props;
+    const canvas = /* @__PURE__ */ ref(null);
+    let ctx = null;
+    let ro = null;
+    let dpr = window.devicePixelRatio || 1;
+    const hintText = /* @__PURE__ */ ref("Connect an image");
+    let cacheW = 0, cacheH = 0;
+    let cacheRgb = null;
+    let cacheLuma = null;
+    let lastSrc = null;
+    let offscreen = null;
+    function hexToRgb(hex) {
+      return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+    }
+    function parseRamp() {
+      try {
+        const data = JSON.parse(props.getRamp());
+        if (Array.isArray(data.stops) && data.stops.length >= 2) {
+          return [...data.stops].sort((a, b) => a.pos - b.pos);
+        }
+      } catch {
+      }
+      return [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
+    }
+    function sampleRamp(stops, t) {
+      t = Math.max(0, Math.min(1, t));
+      if (t <= stops[0].pos) return hexToRgb(stops[0].color);
+      const last = stops[stops.length - 1];
+      if (t >= last.pos) return hexToRgb(last.color);
+      for (let i = 0; i < stops.length - 1; i++) {
+        const a = stops[i], b = stops[i + 1];
+        if (t >= a.pos && t <= b.pos) {
+          const f = (t - a.pos) / Math.max(1e-6, b.pos - a.pos);
+          const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+          return [r1 + (r2 - r1) * f, g1 + (g2 - g1) * f, b1 + (b2 - b1) * f];
+        }
+      }
+      return hexToRgb(stops[0].color);
+    }
+    function decodeSource(img) {
+      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+      if (!iw || !ih) return;
+      const scale = CACHE_RES / Math.max(iw, ih);
+      cacheW = Math.max(1, Math.round(iw * scale));
+      cacheH = Math.max(1, Math.round(ih * scale));
+      if (!offscreen) offscreen = document.createElement("canvas");
+      offscreen.width = cacheW;
+      offscreen.height = cacheH;
+      const octx = offscreen.getContext("2d");
+      octx.drawImage(img, 0, 0, cacheW, cacheH);
+      const data = octx.getImageData(0, 0, cacheW, cacheH).data;
+      cacheRgb = data;
+      cacheLuma = new Float32Array(cacheW * cacheH);
+      for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) {
+        cacheLuma[p2] = (data[i] * LUMA_R + data[i + 1] * LUMA_G + data[i + 2] * LUMA_B) / 255;
+      }
+    }
+    function syncCanvasSize() {
+      const c = canvas.value;
+      if (!c) return false;
+      const rect = c.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return false;
+      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE);
+      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE);
+      const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
+      if (c.width !== newW || c.height !== newH) {
+        c.width = newW;
+        c.height = newH;
+        ctx = c.getContext("2d");
+        ctx == null ? void 0 : ctx.setTransform(sx, 0, 0, sy, 0, 0);
+      }
+      redraw();
+      return true;
+    }
+    function redraw() {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, BOX_W, BOX_H);
+      ctx.fillStyle = "#111318";
+      ctx.fillRect(0, 0, BOX_W, BOX_H);
+      const maxW = BOX_W - PAD * 2, maxH = BOX_H - PAD * 2;
+      if (!cacheRgb || !cacheLuma) {
+        ctx.font = "11px Inter, sans-serif";
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Connect an image", BOX_W / 2, BOX_H / 2);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        return;
+      }
+      const aspect = cacheW / cacheH;
+      let fw = maxW, fh = maxW / aspect;
+      if (fh > maxH) {
+        fh = maxH;
+        fw = maxH * aspect;
+      }
+      const fitX = PAD + (maxW - fw) / 2, fitY = PAD + (maxH - fh) / 2;
+      const stops = parseRamp();
+      const invert = props.getInvert();
+      const strength = Math.max(0, Math.min(1, props.getStrength()));
+      if (!offscreen) return;
+      const outCanvas = document.createElement("canvas");
+      outCanvas.width = cacheW;
+      outCanvas.height = cacheH;
+      const octx = outCanvas.getContext("2d");
+      const img = octx.createImageData(cacheW, cacheH);
+      for (let p2 = 0, i = 0; p2 < cacheW * cacheH; p2++, i += 4) {
+        let t = cacheLuma[p2];
+        if (invert) t = 1 - t;
+        const [rr, gg, bb] = sampleRamp(stops, t);
+        const r0 = cacheRgb[i], g0 = cacheRgb[i + 1], b0 = cacheRgb[i + 2];
+        img.data[i] = r0 * (1 - strength) + rr * strength;
+        img.data[i + 1] = g0 * (1 - strength) + gg * strength;
+        img.data[i + 2] = b0 * (1 - strength) + bb * strength;
+        img.data[i + 3] = 255;
+      }
+      octx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(outCanvas, fitX, fitY, fw, fh);
+      ctx.strokeStyle = "rgba(255,255,255,0.16)";
+      ctx.lineWidth = 0.75;
+      ctx.strokeRect(fitX + 0.5, fitY + 0.5, fw - 1, fh - 1);
+    }
+    function refreshExternal() {
+      const img = props.getSourceImg();
+      const src = (img == null ? void 0 : img.currentSrc) || (img == null ? void 0 : img.src) || null;
+      if (img && img.complete && src && src !== lastSrc) {
+        decodeSource(img);
+        lastSrc = src;
+      } else if (!img && lastSrc !== null) {
+        cacheRgb = null;
+        cacheLuma = null;
+        lastSrc = null;
+      }
+      hintText.value = cacheRgb ? "Live preview" : "Connect an image";
+      redraw();
+    }
+    function forceResize() {
+      return syncCanvasSize();
+    }
+    function cleanup() {
+      ro == null ? void 0 : ro.disconnect();
+    }
+    onMounted(() => {
+      var _a;
+      ctx = ((_a = canvas.value) == null ? void 0 : _a.getContext("2d")) ?? null;
+      ro = new ResizeObserver(() => syncCanvasSize());
+      if (canvas.value) ro.observe(canvas.value);
+      syncCanvasSize();
+    });
+    onBeforeUnmount(cleanup);
+    __expose({ refreshExternal, forceResize, cleanup });
+    return (_ctx, _cache) => {
+      return openBlock(), createElementBlock("div", _hoisted_1, [
+        createBaseVNode("canvas", {
+          ref_key: "canvas",
+          ref: canvas,
+          class: "nkd-canvas"
+        }, null, 512),
+        createBaseVNode("div", _hoisted_2, [
+          createBaseVNode("div", _hoisted_3, [
+            createBaseVNode("span", _hoisted_4, toDisplayString(hintText.value), 1)
+          ])
+        ])
+      ]);
+    };
+  }
+});
+const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-ed917fb6"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -7466,6 +7719,122 @@ app.registerExtension({
         var _a2;
         window.clearInterval(varsTimer);
         (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
+        vueApp.unmount();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
+function findSourceImg(node) {
+  var _a, _b, _c, _d, _e;
+  const inp = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === "image");
+  const linkId = inp == null ? void 0 : inp.link;
+  if (linkId == null) return null;
+  const link = (_c = (_b = node.graph) == null ? void 0 : _b.links) == null ? void 0 : _c[linkId];
+  if (!link) return null;
+  const srcNode = (_d = node.graph) == null ? void 0 : _d.getNodeById(link.origin_id);
+  return ((_e = srcNode == null ? void 0 : srcNode.imgs) == null ? void 0 : _e[0]) ?? null;
+}
+app.registerExtension({
+  name: "NKD.BasicTools.GradientMapPreview.Vue",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDGradientMap") return;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const container = document.createElement("div");
+      let barH = 30;
+      const getRamp = () => {
+        var _a, _b;
+        return ((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "ramp")) == null ? void 0 : _b.value) ?? "{}";
+      };
+      const getInvert = () => {
+        var _a, _b;
+        return !!((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "invert")) == null ? void 0 : _b.value);
+      };
+      const getStrength = () => {
+        var _a, _b;
+        return Number((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "strength")) == null ? void 0 : _b.value) || 0;
+      };
+      let instance = null;
+      const vueApp = createApp(GradientMapPreviewWidget, {
+        getRamp,
+        getInvert,
+        getStrength,
+        getSourceImg: () => findSourceImg(this)
+      });
+      instance = vueApp.mount(container);
+      const PREVIEW_AR = 200 / 320;
+      const heightFor = (width) => Math.round(width * PREVIEW_AR) + barH;
+      this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
+        getValue: () => "",
+        setValue: () => {
+        },
+        serialize: false,
+        hideOnZoom: false,
+        getMinHeight: () => {
+          var _a;
+          return heightFor(((_a = this.size) == null ? void 0 : _a[0]) || 320);
+        },
+        getMaxHeight: () => {
+          var _a;
+          return heightFor(((_a = this.size) == null ? void 0 : _a[0]) || 320);
+        },
+        getHeight: () => {
+          var _a;
+          return heightFor(((_a = this.size) == null ? void 0 : _a[0]) || 320);
+        }
+      });
+      const origResize = this.onResize;
+      this.onResize = function(size) {
+        origResize == null ? void 0 : origResize.apply(this, arguments);
+        if (size[0] < 320) size[0] = 320;
+        size[1] = this.computeSize(size[0])[1];
+      };
+      const origComputeSize = this.computeSize.bind(this);
+      this.computeSize = function(_w) {
+        const sz = origComputeSize();
+        const width = sz[0] || this.size[0];
+        const needed = heightFor(width);
+        if (sz[1] < needed) sz[1] = needed;
+        return sz;
+      };
+      let v1NeedsInit = true;
+      const origDrawBg = this.onDrawBackground;
+      this.onDrawBackground = function(ctx) {
+        var _a;
+        origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
+        if (v1NeedsInit && ((_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance))) v1NeedsInit = false;
+      };
+      const refreshTimer = window.setInterval(() => {
+        var _a;
+        return (_a = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a.call(instance);
+      }, 300);
+      requestAnimationFrame(() => {
+        var _a;
+        const barEl = container.querySelector(".nkd-bar");
+        const measured = barEl ? Math.ceil(barEl.getBoundingClientRect().height) : 0;
+        if (measured > 0) barH = measured;
+        if ((_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance)) v1NeedsInit = false;
+        const sz = this.computeSize(this.size[0]);
+        this.setSize(sz);
+        this.setDirtyCanvas(true, true);
+      });
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        requestAnimationFrame(() => {
+          var _a;
+          if ((_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance)) v1NeedsInit = false;
+        });
+        return r;
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        var _a;
+        window.clearInterval(refreshTimer);
+        (_a = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a.call(instance);
         vueApp.unmount();
         origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
       };
@@ -7704,7 +8073,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-f2c94812] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n}\n.nkd-canvas[data-v-f2c94812] {\n  width: 100%;\n  display: block;\n  cursor: crosshair;\n}\n.nkd-color-input[data-v-f2c94812] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-f2c94812] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f2c94812] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f2c94812] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-f2c94812]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-f2c94812] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f2c94812] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-f2c94812] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-f2c94812] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-f2c94812], .nkd-select[data-v-f2c94812] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-f2c94812]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-a6c8c95d] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n}\n.nkd-canvas[data-v-a6c8c95d] {\n  width: 100%;\n  display: block;\n  cursor: default;\n}\n.nkd-bar[data-v-a6c8c95d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-spacer[data-v-a6c8c95d] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-a6c8c95d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  white-space: nowrap;\n}\n.nkd-btn[data-v-a6c8c95d] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-a6c8c95d]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-8cb034cc] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-8cb034cc] {\n  width: 100%;\n  display: block;\n  cursor: crosshair;\n}\n.nkd-color-input[data-v-8cb034cc] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-8cb034cc] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-8cb034cc] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-8cb034cc] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-8cb034cc]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-8cb034cc] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-8cb034cc] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-8cb034cc] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-8cb034cc] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-8cb034cc], .nkd-select[data-v-8cb034cc] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-8cb034cc]:hover, .nkd-select[data-v-8cb034cc]:hover, .nkd-select[data-v-8cb034cc]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-8cb034cc]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-282f0288] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-282f0288] {\n  width: 100%;\n  display: block;\n  cursor: default;\n}\n.nkd-bar[data-v-282f0288] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-282f0288] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-282f0288] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-282f0288] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-282f0288] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-282f0288] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-282f0288]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-ed917fb6] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-canvas[data-v-ed917fb6] {\n  width: 100%;\n  display: block;\n}\n.nkd-bar[data-v-ed917fb6] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-ed917fb6] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-ed917fb6] { padding: 5px 8px;\n}\n.nkd-hint[data-v-ed917fb6] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

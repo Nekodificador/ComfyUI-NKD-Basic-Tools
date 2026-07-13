@@ -6,6 +6,7 @@ import { createApp } from "vue";
 import PromptVariablesWidget from "./PromptVariablesWidget.vue";
 import ColorRampWidget from "./ColorRampWidget.vue";
 import GradientPreviewWidget from "./GradientPreviewWidget.vue";
+import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -139,6 +140,115 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(varsTimer);
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Gradient Map — live client-side recolor preview. Reads the already-
+// decoded thumbnail of whatever node feeds the `image` input (works even
+// before the graph has ever run, e.g. a Load Image with a file picked), so
+// ramp/invert/strength edits redraw instantly with zero backend round-trip.
+// Registered BEFORE the color-ramp extension (same ordering trick as
+// Gradient Generate) so the preview sits above the ramp bar.
+function findSourceImg(node: any): HTMLImageElement | null {
+  const inp = node.inputs?.find((i: any) => i.name === "image");
+  const linkId = inp?.link;
+  if (linkId == null) return null;
+  const link = node.graph?.links?.[linkId];
+  if (!link) return null;
+  const srcNode = node.graph?.getNodeById(link.origin_id);
+  return srcNode?.imgs?.[0] ?? null;
+}
+
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.GradientMapPreview.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDGradientMap") return;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const container = document.createElement("div");
+      let barH = 30;
+
+      const getRamp = () => this.widgets?.find((w: any) => w.name === "ramp")?.value ?? "{}";
+      const getInvert = () => !!this.widgets?.find((w: any) => w.name === "invert")?.value;
+      const getStrength = () => Number(this.widgets?.find((w: any) => w.name === "strength")?.value) || 0;
+
+      let instance: any = null;
+      const vueApp = createApp(GradientMapPreviewWidget, {
+        getRamp, getInvert, getStrength,
+        getSourceImg: () => findSourceImg(this),
+      });
+      instance = vueApp.mount(container) as any;
+
+      const PREVIEW_AR = 200 / 320;
+      const heightFor = (width: number) => Math.round(width * PREVIEW_AR) + barH;
+
+      this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
+        getValue: () => "",
+        setValue: () => {},
+        serialize: false,
+        hideOnZoom: false,
+        getMinHeight: () => heightFor(this.size?.[0] || 320),
+        getMaxHeight: () => heightFor(this.size?.[0] || 320),
+        getHeight: () => heightFor(this.size?.[0] || 320),
+      });
+
+      const origResize = this.onResize;
+      this.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < 320) size[0] = 320;
+        size[1] = this.computeSize(size[0])[1];
+      };
+
+      const origComputeSize = this.computeSize.bind(this);
+      this.computeSize = function (_w?: number) {
+        const sz = origComputeSize();
+        const width = sz[0] || this.size[0];
+        const needed = heightFor(width);
+        if (sz[1] < needed) sz[1] = needed;
+        return sz;
+      };
+
+      let v1NeedsInit = true;
+      const origDrawBg = this.onDrawBackground;
+      this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
+        origDrawBg?.apply(this, arguments);
+        if (v1NeedsInit && instance?.forceResize?.()) v1NeedsInit = false;
+      };
+      // Poll: catches ramp/invert/strength edits (other widgets) and the
+      // upstream image changing (new file picked, link rewired, or the
+      // graph finishing a run that populates node.imgs for the first time).
+      const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 300);
+
+      requestAnimationFrame(() => {
+        const barEl = container.querySelector(".nkd-bar");
+        const measured = barEl ? Math.ceil((barEl as HTMLElement).getBoundingClientRect().height) : 0;
+        if (measured > 0) barH = measured;
+        if (instance?.forceResize?.()) v1NeedsInit = false;
+        const sz = this.computeSize(this.size[0]);
+        this.setSize(sz);
+        this.setDirtyCanvas(true, true);
+      });
+
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        requestAnimationFrame(() => { if (instance?.forceResize?.()) v1NeedsInit = false; });
+        return r;
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        window.clearInterval(refreshTimer);
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);

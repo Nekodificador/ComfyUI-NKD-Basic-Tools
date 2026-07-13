@@ -60,6 +60,9 @@ const C = {
   gridBorder: "rgba(255,255,255,0.16)",
   ptStroke: "rgba(0,0,0,0.65)",
   active: "rgba(74,180,255,0.65)",
+  tooltipBg: "rgba(15,18,26,0.88)",
+  tooltipBorder: "rgba(74,180,255,0.5)",
+  tooltipText: "#e8eef8",
 } as const;
 
 const canvas = ref<HTMLCanvasElement | null>(null);
@@ -150,7 +153,7 @@ function redraw() {
     const x = toCanvasX(s.pos);
     const isActive = s === activeStop;
     const isHover = s === hoverStop;
-    const r = isActive ? 7 : isHover ? 6 : 5;
+    const r = isActive ? 7 : isHover ? 6 : 4.5;
     if (isActive) {
       ctx.beginPath();
       ctx.arc(x, BAR_MID, r + 3.5, 0, Math.PI * 2);
@@ -171,6 +174,34 @@ function redraw() {
     ctx.strokeStyle = C.ptStroke;
     ctx.stroke();
   }
+
+  const tip = dragging ? activeStop : hoverStop;
+  if (tip) drawTooltip(tip);
+}
+
+function drawTooltip(stop: Stop) {
+  if (!ctx) return;
+  const x = toCanvasX(stop.pos);
+  const label = `${Math.round(stop.pos * 100)}%  ${stop.color}`;
+  ctx.font = "10px monospace";
+  const textW = ctx.measureText(label).width;
+  const padX = 6, h = 16;
+  const w = textW + padX * 2;
+  let tx = x - w / 2;
+  tx = Math.max(2, Math.min(CW - w - 2, tx));
+  const ty = BAR_MID - 5 - h - 6; // above the bar
+  ctx.fillStyle = C.tooltipBg;
+  ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : C.tooltipBorder;
+  ctx.lineWidth = 1;
+  roundRectPath(tx, ty, w, h, 4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = C.tooltipText;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(label, tx + w / 2, ty + h / 2 + 0.5);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "alphabetic";
 }
 
 function roundRectPath(x: number, y: number, w: number, h: number, r: number) {
@@ -426,6 +457,7 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
   border: 1px solid var(--border-color, #2a2d36);
   border-radius: 6px;
   overflow: hidden;
+  font: 11px Inter, sans-serif;
 }
 .nkd-canvas {
   width: 100%;
@@ -455,6 +487,7 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
 .nkd-hint {
   font-size: 9.5px;
   color: rgba(255,255,255,0.32);
+  opacity: 0.7;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

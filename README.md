@@ -76,7 +76,9 @@ load your own ramps as presets.
 
 **Gradient Map** recolors an image by brightness: darks land on one end of the
 ramp, lights on the other — the classic duotone / color-grading look, with an
-`Invert` toggle and a `Strength` slider to dial it back.
+`Invert` toggle and a `Strength` slider to dial it back. Shows a **live
+preview** in the node — reads the connected image, edits redraw instantly as
+you touch the ramp, invert or strength, no run needed.
 
 **Gradient Generate** creates a gradient image from scratch — Linear, Radial,
 Angular (conic) or Diamond — with a Photoshop-style on-canvas gizmo: drag the
