@@ -6357,9 +6357,9 @@ function normalizeContainer(container) {
   }
   return container;
 }
-const _hoisted_1 = { class: "nkd-pv-bar" };
-const _hoisted_2 = ["title", "onClick"];
-const _sfc_main = /* @__PURE__ */ defineComponent({
+const _hoisted_1$1 = { class: "nkd-pv-bar" };
+const _hoisted_2$1 = ["title", "onClick"];
+const _sfc_main$1 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function }
@@ -6585,14 +6585,14 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
-        createBaseVNode("div", _hoisted_1, [
+        createBaseVNode("div", _hoisted_1$1, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
               class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
-            }, "+ " + toDisplayString(v.label), 11, _hoisted_2);
+            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$1);
           }), 128))
         ])
       ], 32);
@@ -6606,7 +6606,415 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-56fcf56b"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-56fcf56b"]]);
+const _hoisted_1 = { class: "nkd-bar" };
+const _hoisted_2 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3 = { class: "nkd-row nkd-row--presets" };
+const _hoisted_4 = ["value"];
+const _hoisted_5 = ["value"];
+const _hoisted_6 = ["disabled"];
+const CW = 380, CH = 64;
+const HIT_R = 10;
+const MIN_RENDER_SCALE = 2;
+const _sfc_main = /* @__PURE__ */ defineComponent({
+  __name: "ColorRampWidget",
+  props: {
+    onChange: { type: Function }
+  },
+  setup(__props, { expose: __expose }) {
+    const props = __props;
+    const PAD = { top: 12, right: 16, bottom: 12, left: 16 };
+    const IW = CW - PAD.left - PAD.right;
+    const BAR_Y = PAD.top;
+    const BAR_H = CH - PAD.top - PAD.bottom;
+    const BAR_MID = BAR_Y + BAR_H / 2;
+    const C = {
+      bg: "#111318",
+      gridBorder: "rgba(255,255,255,0.16)",
+      ptStroke: "rgba(0,0,0,0.65)",
+      active: "rgba(74,180,255,0.65)"
+    };
+    const canvas = /* @__PURE__ */ ref(null);
+    const colorInput = /* @__PURE__ */ ref(null);
+    let ctx = null;
+    let ro = null;
+    let dpr = window.devicePixelRatio || 1;
+    const stops = /* @__PURE__ */ ref([{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }]);
+    let activeStop = null;
+    let hoverStop = null;
+    let dragging = false;
+    let dragOffsetX = 0;
+    let downX = 0, downY = 0, moved = false;
+    function clamp01(v) {
+      return Math.max(0, Math.min(1, v));
+    }
+    function normalizeHex(c) {
+      return /^#[0-9a-fA-F]{6}$/.test(c) ? c.toLowerCase() : "#000000";
+    }
+    function toCanvasX(pos) {
+      return PAD.left + pos * IW;
+    }
+    function fromCanvasX(x) {
+      return clamp01((x - PAD.left) / IW);
+    }
+    function eventToLogical(e) {
+      const rect = canvas.value.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left) * (CW / rect.width),
+        y: (e.clientY - rect.top) * (CH / rect.height)
+      };
+    }
+    function stopAt(x) {
+      let best = null;
+      let bestDist = HIT_R;
+      for (const s of stops.value) {
+        const d = Math.abs(toCanvasX(s.pos) - x);
+        if (d <= bestDist) {
+          best = s;
+          bestDist = d;
+        }
+      }
+      return best;
+    }
+    function syncCanvasSize() {
+      const c = canvas.value;
+      if (!c) return false;
+      const rect = c.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return false;
+      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE);
+      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE);
+      const newW = Math.round(CW * sx), newH = Math.round(CH * sy);
+      if (c.width !== newW || c.height !== newH) {
+        c.width = newW;
+        c.height = newH;
+        ctx = c.getContext("2d");
+        ctx == null ? void 0 : ctx.setTransform(sx, 0, 0, sy, 0, 0);
+      }
+      redraw();
+      return true;
+    }
+    function redraw() {
+      if (!ctx) return;
+      ctx.clearRect(0, 0, CW, CH);
+      ctx.fillStyle = C.bg;
+      ctx.fillRect(0, 0, CW, CH);
+      const grad = ctx.createLinearGradient(PAD.left, 0, PAD.left + IW, 0);
+      for (const s of stops.value) grad.addColorStop(s.pos, s.color);
+      ctx.fillStyle = grad;
+      roundRectPath(PAD.left, BAR_Y, IW, BAR_H, 5);
+      ctx.fill();
+      ctx.strokeStyle = C.gridBorder;
+      ctx.lineWidth = 0.75;
+      roundRectPath(PAD.left, BAR_Y, IW, BAR_H, 5);
+      ctx.stroke();
+      for (const s of stops.value) {
+        const x = toCanvasX(s.pos);
+        const isActive = s === activeStop;
+        const isHover = s === hoverStop;
+        const r = isActive ? 7 : isHover ? 6 : 5;
+        if (isActive) {
+          ctx.beginPath();
+          ctx.arc(x, BAR_MID, r + 3.5, 0, Math.PI * 2);
+          ctx.strokeStyle = C.active;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+        ctx.save();
+        ctx.shadowColor = "rgba(0,0,0,0.55)";
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetY = 1;
+        ctx.beginPath();
+        ctx.arc(x, BAR_MID, r, 0, Math.PI * 2);
+        ctx.fillStyle = s.color;
+        ctx.fill();
+        ctx.restore();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = C.ptStroke;
+        ctx.stroke();
+      }
+    }
+    function roundRectPath(x, y, w, h, r) {
+      if (!ctx) return;
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    function sampleColorAt(pos) {
+      const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
+      if (pos <= sorted[0].pos) return sorted[0].color;
+      if (pos >= sorted[sorted.length - 1].pos) return sorted[sorted.length - 1].color;
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const a = sorted[i], b = sorted[i + 1];
+        if (pos >= a.pos && pos <= b.pos) {
+          const t = (pos - a.pos) / Math.max(1e-6, b.pos - a.pos);
+          return lerpHex(a.color, b.color, t);
+        }
+      }
+      return sorted[0].color;
+    }
+    function lerpHex(c1, c2, t) {
+      const p2 = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+      const [r1, g1, b1] = p2(c1), [r2, g2, b2] = p2(c2);
+      const mix = (a, b) => Math.round(a + (b - a) * t);
+      const hex = (v) => v.toString(16).padStart(2, "0");
+      return `#${hex(mix(r1, r2))}${hex(mix(g1, g2))}${hex(mix(b1, b2))}`;
+    }
+    function onDown(e) {
+      const { x, y } = eventToLogical(e);
+      downX = x;
+      downY = y;
+      moved = false;
+      const hit = stopAt(x);
+      if (hit && e.shiftKey) {
+        if (stops.value.length > 2) {
+          stops.value = stops.value.filter((s) => s !== hit);
+          activeStop = null;
+          emitChange();
+        }
+        redraw();
+        return;
+      }
+      if (hit) {
+        activeStop = hit;
+        dragOffsetX = hit.pos - fromCanvasX(x);
+        dragging = true;
+      } else if (y >= BAR_Y - HIT_R && y <= BAR_Y + BAR_H + HIT_R) {
+        const pos = fromCanvasX(x);
+        const newStop = { pos, color: sampleColorAt(pos) };
+        stops.value.push(newStop);
+        activeStop = newStop;
+        dragOffsetX = 0;
+        dragging = true;
+        emitChange();
+      }
+      redraw();
+    }
+    function onMove(e) {
+      const { x, y } = eventToLogical(e);
+      if (Math.abs(x - downX) > 3 || Math.abs(y - downY) > 3) moved = true;
+      if (dragging && activeStop) {
+        activeStop.pos = clamp01(fromCanvasX(x) + dragOffsetX);
+        stops.value.sort((a, b) => a.pos - b.pos);
+        emitChange();
+        redraw();
+        return;
+      }
+      const prevHover = hoverStop;
+      hoverStop = stopAt(x);
+      if (hoverStop !== prevHover) redraw();
+      if (canvas.value) canvas.value.style.cursor = hoverStop ? "grab" : "crosshair";
+    }
+    function onUp() {
+      if (dragging && activeStop && !moved) {
+        openPickerFor(activeStop);
+      }
+      dragging = false;
+      redraw();
+    }
+    function onLeave() {
+      if (dragging) onUp();
+      hoverStop = null;
+      redraw();
+    }
+    function openPickerFor(stop) {
+      activeStop = stop;
+      const input = colorInput.value;
+      if (!input) return;
+      input.value = stop.color;
+      input.click();
+    }
+    function onColorInput(e) {
+      if (!activeStop) return;
+      activeStop.color = normalizeHex(e.target.value);
+      emitChange();
+      redraw();
+    }
+    function reset() {
+      stops.value = [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
+      activeStop = null;
+      emitChange();
+      redraw();
+    }
+    let debounceTimer;
+    function emitChange() {
+      window.clearTimeout(debounceTimer);
+      debounceTimer = window.setTimeout(() => {
+        props.onChange(JSON.stringify({ stops: [...stops.value].sort((a, b) => a.pos - b.pos) }));
+      }, 60);
+    }
+    function serialise() {
+      return JSON.stringify({ stops: [...stops.value].sort((a, b) => a.pos - b.pos) });
+    }
+    function deserialise(json) {
+      try {
+        const data = JSON.parse(json);
+        if (Array.isArray(data.stops) && data.stops.length >= 2) {
+          stops.value = data.stops.map((s) => ({
+            pos: clamp01(Number(s.pos)),
+            color: normalizeHex(String(s.color))
+          })).sort((a, b) => a.pos - b.pos);
+          redraw();
+          return;
+        }
+      } catch {
+      }
+    }
+    function forceResize() {
+      return syncCanvasSize();
+    }
+    const userPresets = /* @__PURE__ */ ref([]);
+    const selectedPreset = /* @__PURE__ */ ref("");
+    async function loadPresets() {
+      try {
+        const res = await fetch("/nkd_color_ramp/presets");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (Array.isArray(data.user)) userPresets.value = data.user;
+      } catch {
+      }
+    }
+    function onPresetSelect(name) {
+      selectedPreset.value = name;
+      if (!name) return;
+      const p2 = userPresets.value.find((x) => x.name === name);
+      if (!p2) return;
+      stops.value = p2.stops.map((s) => ({ pos: clamp01(s.pos), color: normalizeHex(s.color) }));
+      activeStop = null;
+      emitChange();
+      redraw();
+    }
+    async function saveCurrentAsPreset() {
+      const raw = window.prompt("Preset name (1–64 chars: letters, numbers, spaces, -_().):");
+      if (raw === null) return;
+      const name = raw.trim();
+      if (!name) return;
+      if (!/^[\w \-().]{1,64}$/.test(name)) {
+        window.alert("Invalid name. Use letters, numbers, spaces, or - _ ( ) .");
+        return;
+      }
+      const exists = userPresets.value.some((p2) => p2.name.toLowerCase() === name.toLowerCase());
+      if (exists && !window.confirm(`Overwrite existing preset "${name}"?`)) return;
+      const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos) };
+      try {
+        const res = await fetch("/nkd_color_ramp/presets", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          window.alert(`Save failed: ${err.error ?? res.statusText}`);
+          return;
+        }
+        await loadPresets();
+        selectedPreset.value = name;
+      } catch (e) {
+        window.alert(`Save failed: ${e}`);
+      }
+    }
+    async function deleteSelectedPreset() {
+      const name = selectedPreset.value;
+      if (!name) return;
+      if (!window.confirm(`Delete preset "${name}"?`)) return;
+      try {
+        const res = await fetch(`/nkd_color_ramp/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          window.alert(`Delete failed: ${err.error ?? res.statusText}`);
+          return;
+        }
+        await loadPresets();
+        selectedPreset.value = "";
+      } catch (e) {
+        window.alert(`Delete failed: ${e}`);
+      }
+    }
+    function cleanup() {
+      window.clearTimeout(debounceTimer);
+      ro == null ? void 0 : ro.disconnect();
+    }
+    onMounted(() => {
+      var _a;
+      ctx = ((_a = canvas.value) == null ? void 0 : _a.getContext("2d")) ?? null;
+      ro = new ResizeObserver(() => syncCanvasSize());
+      if (canvas.value) ro.observe(canvas.value);
+      syncCanvasSize();
+      loadPresets();
+    });
+    onBeforeUnmount(cleanup);
+    __expose({ serialise, deserialise, forceResize, cleanup });
+    return (_ctx, _cache) => {
+      return openBlock(), createElementBlock("div", {
+        class: "nkd-root",
+        onMousedown: _cache[1] || (_cache[1] = withModifiers(() => {
+        }, ["stop"])),
+        onMouseup: _cache[2] || (_cache[2] = withModifiers(() => {
+        }, ["stop"])),
+        onMousemove: _cache[3] || (_cache[3] = withModifiers(() => {
+        }, ["stop"])),
+        onContextmenu: _cache[4] || (_cache[4] = withModifiers(() => {
+        }, ["prevent"]))
+      }, [
+        createBaseVNode("canvas", {
+          ref_key: "canvas",
+          ref: canvas,
+          class: "nkd-canvas",
+          onMousedown: withModifiers(onDown, ["stop", "prevent"]),
+          onMousemove: withModifiers(onMove, ["stop"]),
+          onMouseup: withModifiers(onUp, ["stop"]),
+          onMouseleave: withModifiers(onLeave, ["stop"])
+        }, null, 544),
+        createBaseVNode("div", _hoisted_1, [
+          createBaseVNode("div", _hoisted_2, [
+            _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: pick color · Shift+click: delete · drag: move", -1)),
+            _cache[6] || (_cache[6] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+            createBaseVNode("button", {
+              class: "nkd-btn",
+              onClick: withModifiers(reset, ["stop"])
+            }, "Reset")
+          ]),
+          createBaseVNode("div", _hoisted_3, [
+            _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-label" }, "Preset", -1)),
+            createBaseVNode("select", {
+              class: "nkd-select nkd-select--preset",
+              value: selectedPreset.value,
+              onChange: _cache[0] || (_cache[0] = ($event) => onPresetSelect($event.target.value))
+            }, [
+              _cache[7] || (_cache[7] = createBaseVNode("option", { value: "" }, "— Select —", -1)),
+              (openBlock(true), createElementBlock(Fragment, null, renderList(userPresets.value, (p2) => {
+                return openBlock(), createElementBlock("option", {
+                  key: p2.name,
+                  value: p2.name
+                }, toDisplayString(p2.name), 9, _hoisted_5);
+              }), 128))
+            ], 40, _hoisted_4),
+            createBaseVNode("button", {
+              class: "nkd-btn nkd-btn--preset",
+              onClick: withModifiers(saveCurrentAsPreset, ["stop"])
+            }, "Save"),
+            createBaseVNode("button", {
+              class: "nkd-btn nkd-btn--preset",
+              disabled: !selectedPreset.value,
+              onClick: withModifiers(deleteSelectedPreset, ["stop"])
+            }, "Delete", 8, _hoisted_6)
+          ])
+        ]),
+        createBaseVNode("input", {
+          ref_key: "colorInput",
+          ref: colorInput,
+          type: "color",
+          class: "nkd-color-input",
+          onInput: onColorInput
+        }, null, 544)
+      ], 32);
+    };
+  }
+});
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-f2c94812"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -6720,12 +7128,115 @@ app.registerExtension({
     };
   }
 });
+const RAMP_NODES = ["NKDGradientMap", "NKDGradientGenerate"];
+const RAMP_CANVAS_W = 380;
+const RAMP_CANVAS_AR = 64 / RAMP_CANVAS_W;
+const RAMP_MIN_W = 380;
+app.registerExtension({
+  name: "NKD.BasicTools.ColorRamp.Vue",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (!RAMP_NODES.includes(nodeData.name)) return;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      var _a;
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const rampWidget = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "ramp");
+      if (!rampWidget) return result;
+      rampWidget.type = "hidden";
+      rampWidget.hidden = true;
+      if (rampWidget.options) rampWidget.options.hidden = true;
+      rampWidget.computedHeight = 0;
+      rampWidget.computeSize = () => [0, -4];
+      const container = document.createElement("div");
+      let barH = 70;
+      let instance = null;
+      const vueApp = createApp(ColorRampWidget, {
+        onChange: (json) => {
+          if (rampWidget.value !== json) rampWidget.value = json;
+        }
+      });
+      instance = vueApp.mount(container);
+      const heightFor = (width) => Math.round(width * RAMP_CANVAS_AR) + barH;
+      this.addDOMWidget("ramp_editor", "NKD_RAMP_EDITOR", container, {
+        getValue: () => rampWidget.value,
+        setValue: (v) => {
+          rampWidget.value = v;
+          instance == null ? void 0 : instance.deserialise(v ?? "");
+        },
+        serialize: false,
+        hideOnZoom: false,
+        getMinHeight: () => {
+          var _a2;
+          return heightFor(((_a2 = this.size) == null ? void 0 : _a2[0]) || RAMP_CANVAS_W);
+        },
+        getMaxHeight: () => {
+          var _a2;
+          return heightFor(((_a2 = this.size) == null ? void 0 : _a2[0]) || RAMP_CANVAS_W);
+        },
+        getHeight: () => {
+          var _a2;
+          return heightFor(((_a2 = this.size) == null ? void 0 : _a2[0]) || RAMP_CANVAS_W);
+        }
+      });
+      const origResize = this.onResize;
+      this.onResize = function(size) {
+        origResize == null ? void 0 : origResize.apply(this, arguments);
+        if (size[0] < RAMP_MIN_W) size[0] = RAMP_MIN_W;
+        size[1] = this.computeSize(size[0])[1];
+      };
+      const origComputeSize = this.computeSize.bind(this);
+      this.computeSize = function(_w) {
+        const sz = origComputeSize();
+        const width = sz[0] || this.size[0];
+        const needed = heightFor(width);
+        if (sz[1] < needed) sz[1] = needed;
+        return sz;
+      };
+      let v1NeedsInit = true;
+      const origDrawBg = this.onDrawBackground;
+      this.onDrawBackground = function(ctx) {
+        var _a2;
+        origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
+        if (v1NeedsInit && ((_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance))) v1NeedsInit = false;
+      };
+      requestAnimationFrame(() => {
+        var _a2;
+        const barEl = container.querySelector(".nkd-bar");
+        const measured = barEl ? Math.ceil(barEl.getBoundingClientRect().height) : 0;
+        if (measured > 0) barH = measured;
+        instance == null ? void 0 : instance.deserialise(rampWidget.value ?? "");
+        if ((_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance)) v1NeedsInit = false;
+        const sz = this.computeSize(this.size[0]);
+        this.setSize(sz);
+        this.setDirtyCanvas(true, true);
+      });
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        requestAnimationFrame(() => {
+          var _a2;
+          instance == null ? void 0 : instance.deserialise(rampWidget.value ?? "");
+          if ((_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance)) v1NeedsInit = false;
+        });
+        return r;
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        var _a2;
+        (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
+        vueApp.unmount();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
 (function() {
   "use strict";
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-f2c94812] {\n  display: flex;\n  flex-direction: column;\n  height: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n}\n.nkd-canvas[data-v-f2c94812] {\n  width: 100%;\n  display: block;\n  cursor: crosshair;\n}\n.nkd-color-input[data-v-f2c94812] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-f2c94812] {\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f2c94812] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f2c94812] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-f2c94812]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-f2c94812] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f2c94812] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-f2c94812] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-f2c94812] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-f2c94812], .nkd-select[data-v-f2c94812] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:hover, .nkd-select[data-v-f2c94812]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-f2c94812]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

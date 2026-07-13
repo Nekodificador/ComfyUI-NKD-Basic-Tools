@@ -4,9 +4,10 @@ import vue from "@vitejs/plugin-vue";
 import cssInjectedByJs from "vite-plugin-css-injected-by-js";
 
 /**
- * Builds the Vue widgets into js/nkd_prompt_variables.js.
- * js/ also holds the hand-written nkd_basic_tools.js extension, so the
- * build must never wipe the directory (emptyOutDir: false).
+ * Builds every Vue-based node widget in this pack into a single bundle,
+ * js/nkd_vue_widgets.js (Prompt Variables, Gradient Map/Generate's color
+ * ramp editor, ...). js/ also holds the hand-written nkd_basic_tools.js
+ * extension, so the build must never wipe the directory (emptyOutDir: false).
  */
 export default defineConfig({
   plugins: [vue(), cssInjectedByJs({ topExecutionPriority: false })],
@@ -19,7 +20,7 @@ export default defineConfig({
     lib: {
       entry: "./src/main.ts",
       formats: ["es"],
-      fileName: "nkd_prompt_variables",
+      fileName: "nkd_vue_widgets",
     },
     rollupOptions: {
       external: [
@@ -28,7 +29,7 @@ export default defineConfig({
       ],
       output: {
         dir: "js",
-        entryFileNames: "nkd_prompt_variables.js",
+        entryFileNames: "nkd_vue_widgets.js",
         assetFileNames: "assets/[name].[ext]",
       },
     },

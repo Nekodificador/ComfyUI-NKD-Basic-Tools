@@ -68,6 +68,22 @@ multiprompt with two nodes. Shift-click a chip (or use `Randomize All`) to make
 that variable pick a random item from its list instead, seeded for
 reproducibility. Shows the resolved prompt(s) in the node.
 
+### 😺NKD Gradient Map / 😺NKD Gradient Generate
+
+A shared color-ramp editor — click the bar to add a stop, click a stop to pick
+its color (native picker), drag to move it, Shift-click to remove it. Save and
+load your own ramps as presets.
+
+**Gradient Map** recolors an image by brightness: darks land on one end of the
+ramp, lights on the other — the classic duotone / color-grading look, with an
+`Invert` toggle and a `Strength` slider to dial it back.
+
+**Gradient Generate** creates a gradient image from scratch — Linear, Radial,
+Angular (conic) or Diamond — with angle and center controls. No reference
+image needed; wire its output anywhere an image is expected.
+
+Both draw a live preview in the node as you edit the ramp.
+
 ## License
 
 MIT

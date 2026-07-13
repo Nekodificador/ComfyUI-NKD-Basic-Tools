@@ -4,6 +4,7 @@
 import { app as comfyApp } from "../../scripts/app.js";
 import { createApp } from "vue";
 import PromptVariablesWidget from "./PromptVariablesWidget.vue";
+import ColorRampWidget from "./ColorRampWidget.vue";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -137,6 +138,113 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(varsTimer);
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Gradient Map / 😺NKD Gradient Generate — shared color-ramp editor.
+// Hides the raw `ramp` string widget and mounts the same Vue canvas widget on
+// both node types, so a ramp built in one works pasted/loaded into the other.
+const RAMP_NODES = ["NKDGradientMap", "NKDGradientGenerate"];
+const RAMP_CANVAS_W = 380;
+const RAMP_CANVAS_AR = 64 / RAMP_CANVAS_W;
+const RAMP_MIN_W = 380;
+
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.ColorRamp.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (!RAMP_NODES.includes(nodeData.name)) return;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const rampWidget = this.widgets?.find((w: any) => w.name === "ramp");
+      if (!rampWidget) return result;
+      rampWidget.type = "hidden";
+      rampWidget.hidden = true;
+      if (rampWidget.options) rampWidget.options.hidden = true;
+      rampWidget.computedHeight = 0;
+      rampWidget.computeSize = () => [0, -4];
+
+      const container = document.createElement("div");
+      let barH = 70; // overestimate until measured
+
+      let instance: any = null;
+      const vueApp = createApp(ColorRampWidget, {
+        onChange: (json: string) => {
+          if (rampWidget.value !== json) rampWidget.value = json;
+        },
+      });
+      instance = vueApp.mount(container) as any;
+
+      const heightFor = (width: number) => Math.round(width * RAMP_CANVAS_AR) + barH;
+
+      this.addDOMWidget("ramp_editor", "NKD_RAMP_EDITOR", container, {
+        getValue: () => rampWidget.value,
+        setValue: (v: string) => {
+          rampWidget.value = v;
+          instance?.deserialise(v ?? "");
+        },
+        serialize: false,
+        hideOnZoom: false,
+        getMinHeight: () => heightFor(this.size?.[0] || RAMP_CANVAS_W),
+        getMaxHeight: () => heightFor(this.size?.[0] || RAMP_CANVAS_W),
+        getHeight: () => heightFor(this.size?.[0] || RAMP_CANVAS_W),
+      });
+
+      const origResize = this.onResize;
+      this.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < RAMP_MIN_W) size[0] = RAMP_MIN_W;
+        size[1] = this.computeSize(size[0])[1];
+      };
+
+      const origComputeSize = this.computeSize.bind(this);
+      this.computeSize = function (_w?: number) {
+        const sz = origComputeSize();
+        const width = sz[0] || this.size[0];
+        const needed = heightFor(width);
+        if (sz[1] < needed) sz[1] = needed;
+        return sz;
+      };
+
+      let v1NeedsInit = true;
+      const origDrawBg = this.onDrawBackground;
+      this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
+        origDrawBg?.apply(this, arguments);
+        if (v1NeedsInit && instance?.forceResize?.()) v1NeedsInit = false;
+      };
+
+      requestAnimationFrame(() => {
+        const barEl = container.querySelector(".nkd-bar");
+        const measured = barEl ? Math.ceil((barEl as HTMLElement).getBoundingClientRect().height) : 0;
+        if (measured > 0) barH = measured;
+        instance?.deserialise(rampWidget.value ?? "");
+        if (instance?.forceResize?.()) v1NeedsInit = false;
+        const sz = this.computeSize(this.size[0]);
+        this.setSize(sz);
+        this.setDirtyCanvas(true, true);
+      });
+
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        requestAnimationFrame(() => {
+          instance?.deserialise(rampWidget.value ?? "");
+          if (instance?.forceResize?.()) v1NeedsInit = false;
+        });
+        return r;
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);

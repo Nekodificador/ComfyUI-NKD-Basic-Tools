@@ -5,6 +5,8 @@ from comfy_api.latest import ComfyExtension, io
 from .nkd_crop_stitch import NKDInpaintCrop, NKDInpaintStitch
 from .nkd_string_split import NKDStringSplit
 from .nkd_prompt_variables import NKDPromptVariables
+from .nkd_gradient_map import NKDGradientMap
+from .nkd_gradient_generate import NKDGradientGenerate
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
@@ -19,6 +21,8 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDInpaintStitch,
             NKDStringSplit,
             NKDPromptVariables,
+            NKDGradientMap,
+            NKDGradientGenerate,
         ]
 
 
@@ -32,6 +36,8 @@ NODE_CLASS_MAPPINGS = {
     "NKDInpaintStitch": NKDInpaintStitch,
     "NKDStringSplit": NKDStringSplit,
     "NKDPromptVariables": NKDPromptVariables,
+    "NKDGradientMap": NKDGradientMap,
+    "NKDGradientGenerate": NKDGradientGenerate,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -39,6 +45,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDInpaintStitch": "😺NKD Inpaint Stitch",
     "NKDStringSplit": "😺NKD String Split",
     "NKDPromptVariables": "😺NKD Prompt Variables",
+    "NKDGradientMap": "😺NKD Gradient Map",
+    "NKDGradientGenerate": "😺NKD Gradient Generate",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
