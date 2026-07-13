@@ -6611,6 +6611,18 @@ const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
 const MIN_EDITOR_H = 190;
+function syncLabels(node) {
+  const props = node.properties ?? (node.properties = {});
+  const store = props.nkd_var_labels ?? (props.nkd_var_labels = {});
+  for (const inp of node.inputs ?? []) {
+    const m = /(?:^|\.)variable_(\d+)$/.exec(inp.name);
+    if (!m) continue;
+    const local = `variable_${m[1]}`;
+    const isDefault = !inp.label || inp.label === local || inp.label === inp.name;
+    if (!isDefault) store[local] = inp.label;
+    else if (store[local]) inp.label = store[local];
+  }
+}
 function readVariables(node) {
   const list = [];
   for (const inp of node.inputs ?? []) {
@@ -6679,15 +6691,18 @@ app.registerExtension({
       const origDrawBg = this.onDrawBackground;
       this.onDrawBackground = function(ctx) {
         origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
+        syncLabels(this);
         instance == null ? void 0 : instance.setVariables(readVariables(this));
       };
       const varsTimer = window.setInterval(() => {
+        syncLabels(this);
         instance == null ? void 0 : instance.setVariables(readVariables(this));
       }, 800);
       const origConfigure = this.onConfigure;
       this.onConfigure = function() {
         const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
         requestAnimationFrame(() => {
+          syncLabels(this);
           instance == null ? void 0 : instance.deserialise(textWidget.value ?? "");
           instance == null ? void 0 : instance.setVariables(readVariables(this));
         });

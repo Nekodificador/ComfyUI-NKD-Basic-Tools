@@ -11,6 +11,22 @@ const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
 const MIN_EDITOR_H = 190;
 
+// Autogrow rebuilds its dynamic slots on load, dropping custom labels of every
+// socket after the first. Mirror renames into node.properties (which DOES
+// serialize with the workflow) and restore them onto rebuilt slots.
+function syncLabels(node: any) {
+  const props = (node.properties ??= {});
+  const store = (props.nkd_var_labels ??= {});
+  for (const inp of node.inputs ?? []) {
+    const m = /(?:^|\.)variable_(\d+)$/.exec(inp.name);
+    if (!m) continue;
+    const local = `variable_${m[1]}`;
+    const isDefault = !inp.label || inp.label === local || inp.label === inp.name;
+    if (!isDefault) store[local] = inp.label;         // user renamed → remember
+    else if (store[local]) inp.label = store[local];  // rebuilt slot → restore
+  }
+}
+
 function readVariables(node: any) {
   const list: { name: string; label: string; connected: boolean }[] = [];
   for (const inp of node.inputs ?? []) {
@@ -97,10 +113,12 @@ comfyApp.registerExtension({
       const origDrawBg = this.onDrawBackground;
       this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
         origDrawBg?.apply(this, arguments);
+        syncLabels(this);
         instance?.setVariables(readVariables(this));
       };
       // Vue Nodes (2.0) never calls onDrawBackground — poll instead.
       const varsTimer = window.setInterval(() => {
+        syncLabels(this);
         instance?.setVariables(readVariables(this));
       }, 800);
 
@@ -109,6 +127,7 @@ comfyApp.registerExtension({
         const r = origConfigure?.apply(this, arguments);
         // Widget values are restored after creation — re-render the chips.
         requestAnimationFrame(() => {
+          syncLabels(this);
           instance?.deserialise(textWidget.value ?? "");
           instance?.setVariables(readVariables(this));
         });
