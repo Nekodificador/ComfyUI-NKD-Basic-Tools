@@ -6538,7 +6538,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-bb13528a"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-7c03632a"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -6546,10 +6546,10 @@ const MIN_EDITOR_H = 190;
 function readVariables(node) {
   const list = [];
   for (const inp of node.inputs ?? []) {
-    const m = /^variable_(\d+)$/.exec(inp.name);
+    const m = /(?:^|\.)variable_(\d+)$/.exec(inp.name);
     if (!m) continue;
     list.push({
-      name: inp.name,
+      name: `variable_${m[1]}`,
       label: `Variable ${Number(m[1]) + 1}`,
       connected: inp.link != null
     });
@@ -6567,10 +6567,11 @@ app.registerExtension({
       const textWidget = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "text");
       if (!textWidget) return result;
       textWidget.type = "hidden";
+      textWidget.hidden = true;
+      if (textWidget.options) textWidget.options.hidden = true;
       textWidget.computedHeight = 0;
       textWidget.computeSize = () => [0, -4];
       const container = document.createElement("div");
-      container.style.height = "100%";
       let instance = null;
       const vueApp = createApp(PromptVariablesWidget, {
         onChange: (text) => {
@@ -6599,7 +6600,10 @@ app.registerExtension({
       requestAnimationFrame(() => {
         instance == null ? void 0 : instance.deserialise(textWidget.value ?? "");
         instance == null ? void 0 : instance.setVariables(readVariables(this));
-        this.setSize(this.computeSize());
+        const sz = this.computeSize();
+        if (Number.isFinite(sz[0]) && Number.isFinite(sz[1])) {
+          this.setSize([Math.max(sz[0], this.size[0]), Math.max(sz[1], this.size[1])]);
+        }
         this.setDirtyCanvas(true, true);
       });
       const origDrawBg = this.onDrawBackground;
@@ -6607,6 +6611,9 @@ app.registerExtension({
         origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
         instance == null ? void 0 : instance.setVariables(readVariables(this));
       };
+      const varsTimer = window.setInterval(() => {
+        instance == null ? void 0 : instance.setVariables(readVariables(this));
+      }, 800);
       const origConfigure = this.onConfigure;
       this.onConfigure = function() {
         const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
@@ -6619,6 +6626,7 @@ app.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function() {
         var _a2;
+        window.clearInterval(varsTimer);
         (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
         vueApp.unmount();
         origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
@@ -6632,7 +6640,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-bb13528a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  height: 100%;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-bb13528a] {\n  flex: 1 1 auto;\n  min-height: 120px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-bb13528a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-bb13528a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-chip[data-v-bb13528a] {\n  display: inline-block;\n  background: rgba(74, 180, 255, 0.16);\n  border: 1px solid #4ab4ff;\n  color: #4ab4ff;\n  border-radius: 10px;\n  padding: 0 8px;\n  margin: 0 1px;\n  font-size: 11px;\n  line-height: 18px;\n  vertical-align: baseline;\n  user-select: none;\n  cursor: default;\n  white-space: nowrap;\n}\n.nkd-pv-chip-off[data-v-bb13528a] {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.3);\n  color: rgba(255, 255, 255, 0.45);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-bar[data-v-bb13528a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-bb13528a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-bb13528a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-bb13528a] {\n  color: #4ab4ff;\n}"));
+      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-7c03632a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-7c03632a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-7c03632a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-7c03632a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-chip[data-v-7c03632a] {\n  display: inline-block;\n  background: rgba(74, 180, 255, 0.16);\n  border: 1px solid #4ab4ff;\n  color: #4ab4ff;\n  border-radius: 10px;\n  padding: 0 8px;\n  margin: 0 1px;\n  font-size: 11px;\n  line-height: 18px;\n  vertical-align: baseline;\n  user-select: none;\n  cursor: default;\n  white-space: nowrap;\n}\n.nkd-pv-chip-off[data-v-7c03632a] {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.3);\n  color: rgba(255, 255, 255, 0.45);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-bar[data-v-7c03632a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-7c03632a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-7c03632a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-7c03632a] {\n  color: #4ab4ff;\n}"));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

@@ -27,6 +27,11 @@ def demo():
     out = _apply_variables("keep {not_a_var} as is", {"variable_0": "x"})
     assert out == "keep {not_a_var} as is"
 
+    # Chip insertion leaves "{var} ," → space before punctuation cleaned
+    out = _apply_variables("a portrait of {variable_0} , cinematic",
+                           {"variable_0": "a fox"})
+    assert out == "a portrait of a fox, cinematic"
+
     # Newlines preserved; edges trimmed
     out = _apply_variables("  {variable_0}\nline two  ", {"variable_0": "line one"})
     assert out == "line one\nline two"

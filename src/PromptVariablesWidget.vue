@@ -195,13 +195,13 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
   display: flex;
   flex-direction: column;
   gap: 6px;
-  height: 100%;
   box-sizing: border-box;
   padding: 2px;
 }
 .nkd-pv-editor {
-  flex: 1 1 auto;
-  min-height: 120px;
+  height: 150px;
+  min-height: 90px;
+  resize: vertical;
   overflow-y: auto;
   background: #111318;
   border: 1px solid #3a3d46;

@@ -14,10 +14,12 @@ const MIN_EDITOR_H = 190;
 function readVariables(node: any) {
   const list: { name: string; label: string; connected: boolean }[] = [];
   for (const inp of node.inputs ?? []) {
-    const m = /^variable_(\d+)$/.exec(inp.name);
+    // Autogrow sockets are namespaced ("variables.variable_0"); tokens use the
+    // local name, which is also what the backend receives as dict keys.
+    const m = /(?:^|\.)variable_(\d+)$/.exec(inp.name);
     if (!m) continue;
     list.push({
-      name: inp.name,
+      name: `variable_${m[1]}`,
       label: `Variable ${Number(m[1]) + 1}`,
       connected: inp.link != null,
     });
@@ -36,12 +38,15 @@ comfyApp.registerExtension({
 
       const textWidget = this.widgets?.find((w: any) => w.name === "text");
       if (!textWidget) return result;
+      // Hide in BOTH renderers: canvas (1.0) reads type/computeSize, Vue
+      // Nodes (2.0) reads hidden/options.hidden.
       textWidget.type = "hidden";
+      textWidget.hidden = true;
+      if (textWidget.options) textWidget.options.hidden = true;
       textWidget.computedHeight = 0;
       textWidget.computeSize = () => [0, -4];
 
       const container = document.createElement("div");
-      container.style.height = "100%";
 
       let instance: any = null;
       const vueApp = createApp(PromptVariablesWidget, {
@@ -75,7 +80,12 @@ comfyApp.registerExtension({
       requestAnimationFrame(() => {
         instance?.deserialise(textWidget.value ?? "");
         instance?.setVariables(readVariables(this));
-        this.setSize(this.computeSize());
+        // Grow-only, finite-only: never shrink a restored size, never feed
+        // NaN into setSize (runaway node growth).
+        const sz = this.computeSize();
+        if (Number.isFinite(sz[0]) && Number.isFinite(sz[1])) {
+          this.setSize([Math.max(sz[0], this.size[0]), Math.max(sz[1], this.size[1])]);
+        }
         this.setDirtyCanvas(true, true);
       });
 
@@ -84,6 +94,10 @@ comfyApp.registerExtension({
         origDrawBg?.apply(this, arguments);
         instance?.setVariables(readVariables(this));
       };
+      // Vue Nodes (2.0) never calls onDrawBackground — poll instead.
+      const varsTimer = window.setInterval(() => {
+        instance?.setVariables(readVariables(this));
+      }, 800);
 
       const origConfigure = this.onConfigure;
       this.onConfigure = function () {
@@ -98,6 +112,7 @@ comfyApp.registerExtension({
 
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
+        window.clearInterval(varsTimer);
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);

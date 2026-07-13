@@ -22,6 +22,7 @@ def _apply_variables(text: str, variables: dict) -> str:
     for name, value in variables.items():
         text = text.replace("{%s}" % name, value if value is not None else "")
     text = re.sub(r"[ \t]{2,}", " ", text)
+    text = re.sub(r" +([,.;:!?])", r"\1", text)
     return text.strip()
 
 
