@@ -360,7 +360,7 @@ def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
 
     if mask is not None:
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
-        a = (m[0].to(img.device, img.dtype).clamp(0, 1) * 0.35).unsqueeze(-1)
+        a = (m[0].to(img.device, img.dtype).clamp(0, 1) * 0.85).unsqueeze(-1)
         img[0] = img[0] * (1.0 - a) + accent * a
 
     dim = torch.full((h, w, 1), 0.45, device=img.device, dtype=img.dtype)
