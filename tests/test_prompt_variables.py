@@ -40,6 +40,21 @@ def demo():
     assert [p.split(" + ")[0] for p in r1] == ["a", "b", "c"]  # mapping intact
     assert all(p.split(" + ")[1] in "xyz" for p in r1)
 
+    # BUG (reported by Neko): the ONLY list-bearing variable gets marked
+    # random via shift-click, the other variable is unconnected/single-value.
+    # Count must still follow the randomized variable's list, not collapse to 1.
+    out = _resolve_prompts("{variable_0:r} wearing {variable_1}",
+                           {"variable_0": ["a", "b", "c", "d", "e"], "variable_1": None})
+    assert len(out) == 5
+    assert all(p.split(" wearing")[0] in "abcde" for p in out)
+
+    # Mixed lengths: count follows the LONGEST list, random var draws from its own
+    out = _resolve_prompts("{variable_0} + {variable_1:r}",
+                           {"variable_0": ["a", "b", "c", "d", "e"],
+                            "variable_1": ["x", "y", "z"]})
+    assert len(out) == 5
+    assert all(p.split(" + ")[1] in "xyz" for p in out)
+
     # randomize_all → single prompt, every variable random
     ra = _resolve_prompts("{variable_0} + {variable_1}", vars_,
                           randomize_all=True, seed=7)
