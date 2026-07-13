@@ -109,6 +109,20 @@ def demo():
     err_after = (matched[region] - image[region]).abs().sum()
     assert err_after < err_before
 
+    # Edge hugging on non-grid image sizes: mask touching the right border of a
+    # 1003px-wide image → the box must reach the border and contain the mask.
+    He, We = 999, 1003
+    edge_img = torch.rand(1, He, We, 3)
+    edge_mask = torch.zeros(1, He, We)
+    edge_mask[:, 300:600, 850:We] = 1.0
+    edge_proc = _mask_grow(edge_mask, 20, 10)
+    ecrop, _, ebox, _ = _crop_by_mask(edge_img, edge_proc, 50, _megapixels_to_pixels(1.0))
+    ex1, ey1, ex2, ey2 = ebox
+    assert ex2 == We                                              # hugs the edge
+    assert (ex2 - ex1) % _VAE_MULTIPLE == 0 and (ey2 - ey1) % _VAE_MULTIPLE == 0
+    covered = edge_proc[0, ey1:ey2, ex1:ex2].sum() / edge_proc[0].sum()
+    assert covered > 0.999                                        # mask fully inside
+
     # --- Region separation + chained stitch ---
     multi = torch.zeros(1, H, W)
     multi[:, 100:300, 100:400] = 1.0    # big blob, left

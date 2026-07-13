@@ -334,18 +334,18 @@ def _grow_bbox_to_aspect(
     new_w = min(new_w, max_w)
     new_h = min(new_h, max_h)
 
-    cx = (x1 + x2) // 2
-    cy = (y1 + y2) // 2
-    nx1 = (cx - new_w // 2) // multiple * multiple
-    ny1 = (cy - new_h // 2) // multiple * multiple
-    if nx1 < 0:
-        nx1 = 0
-    if ny1 < 0:
-        ny1 = 0
-    if nx1 + new_w > img_w:
-        nx1 = max(0, (img_w - new_w) // multiple * multiple)
-    if ny1 + new_h > img_h:
-        ny1 = max(0, (img_h - new_h) // multiple * multiple)
+    # Placement: only the SIZE needs grid alignment (the VAE cares about the
+    # crop dimensions, not its offset). Free offsets let the box hug the image
+    # edges exactly on non-aligned image sizes, and containment comes first:
+    # cover the original bbox, centre the leftover, clamp to bounds.
+    def _place(a1: int, a2: int, size: int, limit: int) -> int:
+        p = (a1 + a2) // 2 - size // 2
+        p = min(p, a1)          # cover the bbox start
+        p = max(p, a2 - size)   # cover the bbox end (wins when size < bbox)
+        return max(0, min(p, limit - size))
+
+    nx1 = _place(x1, x2, new_w, img_w)
+    ny1 = _place(y1, y2, new_h, img_h)
     return nx1, ny1, nx1 + new_w, ny1 + new_h
 
 
