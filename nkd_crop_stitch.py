@@ -15,6 +15,7 @@ from comfy_api.latest._io import comfytype, ComfyTypeIO
 
 from .helpers import (
     _crop_by_mask,
+    _mask_fill_holes,
     _mask_grow,
     _megapixels_to_pixels,
     _resize_mask,
@@ -50,6 +51,8 @@ class NKDInpaintCrop(io.ComfyNode):
             inputs=[
                 io.Image.Input("image"),
                 io.Mask.Input("mask"),
+                io.Boolean.Input("fill_holes", default=True,
+                                 tooltip="Fill fully-enclosed holes in the mask before processing."),
                 io.Int.Input("mask_expand", default=20, min=0, max=512,
                              tooltip="Grow the mask outward by this many pixels before cropping."),
                 io.Int.Input("mask_blur", default=10, min=0, max=256,
@@ -73,10 +76,12 @@ class NKDInpaintCrop(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, image, mask, mask_expand, mask_blur, padding, megapixels) -> io.NodeOutput:
+    def execute(cls, image, mask, fill_holes, mask_expand, mask_blur, padding, megapixels) -> io.NodeOutput:
         _, ih, iw, _ = image.shape
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
         m = _resize_mask(m, iw, ih)
+        if fill_holes:
+            m = _mask_fill_holes(m)
         processed = _mask_grow(m, mask_expand, mask_blur)
 
         crop_img, crop_mask, crop_box, orig_size = _crop_by_mask(

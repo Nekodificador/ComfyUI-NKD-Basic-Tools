@@ -6,7 +6,8 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from helpers import _crop_by_mask, _mask_grow, _megapixels_to_pixels, _uncrop, _VAE_MULTIPLE
+from helpers import (_crop_by_mask, _mask_fill_holes, _mask_grow,
+                     _megapixels_to_pixels, _uncrop, _VAE_MULTIPLE)
 
 
 def demo():
@@ -16,7 +17,15 @@ def demo():
 
     # Circular mask off-center
     yy, xx = torch.meshgrid(torch.arange(H), torch.arange(W), indexing="ij")
-    mask = (((yy - 220) ** 2 + (xx - 550) ** 2) < 60 ** 2).float().unsqueeze(0)
+    dist2 = (yy - 220) ** 2 + (xx - 550) ** 2
+    mask = (dist2 < 60 ** 2).float().unsqueeze(0)
+
+    # Fill holes: a ring (donut) must become a full disc; borders untouched.
+    ring = ((dist2 < 60 ** 2) & (dist2 > 30 ** 2)).float().unsqueeze(0)
+    filled = _mask_fill_holes(ring)
+    assert filled[0, 220, 550] == 1.0        # hole center filled
+    assert filled[0, 0, 0] == 0.0            # outside untouched
+    assert torch.equal(_mask_fill_holes(mask), mask)  # no holes → identity
 
     processed = _mask_grow(mask, 20, 10)
     assert processed.shape == (1, H, W)

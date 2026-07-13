@@ -87,6 +87,20 @@ def _mask_grow(mask: torch.Tensor, expand: int, blur: int) -> torch.Tensor:
     return m.squeeze(1)
 
 
+def _mask_fill_holes(mask: torch.Tensor) -> torch.Tensor:
+    """Fill fully-enclosed holes in the mask (regions of 0 not connected to the
+    border). Soft edge values are preserved — only the holes are set to 1."""
+    from scipy.ndimage import binary_fill_holes  # ships with ComfyUI core
+    if mask.dim() == 2:
+        mask = mask.unsqueeze(0)
+    binary = (mask > 0.5).cpu().numpy()
+    out = mask.clone()
+    for i in range(binary.shape[0]):
+        filled = torch.from_numpy(binary_fill_holes(binary[i])).to(mask.device)
+        out[i] = torch.maximum(out[i], filled.to(out.dtype))
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Resolution helpers
 # ---------------------------------------------------------------------------
