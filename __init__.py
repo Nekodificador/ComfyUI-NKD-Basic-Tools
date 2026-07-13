@@ -4,6 +4,7 @@ from comfy_api.latest import ComfyExtension, io
 
 from .nkd_crop_stitch import NKDInpaintCrop, NKDInpaintStitch
 from .nkd_string_split import NKDStringSplit
+from .nkd_prompt_variables import NKDPromptVariables
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
@@ -17,6 +18,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDInpaintCrop,
             NKDInpaintStitch,
             NKDStringSplit,
+            NKDPromptVariables,
         ]
 
 
@@ -29,12 +31,14 @@ NODE_CLASS_MAPPINGS = {
     "NKDInpaintCrop": NKDInpaintCrop,
     "NKDInpaintStitch": NKDInpaintStitch,
     "NKDStringSplit": NKDStringSplit,
+    "NKDPromptVariables": NKDPromptVariables,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDInpaintCrop": "😺NKD Inpaint Crop",
     "NKDInpaintStitch": "😺NKD Inpaint Stitch",
     "NKDStringSplit": "😺NKD String Split",
+    "NKDPromptVariables": "😺NKD Prompt Variables",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

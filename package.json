@@ -1,0 +1,18 @@
+{
+  "name": "nkd-basic-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NKD Basic Tools – ComfyUI transversal utility nodes",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0",
+    "vite-plugin-css-injected-by-js": "^4.0.1",
+    "vue": "^3.5.0",
+    "vue-tsc": "^2.0.0"
+  }
+}

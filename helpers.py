@@ -15,6 +15,16 @@ import torch.nn.functional as F
 _LIST_MARKER_RE = re.compile(r"^\s*(?:\d+\s*[.):]|[-*•])\s*")
 
 
+def _apply_variables(text: str, variables: dict) -> str:
+    """Replace {socket_name} tokens with their wired values. Unconnected
+    variables resolve to empty string; whitespace runs left behind by empty
+    substitutions are collapsed so the prompt stays clean."""
+    for name, value in variables.items():
+        text = text.replace("{%s}" % name, value if value is not None else "")
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
 def _split_text(text: str, delimiter: str, trim: bool = True,
                 skip_empty: bool = True, remove_numbering: bool = False) -> list:
     parts = text.split(delimiter) if delimiter else [text]

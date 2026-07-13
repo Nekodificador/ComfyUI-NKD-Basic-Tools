@@ -57,6 +57,14 @@ optional removal of list numbering (`1.`, `2)`, `-`) for lists written by an
 LLM. Shows the resulting list in the node, with partial execution support for
 instant iteration.
 
+### 😺NKD Prompt Variables
+
+A prompt box with variables, chips included: write your prompt, drop variable
+chips into it, and each chip is filled by whatever text arrives on its input
+socket (sockets grow as you connect). Wire a list — e.g. from 😺NKD String
+Split — into a variable and the prompt resolves once per item: a full
+multiprompt with two nodes. Shows the resolved prompt in the node.
+
 ## License
 
 MIT
