@@ -57,7 +57,10 @@ function chipEl(name: string): HTMLSpanElement {
   span.className = "nkd-pv-chip";
   span.contentEditable = "false";
   span.dataset.var = name;
-  span.textContent = labelFor(name);
+  const dot = document.createElement("i");
+  dot.className = "nkd-pv-dot";
+  span.appendChild(dot);
+  span.appendChild(document.createTextNode(labelFor(name)));
   const v = vars.value.find((x) => x.name === name);
   if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
   return span;
@@ -222,27 +225,6 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
   color: rgba(255, 255, 255, 0.22);
   pointer-events: none;
 }
-.nkd-pv-chip {
-  display: inline-block;
-  background: rgba(74, 180, 255, 0.16);
-  border: 1px solid #4ab4ff;
-  color: #4ab4ff;
-  border-radius: 10px;
-  padding: 0 8px;
-  margin: 0 1px;
-  font-size: 11px;
-  line-height: 18px;
-  vertical-align: baseline;
-  user-select: none;
-  cursor: default;
-  white-space: nowrap;
-}
-.nkd-pv-chip-off {
-  border-style: dashed;
-  border-color: rgba(255, 255, 255, 0.3);
-  color: rgba(255, 255, 255, 0.45);
-  background: rgba(255, 255, 255, 0.05);
-}
 .nkd-pv-bar {
   display: flex;
   flex-wrap: wrap;
@@ -264,5 +246,51 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
 }
 .nkd-pv-add.connected {
   color: #4ab4ff;
+}
+</style>
+
+<!-- Chips are created with document.createElement, outside Vue's render tree,
+     so their styles must be UNSCOPED (scoped rules only match hashed nodes). -->
+<style>
+.nkd-pv-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(74, 180, 255, 0.14);
+  border: 1px solid rgba(74, 180, 255, 0.75);
+  color: #bfe3ff;
+  border-radius: 999px;
+  padding: 0 9px 0 7px;
+  margin: 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 17px;
+  vertical-align: text-bottom;
+  user-select: none;
+  cursor: default;
+  white-space: nowrap;
+  transform: translateY(-1px);
+}
+.nkd-pv-chip::selection,
+.nkd-pv-chip *::selection {
+  background: transparent;
+}
+.nkd-pv-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #4ab4ff;
+  flex: 0 0 auto;
+}
+.nkd-pv-chip-off {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.32);
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.05);
+}
+.nkd-pv-chip-off .nkd-pv-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);
 }
 </style>

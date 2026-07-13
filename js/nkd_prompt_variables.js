@@ -6380,7 +6380,10 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       span.className = "nkd-pv-chip";
       span.contentEditable = "false";
       span.dataset.var = name;
-      span.textContent = labelFor(name);
+      const dot = document.createElement("i");
+      dot.className = "nkd-pv-dot";
+      span.appendChild(dot);
+      span.appendChild(document.createTextNode(labelFor(name)));
       const v = vars.value.find((x) => x.name === name);
       if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
       return span;
@@ -6538,7 +6541,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-7c03632a"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-b29e004c"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -6640,7 +6643,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-7c03632a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-7c03632a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-7c03632a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-7c03632a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-chip[data-v-7c03632a] {\n  display: inline-block;\n  background: rgba(74, 180, 255, 0.16);\n  border: 1px solid #4ab4ff;\n  color: #4ab4ff;\n  border-radius: 10px;\n  padding: 0 8px;\n  margin: 0 1px;\n  font-size: 11px;\n  line-height: 18px;\n  vertical-align: baseline;\n  user-select: none;\n  cursor: default;\n  white-space: nowrap;\n}\n.nkd-pv-chip-off[data-v-7c03632a] {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.3);\n  color: rgba(255, 255, 255, 0.45);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-bar[data-v-7c03632a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-7c03632a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-7c03632a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-7c03632a] {\n  color: #4ab4ff;\n}"));
+      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-b29e004c] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-b29e004c] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-b29e004c]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-b29e004c]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-b29e004c] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-b29e004c] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-b29e004c]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-b29e004c] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: default;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}"));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
