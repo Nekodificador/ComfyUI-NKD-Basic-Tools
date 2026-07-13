@@ -26,11 +26,12 @@ from .helpers import (
 )
 
 
-def _apply_differential_diffusion(model):
+def _apply_differential_diffusion(model, blend: float = 1.0):
     """Patch the model so the soft noise_mask drives per-pixel denoise strength.
     Same behavior as core's DifferentialDiffusion node (adapted from
     https://github.com/exx8/differential-diffusion), applied inline so the
-    workflow doesn't need the extra node."""
+    workflow doesn't need the extra node. `blend` mixes the per-step binary
+    mask with the original soft mask (1.0 = full differential diffusion)."""
     def forward(sigma: torch.Tensor, denoise_mask: torch.Tensor, extra_options: dict):
         inner = extra_options["model"]
         step_sigmas = extra_options["sigmas"]
@@ -42,7 +43,10 @@ def _apply_differential_diffusion(model):
         ts_to = inner.inner_model.model_sampling.timestep(sigma_to)
         current_ts = inner.inner_model.model_sampling.timestep(sigma[0])
         threshold = (current_ts - ts_to) / (ts_from - ts_to)
-        return (denoise_mask >= threshold).to(denoise_mask.dtype)
+        binary_mask = (denoise_mask >= threshold).to(denoise_mask.dtype)
+        if blend < 1.0:
+            return blend * binary_mask + (1.0 - blend) * denoise_mask
+        return binary_mask
 
     model = model.clone()
     model.set_model_denoise_mask_function(forward)
@@ -75,8 +79,6 @@ class NKDInpaintCrop(io.ComfyNode):
                 "Connect crop_data to 😺NKD Inpaint Stitch to composite back."
             ),
             inputs=[
-                io.Image.Input("image"),
-                io.Mask.Input("mask"),
                 io.Model.Input("model", optional=True,
                                tooltip="Optional. When connected, the model output comes back "
                                        "patched with Differential Diffusion so the soft mask "
@@ -84,6 +86,8 @@ class NKDInpaintCrop(io.ComfyNode):
                 io.Vae.Input("vae", optional=True,
                              tooltip="Optional. When connected, the latent output is the crop "
                                      "already encoded with its noise_mask set — ready to sample."),
+                io.Image.Input("image"),
+                io.Mask.Input("mask"),
                 io.Boolean.Input("invert_mask", default=False,
                                  tooltip="Invert the mask before processing."),
                 io.Boolean.Input("fill_holes", default=True,
@@ -93,6 +97,12 @@ class NKDInpaintCrop(io.ComfyNode):
                 io.Int.Input("mask_blur", default=10, min=0, max=256,
                              tooltip="Feather the mask edge by this many pixels. This same "
                                      "softness is used by Stitch when compositing back."),
+                io.Float.Input("inpaint_blend", default=1.0, min=0.0, max=1.0, step=0.01,
+                               tooltip="Strength of the Differential Diffusion mask (only used "
+                                       "when model is connected). Controls how sharp the "
+                                       "transition is between the regenerated area and the "
+                                       "original. 1.0 = full differential diffusion; lower "
+                                       "values fade the two together more gently."),
                 io.Int.Input("padding", default=50, min=0, max=2048,
                              tooltip="Context around the mask included in the crop, in pixels."),
                 io.Float.Input("megapixels", default=1.0, min=0.0, max=16.0, step=0.05,
@@ -102,15 +112,15 @@ class NKDInpaintCrop(io.ComfyNode):
                                        "0 = native: no resample, pixel-perfect restore."),
             ],
             outputs=[
+                io.Model.Output(display_name="model",
+                                tooltip="Model patched with Differential Diffusion. "
+                                        "Requires model."),
+                io.Latent.Output(display_name="latent",
+                                 tooltip="Encoded crop with noise_mask set. Requires vae."),
                 io.Image.Output(display_name="image",
                                 tooltip="Cropped region, resampled to the megapixel budget."),
                 io.Mask.Output(display_name="mask",
                                tooltip="Processed mask cropped to the same region."),
-                io.Latent.Output(display_name="latent",
-                                 tooltip="Encoded crop with noise_mask set. Requires vae."),
-                io.Model.Output(display_name="model",
-                                tooltip="Model patched with Differential Diffusion. "
-                                        "Requires model."),
                 NKDCropDataType.Output("crop_data",
                                        tooltip="Everything Stitch needs to composite back."),
             ],
@@ -118,7 +128,7 @@ class NKDInpaintCrop(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, mask, invert_mask, fill_holes, mask_expand, mask_blur,
-                padding, megapixels, model=None, vae=None) -> io.NodeOutput:
+                inpaint_blend, padding, megapixels, model=None, vae=None) -> io.NodeOutput:
         _, ih, iw, _ = image.shape
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
         m = _resize_mask(m, iw, ih)
@@ -138,7 +148,8 @@ class NKDInpaintCrop(io.ComfyNode):
             noise_mask = _resize_mask(crop_mask, samples.shape[-1], samples.shape[-2])
             latent = {"samples": samples, "noise_mask": noise_mask}
 
-        patched_model = _apply_differential_diffusion(model) if model is not None else None
+        patched_model = (_apply_differential_diffusion(model, inpaint_blend)
+                         if model is not None else None)
 
         data = NKDCropData(
             background=image.cpu(),
@@ -146,7 +157,7 @@ class NKDInpaintCrop(io.ComfyNode):
             original_size=orig_size,
             mask=processed.cpu(),
         )
-        return io.NodeOutput(crop_img, crop_mask, latent, patched_model, data)
+        return io.NodeOutput(patched_model, latent, crop_img, crop_mask, data)
 
 
 class NKDInpaintStitch(io.ComfyNode):
