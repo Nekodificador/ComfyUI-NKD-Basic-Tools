@@ -1,8 +1,33 @@
 from __future__ import annotations
+import re
 from typing import Optional, Tuple
 import numpy as np
 import torch
 import torch.nn.functional as F
+
+
+# ---------------------------------------------------------------------------
+# Text splitting
+# ---------------------------------------------------------------------------
+
+# Leading list markers: "1.", "2)", "3:", "-", "*", "•" (digits require the
+# punctuation so "2 cats" survives intact).
+_LIST_MARKER_RE = re.compile(r"^\s*(?:\d+\s*[.):]|[-*•])\s*")
+
+
+def _split_text(text: str, delimiter: str, trim: bool = True,
+                skip_empty: bool = True, remove_numbering: bool = False) -> list:
+    parts = text.split(delimiter) if delimiter else [text]
+    out = []
+    for p in parts:
+        if remove_numbering:
+            p = _LIST_MARKER_RE.sub("", p, count=1)
+        if trim:
+            p = p.strip()
+        if skip_empty and not p:
+            continue
+        out.append(p)
+    return out
 
 
 def _probe(module_name: str) -> bool:

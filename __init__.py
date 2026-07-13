@@ -3,6 +3,7 @@ from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 
 from .nkd_crop_stitch import NKDInpaintCrop, NKDInpaintStitch
+from .nkd_string_split import NKDStringSplit
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
@@ -15,6 +16,7 @@ class NKDBasicToolsExtension(ComfyExtension):
         return [
             NKDInpaintCrop,
             NKDInpaintStitch,
+            NKDStringSplit,
         ]
 
 
@@ -26,11 +28,13 @@ async def comfy_entrypoint() -> NKDBasicToolsExtension:
 NODE_CLASS_MAPPINGS = {
     "NKDInpaintCrop": NKDInpaintCrop,
     "NKDInpaintStitch": NKDInpaintStitch,
+    "NKDStringSplit": NKDStringSplit,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDInpaintCrop": "😺NKD Inpaint Crop",
     "NKDInpaintStitch": "😺NKD Inpaint Stitch",
+    "NKDStringSplit": "😺NKD String Split",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

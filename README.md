@@ -48,6 +48,15 @@ and choose the processing order.
   so the composite belongs to the same scene.
 - `Seamless Edges` — extra pass for stubborn seams (requires OpenCV).
 
+### 😺NKD String Split
+
+Split one block of text into a list of strings — downstream nodes run once per
+item, so a list of prompts becomes N generations with no extra wiring. Common
+delimiters plus a custom one, whitespace trimming, empty-piece skipping, and
+optional removal of list numbering (`1.`, `2)`, `-`) for lists written by an
+LLM. Shows the resulting list in the node, with partial execution support for
+instant iteration.
+
 ## License
 
 MIT
