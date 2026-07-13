@@ -1,7 +1,16 @@
 from __future__ import annotations
 from typing import Optional, Tuple
+import numpy as np
 import torch
 import torch.nn.functional as F
+
+
+def _probe(module_name: str) -> bool:
+    import importlib.util
+    return importlib.util.find_spec(module_name) is not None
+
+
+_HAS_CV2 = _probe("cv2")
 
 
 # ---------------------------------------------------------------------------
@@ -285,6 +294,11 @@ def _crop_by_mask(
 
     x1, y1, x2, y2 = _expand_bbox_to_multiple(x1, y1, x2, y2, ow, oh, multiple=_VAE_MULTIPLE)
 
+    # Native mode: no resample at all — the bbox is taken 1:1 (already /multiple),
+    # guaranteeing the composite fast path (pixel-perfect restore).
+    if target_pixels <= 0:
+        return image[:, y1:y2, x1:x2, :], full_mask[:, y1:y2, x1:x2], (x1, y1, x2, y2), (oh, ow)
+
     crop_w, crop_h = x2 - x1, y2 - y1
     render_w, render_h = _pick_render_dims(crop_w, crop_h, target_pixels)
     target_aspect = render_w / render_h
@@ -309,6 +323,18 @@ def _crop_by_mask(
     return cropped, cm, (x1, y1, x2, y2), (oh, ow)
 
 
+def _alpha_hardness(alpha: torch.Tensor, hardness: float) -> torch.Tensor:
+    """Histogram remap on the alpha (LayerStyle-style black/white point):
+    raises the black point and lowers the white point symmetrically, collapsing
+    the low-alpha fringe where the original background bleeds through as a halo.
+    0 = identity, 1 = hard cut at 0.5."""
+    if hardness <= 0.0:
+        return alpha
+    bp = min(hardness * 0.5, 0.499)
+    wp = 1.0 - bp
+    return ((alpha - bp) / (wp - bp)).clamp(0.0, 1.0)
+
+
 def _uncrop(
     patch: torch.Tensor,
     background: torch.Tensor,
@@ -316,7 +342,8 @@ def _uncrop(
     original_size: Tuple[int, int],
     mask: Optional[torch.Tensor],
     feather: int,
-) -> torch.Tensor:
+    hardness: float = 0.0,
+) -> Tuple[torch.Tensor, torch.Tensor]:
     x1, y1, x2, y2 = crop_box
     crop_h, crop_w = y2 - y1, x2 - x1
 
@@ -339,10 +366,133 @@ def _uncrop(
             region_mask = _resize_mask(region_mask, crop_w, crop_h)
         if feather > 0:
             region_mask = _mask_grow(region_mask, 0, feather)
+        region_mask = _alpha_hardness(region_mask, hardness)
         alpha = region_mask.unsqueeze(-1)
     else:
-        alpha = torch.ones(patch_resized.shape[0], crop_h, crop_w, 1,
-                           device=patch_resized.device)
+        region_mask = torch.ones(patch_resized.shape[0], crop_h, crop_w,
+                                 device=patch_resized.device)
+        alpha = region_mask.unsqueeze(-1)
 
     bg[:, y1:y2, x1:x2, :] = patch_resized * alpha + bg[:, y1:y2, x1:x2, :] * (1.0 - alpha)
-    return bg
+    return bg, region_mask
+
+
+# ---------------------------------------------------------------------------
+# Post blend — color match (Reinhard, LAB) + optional Poisson seamless clone.
+# Ported from NKD Klein Postsampling. LAB conversion stays in float32 numpy
+# (cv2's COLOR_RGB2LAB rounds through uint8 and loses precision).
+# ---------------------------------------------------------------------------
+
+def _rgb_to_lab(rgb):
+    lin = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+    M = np.array([
+        [0.4124564, 0.3575761, 0.1804375],
+        [0.2126729, 0.7151522, 0.0721750],
+        [0.0193339, 0.1191920, 0.9503041],
+    ], dtype=np.float32)
+    xyz = lin @ M.T / np.array([0.95047, 1.0, 1.08883], dtype=np.float32)
+    delta = (6.0 / 29.0)
+    delta3 = delta ** 3
+
+    def f(t):
+        return np.where(t > delta3, np.cbrt(t), t / (3.0 * delta * delta) + 4.0 / 29.0)
+
+    fx, fy, fz = f(xyz[..., 0]), f(xyz[..., 1]), f(xyz[..., 2])
+    L = 116.0 * fy - 16.0
+    a = 500.0 * (fx - fy)
+    b = 200.0 * (fy - fz)
+    return np.stack([L, a, b], axis=-1).astype(np.float32)
+
+
+def _lab_to_rgb(lab):
+    L, a, b = lab[..., 0], lab[..., 1], lab[..., 2]
+    fy = (L + 16.0) / 116.0
+    fx = a / 500.0 + fy
+    fz = fy - b / 200.0
+    delta = 6.0 / 29.0
+
+    def f_inv(t):
+        return np.where(t > delta, t ** 3, 3.0 * delta * delta * (t - 4.0 / 29.0))
+
+    xyz = np.stack([
+        f_inv(fx) * 0.95047,
+        f_inv(fy) * 1.0,
+        f_inv(fz) * 1.08883,
+    ], axis=-1)
+    M_inv = np.array([
+        [3.2404542, -1.5371385, -0.4985314],
+        [-0.9692660, 1.8760108, 0.0415560],
+        [0.0556434, -0.2040259, 1.0572252],
+    ], dtype=np.float32)
+    lin = np.clip(xyz @ M_inv.T, 0.0, None)
+    rgb = np.where(lin <= 0.0031308, lin * 12.92, 1.055 * (lin ** (1.0 / 2.4)) - 0.055)
+    return np.clip(rgb, 0.0, 1.0).astype(np.float32)
+
+
+def _reinhard_match(orig_rgb, gen_rgb, mask, strength):
+    """Match gen's color statistics to orig using only background pixels.
+    Returns gen unchanged when the background is too small to be reliable —
+    matching on the edit region itself would just propagate the shift."""
+    if strength <= 0.0:
+        return gen_rgb
+    bg = mask < 0.05
+    if bg.sum() < 100:
+        return gen_rgb
+    orig_lab = _rgb_to_lab(orig_rgb)
+    gen_lab = _rgb_to_lab(gen_rgb)
+    o_mean = orig_lab[bg].mean(axis=0)
+    o_std = orig_lab[bg].std(axis=0) + 1e-5
+    g_mean = gen_lab[bg].mean(axis=0)
+    g_std = gen_lab[bg].std(axis=0) + 1e-5
+    matched = (gen_lab - g_mean) / g_std * o_std + o_mean
+    matched_rgb = _lab_to_rgb(matched)
+    blended = matched_rgb * strength + gen_rgb * (1.0 - strength)
+    return np.clip(blended, 0.0, 1.0)
+
+
+def _seamless_clone(orig_rgb, gen_rgb, mask):
+    """Poisson blend gen onto orig inside `mask`. The clamped-edge guard on the
+    binary mask prevents the OpenCV crash you get when the mask touches the
+    image boundary, and the bounding-rect centre matches what seamlessClone
+    computes internally — using numpy min/max instead shifts the result by 1px."""
+    import cv2
+    o_u8 = (np.clip(orig_rgb, 0, 1) * 255).astype(np.uint8)
+    g_u8 = (np.clip(gen_rgb, 0, 1) * 255).astype(np.uint8)
+    binary = (mask > 0.1).astype(np.uint8) * 255
+    binary[0, :] = 0; binary[-1, :] = 0
+    binary[:, 0] = 0; binary[:, -1] = 0
+    m3 = mask[..., np.newaxis]
+    x, y, w, h = cv2.boundingRect(binary)
+    if w == 0 or h == 0:
+        return np.clip(orig_rgb * (1.0 - m3) + gen_rgb * m3, 0, 1)
+    center = (x + w // 2, y + h // 2)
+    try:
+        cloned = cv2.seamlessClone(g_u8, o_u8, binary, center, cv2.NORMAL_CLONE)
+        cloned = cloned.astype(np.float32) / 255.0
+        return np.clip(orig_rgb * (1.0 - m3) + cloned * m3, 0, 1)
+    except Exception:
+        return np.clip(orig_rgb * (1.0 - m3) + gen_rgb * m3, 0, 1)
+
+
+def _post_blend(orig: torch.Tensor, composite: torch.Tensor, mask: torch.Tensor,
+                match_strength: float, seamless: bool) -> torch.Tensor:
+    """Re-blend composite over orig with Reinhard color match + optional Poisson.
+    `mask` is the full-res alpha [B, H, W]. Per-item loop: cv2/numpy domain.
+    An empty mask returns the composite unchanged so seamlessClone never hits a
+    zero rect."""
+    out = composite.clone()
+    for i in range(composite.shape[0]):
+        m = mask[min(i, mask.shape[0] - 1)].detach().clamp(0, 1).cpu().numpy().astype(np.float32)
+        if m.sum() < 1:
+            continue
+        o = orig[min(i, orig.shape[0] - 1), :, :, :3].detach().clamp(0, 1).cpu().numpy().astype(np.float32)
+        c = composite[i, :, :, :3].detach().clamp(0, 1).cpu().numpy().astype(np.float32)
+        matched = _reinhard_match(o, c, m, match_strength)
+        if seamless:
+            res = _seamless_clone(o, matched, m)
+        else:
+            m3 = m[..., np.newaxis]
+            res = np.clip(o * (1.0 - m3) + matched * m3, 0, 1)
+        out[i, :, :, :3] = torch.from_numpy(np.ascontiguousarray(res)).to(
+            device=composite.device, dtype=composite.dtype)
+    return out
