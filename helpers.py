@@ -196,6 +196,25 @@ def _pick_render_dims(
     return render_w, render_h
 
 
+def _pick_render_dims_longest(
+    bbox_w: int, bbox_h: int, longest: int, multiple: int = _VAE_MULTIPLE,
+) -> Tuple[int, int]:
+    """Pick (render_w, render_h), both /multiple, where the longest side equals
+    `longest` (snapped to /multiple) and the aspect follows the bbox. Same
+    contract as _pick_render_dims: the caller grows the bbox to the render's
+    exact aspect afterwards."""
+    if bbox_w <= 0 or bbox_h <= 0:
+        return multiple, multiple
+    L = max(multiple, int(round(longest / multiple)) * multiple)
+    if bbox_w >= bbox_h:
+        render_w = L
+        render_h = max(multiple, int(round(L * bbox_h / bbox_w / multiple)) * multiple)
+    else:
+        render_h = L
+        render_w = max(multiple, int(round(L * bbox_w / bbox_h / multiple)) * multiple)
+    return render_w, render_h
+
+
 def _grow_bbox_to_aspect(
     x1: int, y1: int, x2: int, y2: int,
     target_aspect: float,
@@ -261,6 +280,7 @@ def _crop_by_mask(
     mask: Optional[torch.Tensor],
     padding: int,
     target_pixels: int,
+    longest_side: int = 0,
 ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[int, int, int, int], Tuple[int, int]]:
     """Crop image+mask around the mask bbox and resample to the MP budget.
 
@@ -296,11 +316,16 @@ def _crop_by_mask(
 
     # Native mode: no resample at all — the bbox is taken 1:1 (already /multiple),
     # guaranteeing the composite fast path (pixel-perfect restore).
-    if target_pixels <= 0:
+    if target_pixels <= 0 and longest_side <= 0:
         return image[:, y1:y2, x1:x2, :], full_mask[:, y1:y2, x1:x2], (x1, y1, x2, y2), (oh, ow)
 
+    def _render_dims(bw: int, bh: int) -> Tuple[int, int]:
+        if longest_side > 0:
+            return _pick_render_dims_longest(bw, bh, longest_side)
+        return _pick_render_dims(bw, bh, target_pixels)
+
     crop_w, crop_h = x2 - x1, y2 - y1
-    render_w, render_h = _pick_render_dims(crop_w, crop_h, target_pixels)
+    render_w, render_h = _render_dims(crop_w, crop_h)
     target_aspect = render_w / render_h
     x1, y1, x2, y2 = _grow_bbox_to_aspect(x1, y1, x2, y2, target_aspect, ow, oh)
     crop_w, crop_h = x2 - x1, y2 - y1
@@ -309,7 +334,7 @@ def _crop_by_mask(
     # invariant we need is render_aspect == bbox_aspect.
     final_aspect = crop_w / crop_h
     if abs(final_aspect - target_aspect) > 1e-6:
-        render_w, render_h = _pick_render_dims(crop_w, crop_h, target_pixels)
+        render_w, render_h = _render_dims(crop_w, crop_h)
 
     cropped_raw = image[:, y1:y2, x1:x2, :]
     mask_raw = full_mask[:, y1:y2, x1:x2]

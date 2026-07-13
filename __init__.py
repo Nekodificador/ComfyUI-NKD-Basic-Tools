@@ -6,6 +6,8 @@ from .nkd_crop_stitch import NKDInpaintCrop, NKDInpaintStitch
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
+WEB_DIRECTORY = "./js"
+
 
 class NKDBasicToolsExtension(ComfyExtension):
     @override
@@ -31,4 +33,4 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDInpaintStitch": "😺NKD Inpaint Stitch",
 }
 
-__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]
+__all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

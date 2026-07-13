@@ -55,6 +55,13 @@ def demo():
     hard = _alpha_hardness(soft, 0.8)
     assert hard[1] == 0.0 and hard[-2] == 1.0 and abs(hard[5] - soft[5]) < 1e-5
 
+    # Longest-side mode: longest render side == requested, aspect ≈ bbox aspect.
+    lcrop, _, lbox, _ = _crop_by_mask(image, processed, 50, 0, longest_side=512)
+    assert max(lcrop.shape[1], lcrop.shape[2]) == 512
+    assert lcrop.shape[1] % _VAE_MULTIPLE == 0 and lcrop.shape[2] % _VAE_MULTIPLE == 0
+    lx1, ly1, lx2, ly2 = lbox
+    assert abs((lcrop.shape[2] / lcrop.shape[1]) - ((lx2 - lx1) / (ly2 - ly1))) < 0.05
+
     # Box preview: right shape, downscaled, border painted in the accent color.
     prev = _box_preview(image, processed, box, max_side=400)
     assert prev.shape[0] == 1 and prev.shape[-1] == 3

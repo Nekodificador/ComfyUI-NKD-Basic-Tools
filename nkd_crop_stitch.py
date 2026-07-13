@@ -106,11 +106,20 @@ class NKDInpaintCrop(io.ComfyNode):
                                        "values fade the two together more gently."),
                 io.Int.Input("padding", default=50, min=0, max=2048,
                              tooltip="Context around the mask included in the crop, in pixels."),
+                io.Combo.Input("resize_mode",
+                               options=["Megapixels", "Longest Side"],
+                               default="Megapixels",
+                               tooltip="How the crop's sampling resolution is chosen: by a "
+                                       "megapixel budget or by the exact size of its longest "
+                                       "side."),
                 io.Float.Input("megapixels", default=1.0, min=0.0, max=16.0, step=0.05,
                                tooltip="Resolution budget for the cropped region, in megapixels "
                                        "(1.0 = 1024×1024). The crop is resampled to this size "
                                        "for sampling and restored on Stitch. "
                                        "0 = native: no resample, pixel-perfect restore."),
+                io.Int.Input("longest_side", default=1024, min=16, max=8192, step=16,
+                             tooltip="Exact size of the crop's longest side after resampling, "
+                                     "in pixels."),
             ],
             outputs=[
                 io.Model.Output(display_name="model",
@@ -129,7 +138,8 @@ class NKDInpaintCrop(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, mask, invert_mask, fill_holes, mask_expand, mask_blur,
-                inpaint_blend, padding, megapixels, model=None, vae=None) -> io.NodeOutput:
+                inpaint_blend, padding, resize_mode, megapixels, longest_side,
+                model=None, vae=None) -> io.NodeOutput:
         _, ih, iw, _ = image.shape
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
         m = _resize_mask(m, iw, ih)
@@ -139,8 +149,12 @@ class NKDInpaintCrop(io.ComfyNode):
             m = _mask_fill_holes(m)
         processed = _mask_grow(m, mask_expand, mask_blur)
 
+        if resize_mode == "Longest Side":
+            target_pixels, longest = 0, longest_side
+        else:
+            target_pixels, longest = _megapixels_to_pixels(megapixels), 0
         crop_img, crop_mask, crop_box, orig_size = _crop_by_mask(
-            image, processed, padding, _megapixels_to_pixels(megapixels)
+            image, processed, padding, target_pixels, longest_side=longest
         )
 
         latent = None
