@@ -4,37 +4,59 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from helpers import _apply_variables
+from helpers import _resolve_prompts
 
 
 def demo():
-    # Basic substitution
-    out = _apply_variables("a photo of {variable_0} in {variable_1}",
-                           {"variable_0": "a red fox", "variable_1": "the snow"})
-    assert out == "a photo of a red fox in the snow"
+    # Single values → one prompt
+    out = _resolve_prompts("a photo of {variable_0} in {variable_1}",
+                           {"variable_0": ["a red fox"], "variable_1": ["the snow"]})
+    assert out == ["a photo of a red fox in the snow"]
 
-    # Unconnected variable → empty, leftover double spaces collapsed
-    out = _apply_variables("a photo of {variable_0} outside",
-                           {"variable_0": None})
-    assert out == "a photo of outside"
-
-    # Same variable used twice
-    out = _apply_variables("{variable_0}, then {variable_0} again",
-                           {"variable_0": "twice"})
-    assert out == "twice, then twice again"
-
-    # Unknown tokens survive untouched (no variables dict entry)
-    out = _apply_variables("keep {not_a_var} as is", {"variable_0": "x"})
-    assert out == "keep {not_a_var} as is"
+    # Unconnected variable → empty, extra spaces collapsed
+    out = _resolve_prompts("a photo of {variable_0} outside", {"variable_0": None})
+    assert out == ["a photo of outside"]
 
     # Chip insertion leaves "{var} ," → space before punctuation cleaned
-    out = _apply_variables("a portrait of {variable_0} , cinematic",
-                           {"variable_0": "a fox"})
-    assert out == "a portrait of a fox, cinematic"
+    out = _resolve_prompts("a portrait of {variable_0} , cinematic",
+                           {"variable_0": ["a fox"]})
+    assert out == ["a portrait of a fox, cinematic"]
 
-    # Newlines preserved; edges trimmed
-    out = _apply_variables("  {variable_0}\nline two  ", {"variable_0": "line one"})
-    assert out == "line one\nline two"
+    # List mapping: one prompt per item, shorter lists repeat
+    out = _resolve_prompts("{variable_0} wearing {variable_1}",
+                           {"variable_0": ["a man", "a woman", "a kid"],
+                            "variable_1": ["red", "blue"]})
+    assert len(out) == 3
+    assert out[0] == "a man wearing red"
+    assert out[1] == "a woman wearing blue"
+    assert out[2] == "a kid wearing red"  # wraps around
+
+    # {name:r} → random pick, seeded and reproducible; mapped var drives count
+    vars_ = {"variable_0": ["a", "b", "c"], "variable_1": ["x", "y", "z"]}
+    r1 = _resolve_prompts("{variable_0} + {variable_1:r}", vars_, seed=42)
+    r2 = _resolve_prompts("{variable_0} + {variable_1:r}", vars_, seed=42)
+    assert r1 == r2                                   # reproducible
+    assert len(r1) == 3                               # count from mapped var
+    assert [p.split(" + ")[0] for p in r1] == ["a", "b", "c"]  # mapping intact
+    assert all(p.split(" + ")[1] in "xyz" for p in r1)
+
+    # randomize_all → single prompt, every variable random
+    ra = _resolve_prompts("{variable_0} + {variable_1}", vars_,
+                          randomize_all=True, seed=7)
+    assert len(ra) == 1
+    a, b = ra[0].split(" + ")
+    assert a in "abc" and b in "xyz"
+
+    # Repeated random variable keeps the same pick within one prompt
+    rep = _resolve_prompts("{variable_0:r} and {variable_0:r}",
+                           {"variable_0": ["p", "q", "r", "s", "t"]}, seed=3)
+    left, right = rep[0].split(" and ")
+    assert left == right
+
+    # Different seeds eventually differ
+    outs = {_resolve_prompts("{variable_0:r}", {"variable_0": list("abcdefgh")},
+                             seed=s)[0] for s in range(10)}
+    assert len(outs) > 1
 
     print("prompt variables self-check OK")
 

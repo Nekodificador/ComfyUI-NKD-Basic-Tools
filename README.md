@@ -61,9 +61,12 @@ instant iteration.
 
 A prompt box with variables, chips included: write your prompt, drop variable
 chips into it, and each chip is filled by whatever text arrives on its input
-socket (sockets grow as you connect). Wire a list — e.g. from 😺NKD String
+socket (sockets grow as you connect; renamed sockets rename their chips, and
+chips can be dragged around the text). Wire a list — e.g. from 😺NKD String
 Split — into a variable and the prompt resolves once per item: a full
-multiprompt with two nodes. Shows the resolved prompt in the node.
+multiprompt with two nodes. Shift-click a chip (or use `Randomize All`) to make
+that variable pick a random item from its list instead, seeded for
+reproducibility. Shows the resolved prompt(s) in the node.
 
 ## License
 

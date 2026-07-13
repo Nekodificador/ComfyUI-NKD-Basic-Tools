@@ -15,15 +15,59 @@ import torch.nn.functional as F
 _LIST_MARKER_RE = re.compile(r"^\s*(?:\d+\s*[.):]|[-*•])\s*")
 
 
-def _apply_variables(text: str, variables: dict) -> str:
-    """Replace {socket_name} tokens with their wired values. Unconnected
-    variables resolve to empty string; whitespace runs left behind by empty
-    substitutions are collapsed so the prompt stays clean."""
-    for name, value in variables.items():
-        text = text.replace("{%s}" % name, value if value is not None else "")
+_VAR_TOKEN_RE = re.compile(r"\{(variable_\d+)(:r)?\}")
+
+
+def _tidy_prompt(text: str) -> str:
+    """Collapse whitespace runs left behind by empty substitutions and clean
+    the space-before-punctuation that chip insertion leaves."""
     text = re.sub(r"[ \t]{2,}", " ", text)
     text = re.sub(r" +([,.;:!?])", r"\1", text)
     return text.strip()
+
+
+def _resolve_prompts(text: str, variables: dict, randomize_all: bool = False,
+                     seed: int = 0) -> list:
+    """Resolve {variable_N} tokens into one or more prompts.
+
+    Each variable's value is a LIST (the node runs in whole-list mode).
+    Plain tokens map by index: the output has one prompt per item of the
+    longest mapped list (shorter lists repeat). Tokens flagged {name:r} — or
+    every token when randomize_all — pick a random item per prompt, seeded for
+    reproducibility. A variable repeated within one prompt keeps its pick."""
+    import random as _random
+
+    lists = {}
+    for name, value in variables.items():
+        if value is None:
+            lists[name] = []
+        elif isinstance(value, list):
+            lists[name] = ["" if v is None else str(v) for v in value]
+        else:
+            lists[name] = [str(value)]
+
+    tokens = _VAR_TOKEN_RE.findall(text)
+    mapped = [n for n, flag in tokens
+              if not flag and not randomize_all and len(lists.get(n, [])) > 0]
+    n_out = max((len(lists[n]) for n in mapped), default=1)
+
+    rng = _random.Random(seed)
+    prompts = []
+    for i in range(n_out):
+        picks = {}
+        for name, flag in tokens:
+            if name in picks:
+                continue
+            vals = lists.get(name, [])
+            if not vals:
+                picks[name] = ""
+            elif flag or randomize_all:
+                picks[name] = rng.choice(vals)
+            else:
+                picks[name] = vals[i % len(vals)]
+        resolved = _VAR_TOKEN_RE.sub(lambda m: picks[m.group(1)], text)
+        prompts.append(_tidy_prompt(resolved))
+    return prompts
 
 
 def _split_text(text: str, delimiter: str, trim: bool = True,

@@ -6370,7 +6370,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     const vars = /* @__PURE__ */ ref([]);
     let savedRange = null;
     let debounceTimer;
-    const TOKEN_RE = /\{(variable_\d+)\}/g;
+    const TOKEN_RE = /\{(variable_\d+)(:r)?\}/g;
     let draggedChip = null;
     function labelFor(name) {
       const v = vars.value.find((x) => x.name === name);
@@ -6378,11 +6378,16 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       const m = name.match(/_(\d+)$/);
       return `Variable ${m ? Number(m[1]) + 1 : "?"}`;
     }
-    function chipEl(name) {
+    function chipEl(name, rand = false) {
       const span = document.createElement("span");
       span.className = "nkd-pv-chip";
       span.contentEditable = "false";
       span.dataset.var = name;
+      if (rand) {
+        span.dataset.rand = "1";
+        span.classList.add("nkd-pv-chip-rand");
+      }
+      span.title = "Shift+clic: aleatorizar esta variable · arrastra para mover";
       span.draggable = true;
       span.addEventListener("dragstart", (e) => {
         var _a;
@@ -6438,7 +6443,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       let last = 0;
       for (const m of text.matchAll(TOKEN_RE)) {
         if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
-        el.appendChild(chipEl(m[1]));
+        el.appendChild(chipEl(m[1], m[2] === ":r"));
         last = m.index + m[0].length;
       }
       if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
@@ -6452,7 +6457,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           if (child.nodeType === Node.TEXT_NODE) {
             out += child.textContent ?? "";
           } else if (child instanceof HTMLElement && child.dataset.var) {
-            out += `{${child.dataset.var}}`;
+            out += `{${child.dataset.var}${child.dataset.rand === "1" ? ":r" : ""}}`;
           } else if (child instanceof HTMLBRElement) {
             out += "\n";
           } else if (child instanceof HTMLElement) {
@@ -6489,6 +6494,17 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         insertAtCursor(document.createTextNode(text));
         emitChange();
       }
+    }
+    function onEditorClick(e) {
+      var _a, _b;
+      const chip = (_b = (_a = e.target) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, ".nkd-pv-chip");
+      if (!chip || !e.shiftKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rand = chip.dataset.rand !== "1";
+      chip.dataset.rand = rand ? "1" : "";
+      chip.classList.toggle("nkd-pv-chip-rand", rand);
+      emitChange();
     }
     function saveSelection() {
       var _a;
@@ -6565,6 +6581,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           onMouseup: saveSelection,
           onDragover: withModifiers(onDragOver, ["prevent"]),
           onDrop: withModifiers(onDrop, ["prevent"]),
+          onClick: onEditorClick,
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
@@ -6589,7 +6606,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-412356eb"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-56fcf56b"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -6693,7 +6710,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode(".nkd-pv[data-v-412356eb] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-412356eb] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-412356eb]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-412356eb]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-412356eb] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-412356eb] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-412356eb]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-412356eb] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}"));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
