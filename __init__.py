@@ -1,7 +1,10 @@
+import logging
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 
 from .nkd_crop_stitch import NKDInpaintCrop, NKDInpaintStitch
+
+logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
 
 class NKDBasicToolsExtension(ComfyExtension):
