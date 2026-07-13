@@ -6,13 +6,13 @@ Transversal utility nodes for ComfyUI.
 
 ### 😺NKD Inpaint Crop / 😺NKD Inpaint Stitch
 
-Crop the image around a mask (with context padding) and resample the crop to a
-megapixel budget for sampling. Stitch composites the processed patch back onto
-the original image **at its native resolution**, feathered by the processed mask.
+Crop the image around a mask (with context padding), work on it at the ideal
+resolution, and composite the result back onto the original image **at its
+native resolution** — clean edges, no drift, no visible seams.
 
 ```
-Load Image ─┬─▶ 😺NKD Inpaint Crop ─▶ image/mask ─▶ (your sampling pipeline)
-   Mask ────┘         │                                      │
+Load Image ─┬─▶ 😺NKD Inpaint Crop ─▶ image/mask/latent ─▶ (your sampling pipeline)
+   Mask ────┘         │                                          │
                       └──── crop_data ──▶ 😺NKD Inpaint Stitch ◀── image
                                                    │
                                                    ▼
@@ -21,38 +21,32 @@ Load Image ─┬─▶ 😺NKD Inpaint Crop ─▶ image/mask ─▶ (your samp
 
 **Crop**
 
-- `invert_mask` / `fill_holes` — mask cleanup before processing.
-- `mask_expand` / `mask_blur` — grow and feather the mask before cropping; the
-  same softness drives the composite on Stitch.
-- `padding` — context around the mask included in the crop.
-- `megapixels` — resolution budget for the sampled region (1.0 = 1024×1024).
-  `0` = native mode: no resample, pixel-perfect restore.
-- Optional `model` / `vae` inputs turn Crop into a full sampler prep: the
-  `model` output comes back patched with Differential Diffusion and the
-  `latent` output is the encoded crop with its `noise_mask` already set —
-  no extra nodes needed between Crop and your sampler.
-- Crop dimensions are aligned to the VAE grid and the crop/render aspect ratios
-  are matched exactly, so the restore is a single symmetric scale — no drift,
-  no sub-pixel bevel on the composite.
+- Mask cleanup built in: invert, fill holes, expand and soften in one place.
+- `Resize Mode` — `Automatic` keeps the original resolution and only rescales
+  when the crop is too small or too big (min/max limits); `Megapixels` gives a
+  fixed budget; `Longest Side` an exact size.
+- Connect your `model` and `vae` (optional) and the node hands you a prepared
+  model and a ready-to-sample latent — no extra nodes between Crop and your
+  sampler.
+- In-node preview of the mask and crop region, with partial execution support
+  (blue play button) for instant iteration on the crop settings.
 
-**Chained detailing (`separate_regions`)**
+**Chained detailing (`Separate Regions`)**
 
-Turn on `separate_regions` and the mask is split into individual regions
-(connected components — or one region per mask when a mask batch, e.g. from a
-segmentation node, is connected). Crop then emits **one crop per region as a
-list**: your sampler nodes run once per region automatically (no extra wiring),
-and Stitch composites every detailed region back onto the original in a single
-pass. `region_min_area`, `max_regions` and `region_order` (largest first /
-left-to-right / top-to-bottom) control the chain.
+Turn on `Separate Regions` and each separate area of the mask gets its own
+crop at its own ideal resolution. Your sampler nodes run once per area
+automatically — no extra wiring — and Stitch composites every detailed area
+back onto the original in a single pass. Also accepts mask batches from
+segmentation nodes (one area per mask). Filter by minimum area, cap the count,
+and choose the processing order.
 
 **Stitch**
 
-- `feather` — extra edge feathering on composite.
-- `edge_hardness` — black/white point remap on the blend mask; collapses the
-  low-alpha fringe where the original background bleeds through as a halo.
-- `match_colors` — Reinhard color match (LAB) of the patch toward the original,
-  with statistics read from the unchanged background only.
-- `seamless_edges` — Poisson blending for stubborn seams (requires OpenCV).
+- `Feather` and `Edge Hardness` — control how softly the result blends in and
+  keep the original background from ghosting through at the edges.
+- `Match Colors` — corrects the subtle color/brightness drift models introduce
+  so the composite belongs to the same scene.
+- `Seamless Edges` — extra pass for stubborn seams (requires OpenCV).
 
 ## License
 

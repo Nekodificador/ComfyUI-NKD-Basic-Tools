@@ -83,85 +83,94 @@ class NKDInpaintCrop(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Model.Input("model", optional=True,
-                               tooltip="Optional. When connected, the model output comes back "
-                                       "patched with Differential Diffusion so the soft mask "
-                                       "drives per-pixel denoise strength."),
+                               tooltip="Optional. Connect your model and use the model output: "
+                                       "the regenerated area will follow the mask softness for "
+                                       "a cleaner inpaint, with no extra nodes."),
                 io.Vae.Input("vae", optional=True,
-                             tooltip="Optional. When connected, the latent output is the crop "
-                                     "already encoded with its noise_mask set — ready to sample."),
+                             tooltip="Optional. Connect your VAE and the latent output comes "
+                                     "out ready to plug straight into the sampler."),
                 io.Image.Input("image"),
                 io.Mask.Input("mask"),
                 io.Boolean.Input("invert_mask", default=False,
+                                 display_name="Invert Mask",
                                  tooltip="Invert the mask before processing."),
                 io.Boolean.Input("fill_holes", default=True,
-                                 tooltip="Fill fully-enclosed holes in the mask before processing."),
+                                 display_name="Fill Mask Holes",
+                                 tooltip="Fill enclosed gaps in the mask so each area becomes "
+                                         "a solid shape."),
                 io.Int.Input("mask_expand", default=20, min=0, max=512,
-                             tooltip="Grow the mask outward by this many pixels before cropping."),
+                             display_name="Mask Expand",
+                             tooltip="Grow the mask outward by this many pixels."),
                 io.Int.Input("mask_blur", default=10, min=0, max=256,
-                             tooltip="Feather the mask edge by this many pixels. This same "
-                                     "softness is used by Stitch when compositing back."),
+                             display_name="Mask Blur",
+                             tooltip="Soften the mask edge by this many pixels. The same "
+                                     "softness is used when compositing back."),
                 io.Float.Input("inpaint_blend", default=1.0, min=0.0, max=1.0, step=0.01,
-                               tooltip="Strength of the Differential Diffusion mask (only used "
-                                       "when model is connected). Controls how sharp the "
-                                       "transition is between the regenerated area and the "
-                                       "original. 1.0 = full differential diffusion; lower "
-                                       "values fade the two together more gently."),
+                               display_name="Inpaint Blend",
+                               tooltip="How sharp the transition is between the regenerated "
+                                       "area and the original image. Lower values fade the two "
+                                       "together more gently. Only used when model is "
+                                       "connected."),
                 io.Int.Input("padding", default=50, min=0, max=2048,
-                             tooltip="Context around the mask included in the crop, in pixels."),
+                             display_name="Context Padding",
+                             tooltip="How much surrounding image to include around the mask, "
+                                     "in pixels. More context helps the edit blend with the "
+                                     "scene."),
                 io.Combo.Input("resize_mode",
                                options=["Automatic", "Megapixels", "Longest Side"],
                                default="Automatic",
-                               tooltip="How the crop's sampling resolution is chosen. "
-                                       "Automatic: keep native resolution while the crop fits "
-                                       "between min/max, only rescaling when it falls outside. "
-                                       "Megapixels: fixed pixel budget. Longest Side: exact "
-                                       "size of the longest side."),
+                               display_name="Resize Mode",
+                               tooltip="How the crop's working resolution is chosen. "
+                                       "Automatic: keeps the original resolution and only "
+                                       "rescales when the crop is too small or too big. "
+                                       "Megapixels: fixed budget. Longest Side: exact size."),
                 io.Float.Input("megapixels", default=1.0, min=0.0, max=16.0, step=0.05,
-                               tooltip="Resolution budget for the cropped region, in megapixels "
-                                       "(1.0 = 1024×1024). The crop is resampled to this size "
-                                       "for sampling and restored on Stitch. "
-                                       "0 = native: no resample, pixel-perfect restore."),
+                               display_name="Megapixels",
+                               tooltip="Working resolution for the crop, in megapixels "
+                                       "(1.0 ≈ 1024×1024). 0 = keep the original resolution "
+                                       "untouched."),
                 io.Int.Input("longest_side", default=1024, min=16, max=8192, step=16,
-                             tooltip="Exact size of the crop's longest side after resampling, "
-                                     "in pixels."),
+                             display_name="Longest Side",
+                             tooltip="Exact size of the crop's longest side, in pixels."),
                 io.Int.Input("min_resolution", default=768, min=64, max=4096, step=16,
-                             tooltip="Automatic mode: if the crop's short side is smaller than "
-                                     "this, it is scaled up to reach it."),
+                             display_name="Min Resolution",
+                             tooltip="If the crop is smaller than this, it is scaled up to "
+                                     "reach it."),
                 io.Int.Input("max_resolution", default=2048, min=64, max=16384, step=16,
-                             tooltip="Automatic mode: if the crop's long side is larger than "
-                                     "this, it is scaled down to fit it. Crops between min and "
-                                     "max keep their native resolution (pixel-perfect restore)."),
+                             display_name="Max Resolution",
+                             tooltip="If the crop is larger than this, it is scaled down to "
+                                     "fit. Crops in between keep their original resolution."),
                 io.Boolean.Input("separate_regions", default=False,
-                                 tooltip="Chained detailing: split the mask into individual "
-                                         "regions (connected components, or one per mask when "
-                                         "a mask batch is connected) and emit one crop per "
-                                         "region as a list. Downstream sampler nodes run once "
-                                         "per region automatically; Stitch composites them all "
-                                         "back."),
+                                 display_name="Separate Regions",
+                                 tooltip="Detail several areas in one go: each separate area "
+                                         "of the mask gets its own crop, your sampler runs "
+                                         "once per area automatically, and Stitch puts them "
+                                         "all back."),
                 io.Float.Input("region_min_area", default=0.1, min=0.0, max=100.0, step=0.05,
-                               tooltip="Discard regions smaller than this percentage of the "
-                                       "image area."),
+                               display_name="Min Region Area %",
+                               tooltip="Ignore areas smaller than this percentage of the "
+                                       "image."),
                 io.Int.Input("max_regions", default=8, min=1, max=64,
-                             tooltip="Process at most this many regions."),
+                             display_name="Max Regions",
+                             tooltip="Process at most this many areas."),
                 io.Combo.Input("region_order",
                                options=["Largest First", "Left to Right", "Top to Bottom"],
                                default="Largest First",
-                               tooltip="Order in which the regions are detailed."),
+                               display_name="Region Order",
+                               tooltip="Order in which the areas are processed."),
             ],
             outputs=[
                 io.Model.Output(display_name="model",
-                                tooltip="Model patched with Differential Diffusion. "
-                                        "Requires model."),
+                                tooltip="Model prepared for masked inpainting. Requires "
+                                        "model."),
                 io.Image.Output(display_name="image", is_output_list=True,
-                                tooltip="Cropped region(s), resampled per resize mode. One "
-                                        "list item per region; downstream nodes run once per "
-                                        "item."),
+                                tooltip="The cropped region(s), at working resolution."),
                 io.Mask.Output(display_name="mask", is_output_list=True,
-                               tooltip="Processed mask cropped to each region."),
+                               tooltip="Mask for each crop."),
                 io.Latent.Output(display_name="latent", is_output_list=True,
-                                 tooltip="Encoded crop(s) with noise_mask set. Requires vae."),
+                                 tooltip="Ready-to-sample crop(s). Requires vae."),
                 NKDCropDataType.Output("crop_data", is_output_list=True,
-                                       tooltip="Everything Stitch needs to composite back."),
+                                       tooltip="Connect to 😺NKD Inpaint Stitch."),
             ],
         )
 
@@ -249,30 +258,33 @@ class NKDInpaintStitch(io.ComfyNode):
             ),
             is_input_list=True,
             inputs=[
-                io.Image.Input("image", tooltip="The processed (inpainted) crop."),
+                io.Image.Input("image", tooltip="The processed (inpainted) crop(s)."),
                 NKDCropDataType.Input("crop_data"),
                 io.Int.Input("feather", default=10, min=0, max=256,
-                             tooltip="Extra edge feathering applied on composite, in pixels."),
+                             display_name="Feather",
+                             tooltip="Softens the edge of the pasted area, in pixels."),
                 io.Float.Input("edge_hardness", default=0.0, min=0.0, max=1.0, step=0.05,
-                               tooltip="Contrast on the blend mask edge (black/white point "
-                                       "remap). Collapses the low-alpha fringe where the "
-                                       "original background bleeds through as a halo. "
-                                       "0 = off, 1 = hard cut."),
+                               display_name="Edge Hardness",
+                               tooltip="Firms up the blend edge to stop the original "
+                                       "background from ghosting through as a halo. "
+                                       "0 = off, 1 = hard edge."),
                 io.Float.Input("match_colors", default=0.0, min=0.0, max=1.0, step=0.05,
-                               tooltip="Pulls the patch's colors back toward the original "
-                                       "image (statistics read from the unchanged background "
-                                       "only). Corrects the white balance / saturation drift "
-                                       "the model introduces. 0 = off, 1 = full match."),
+                               display_name="Match Colors",
+                               tooltip="Pulls the colors of the regenerated area back toward "
+                                       "the original image, correcting the slight color and "
+                                       "brightness drift models introduce. 0 = off, "
+                                       "1 = full match."),
                 io.Boolean.Input("seamless_edges", default=False,
-                                 tooltip="Poisson blending to erase any remaining color or "
-                                         "lighting seam at the patch edge. Heavier than a "
-                                         "normal blend and can smear textured edges — use "
-                                         "when the boundary is still visible after color "
-                                         "matching. Requires OpenCV."),
+                                 display_name="Seamless Edges",
+                                 tooltip="Extra pass that erases any remaining color or "
+                                         "lighting seam at the edge. Heavier, and can smear "
+                                         "fine texture — use only if a seam is still visible "
+                                         "after Match Colors. Requires OpenCV."),
             ],
             outputs=[
                 io.Image.Output(display_name="image",
-                                tooltip="Original image with the patch composited back."),
+                                tooltip="Original image with the detailed region(s) "
+                                        "composited back."),
             ],
         )
 
