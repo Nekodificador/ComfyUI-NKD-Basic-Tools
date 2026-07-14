@@ -48,7 +48,11 @@ const vars = ref<VarInfo[]>([]);
 let savedRange: Range | null = null;
 let debounceTimer: number | undefined;
 
-const TOKEN_RE = /\{(variable_\d+)(:r)?\}/g;
+const TOKEN_RE = /\{(variable_\d+)(:[rc])?\}/g;
+
+// Per-chip pick mode. Shift-click rotates "" → random → cycle → "".
+type Mode = "" | "r" | "c";
+const NEXT_MODE: Record<Mode, Mode> = { "": "r", r: "c", c: "" };
 
 let draggedChip: HTMLElement | null = null;
 
@@ -59,16 +63,19 @@ function labelFor(name: string): string {
   return `Variable ${m ? Number(m[1]) + 1 : "?"}`;
 }
 
-function chipEl(name: string, rand = false): HTMLSpanElement {
+function applyMode(span: HTMLElement, mode: Mode) {
+  span.dataset.mode = mode;
+  span.classList.toggle("nkd-pv-chip-rand", mode === "r");
+  span.classList.toggle("nkd-pv-chip-cycle", mode === "c");
+}
+
+function chipEl(name: string, mode: Mode = ""): HTMLSpanElement {
   const span = document.createElement("span");
   span.className = "nkd-pv-chip";
   span.contentEditable = "false";
   span.dataset.var = name;
-  if (rand) {
-    span.dataset.rand = "1";
-    span.classList.add("nkd-pv-chip-rand");
-  }
-  span.title = "Shift+clic: aleatorizar esta variable · arrastra para mover";
+  applyMode(span, mode);
+  span.title = "Shift+clic: normal → aleatorio 🎲 → ciclo 🔁 · arrastra para mover";
   span.draggable = true;
   span.addEventListener("dragstart", (e: DragEvent) => {
     draggedChip = span;
@@ -128,7 +135,7 @@ function renderText(text: string) {
   let last = 0;
   for (const m of text.matchAll(TOKEN_RE)) {
     if (m.index! > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
-    el.appendChild(chipEl(m[1], m[2] === ":r"));
+    el.appendChild(chipEl(m[1], (m[2]?.slice(1) as Mode) ?? ""));
     last = m.index! + m[0].length;
   }
   if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
@@ -143,7 +150,8 @@ function serialise(): string {
       if (child.nodeType === Node.TEXT_NODE) {
         out += child.textContent ?? "";
       } else if (child instanceof HTMLElement && child.dataset.var) {
-        out += `{${child.dataset.var}${child.dataset.rand === "1" ? ":r" : ""}}`;
+        const mode = child.dataset.mode ?? "";
+        out += `{${child.dataset.var}${mode ? `:${mode}` : ""}}`;
       } else if (child instanceof HTMLBRElement) {
         out += "\n";
       } else if (child instanceof HTMLElement) {
@@ -194,9 +202,7 @@ function onEditorClick(e: MouseEvent) {
   if (!chip || !e.shiftKey) return;
   e.preventDefault();
   e.stopPropagation();
-  const rand = chip.dataset.rand !== "1";
-  chip.dataset.rand = rand ? "1" : "";
-  chip.classList.toggle("nkd-pv-chip-rand", rand);
+  applyMode(chip, NEXT_MODE[(chip.dataset.mode as Mode) ?? ""]);
   emitChange();
 }
 
@@ -380,5 +386,22 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
 .nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);
+}
+.nkd-pv-chip-cycle {
+  border-color: rgba(102, 224, 170, 0.85);
+  color: #b6f2d8;
+  background: rgba(102, 224, 170, 0.12);
+}
+.nkd-pv-chip-cycle::after {
+  content: "🔁";
+  font-size: 10px;
+  line-height: 1;
+}
+.nkd-pv-chip-cycle .nkd-pv-dot {
+  background: #66e0aa;
+}
+.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);
 }
 </style>

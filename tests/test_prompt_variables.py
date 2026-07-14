@@ -22,14 +22,21 @@ def demo():
                            {"variable_0": ["a fox"]})
     assert out == ["a portrait of a fox, cinematic"]
 
-    # List mapping: one prompt per item, shorter lists repeat
+    # List mapping: one prompt per item; a shorter PLAIN list HOLDS its last
+    # item once it runs out (i=2 has no 3rd color → keeps "blue").
     out = _resolve_prompts("{variable_0} wearing {variable_1}",
                            {"variable_0": ["a man", "a woman", "a kid"],
                             "variable_1": ["red", "blue"]})
     assert len(out) == 3
     assert out[0] == "a man wearing red"
     assert out[1] == "a woman wearing blue"
-    assert out[2] == "a kid wearing red"  # wraps around
+    assert out[2] == "a kid wearing blue"  # plain: holds the last item
+
+    # cycle {name:c}: the short list WRAPS back to the first instead of holding
+    out = _resolve_prompts("{variable_0} wearing {variable_1:c}",
+                           {"variable_0": ["a man", "a woman", "a kid"],
+                            "variable_1": ["red", "blue"]})
+    assert out[2] == "a kid wearing red"  # cycle: 2 % 2 == 0 → "red"
 
     # {name:r} → random pick, seeded and reproducible; mapped var drives count
     vars_ = {"variable_0": ["a", "b", "c"], "variable_1": ["x", "y", "z"]}

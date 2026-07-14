@@ -7,6 +7,7 @@ import PromptVariablesWidget from "./PromptVariablesWidget.vue";
 import ColorRampWidget from "./ColorRampWidget.vue";
 import GradientPreviewWidget from "./GradientPreviewWidget.vue";
 import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
+import NoisePreviewWidget from "./NoisePreviewWidget.vue";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -26,28 +27,57 @@ function sizeDomWidgetToContent(
   estimate: (width: number) => number,
 ): ResizeObserver {
   let measuredH = 0;
+  let raf = 0;         // coalesce: at most one resize scheduled at a time
+  let settling = false; // ignore the RO fire our own setSize may provoke
   const inner = (container.firstElementChild as HTMLElement | null) ?? container;
   domWidget.computeSize = (width: number) => {
     const w = Math.max(width ?? minW, minW);
     const h = (measuredH > 0 ? measuredH : estimate(w)) + ROW_SAFETY;
     return [w, h];
   };
-  const ro = new ResizeObserver(() => {
-    const h = inner.offsetHeight;
-    if (h > 0 && Math.abs(h - measuredH) > 1) {
-      measuredH = h;
-      requestAnimationFrame(() => {
-        if (!node.size) return;
-        const needed = node.computeSize();
-        if (Math.abs(needed[1] - node.size[1]) > 1) {
-          node.setSize([node.size[0], needed[1]]);
-          node.setDirtyCanvas(true, true);
-        }
-      });
+  const apply = () => {
+    raf = 0;
+    if (!node.size) return;
+    const needed = node.computeSize();
+    if (Math.abs(needed[1] - node.size[1]) > 1) {
+      settling = true;
+      node.setSize([node.size[0], needed[1]]);
+      node.setDirtyCanvas(true, true);
+      requestAnimationFrame(() => { settling = false; });
     }
+  };
+  const ro = new ResizeObserver(() => {
+    if (settling) return;                       // don't chase our own resize
+    const h = inner.offsetHeight;
+    if (h < 1) return;                           // collapsed/hidden — keep last size
+    if (Math.abs(h - measuredH) <= 1) return;    // sub-pixel jitter — ignore
+    measuredH = h;
+    if (!raf) raf = requestAnimationFrame(apply); // coalesce bursts into one pass
   });
   ro.observe(inner);
   return ro;
+}
+
+// Resolve a numeric widget that may have been converted to an input socket and
+// wired from another node (e.g. a resolution node → width/height). When
+// connected, read the value from the source node's matching widget; otherwise
+// use this node's own widget value. A value COMPUTED at runtime upstream can't
+// be known before the graph runs — the render is still correct, only this
+// pre-run preview falls back to the widget default until the first run.
+function resolveDim(node: any, name: string, fallback: number): number {
+  const slot = node.inputs?.find((i: any) => i.name === name);
+  if (slot && slot.link != null) {
+    const link = node.graph?.links?.[slot.link];
+    const src = link && node.graph?.getNodeById(link.origin_id);
+    if (src) {
+      const sw = src.widgets?.find((w: any) => w.name === name && Number.isFinite(Number(w.value)))
+        ?? src.widgets?.find((w: any) => Number.isFinite(Number(w.value)));
+      if (sw) return Number(sw.value);
+    }
+  }
+  const w = node.widgets?.find((w: any) => w.name === name);
+  if (w && Number.isFinite(Number(w.value))) return Number(w.value);
+  return fallback;
 }
 
 // Autogrow rebuilds its dynamic slots on load, dropping custom labels of every
@@ -187,8 +217,8 @@ comfyApp.registerExtension({
 // ramp/invert/strength edits redraw instantly with zero backend round-trip.
 // Registered BEFORE the color-ramp extension (same ordering trick as
 // Gradient Generate) so the preview sits above the ramp bar.
-function findSourceImg(node: any): HTMLImageElement | null {
-  const inp = node.inputs?.find((i: any) => i.name === "image");
+function findSourceImg(node: any, inputName = "image"): HTMLImageElement | null {
+  const inp = node.inputs?.find((i: any) => i.name === inputName);
   const linkId = inp?.link;
   if (linkId == null) return null;
   const link = node.graph?.links?.[linkId];
@@ -215,6 +245,7 @@ comfyApp.registerExtension({
       const vueApp = createApp(GradientMapPreviewWidget, {
         getRamp, getInvert, getStrength,
         getSourceImg: () => findSourceImg(this),
+        getMaskImg: () => findSourceImg(this, "mask"),
       });
       instance = vueApp.mount(container) as any;
 
@@ -284,8 +315,8 @@ comfyApp.registerExtension({
       const getRamp = () => this.widgets?.find((w: any) => w.name === "ramp")?.value ?? "{}";
       const getShape = () => this.widgets?.find((w: any) => w.name === "shape")?.value ?? "Linear";
       const getSize = (): [number, number] => [
-        Number(this.widgets?.find((w: any) => w.name === "width")?.value) || 1024,
-        Number(this.widgets?.find((w: any) => w.name === "height")?.value) || 1024,
+        resolveDim(this, "width", 1024),
+        resolveDim(this, "height", 1024),
       ];
 
       let instance: any = null;
@@ -419,6 +450,76 @@ comfyApp.registerExtension({
 
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
+        ro.disconnect();
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Noise — live client-side preview of the fractal noise (frame 0),
+// mirroring the exact integer hash so it equals the render.
+const NOISE_MIN_W = 260;
+
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.Noise.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDNoise") return;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const num = (name: string, def: number) =>
+        Number(this.widgets?.find((w: any) => w.name === name)?.value ?? def);
+      const getParams = () => ({
+        width: resolveDim(this, "width", 1024), height: resolveDim(this, "height", 1024),
+        scale: num("scale", 6), detail: num("detail", 4),
+        roughness: num("roughness", 0.5), lacunarity: num("lacunarity", 2),
+        distortion: num("distortion", 0), contrast: num("contrast", 1),
+        brightness: num("brightness", 0), evolution: num("evolution", 0),
+        loop: !!this.widgets?.find((w: any) => w.name === "loop")?.value,
+        offset_x: num("offset_x", 0), offset_y: num("offset_y", 0),
+        seed: num("seed", 0),
+      });
+
+      const container = document.createElement("div");
+      let instance: any = null;
+      const vueApp = createApp(NoisePreviewWidget, { getParams });
+      instance = vueApp.mount(container) as any;
+
+      const domWidget = this.addDOMWidget("noise_preview", "NKD_NOISE_PREVIEW", container, {
+        getValue: () => "",
+        setValue: () => {},
+        serialize: false,
+        hideOnZoom: false,
+      });
+      const ro = sizeDomWidgetToContent(this, domWidget, container, NOISE_MIN_W,
+        (w) => Math.round(w) + 26);
+
+      const origResize = this.onResize;
+      this.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < NOISE_MIN_W) size[0] = NOISE_MIN_W;
+      };
+
+      const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 300);
+      requestAnimationFrame(() => { instance?.forceResize?.(); });
+
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        requestAnimationFrame(() => { instance?.forceResize?.(); });
+        return r;
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        window.clearInterval(refreshTimer);
         ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();

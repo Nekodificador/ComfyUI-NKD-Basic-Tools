@@ -6357,9 +6357,9 @@ function normalizeContainer(container) {
   }
   return container;
 }
-const _hoisted_1$3 = { class: "nkd-pv-bar" };
-const _hoisted_2$3 = ["title", "onClick"];
-const _sfc_main$3 = /* @__PURE__ */ defineComponent({
+const _hoisted_1$4 = { class: "nkd-pv-bar" };
+const _hoisted_2$4 = ["title", "onClick"];
+const _sfc_main$4 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function }
@@ -6370,7 +6370,8 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     const vars = /* @__PURE__ */ ref([]);
     let savedRange = null;
     let debounceTimer;
-    const TOKEN_RE = /\{(variable_\d+)(:r)?\}/g;
+    const TOKEN_RE = /\{(variable_\d+)(:[rc])?\}/g;
+    const NEXT_MODE = { "": "r", r: "c", c: "" };
     let draggedChip = null;
     function labelFor(name) {
       const v = vars.value.find((x) => x.name === name);
@@ -6378,16 +6379,18 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       const m = name.match(/_(\d+)$/);
       return `Variable ${m ? Number(m[1]) + 1 : "?"}`;
     }
-    function chipEl(name, rand = false) {
+    function applyMode(span, mode) {
+      span.dataset.mode = mode;
+      span.classList.toggle("nkd-pv-chip-rand", mode === "r");
+      span.classList.toggle("nkd-pv-chip-cycle", mode === "c");
+    }
+    function chipEl(name, mode = "") {
       const span = document.createElement("span");
       span.className = "nkd-pv-chip";
       span.contentEditable = "false";
       span.dataset.var = name;
-      if (rand) {
-        span.dataset.rand = "1";
-        span.classList.add("nkd-pv-chip-rand");
-      }
-      span.title = "Shift+clic: aleatorizar esta variable · arrastra para mover";
+      applyMode(span, mode);
+      span.title = "Shift+clic: normal → aleatorio 🎲 → ciclo 🔁 · arrastra para mover";
       span.draggable = true;
       span.addEventListener("dragstart", (e) => {
         var _a;
@@ -6437,13 +6440,14 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       emitChange();
     }
     function renderText(text) {
+      var _a;
       const el = editor.value;
       if (!el) return;
       el.textContent = "";
       let last = 0;
       for (const m of text.matchAll(TOKEN_RE)) {
         if (m.index > last) el.appendChild(document.createTextNode(text.slice(last, m.index)));
-        el.appendChild(chipEl(m[1], m[2] === ":r"));
+        el.appendChild(chipEl(m[1], ((_a = m[2]) == null ? void 0 : _a.slice(1)) ?? ""));
         last = m.index + m[0].length;
       }
       if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
@@ -6457,7 +6461,8 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
           if (child.nodeType === Node.TEXT_NODE) {
             out += child.textContent ?? "";
           } else if (child instanceof HTMLElement && child.dataset.var) {
-            out += `{${child.dataset.var}${child.dataset.rand === "1" ? ":r" : ""}}`;
+            const mode = child.dataset.mode ?? "";
+            out += `{${child.dataset.var}${mode ? `:${mode}` : ""}}`;
           } else if (child instanceof HTMLBRElement) {
             out += "\n";
           } else if (child instanceof HTMLElement) {
@@ -6501,9 +6506,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       if (!chip || !e.shiftKey) return;
       e.preventDefault();
       e.stopPropagation();
-      const rand = chip.dataset.rand !== "1";
-      chip.dataset.rand = rand ? "1" : "";
-      chip.classList.toggle("nkd-pv-chip-rand", rand);
+      applyMode(chip, NEXT_MODE[chip.dataset.mode ?? ""]);
       emitChange();
     }
     function saveSelection() {
@@ -6585,14 +6588,14 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$3, [
+        createBaseVNode("div", _hoisted_1$4, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
               class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
-            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$3);
+            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$4);
           }), 128))
         ])
       ], 32);
@@ -6606,17 +6609,96 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-56fcf56b"]]);
-const _hoisted_1$2 = { class: "nkd-bar" };
-const _hoisted_2$2 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3$2 = { class: "nkd-row nkd-row--presets" };
-const _hoisted_4$1 = ["value"];
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["__scopeId", "data-v-e3af9b8a"]]);
+const MODES = ["smooth", "bezier", "steps"];
+function midWarp(f, mid) {
+  const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
+  if (Math.abs(m - 0.5) < 1e-4) return f;
+  return f <= 0 ? 0 : Math.pow(f, Math.log(0.5) / Math.log(m));
+}
+function smoothstep(f) {
+  return f * f * (3 - 2 * f);
+}
+function parseInterp(rampJson) {
+  var _a;
+  try {
+    const m = (_a = JSON.parse(rampJson)) == null ? void 0 : _a.interp;
+    if (MODES.includes(m)) return m;
+  } catch {
+  }
+  return "smooth";
+}
+function hexToRgb(hex) {
+  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+}
+function buildRampLut(stops, interp) {
+  const lut = new Uint8ClampedArray(256 * 3);
+  let si = 0;
+  for (let i = 0; i < 256; i++) {
+    const t = i / 255;
+    if (interp === "steps") {
+      let k = 0;
+      while (k < stops.length - 1 && stops[k + 1].pos <= t) k++;
+      const [r, g, b3] = hexToRgb(stops[k].color);
+      lut[i * 3] = r;
+      lut[i * 3 + 1] = g;
+      lut[i * 3 + 2] = b3;
+      continue;
+    }
+    while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
+    const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
+    let f = Math.max(0, Math.min(1, (t - a.pos) / Math.max(1e-6, b.pos - a.pos)));
+    f = midWarp(f, a.mid);
+    if (interp === "bezier") f = smoothstep(f);
+    const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
+    lut[i * 3] = r1 + (r2 - r1) * f;
+    lut[i * 3 + 1] = g1 + (g2 - g1) * f;
+    lut[i * 3 + 2] = b1 + (b2 - b1) * f;
+  }
+  return lut;
+}
+function lerpHex(c1, c2, t) {
+  const [r1, g1, b1] = hexToRgb(c1), [r2, g2, b2] = hexToRgb(c2);
+  const mix = (a, b) => Math.round(a + (b - a) * t);
+  const hex = (v) => v.toString(16).padStart(2, "0");
+  return `#${hex(mix(r1, r2))}${hex(mix(g1, g2))}${hex(mix(b1, b2))}`;
+}
+function expandStops(stops, interp, remap = (p2) => p2) {
+  if (interp === "smooth") return stops.map((s) => ({ pos: remap(s.pos), color: s.color }));
+  const out = [];
+  if (interp === "steps") {
+    for (let i = 0; i < stops.length; i++) {
+      const s = stops[i];
+      if (i > 0) out.push({ pos: remap(s.pos), color: stops[i - 1].color });
+      out.push({ pos: remap(s.pos), color: s.color });
+    }
+    return out;
+  }
+  const SUB = 12;
+  for (let i = 0; i < stops.length - 1; i++) {
+    const a = stops[i], b = stops[i + 1];
+    const needsSub = interp === "bezier" || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
+    const n = needsSub ? SUB : 1;
+    for (let k = 0; k <= n; k++) {
+      const u = k / n;
+      let e = midWarp(u, a.mid);
+      if (interp === "bezier") e = smoothstep(e);
+      out.push({ pos: remap(a.pos + (b.pos - a.pos) * u), color: lerpHex(a.color, b.color, e) });
+    }
+  }
+  return out;
+}
+const _hoisted_1$3 = { class: "nkd-bar" };
+const _hoisted_2$3 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$3 = ["value"];
+const _hoisted_4$2 = { class: "nkd-row nkd-row--presets" };
 const _hoisted_5 = ["value"];
-const _hoisted_6 = ["disabled"];
+const _hoisted_6 = ["value"];
+const _hoisted_7 = ["disabled"];
 const CW = 380, CH = 64;
 const HIT_R$1 = 10;
-const MIN_RENDER_SCALE$2 = 2;
-const _sfc_main$2 = /* @__PURE__ */ defineComponent({
+const MIN_RENDER_SCALE$3 = 2;
+const _sfc_main$3 = /* @__PURE__ */ defineComponent({
   __name: "ColorRampWidget",
   props: {
     onChange: { type: Function }
@@ -6643,8 +6725,11 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     let ro = null;
     let dpr = window.devicePixelRatio || 1;
     const stops = /* @__PURE__ */ ref([{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }]);
+    const interp = /* @__PURE__ */ ref("smooth");
     let activeStop = null;
     let hoverStop = null;
+    let draggingMid = null;
+    let hoverMid = null;
     let dragging = false;
     let dragOffsetX = 0;
     let downX = 0, downY = 0, moved = false;
@@ -6684,8 +6769,8 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$2);
-      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$2);
+      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$3);
+      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$3);
       const newW = Math.round(CW * sx), newH = Math.round(CH * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -6702,7 +6787,8 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       ctx.fillStyle = C.bg;
       ctx.fillRect(0, 0, CW, CH);
       const grad = ctx.createLinearGradient(PAD2.left, 0, PAD2.left + IW, 0);
-      for (const s of stops.value) grad.addColorStop(s.pos, s.color);
+      const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
+      for (const s of expandStops(sorted, interp.value)) grad.addColorStop(clamp01(s.pos), s.color);
       ctx.fillStyle = grad;
       roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.fill();
@@ -6710,6 +6796,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       ctx.lineWidth = 0.75;
       roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.stroke();
+      drawMidDiamonds();
       for (const s of stops.value) {
         const x = toCanvasX(s.pos);
         const isActive = s === activeStop;
@@ -6762,6 +6849,41 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       ctx.textAlign = "left";
       ctx.textBaseline = "alphabetic";
     }
+    function sortedStops() {
+      return [...stops.value].sort((a, b) => a.pos - b.pos);
+    }
+    function drawMidDiamonds() {
+      if (!ctx) return;
+      const sorted = sortedStops();
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const a = sorted[i], b = sorted[i + 1];
+        const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
+        if (mx - toCanvasX(a.pos) < 5 || toCanvasX(b.pos) - mx < 5) continue;
+        const on = a === draggingMid || a === hoverMid;
+        const r = on ? 4.5 : 3.5;
+        ctx.save();
+        ctx.translate(mx, BAR_MID);
+        ctx.rotate(Math.PI / 4);
+        ctx.beginPath();
+        ctx.rect(-r, -r, r * 2, r * 2);
+        ctx.fillStyle = on ? "rgba(232,238,248,0.95)" : "rgba(232,238,248,0.6)";
+        ctx.fill();
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    function midpointAt(x, y) {
+      if (Math.abs(y - BAR_MID) > HIT_R$1) return null;
+      const sorted = sortedStops();
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const a = sorted[i], b = sorted[i + 1];
+        const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
+        if (Math.abs(mx - x) <= HIT_R$1) return a;
+      }
+      return null;
+    }
     function roundRectPath(x, y, w, h, r) {
       if (!ctx) return;
       ctx.beginPath();
@@ -6780,12 +6902,12 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         const a = sorted[i], b = sorted[i + 1];
         if (pos >= a.pos && pos <= b.pos) {
           const t = (pos - a.pos) / Math.max(1e-6, b.pos - a.pos);
-          return lerpHex(a.color, b.color, t);
+          return lerpHex2(a.color, b.color, t);
         }
       }
       return sorted[0].color;
     }
-    function lerpHex(c1, c2, t) {
+    function lerpHex2(c1, c2, t) {
       const p2 = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
       const [r1, g1, b1] = p2(c1), [r2, g2, b2] = p2(c2);
       const mix = (a, b) => Math.round(a + (b - a) * t);
@@ -6811,9 +6933,18 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         activeStop = hit;
         dragOffsetX = hit.pos - fromCanvasX(x);
         dragging = true;
-      } else if (y >= BAR_Y - HIT_R$1 && y <= BAR_Y + BAR_H + HIT_R$1) {
+        redraw();
+        return;
+      }
+      const mp = midpointAt(x, y);
+      if (mp) {
+        draggingMid = mp;
+        redraw();
+        return;
+      }
+      if (y >= BAR_Y - HIT_R$1 && y <= BAR_Y + BAR_H + HIT_R$1) {
         const pos = fromCanvasX(x);
-        const newStop = { pos, color: sampleColorAt(pos) };
+        const newStop = { pos, color: sampleColorAt(pos), mid: 0.5 };
         stops.value.push(newStop);
         activeStop = newStop;
         dragOffsetX = 0;
@@ -6825,6 +6956,18 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     function onMove(e) {
       const { x, y } = eventToLogical(e);
       if (Math.abs(x - downX) > 3 || Math.abs(y - downY) > 3) moved = true;
+      if (draggingMid) {
+        const sorted = sortedStops();
+        const i = sorted.indexOf(draggingMid);
+        if (i >= 0 && i < sorted.length - 1) {
+          const a = sorted[i], b = sorted[i + 1];
+          const span = Math.max(1e-6, b.pos - a.pos);
+          draggingMid.mid = Math.min(0.95, Math.max(0.05, (fromCanvasX(x) - a.pos) / span));
+          emitChange();
+          redraw();
+        }
+        return;
+      }
       if (dragging && activeStop) {
         activeStop.pos = clamp01(fromCanvasX(x) + dragOffsetX);
         stops.value.sort((a, b) => a.pos - b.pos);
@@ -6832,12 +6975,18 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         redraw();
         return;
       }
-      const prevHover = hoverStop;
+      const prevHover = hoverStop, prevMid = hoverMid;
       hoverStop = stopAt(x);
-      if (hoverStop !== prevHover) redraw();
-      if (canvas.value) canvas.value.style.cursor = hoverStop ? "grab" : "crosshair";
+      hoverMid = hoverStop ? null : midpointAt(x, y);
+      if (hoverStop !== prevHover || hoverMid !== prevMid) redraw();
+      if (canvas.value) canvas.value.style.cursor = hoverStop ? "grab" : hoverMid ? "ew-resize" : "crosshair";
     }
     function onUp() {
+      if (draggingMid) {
+        draggingMid = null;
+        redraw();
+        return;
+      }
       if (dragging && activeStop && !moved) {
         openPickerFor(activeStop);
       }
@@ -6846,7 +6995,9 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     }
     function onLeave() {
       if (dragging) onUp();
+      draggingMid = null;
       hoverStop = null;
+      hoverMid = null;
       redraw();
     }
     function openPickerFor(stop) {
@@ -6864,19 +7015,32 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     }
     function reset() {
       stops.value = [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
+      interp.value = "smooth";
       activeStop = null;
       emitChange();
       redraw();
     }
+    function reverse() {
+      stops.value = stops.value.map((s) => ({ pos: clamp01(1 - s.pos), color: s.color })).sort((a, b) => a.pos - b.pos);
+      activeStop = null;
+      emitChange();
+      redraw();
+    }
+    function onInterpChange(mode) {
+      interp.value = parseInterp(JSON.stringify({ interp: mode }));
+      emitChange();
+      redraw();
+    }
     let debounceTimer;
+    function serialise() {
+      return JSON.stringify({
+        stops: [...stops.value].sort((a, b) => a.pos - b.pos),
+        interp: interp.value
+      });
+    }
     function emitChange() {
       window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => {
-        props.onChange(JSON.stringify({ stops: [...stops.value].sort((a, b) => a.pos - b.pos) }));
-      }, 60);
-    }
-    function serialise() {
-      return JSON.stringify({ stops: [...stops.value].sort((a, b) => a.pos - b.pos) });
+      debounceTimer = window.setTimeout(() => props.onChange(serialise()), 60);
     }
     function deserialise(json) {
       try {
@@ -6884,8 +7048,10 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         if (Array.isArray(data.stops) && data.stops.length >= 2) {
           stops.value = data.stops.map((s) => ({
             pos: clamp01(Number(s.pos)),
-            color: normalizeHex(String(s.color))
+            color: normalizeHex(String(s.color)),
+            mid: Number.isFinite(s.mid) ? Math.min(0.95, Math.max(0.05, Number(s.mid))) : 0.5
           })).sort((a, b) => a.pos - b.pos);
+          interp.value = parseInterp(json);
           redraw();
           return;
         }
@@ -6911,7 +7077,12 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       if (!name) return;
       const p2 = userPresets.value.find((x) => x.name === name);
       if (!p2) return;
-      stops.value = p2.stops.map((s) => ({ pos: clamp01(s.pos), color: normalizeHex(s.color) }));
+      stops.value = p2.stops.map((s) => ({
+        pos: clamp01(s.pos),
+        color: normalizeHex(s.color),
+        mid: Number.isFinite(s.mid) ? Math.min(0.95, Math.max(0.05, Number(s.mid))) : 0.5
+      }));
+      if (p2.interp) interp.value = parseInterp(JSON.stringify({ interp: p2.interp }));
       activeStop = null;
       emitChange();
       redraw();
@@ -6927,7 +7098,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       }
       const exists = userPresets.value.some((p2) => p2.name.toLowerCase() === name.toLowerCase());
       if (exists && !window.confirm(`Overwrite existing preset "${name}"?`)) return;
-      const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos) };
+      const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos), interp: interp.value };
       try {
         const res = await fetch("/nkd_color_ramp/presets", {
           method: "POST",
@@ -6979,13 +7150,13 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
         class: "nkd-root",
-        onMousedown: _cache[1] || (_cache[1] = withModifiers(() => {
+        onMousedown: _cache[2] || (_cache[2] = withModifiers(() => {
         }, ["stop"])),
-        onMouseup: _cache[2] || (_cache[2] = withModifiers(() => {
+        onMouseup: _cache[3] || (_cache[3] = withModifiers(() => {
         }, ["stop"])),
-        onMousemove: _cache[3] || (_cache[3] = withModifiers(() => {
+        onMousemove: _cache[4] || (_cache[4] = withModifiers(() => {
         }, ["stop"])),
-        onContextmenu: _cache[4] || (_cache[4] = withModifiers(() => {
+        onContextmenu: _cache[5] || (_cache[5] = withModifiers(() => {
         }, ["prevent"]))
       }, [
         createBaseVNode("canvas", {
@@ -6997,30 +7168,45 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onLeave, ["stop"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$2, [
-          createBaseVNode("div", _hoisted_2$2, [
-            _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: pick color · Shift+click: delete · drag: move", -1)),
-            _cache[6] || (_cache[6] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+        createBaseVNode("div", _hoisted_1$3, [
+          createBaseVNode("div", _hoisted_2$3, [
+            _cache[7] || (_cache[7] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: color · Shift+click: delete · drag ◆: tension", -1)),
+            _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+            createBaseVNode("select", {
+              class: "nkd-select nkd-select--interp",
+              value: interp.value,
+              title: "How colors blend between stops",
+              onChange: _cache[0] || (_cache[0] = ($event) => onInterpChange($event.target.value))
+            }, [..._cache[6] || (_cache[6] = [
+              createBaseVNode("option", { value: "smooth" }, "Smooth", -1),
+              createBaseVNode("option", { value: "bezier" }, "Bezier", -1),
+              createBaseVNode("option", { value: "steps" }, "Steps", -1)
+            ])], 40, _hoisted_3$3),
+            createBaseVNode("button", {
+              class: "nkd-btn",
+              title: "Reverse the color order",
+              onClick: withModifiers(reverse, ["stop"])
+            }, "⇄"),
             createBaseVNode("button", {
               class: "nkd-btn",
               onClick: withModifiers(reset, ["stop"])
             }, "Reset")
           ]),
-          createBaseVNode("div", _hoisted_3$2, [
-            _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-label" }, "Preset", -1)),
+          createBaseVNode("div", _hoisted_4$2, [
+            _cache[10] || (_cache[10] = createBaseVNode("span", { class: "nkd-label" }, "Preset", -1)),
             createBaseVNode("select", {
               class: "nkd-select nkd-select--preset",
               value: selectedPreset.value,
-              onChange: _cache[0] || (_cache[0] = ($event) => onPresetSelect($event.target.value))
+              onChange: _cache[1] || (_cache[1] = ($event) => onPresetSelect($event.target.value))
             }, [
-              _cache[7] || (_cache[7] = createBaseVNode("option", { value: "" }, "— Select —", -1)),
+              _cache[9] || (_cache[9] = createBaseVNode("option", { value: "" }, "— Select —", -1)),
               (openBlock(true), createElementBlock(Fragment, null, renderList(userPresets.value, (p2) => {
                 return openBlock(), createElementBlock("option", {
                   key: p2.name,
                   value: p2.name
-                }, toDisplayString(p2.name), 9, _hoisted_5);
+                }, toDisplayString(p2.name), 9, _hoisted_6);
               }), 128))
-            ], 40, _hoisted_4$1),
+            ], 40, _hoisted_5),
             createBaseVNode("button", {
               class: "nkd-btn nkd-btn--preset",
               onClick: withModifiers(saveCurrentAsPreset, ["stop"])
@@ -7029,7 +7215,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
               class: "nkd-btn nkd-btn--preset",
               disabled: !selectedPreset.value,
               onClick: withModifiers(deleteSelectedPreset, ["stop"])
-            }, "Delete", 8, _hoisted_6)
+            }, "Delete", 8, _hoisted_7)
           ])
         ]),
         createBaseVNode("input", {
@@ -7043,15 +7229,17 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-b0354f72"]]);
-const _hoisted_1$1 = { class: "nkd-bar" };
-const _hoisted_2$1 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3$1 = { class: "nkd-hint" };
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-3d741d05"]]);
+const _hoisted_1$2 = { class: "nkd-bar" };
+const _hoisted_2$2 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$2 = { class: "nkd-hint" };
 const BOX_W = 320, BOX_H = 210, PAD = 14;
 const HIT_R = 11;
-const MIN_RENDER_SCALE$1 = 2;
-const DIAMOND_RES = 96;
-const _sfc_main$1 = /* @__PURE__ */ defineComponent({
+const MIN_RENDER_SCALE$2 = 2;
+const MID_MIN = 0.05, MID_MAX = 0.95;
+const CANVAS_INSET = 5;
+const DIAMOND_RES = 160;
+const _sfc_main$2 = /* @__PURE__ */ defineComponent({
   __name: "GradientPreviewWidget",
   props: {
     onChange: { type: Function },
@@ -7080,6 +7268,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     let dpr = window.devicePixelRatio || 1;
     const p0 = /* @__PURE__ */ ref([0, 0.5]);
     const p1 = /* @__PURE__ */ ref([1, 0.5]);
+    const mid = /* @__PURE__ */ ref(0.5);
     const hintText = /* @__PURE__ */ ref("Drag the handles to set direction");
     let lastShape = null;
     let dragging = null;
@@ -7089,10 +7278,17 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       return [fitX + pt[0] * fitW, fitY + pt[1] * fitH];
     }
     function fromPx(x, y) {
-      return [
-        Math.max(0, Math.min(1, (x - fitX) / fitW)),
-        Math.max(0, Math.min(1, (y - fitY) / fitH))
-      ];
+      const cx = Math.max(CANVAS_INSET, Math.min(BOX_W - CANVAS_INSET, x));
+      const cy = Math.max(CANVAS_INSET, Math.min(BOX_H - CANVAS_INSET, y));
+      return [(cx - fitX) / fitW, (cy - fitY) / fitH];
+    }
+    function midPx() {
+      const a = toPx(p0.value), b = toPx(p1.value);
+      return [a[0] + (b[0] - a[0]) * mid.value, a[1] + (b[1] - a[1]) * mid.value];
+    }
+    function warpExp() {
+      const m = Math.min(MID_MAX, Math.max(MID_MIN, mid.value));
+      return Math.log(0.5) / Math.log(m);
     }
     function eventToLogical(e) {
       const rect = canvas.value.getBoundingClientRect();
@@ -7113,8 +7309,8 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE$1);
-      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE$1);
+      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE$2);
+      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE$2);
       const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -7139,49 +7335,34 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       fitW = fw;
       fitH = fh;
     }
+    function warpStop(pos) {
+      const g = Math.pow(Math.max(0, Math.min(1, pos)), 1 / warpExp());
+      return Math.max(0, Math.min(1, g));
+    }
     function buildFill(shape, stops, a, b) {
       if (!ctx) return null;
+      if (shape === "Diamond") return null;
+      const expanded = expandStops(stops, parseInterp(props.getRamp()), warpStop);
+      const add = (g) => {
+        expanded.forEach((s) => g.addColorStop(Math.max(0, Math.min(1, s.pos)), s.color));
+        return g;
+      };
       if (shape === "Radial") {
         const r = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), 1);
-        const g2 = ctx.createRadialGradient(a[0], a[1], 0, a[0], a[1], r);
-        stops.forEach((s) => g2.addColorStop(s.pos, s.color));
-        return g2;
+        return add(ctx.createRadialGradient(a[0], a[1], 0, a[0], a[1], r));
       }
       if (shape === "Angular" && "createConicGradient" in ctx) {
         const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
-        const g2 = ctx.createConicGradient(angle, a[0], a[1]);
-        stops.forEach((s) => g2.addColorStop(s.pos, s.color));
-        return g2;
+        return add(ctx.createConicGradient(angle, a[0], a[1]));
       }
-      if (shape === "Diamond") return null;
-      const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
-      stops.forEach((s) => g.addColorStop(s.pos, s.color));
-      return g;
-    }
-    function hexToRgb(hex) {
-      return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+      return add(ctx.createLinearGradient(a[0], a[1], b[0], b[1]));
     }
     let rampLut = null;
     let lutKey = "";
-    function buildLut(stops) {
-      const lut = new Uint8ClampedArray(256 * 3);
-      let si = 0;
-      for (let i = 0; i < 256; i++) {
-        const t = i / 255;
-        while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
-        const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
-        const f = Math.max(0, Math.min(1, (t - a.pos) / Math.max(1e-6, b.pos - a.pos)));
-        const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-        lut[i * 3] = r1 + (r2 - r1) * f;
-        lut[i * 3 + 1] = g1 + (g2 - g1) * f;
-        lut[i * 3 + 2] = b1 + (b2 - b1) * f;
-      }
-      return lut;
-    }
     function rampLutFor(stops) {
-      const key = JSON.stringify(stops);
+      const key = props.getRamp();
       if (key !== lutKey) {
-        rampLut = buildLut(stops);
+        rampLut = buildRampLut(stops, parseInterp(key));
         lutKey = key;
       }
       return rampLut;
@@ -7201,6 +7382,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         diamondImg = diamondCtx.createImageData(dw, dh);
       }
       const lut = rampLutFor(stops);
+      const exp = warpExp();
       const data = diamondImg.data;
       const p0n = [(a[0] - fitX) / fitW, (a[1] - fitY) / fitH];
       const p1n = [(b[0] - fitX) / fitW, (b[1] - fitY) / fitH];
@@ -7210,7 +7392,8 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         const ny = (py + 0.5) / dh;
         for (let px = 0; px < dw; px++) {
           const nx = (px + 0.5) / dw;
-          const t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
+          let t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
+          t = Math.pow(t, exp);
           let idx = t * 255 | 0;
           if (idx > 255) idx = 255;
           const li = idx * 3;
@@ -7253,14 +7436,42 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       ctx.stroke();
       ctx.setLineDash([]);
       const labels = HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear;
+      const m = midPx();
+      drawMidHandle(m);
       drawHandle(a, "p0", labels[0]);
       drawHandle(b, "p1", labels[1]);
       const tipWhich = dragging ?? hover;
-      if (tipWhich) {
+      if (tipWhich === "mid") {
+        drawTooltip(m, `Mid  ${Math.round(mid.value * 100)}%`);
+      } else if (tipWhich) {
         const pos = tipWhich === "p0" ? p0.value : p1.value;
         const label = tipWhich === "p0" ? labels[0] : labels[1];
         drawTooltip(tipWhich === "p0" ? a : b, `${label}  ${pos[0].toFixed(2)}, ${pos[1].toFixed(2)}`);
       }
+    }
+    function drawMidHandle(pos) {
+      if (!ctx) return;
+      const isDrag = dragging === "mid";
+      const isHover = hover === "mid";
+      const r = isDrag ? 6 : isHover ? 5.5 : 4;
+      ctx.save();
+      ctx.translate(pos[0], pos[1]);
+      ctx.rotate(Math.PI / 4);
+      ctx.shadowColor = "rgba(0,0,0,0.6)";
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetY = 1;
+      ctx.beginPath();
+      ctx.rect(-r, -r, r * 2, r * 2);
+      ctx.fillStyle = "#e8eef8";
+      ctx.fill();
+      ctx.restore();
+      ctx.save();
+      ctx.translate(pos[0], pos[1]);
+      ctx.rotate(Math.PI / 4);
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "rgba(0,0,0,0.65)";
+      ctx.strokeRect(-r, -r, r * 2, r * 2);
+      ctx.restore();
     }
     function drawTooltip(at, text) {
       if (!ctx) return;
@@ -7319,6 +7530,8 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       const db = Math.hypot(b[0] - x, b[1] - y);
       if (da <= HIT_R && da <= db) return "p0";
       if (db <= HIT_R) return "p1";
+      const m = midPx();
+      if (Math.hypot(m[0] - x, m[1] - y) <= HIT_R) return "mid";
       return null;
     }
     function onDown(e) {
@@ -7328,6 +7541,16 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     }
     function onMove(e) {
       const [x, y] = eventToLogical(e);
+      if (dragging === "mid") {
+        const a = toPx(p0.value), b = toPx(p1.value);
+        const abx = b[0] - a[0], aby = b[1] - a[1];
+        const len2 = abx * abx + aby * aby || 1;
+        const f = ((x - a[0]) * abx + (y - a[1]) * aby) / len2;
+        mid.value = Math.min(MID_MAX, Math.max(MID_MIN, f));
+        emitChange();
+        redraw();
+        return;
+      }
       if (dragging) {
         const target = dragging === "p0" ? p0 : p1;
         target.value = fromPx(x, y);
@@ -7344,6 +7567,20 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       dragging = null;
       redraw();
     }
+    function onDblClick(e) {
+      const [x, y] = eventToLogical(e);
+      const which = hitTest(x, y);
+      if (!which) return;
+      if (which === "mid") {
+        mid.value = 0.5;
+      } else {
+        const def2 = SHAPE_DEFAULTS[props.getShape() || "Linear"] ?? SHAPE_DEFAULTS.Linear;
+        (which === "p0" ? p0 : p1).value = [...def2[which]];
+      }
+      dragging = null;
+      emitChange();
+      redraw();
+    }
     function onLeave() {
       dragging = null;
       hover = null;
@@ -7354,6 +7591,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       const def2 = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
       p0.value = [...def2.p0];
       p1.value = [...def2.p1];
+      mid.value = 0.5;
       emitChange();
       redraw();
     }
@@ -7361,11 +7599,11 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     function emitChange() {
       window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(() => {
-        props.onChange(JSON.stringify({ p0: p0.value, p1: p1.value }));
+        props.onChange(serialise());
       }, 40);
     }
     function serialise() {
-      return JSON.stringify({ p0: p0.value, p1: p1.value });
+      return JSON.stringify({ p0: p0.value, p1: p1.value, mid: mid.value });
     }
     function deserialise(json) {
       try {
@@ -7373,6 +7611,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         if (Array.isArray(data.p0) && Array.isArray(data.p1)) {
           p0.value = [Number(data.p0[0]), Number(data.p0[1])];
           p1.value = [Number(data.p1[0]), Number(data.p1[1])];
+          mid.value = Number.isFinite(data.mid) ? Number(data.mid) : 0.5;
           lastShape = props.getShape();
           redraw();
           return;
@@ -7387,6 +7626,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         const def2 = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
         p0.value = [...def2.p0];
         p1.value = [...def2.p1];
+        mid.value = 0.5;
         emitChange();
       }
       lastShape = shape;
@@ -7434,11 +7674,12 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
           onMousedown: withModifiers(onDown, ["stop", "prevent"]),
           onMousemove: withModifiers(onMove, ["stop"]),
           onMouseup: withModifiers(onUp, ["stop"]),
-          onMouseleave: withModifiers(onLeave, ["stop"])
+          onMouseleave: withModifiers(onLeave, ["stop"]),
+          onDblclick: withModifiers(onDblClick, ["stop", "prevent"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$1, [
-          createBaseVNode("div", _hoisted_2$1, [
-            createBaseVNode("span", _hoisted_3$1, toDisplayString(hintText.value), 1),
+        createBaseVNode("div", _hoisted_1$2, [
+          createBaseVNode("div", _hoisted_2$2, [
+            createBaseVNode("span", _hoisted_3$2, toDisplayString(hintText.value), 1),
             _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("button", {
               class: "nkd-btn",
@@ -7450,22 +7691,23 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-d28ef3ed"]]);
-const _hoisted_1 = { class: "nkd-root" };
-const _hoisted_2 = { class: "nkd-bar" };
-const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4 = { class: "nkd-hint" };
-const MIN_RENDER_SCALE = 2;
-const CACHE_RES = 220;
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-45c56d8c"]]);
+const _hoisted_1$1 = { class: "nkd-root" };
+const _hoisted_2$1 = { class: "nkd-bar" };
+const _hoisted_3$1 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4$1 = { class: "nkd-hint" };
+const MIN_RENDER_SCALE$1 = 2;
+const CACHE_RES = 640;
 const DEFAULT_ASPECT = "16 / 10";
 const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
-const _sfc_main = /* @__PURE__ */ defineComponent({
+const _sfc_main$1 = /* @__PURE__ */ defineComponent({
   __name: "GradientMapPreviewWidget",
   props: {
     getRamp: { type: Function },
     getInvert: { type: Function },
     getStrength: { type: Function },
-    getSourceImg: { type: Function }
+    getSourceImg: { type: Function },
+    getMaskImg: { type: Function }
   },
   setup(__props, { expose: __expose }) {
     const props = __props;
@@ -7481,15 +7723,15 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     let cacheLuma = null;
     let lastSrc = null;
     let offscreen = null;
+    let cacheMask = null;
+    let lastMaskSrc = null;
+    let maskOffscreen = null;
     let outCanvas = null;
     let outCtx = null;
     let outImg = null;
     let rampLut = null;
     let lutKey = "";
     let lastSig = "";
-    function hexToRgb(hex) {
-      return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-    }
     function parseRamp() {
       try {
         const data = JSON.parse(props.getRamp());
@@ -7499,22 +7741,6 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       } catch {
       }
       return [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
-    }
-    function buildLut(stops) {
-      const lut = new Uint8ClampedArray(256 * 3);
-      let si = 0;
-      for (let i = 0; i < 256; i++) {
-        const t = i / 255;
-        while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
-        const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
-        const span = Math.max(1e-6, b.pos - a.pos);
-        const f = Math.max(0, Math.min(1, (t - a.pos) / span));
-        const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-        lut[i * 3] = r1 + (r2 - r1) * f;
-        lut[i * 3 + 1] = g1 + (g2 - g1) * f;
-        lut[i * 3 + 2] = b1 + (b2 - b1) * f;
-      }
-      return lut;
     }
     function decodeSource(img) {
       const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
@@ -7534,6 +7760,28 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         cacheLuma[p2] = (data[i] * LUMA_R + data[i + 1] * LUMA_G + data[i + 2] * LUMA_B) / 255;
       }
     }
+    function decodeMask(img) {
+      cacheMask = null;
+      if (!cacheW || !cacheH) return;
+      if (!maskOffscreen) maskOffscreen = document.createElement("canvas");
+      maskOffscreen.width = cacheW;
+      maskOffscreen.height = cacheH;
+      const mctx = maskOffscreen.getContext("2d");
+      mctx.clearRect(0, 0, cacheW, cacheH);
+      mctx.drawImage(img, 0, 0, cacheW, cacheH);
+      const data = mctx.getImageData(0, 0, cacheW, cacheH).data;
+      let alphaVaries = false;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 250) {
+          alphaVaries = true;
+          break;
+        }
+      }
+      if (!alphaVaries) return;
+      const m = new Float32Array(cacheW * cacheH);
+      for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) m[p2] = 1 - data[i + 3] / 255;
+      cacheMask = m;
+    }
     function syncCanvasSize() {
       const c = canvas.value;
       if (!c) return false;
@@ -7541,7 +7789,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       if (rect.width < 1 || rect.height < 1) return false;
       logicalW = rect.width;
       logicalH = rect.height;
-      const s = Math.max(dpr, MIN_RENDER_SCALE);
+      const s = Math.max(dpr, MIN_RENDER_SCALE$1);
       const newW = Math.round(rect.width * s), newH = Math.round(rect.height * s);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -7571,7 +7819,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       const invert = props.getInvert();
       const strength = Math.max(0, Math.min(1, props.getStrength()));
       if (rampStr !== lutKey) {
-        rampLut = buildLut(parseRamp());
+        rampLut = buildRampLut(parseRamp(), parseInterp(rampStr));
         lutKey = rampStr;
       }
       const lut = rampLut;
@@ -7583,16 +7831,17 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         outImg = outCtx.createImageData(cacheW, cacheH);
       }
       const data = outImg.data;
-      const invStrength = 1 - strength;
       for (let p2 = 0, i = 0; p2 < cacheW * cacheH; p2++, i += 4) {
         let idx = cacheLuma[p2] * 255 | 0;
         if (idx < 0) idx = 0;
         else if (idx > 255) idx = 255;
         if (invert) idx = 255 - idx;
         const li = idx * 3;
-        data[i] = cacheRgb[i] * invStrength + lut[li] * strength;
-        data[i + 1] = cacheRgb[i + 1] * invStrength + lut[li + 1] * strength;
-        data[i + 2] = cacheRgb[i + 2] * invStrength + lut[li + 2] * strength;
+        const sf = cacheMask ? strength * cacheMask[p2] : strength;
+        const inv = 1 - sf;
+        data[i] = cacheRgb[i] * inv + lut[li] * sf;
+        data[i + 1] = cacheRgb[i + 1] * inv + lut[li + 1] * sf;
+        data[i + 2] = cacheRgb[i + 2] * inv + lut[li + 2] * sf;
         data[i + 3] = 255;
       }
       outCtx.putImageData(outImg, 0, 0);
@@ -7602,21 +7851,208 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     function refreshExternal() {
       const img = props.getSourceImg();
       const src = (img == null ? void 0 : img.currentSrc) || (img == null ? void 0 : img.src) || null;
+      let srcChanged = false;
       if (img && img.complete && src && src !== lastSrc) {
         decodeSource(img);
         lastSrc = src;
+        srcChanged = true;
       } else if (!img && lastSrc !== null) {
         cacheRgb = null;
         cacheLuma = null;
+        cacheMask = null;
         lastSrc = null;
+        lastMaskSrc = null;
       }
-      hintText.value = cacheRgb ? "Live preview" : "Connect an image";
+      const mimg = props.getMaskImg();
+      const msrc = (mimg == null ? void 0 : mimg.currentSrc) || (mimg == null ? void 0 : mimg.src) || null;
+      if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
+        decodeMask(mimg);
+        lastMaskSrc = msrc;
+      } else if (!mimg && lastMaskSrc !== null) {
+        cacheMask = null;
+        lastMaskSrc = null;
+      }
+      hintText.value = cacheRgb ? cacheMask ? "Live preview · masked" : "Live preview" : "Connect an image";
       const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
       if (wantAspect !== canvasAspect.value) {
         canvasAspect.value = wantAspect;
         return;
       }
-      const sig = `${lastSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+      const sig = `${lastSrc}|${lastMaskSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+      if (sig !== lastSig) {
+        lastSig = sig;
+        redraw();
+      }
+    }
+    function forceResize() {
+      return syncCanvasSize();
+    }
+    function cleanup() {
+      ro == null ? void 0 : ro.disconnect();
+    }
+    onMounted(() => {
+      var _a;
+      ctx = ((_a = canvas.value) == null ? void 0 : _a.getContext("2d")) ?? null;
+      ro = new ResizeObserver(() => syncCanvasSize());
+      if (canvas.value) ro.observe(canvas.value);
+      syncCanvasSize();
+    });
+    onBeforeUnmount(cleanup);
+    __expose({ refreshExternal, forceResize, cleanup });
+    return (_ctx, _cache) => {
+      return openBlock(), createElementBlock("div", _hoisted_1$1, [
+        createBaseVNode("canvas", {
+          ref_key: "canvas",
+          ref: canvas,
+          class: "nkd-canvas",
+          style: normalizeStyle({ aspectRatio: canvasAspect.value })
+        }, null, 4),
+        createBaseVNode("div", _hoisted_2$1, [
+          createBaseVNode("div", _hoisted_3$1, [
+            createBaseVNode("span", _hoisted_4$1, toDisplayString(hintText.value), 1)
+          ])
+        ])
+      ]);
+    };
+  }
+});
+const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-eb6979dd"]]);
+const _hoisted_1 = { class: "nkd-root" };
+const _hoisted_2 = { class: "nkd-bar" };
+const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4 = { class: "nkd-hint" };
+const PREVIEW_MAX = 256;
+const MIN_RENDER_SCALE = 2;
+const LOOP_RADIUS = 1.5;
+const _sfc_main = /* @__PURE__ */ defineComponent({
+  __name: "NoisePreviewWidget",
+  props: {
+    getParams: { type: Function }
+  },
+  setup(__props, { expose: __expose }) {
+    const props = __props;
+    const canvas = /* @__PURE__ */ ref(null);
+    let ctx = null;
+    let ro = null;
+    const dpr = window.devicePixelRatio || 1;
+    let logicalW = 0, logicalH = 0;
+    const hint = /* @__PURE__ */ ref("Live preview");
+    const aspect = /* @__PURE__ */ ref("1 / 1");
+    let lastSig = "";
+    function h32(x) {
+      x = x >>> 0;
+      x ^= x >>> 16;
+      x = Math.imul(x, 2146121005) >>> 0;
+      x ^= x >>> 15;
+      x = Math.imul(x, 2221713035) >>> 0;
+      x ^= x >>> 16;
+      return x >>> 0;
+    }
+    function vnoise(c, seed) {
+      const d = c.length;
+      const fl = [], u = [];
+      for (let k = 0; k < d; k++) {
+        const f0 = Math.floor(c[k]);
+        fl[k] = f0;
+        const fr = c[k] - f0;
+        u[k] = fr * fr * fr * (fr * (fr * 6 - 15) + 10);
+      }
+      let total = 0;
+      for (let corner = 0; corner < 1 << d; corner++) {
+        let w = 1, h = seed >>> 0;
+        for (let k = 0; k < d; k++) {
+          const bit = corner >> k & 1;
+          h = h32(h + fl[k] + bit);
+          w *= bit ? u[k] : 1 - u[k];
+        }
+        total += w * (h / 4294967296);
+      }
+      return total;
+    }
+    function fbm(gx, gy, tc, p2, seedLow) {
+      let val = 0, amp = 1, freq = 1, norm = 0;
+      const detail = Math.max(1, Math.round(p2.detail));
+      for (let o = 0; o < detail; o++) {
+        let cx = gx * freq, cy = gy * freq;
+        const t = tc.map((v) => v * freq);
+        if (p2.distortion > 0) {
+          const wx = vnoise([cx + 17.3, cy + 5.1, ...t], (seedLow ^ 2654435761) >>> 0);
+          const wy = vnoise([cx + 3.7, cy + 19.2, ...t], (seedLow ^ 2246822519) >>> 0);
+          cx += (wx - 0.5) * 2 * p2.distortion;
+          cy += (wy - 0.5) * 2 * p2.distortion;
+        }
+        val += amp * vnoise([cx, cy, ...t], seedLow + o * 1013 >>> 0);
+        norm += amp;
+        amp *= p2.roughness;
+        freq *= p2.lacunarity;
+      }
+      return val / Math.max(norm, 1e-6);
+    }
+    function syncCanvasSize() {
+      const c = canvas.value;
+      if (!c) return false;
+      const rect = c.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return false;
+      logicalW = rect.width;
+      logicalH = rect.height;
+      const s = Math.max(dpr, MIN_RENDER_SCALE);
+      const nw = Math.round(rect.width * s), nh = Math.round(rect.height * s);
+      if (c.width !== nw || c.height !== nh) {
+        c.width = nw;
+        c.height = nh;
+        ctx = c.getContext("2d");
+      }
+      ctx == null ? void 0 : ctx.setTransform(nw / rect.width, 0, 0, nh / rect.height, 0, 0);
+      redraw();
+      return true;
+    }
+    let offscreen = null;
+    function redraw() {
+      if (!ctx || logicalW < 1) return;
+      const p2 = props.getParams();
+      const W = Math.max(1, p2.width), H = Math.max(1, p2.height);
+      const aspectN = W / H;
+      const pw = aspectN >= 1 ? PREVIEW_MAX : Math.max(1, Math.round(PREVIEW_MAX * aspectN));
+      const ph = aspectN >= 1 ? Math.max(1, Math.round(PREVIEW_MAX / aspectN)) : PREVIEW_MAX;
+      const evo = Math.max(0, p2.evolution) / 100;
+      let tc = [];
+      if (p2.loop && evo > 0) tc = [evo * LOOP_RADIUS, 0];
+      else if (evo > 0) tc = [0];
+      const seedLow = (p2.seed % 4294967296 + 4294967296) % 4294967296;
+      if (!offscreen || offscreen.width !== pw || offscreen.height !== ph) {
+        offscreen = document.createElement("canvas");
+        offscreen.width = pw;
+        offscreen.height = ph;
+      }
+      const octx = offscreen.getContext("2d");
+      const img = octx.createImageData(pw, ph);
+      const data = img.data;
+      for (let j = 0; j < ph; j++) {
+        const gy = j / ph * p2.scale + p2.offset_y;
+        for (let i = 0; i < pw; i++) {
+          const gx = i / pw * p2.scale * aspectN + p2.offset_x;
+          let v = fbm(gx, gy, tc, p2, seedLow);
+          v = (v - 0.5) * p2.contrast + 0.5 + p2.brightness;
+          v = v < 0 ? 0 : v > 1 ? 1 : v;
+          const px = (j * pw + i) * 4, g = v * 255 | 0;
+          data[px] = g;
+          data[px + 1] = g;
+          data[px + 2] = g;
+          data[px + 3] = 255;
+        }
+      }
+      octx.putImageData(img, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(offscreen, 0, 0, logicalW, logicalH);
+    }
+    function refreshExternal() {
+      const p2 = props.getParams();
+      const a = `${Math.max(1, p2.width)} / ${Math.max(1, p2.height)}`;
+      if (a !== aspect.value) {
+        aspect.value = a;
+        return;
+      }
+      const sig = JSON.stringify(p2);
       if (sig !== lastSig) {
         lastSig = sig;
         redraw();
@@ -7643,18 +8079,18 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           ref_key: "canvas",
           ref: canvas,
           class: "nkd-canvas",
-          style: normalizeStyle({ aspectRatio: canvasAspect.value })
+          style: normalizeStyle({ aspectRatio: aspect.value })
         }, null, 4),
         createBaseVNode("div", _hoisted_2, [
           createBaseVNode("div", _hoisted_3, [
-            createBaseVNode("span", _hoisted_4, toDisplayString(hintText.value), 1)
+            createBaseVNode("span", _hoisted_4, toDisplayString(hint.value), 1)
           ])
         ])
       ]);
     };
   }
 });
-const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-69c09356"]]);
+const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-773b27a5"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -7662,28 +8098,52 @@ const MIN_EDITOR_H = 190;
 const ROW_SAFETY = 8;
 function sizeDomWidgetToContent(node, domWidget, container, minW, estimate) {
   let measuredH = 0;
+  let raf = 0;
+  let settling = false;
   const inner = container.firstElementChild ?? container;
   domWidget.computeSize = (width) => {
     const w = Math.max(width ?? minW, minW);
     const h = (measuredH > 0 ? measuredH : estimate(w)) + ROW_SAFETY;
     return [w, h];
   };
-  const ro = new ResizeObserver(() => {
-    const h = inner.offsetHeight;
-    if (h > 0 && Math.abs(h - measuredH) > 1) {
-      measuredH = h;
+  const apply2 = () => {
+    raf = 0;
+    if (!node.size) return;
+    const needed = node.computeSize();
+    if (Math.abs(needed[1] - node.size[1]) > 1) {
+      settling = true;
+      node.setSize([node.size[0], needed[1]]);
+      node.setDirtyCanvas(true, true);
       requestAnimationFrame(() => {
-        if (!node.size) return;
-        const needed = node.computeSize();
-        if (Math.abs(needed[1] - node.size[1]) > 1) {
-          node.setSize([node.size[0], needed[1]]);
-          node.setDirtyCanvas(true, true);
-        }
+        settling = false;
       });
     }
+  };
+  const ro = new ResizeObserver(() => {
+    if (settling) return;
+    const h = inner.offsetHeight;
+    if (h < 1) return;
+    if (Math.abs(h - measuredH) <= 1) return;
+    measuredH = h;
+    if (!raf) raf = requestAnimationFrame(apply2);
   });
   ro.observe(inner);
   return ro;
+}
+function resolveDim(node, name, fallback) {
+  var _a, _b, _c, _d, _e, _f, _g;
+  const slot = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === name);
+  if (slot && slot.link != null) {
+    const link = (_c = (_b = node.graph) == null ? void 0 : _b.links) == null ? void 0 : _c[slot.link];
+    const src = link && ((_d = node.graph) == null ? void 0 : _d.getNodeById(link.origin_id));
+    if (src) {
+      const sw = ((_e = src.widgets) == null ? void 0 : _e.find((w2) => w2.name === name && Number.isFinite(Number(w2.value)))) ?? ((_f = src.widgets) == null ? void 0 : _f.find((w2) => Number.isFinite(Number(w2.value))));
+      if (sw) return Number(sw.value);
+    }
+  }
+  const w = (_g = node.widgets) == null ? void 0 : _g.find((w2) => w2.name === name);
+  if (w && Number.isFinite(Number(w.value))) return Number(w.value);
+  return fallback;
 }
 function syncLabels(node) {
   const props = node.properties ?? (node.properties = {});
@@ -7796,9 +8256,9 @@ app.registerExtension({
     };
   }
 });
-function findSourceImg(node) {
+function findSourceImg(node, inputName = "image") {
   var _a, _b, _c, _d, _e;
-  const inp = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === "image");
+  const inp = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === inputName);
   const linkId = inp == null ? void 0 : inp.link;
   if (linkId == null) return null;
   const link = (_c = (_b = node.graph) == null ? void 0 : _b.links) == null ? void 0 : _c[linkId];
@@ -7831,7 +8291,8 @@ app.registerExtension({
         getRamp,
         getInvert,
         getStrength,
-        getSourceImg: () => findSourceImg(this)
+        getSourceImg: () => findSourceImg(this),
+        getMaskImg: () => findSourceImg(this, "mask")
       });
       instance = vueApp.mount(container);
       const domWidget = this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
@@ -7907,13 +8368,10 @@ app.registerExtension({
         var _a2, _b;
         return ((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "shape")) == null ? void 0 : _b.value) ?? "Linear";
       };
-      const getSize = () => {
-        var _a2, _b, _c, _d;
-        return [
-          Number((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "width")) == null ? void 0 : _b.value) || 1024,
-          Number((_d = (_c = this.widgets) == null ? void 0 : _c.find((w) => w.name === "height")) == null ? void 0 : _d.value) || 1024
-        ];
-      };
+      const getSize = () => [
+        resolveDim(this, "width", 1024),
+        resolveDim(this, "height", 1024)
+      ];
       let instance = null;
       const vueApp = createApp(GradientPreviewWidget, {
         onChange: (json) => {
@@ -8053,12 +8511,96 @@ app.registerExtension({
     };
   }
 });
+const NOISE_MIN_W = 260;
+app.registerExtension({
+  name: "NKD.BasicTools.Noise.Vue",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDNoise") return;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const num = (name, def2) => {
+        var _a, _b;
+        return Number(((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === name)) == null ? void 0 : _b.value) ?? def2);
+      };
+      const getParams = () => {
+        var _a, _b;
+        return {
+          width: resolveDim(this, "width", 1024),
+          height: resolveDim(this, "height", 1024),
+          scale: num("scale", 6),
+          detail: num("detail", 4),
+          roughness: num("roughness", 0.5),
+          lacunarity: num("lacunarity", 2),
+          distortion: num("distortion", 0),
+          contrast: num("contrast", 1),
+          brightness: num("brightness", 0),
+          evolution: num("evolution", 0),
+          loop: !!((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "loop")) == null ? void 0 : _b.value),
+          offset_x: num("offset_x", 0),
+          offset_y: num("offset_y", 0),
+          seed: num("seed", 0)
+        };
+      };
+      const container = document.createElement("div");
+      let instance = null;
+      const vueApp = createApp(NoisePreviewWidget, { getParams });
+      instance = vueApp.mount(container);
+      const domWidget = this.addDOMWidget("noise_preview", "NKD_NOISE_PREVIEW", container, {
+        getValue: () => "",
+        setValue: () => {
+        },
+        serialize: false,
+        hideOnZoom: false
+      });
+      const ro = sizeDomWidgetToContent(
+        this,
+        domWidget,
+        container,
+        NOISE_MIN_W,
+        (w) => Math.round(w) + 26
+      );
+      const origResize = this.onResize;
+      this.onResize = function(size) {
+        origResize == null ? void 0 : origResize.apply(this, arguments);
+        if (size[0] < NOISE_MIN_W) size[0] = NOISE_MIN_W;
+      };
+      const refreshTimer = window.setInterval(() => {
+        var _a;
+        return (_a = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a.call(instance);
+      }, 300);
+      requestAnimationFrame(() => {
+        var _a;
+        (_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance);
+      });
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        requestAnimationFrame(() => {
+          var _a;
+          (_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance);
+        });
+        return r;
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        var _a;
+        window.clearInterval(refreshTimer);
+        ro.disconnect();
+        (_a = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a.call(instance);
+        vueApp.unmount();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
 (function() {
   "use strict";
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-56fcf56b] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-56fcf56b] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-56fcf56b]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-56fcf56b]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-56fcf56b] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-56fcf56b] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-56fcf56b]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-56fcf56b] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n\n.nkd-root[data-v-b0354f72] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-b0354f72], .nkd-root[data-v-b0354f72] *, .nkd-root[data-v-b0354f72] *::before, .nkd-root[data-v-b0354f72] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-b0354f72] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-b0354f72] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-b0354f72] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-b0354f72] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-b0354f72] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-b0354f72]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-b0354f72] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-b0354f72] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-b0354f72] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-b0354f72] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-btn[data-v-b0354f72], .nkd-select[data-v-b0354f72] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-b0354f72]:hover, .nkd-select[data-v-b0354f72]:hover, .nkd-select[data-v-b0354f72]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-b0354f72]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-d28ef3ed] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-d28ef3ed], .nkd-root[data-v-d28ef3ed] *, .nkd-root[data-v-d28ef3ed] *::before, .nkd-root[data-v-d28ef3ed] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-d28ef3ed] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-d28ef3ed] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-d28ef3ed] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-d28ef3ed] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-d28ef3ed] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-d28ef3ed] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-d28ef3ed] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-d28ef3ed]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-69c09356] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-69c09356], .nkd-root[data-v-69c09356] *, .nkd-root[data-v-69c09356] *::before, .nkd-root[data-v-69c09356] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-69c09356] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-69c09356] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-69c09356] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-69c09356] { padding: 5px 8px;\n}\n.nkd-hint[data-v-69c09356] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-45c56d8c] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-45c56d8c], .nkd-root[data-v-45c56d8c] *, .nkd-root[data-v-45c56d8c] *::before, .nkd-root[data-v-45c56d8c] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-45c56d8c] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-45c56d8c] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-45c56d8c] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-45c56d8c] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-45c56d8c] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-45c56d8c] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-45c56d8c] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-45c56d8c]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-eb6979dd] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-eb6979dd], .nkd-root[data-v-eb6979dd] *, .nkd-root[data-v-eb6979dd] *::before, .nkd-root[data-v-eb6979dd] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-eb6979dd] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-eb6979dd] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-eb6979dd] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-eb6979dd] { padding: 5px 8px;\n}\n.nkd-hint[data-v-eb6979dd] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

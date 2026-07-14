@@ -1,4 +1,5 @@
 from __future__ import annotations
+import math
 import re
 from typing import Optional, Tuple
 import numpy as np
@@ -15,7 +16,7 @@ import torch.nn.functional as F
 _LIST_MARKER_RE = re.compile(r"^\s*(?:\d+\s*[.):]|[-*•])\s*")
 
 
-_VAR_TOKEN_RE = re.compile(r"\{(variable_\d+)(:r)?\}")
+_VAR_TOKEN_RE = re.compile(r"\{(variable_\d+)(:[rc])?\}")
 
 
 def _tidy_prompt(text: str) -> str:
@@ -31,13 +32,14 @@ def _resolve_prompts(text: str, variables: dict, randomize_all: bool = False,
     """Resolve {variable_N} tokens into one or more prompts.
 
     Each variable's value is a LIST (the node runs in whole-list mode). The
-    output count follows the longest list among ALL referenced variables,
-    random-flagged or not — marking a variable random changes only HOW its
-    value is picked, never how many prompts come out. Plain tokens map by
-    index (shorter lists repeat); tokens flagged {name:r} pick a random item
-    per prompt, seeded for reproducibility. `randomize_all` collapses this to
-    a single prompt with every variable randomized. A variable repeated
-    within one prompt keeps its pick."""
+    output count follows the longest list among ALL referenced variables — the
+    per-token mode changes only HOW each value is picked, never how many
+    prompts come out. Modes:
+      plain  {name}    map by index, HOLD the last item once the list runs out
+      cycle  {name:c}  map by index, WRAP back to the first (i % len)
+      random {name:r}  pick a random item per prompt, seeded
+    `randomize_all` collapses everything to a single all-random prompt. A
+    variable repeated within one prompt keeps its pick."""
     import random as _random
 
     lists = {}
@@ -66,13 +68,224 @@ def _resolve_prompts(text: str, variables: dict, randomize_all: bool = False,
             vals = lists.get(name, [])
             if not vals:
                 picks[name] = ""
-            elif flag or randomize_all:
+            elif flag == ":r" or randomize_all:
                 picks[name] = rng.choice(vals)
+            elif flag == ":c":
+                picks[name] = vals[i % len(vals)]          # cycle / wrap
             else:
-                picks[name] = vals[i % len(vals)]
+                picks[name] = vals[min(i, len(vals) - 1)]  # hold last
         resolved = _VAR_TOKEN_RE.sub(lambda m: picks[m.group(1)], text)
         prompts.append(_tidy_prompt(resolved))
     return prompts
+
+
+# ---------------------------------------------------------------------------
+# Fractal (value-noise fBm) generator — After Effects Fractal Noise / Blender
+# Noise Texture in spirit. N-D so it animates (3D) and loops (4D) over time.
+# The 32-bit integer hash is bit-identical in torch and JS, so the client-side
+# preview matches the rendered output exactly (no float-precision drift).
+# ---------------------------------------------------------------------------
+
+_LUMA_WEIGHTS = (0.2126, 0.7152, 0.0722)  # Rec.709
+
+
+def _luminance(image: torch.Tensor) -> torch.Tensor:
+    """Rec.709 luminance of an image [..., C] → [...], usable as a MASK."""
+    rgb = image[..., :3]
+    w = torch.tensor(_LUMA_WEIGHTS, device=rgb.device, dtype=rgb.dtype)
+    return (rgb * w).sum(-1)
+
+
+_HASH_M32 = 0xFFFFFFFF
+
+
+def _h32(x: torch.Tensor) -> torch.Tensor:
+    """32-bit integer hash (int64 tensor in, low-32 semantics). Mirrors the JS
+    hash32() in NoisePreviewWidget.vue — keep the two in lock-step."""
+    x = x & _HASH_M32
+    x = x ^ (x >> 16)
+    x = (x * 0x7feb352d) & _HASH_M32
+    x = x ^ (x >> 15)
+    x = (x * 0x846ca68b) & _HASH_M32
+    x = x ^ (x >> 16)
+    return x & _HASH_M32
+
+
+def _value_noise(coords, seed: int) -> torch.Tensor:
+    """N-D value noise in [0,1). `coords` is a list of D float tensors already
+    broadcast to a common shape. Quintic-smoothstep interpolation of hashed
+    lattice corners."""
+    d = len(coords)
+    fl = [torch.floor(c) for c in coords]
+    u = [(f := c - flo) * f * f * (f * (f * 6.0 - 15.0) + 10.0) for c, flo in zip(coords, fl)]
+    ii = [f.to(torch.int64) for f in fl]
+    total = None
+    for corner in range(1 << d):
+        w = None
+        h = torch.full_like(ii[0], int(seed) & _HASH_M32)
+        for k in range(d):
+            bit = (corner >> k) & 1
+            h = _h32(h + ii[k] + bit)
+            wd = u[k] if bit else (1.0 - u[k])
+            w = wd if w is None else w * wd
+        val = h.to(torch.float64) / 4294967296.0
+        contrib = w.to(torch.float64) * val
+        total = contrib if total is None else total + contrib
+    return total
+
+
+# ponytail: calibration knobs for the animation feel.
+_NOISE_EVO_SPEED = 0.12   # cells advanced per frame at evolution=100 (linear)
+_NOISE_LOOP_RADIUS = 1.5  # radius in noise-space of the seamless loop at evolution=100
+
+
+def _fractal_noise(width, height, frames, scale, detail, roughness, lacunarity,
+                   distortion, contrast, brightness, evolution, loop,
+                   offset_x, offset_y, seed, device=None) -> torch.Tensor:
+    """Generate a [frames, H, W] fractal (fBm value-noise) field in [0,1].
+
+    scale = feature cells across the short side. detail = octaves. roughness =
+    persistence. lacunarity = per-octave frequency step. distortion = domain
+    warp. evolution animates the field over frames; loop makes it seamless
+    (time travels a circle in 2 extra noise dimensions)."""
+    dev = device or torch.device("cpu")
+    frames = max(1, int(frames))
+    detail = max(1, int(detail))
+
+    py = (torch.arange(height, device=dev, dtype=torch.float64) / height) * scale
+    px = (torch.arange(width, device=dev, dtype=torch.float64) / height) * scale  # /height → square cells
+    gy = (py + offset_y).view(height, 1).expand(height, width)
+    gx = (px + offset_x).view(1, width).expand(height, width)
+
+    out = torch.empty(frames, height, width, device=dev, dtype=torch.float32)
+    evo = max(0.0, evolution) / 100.0
+
+    for t in range(frames):
+        # Time coordinates: none (2D) / linear (3D) / circular (4D loop).
+        # As 0-dim tensors so they broadcast into the [H,W] noise evaluation.
+        def _c(v):
+            return torch.tensor(float(v), device=dev, dtype=torch.float64)
+        if loop and evo > 0.0:
+            theta = 2.0 * math.pi * t / frames
+            r = evo * _NOISE_LOOP_RADIUS
+            time_coords = [_c(math.cos(theta) * r), _c(math.sin(theta) * r)]
+        elif evo > 0.0:
+            time_coords = [_c(evo * _NOISE_EVO_SPEED * t)]
+        else:
+            time_coords = []
+
+        val = torch.zeros(height, width, device=dev, dtype=torch.float64)
+        amp, freq, norm = 1.0, 1.0, 0.0
+        for o in range(detail):
+            cx, cy = gx * freq, gy * freq
+            if distortion > 0.0:
+                # domain warp: nudge the sample point by another noise field
+                wx = _value_noise([cx + 17.3, cy + 5.1] + _tc(time_coords, freq),
+                                  seed ^ 0x9E3779B1)
+                wy = _value_noise([cx + 3.7, cy + 19.2] + _tc(time_coords, freq),
+                                  seed ^ 0x85EBCA77)
+                cx = cx + (wx - 0.5) * 2.0 * distortion
+                cy = cy + (wy - 0.5) * 2.0 * distortion
+            coords = [cx, cy] + _tc(time_coords, freq)
+            val = val + amp * _value_noise(coords, int(seed) + o * 1013)
+            norm += amp
+            amp *= roughness
+            freq *= lacunarity
+        val = val / max(norm, 1e-6)
+
+        # contrast around 0.5, then brightness, clamp.
+        val = (val - 0.5) * contrast + 0.5 + brightness
+        out[t] = val.clamp(0.0, 1.0).to(torch.float32)
+
+    return out
+
+
+def _tc(time_coords, freq):
+    """Scale time coords by the octave frequency and return as a list (so the
+    fractal detail lives in the time dimension too)."""
+    return [tc * freq for tc in time_coords]
+
+
+# ---------------------------------------------------------------------------
+# Film grain — Lightroom / Camera Raw-style (Amount, Size, Roughness) + optional
+# color, additive in gamma, with per-frame animated grain for video.
+# ---------------------------------------------------------------------------
+
+# ponytail: calibration knobs — a monitor and a taste need tuning a formula
+# can't see. Bump if amount=100 reads too weak/strong etc.
+_GRAIN_MAX_AMOUNT = 0.22    # grain std at amount=100 (unit-normalised field)
+_GRAIN_SIZE_SCALE_MAX = 7.0  # size=100 downsamples the noise field by ~1+this
+_GRAIN_COARSE_MULT = 2.6    # the coarse roughness field is this much lower-frequency
+_GRAIN_ROUGH_MAX = 0.6      # roughness=100 blends in this much of the coarse field
+_GRAIN_CHANNEL_W = (2.0, 1.0, 3.0)  # per-channel emphasis for color grain (R, G, B)
+_GRAIN_FRAME_CHUNK = 8      # frames upscaled/composited at once (VRAM bound)
+
+
+def _film_grain(image: torch.Tensor, amount: float, size: float, roughness: float,
+                color: float, seed: int, animate: bool = True,
+                mask: Optional[torch.Tensor] = None,
+                device=None) -> torch.Tensor:
+    """Apply film grain to an image batch [B, H, W, C] (C == 3 or 4), values in
+    [0, 1]. Returns the same shape/device; any alpha channel is passed through.
+
+    Gaussian noise at reduced resolution (size = field divisor) upscaled to
+    full res; roughness blends a fine and a coarse field (Lightroom's method);
+    composited additively in gamma. color>0 mixes in per-channel dye-cloud
+    grain. animate=True gives each frame an independent field (film shimmer).
+    An optional `mask` [B,H,W] (or [H,W]) confines the grain to its bright
+    areas, feathered by the mask value (soft edges blend the grain in)."""
+    b, h, w, c = image.shape
+    src_device = image.device
+    dev = device or src_device
+
+    strength = (max(0.0, amount) / 100.0) * _GRAIN_MAX_AMOUNT
+    if strength <= 0.0:
+        return image
+    color01 = min(max(color, 0.0), 100.0) / 100.0
+    rough01 = min(max(roughness, 0.0), 100.0) / 100.0
+
+    mask_full = None
+    if mask is not None:
+        mm = mask if mask.dim() == 3 else mask.unsqueeze(0)
+        mask_full = _resize_mask(mm.to(dev), w, h).clamp(0.0, 1.0)  # [Bm, H, W]
+
+    # Size → noise-field resolution. Larger size = coarser grain = smaller field.
+    scale = 1.0 + (min(max(size, 0.0), 100.0) / 100.0) * _GRAIN_SIZE_SCALE_MAX
+    fine_h, fine_w = max(1, round(h / scale)), max(1, round(w / scale))
+    coarse_h = max(1, round(h / (scale * _GRAIN_COARSE_MULT)))
+    coarse_w = max(1, round(w / (scale * _GRAIN_COARSE_MULT)))
+
+    frames = b if animate else 1
+    gen = torch.Generator(device=dev).manual_seed(int(seed) & 0xffffffffffffffff)
+    # Reduced-res noise for every frame, generated once (small + deterministic).
+    fine = torch.randn(frames, 3, fine_h, fine_w, generator=gen, device=dev)
+    coarse = torch.randn(frames, 3, coarse_h, coarse_w, generator=gen, device=dev)
+
+    weights = torch.tensor(_GRAIN_CHANNEL_W, device=dev).view(1, 1, 1, 3)
+    out = image.to(dev).clone()
+
+    for s in range(0, b, _GRAIN_FRAME_CHUNK):
+        e = min(b, s + _GRAIN_FRAME_CHUNK)
+        idx = slice(s, e) if animate else slice(0, 1)
+        n = e - s
+        ff = F.interpolate(fine[idx], size=(h, w), mode="bilinear", align_corners=False)
+        fc = F.interpolate(coarse[idx], size=(h, w), mode="bilinear", align_corners=False)
+        field = ff * (1.0 - rough01 * _GRAIN_ROUGH_MAX) + fc * (rough01 * _GRAIN_ROUGH_MAX)
+        field = field.permute(0, 2, 3, 1)  # [n, H, W, 3]
+        if not animate and n > 1:
+            field = field.expand(n, -1, -1, -1)
+        # Unit-normalise per frame so `amount` stays predictable across sizes.
+        std = field.reshape(field.shape[0], -1).std(dim=1).clamp_min(1e-5).view(-1, 1, 1, 1)
+        field = field / std
+        mono = field[..., 1:2].expand(-1, -1, -1, 3)  # green as luminance grain
+        grain = mono * (1.0 - color01) + field * weights * color01
+        grain = grain * strength
+        if mask_full is not None:
+            fidx = torch.arange(s, e, device=dev).clamp(max=mask_full.shape[0] - 1)
+            grain = grain * mask_full[fidx].unsqueeze(-1)  # confine + feather
+        out[s:e, :, :, :3] = (out[s:e, :, :, :3] + grain).clamp(0.0, 1.0)
+
+    return out.to(src_device)
 
 
 def _split_text(text: str, delimiter: str, trim: bool = True,

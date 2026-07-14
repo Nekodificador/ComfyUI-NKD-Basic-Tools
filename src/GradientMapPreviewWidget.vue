@@ -11,6 +11,7 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from "vue";
+import { buildRampLut, parseInterp } from "./rampInterp";
 
 interface Stop { pos: number; color: string }
 
@@ -19,10 +20,11 @@ const props = defineProps<{
   getInvert: () => boolean;
   getStrength: () => number;
   getSourceImg: () => HTMLImageElement | null;
+  getMaskImg: () => HTMLImageElement | null;
 }>();
 
 const MIN_RENDER_SCALE = 2;
-const CACHE_RES = 220; // longest side of the cached source decode — preview only
+const CACHE_RES = 640; // longest side of the cached source decode — preview only
 const DEFAULT_ASPECT = "16 / 10";
 
 const canvas = ref<HTMLCanvasElement | null>(null);
@@ -45,6 +47,12 @@ let cacheLuma: Float32Array | null = null;
 let lastSrc: string | null = null;
 let offscreen: HTMLCanvasElement | null = null;
 
+// Optional connected mask, decoded to the same cache grid: the effect is
+// confined to it (blend scaled per pixel), so the preview matches the render.
+let cacheMask: Float32Array | null = null;
+let lastMaskSrc: string | null = null;
+let maskOffscreen: HTMLCanvasElement | null = null;
+
 // Reusable output surface + a 256-entry ramp lookup table. Rebuilding these
 // per redraw (new canvas, per-pixel ramp search) was what made the preview
 // crawl; now each redraw is a flat pass of LUT lookups into a persistent
@@ -58,9 +66,6 @@ let lastSig = "";  // dirty-check so the idle poll doesn't recompute the map
 
 const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
 
-function hexToRgb(hex: string): [number, number, number] {
-  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-}
 function parseRamp(): Stop[] {
   try {
     const data = JSON.parse(props.getRamp());
@@ -69,25 +74,6 @@ function parseRamp(): Stop[] {
     }
   } catch { /* fall through */ }
   return [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
-}
-
-// Build a 256×RGB LUT once per ramp change: sample the ramp at 256 evenly
-// spaced positions. Per-pixel work then collapses to a single array index.
-function buildLut(stops: Stop[]): Uint8ClampedArray {
-  const lut = new Uint8ClampedArray(256 * 3);
-  let si = 0;
-  for (let i = 0; i < 256; i++) {
-    const t = i / 255;
-    while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
-    const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
-    const span = Math.max(1e-6, b.pos - a.pos);
-    const f = Math.max(0, Math.min(1, (t - a.pos) / span));
-    const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-    lut[i * 3] = r1 + (r2 - r1) * f;
-    lut[i * 3 + 1] = g1 + (g2 - g1) * f;
-    lut[i * 3 + 2] = b1 + (b2 - b1) * f;
-  }
-  return lut;
 }
 
 function decodeSource(img: HTMLImageElement) {
@@ -106,6 +92,29 @@ function decodeSource(img: HTMLImageElement) {
   for (let i = 0, p = 0; i < data.length; i += 4, p++) {
     cacheLuma[p] = (data[i] * LUMA_R + data[i + 1] * LUMA_G + data[i + 2] * LUMA_B) / 255;
   }
+}
+
+// Decode the connected mask onto the source cache grid. ComfyUI's Load Image
+// stores the mask as (1 - alpha), so we can only reliably reproduce it when the
+// source actually carries a painted alpha channel. If the alpha is flat (no
+// real mask in the thumbnail — e.g. a mask computed elsewhere), we leave the
+// preview UNMASKED rather than guess and draw garbage; the render is confined
+// correctly regardless.
+function decodeMask(img: HTMLImageElement) {
+  cacheMask = null;
+  if (!cacheW || !cacheH) return;
+  if (!maskOffscreen) maskOffscreen = document.createElement("canvas");
+  maskOffscreen.width = cacheW; maskOffscreen.height = cacheH;
+  const mctx = maskOffscreen.getContext("2d")!;
+  mctx.clearRect(0, 0, cacheW, cacheH);
+  mctx.drawImage(img, 0, 0, cacheW, cacheH);
+  const data = mctx.getImageData(0, 0, cacheW, cacheH).data;
+  let alphaVaries = false;
+  for (let i = 3; i < data.length; i += 4) { if (data[i] < 250) { alphaVaries = true; break; } }
+  if (!alphaVaries) return;  // no painted alpha → don't fake a mask
+  const m = new Float32Array(cacheW * cacheH);
+  for (let i = 0, p = 0; i < data.length; i += 4, p++) m[p] = 1 - data[i + 3] / 255;
+  cacheMask = m;
 }
 
 function syncCanvasSize(): boolean {
@@ -147,8 +156,8 @@ function redraw() {
   const invert = props.getInvert();
   const strength = Math.max(0, Math.min(1, props.getStrength()));
 
-  // Rebuild the LUT only when the ramp string changes.
-  if (rampStr !== lutKey) { rampLut = buildLut(parseRamp()); lutKey = rampStr; }
+  // Rebuild the LUT only when the ramp string changes (interp is baked in).
+  if (rampStr !== lutKey) { rampLut = buildRampLut(parseRamp(), parseInterp(rampStr)); lutKey = rampStr; }
   const lut = rampLut!;
 
   // Reuse the output canvas + ImageData; only reallocate on cache-size change.
@@ -159,15 +168,17 @@ function redraw() {
     outImg = outCtx!.createImageData(cacheW, cacheH);
   }
   const data = outImg!.data;
-  const invStrength = 1 - strength;
   for (let p = 0, i = 0; p < cacheW * cacheH; p++, i += 4) {
     let idx = (cacheLuma[p] * 255) | 0;
     if (idx < 0) idx = 0; else if (idx > 255) idx = 255;
     if (invert) idx = 255 - idx;
     const li = idx * 3;
-    data[i] = cacheRgb[i] * invStrength + lut[li] * strength;
-    data[i + 1] = cacheRgb[i + 1] * invStrength + lut[li + 1] * strength;
-    data[i + 2] = cacheRgb[i + 2] * invStrength + lut[li + 2] * strength;
+    // Confine to the mask: blend scaled per pixel (mask=0 → untouched original).
+    const sf = cacheMask ? strength * cacheMask[p] : strength;
+    const inv = 1 - sf;
+    data[i] = cacheRgb[i] * inv + lut[li] * sf;
+    data[i + 1] = cacheRgb[i + 1] * inv + lut[li + 1] * sf;
+    data[i + 2] = cacheRgb[i + 2] * inv + lut[li + 2] * sf;
     data[i + 3] = 255;
   }
   outCtx!.putImageData(outImg!, 0, 0);
@@ -179,20 +190,28 @@ function redraw() {
 function refreshExternal() {
   const img = props.getSourceImg();
   const src = img?.currentSrc || img?.src || null;
+  let srcChanged = false;
   if (img && img.complete && src && src !== lastSrc) {
-    decodeSource(img);
-    lastSrc = src;
+    decodeSource(img); lastSrc = src; srcChanged = true;
   } else if (!img && lastSrc !== null) {
-    cacheRgb = null; cacheLuma = null; lastSrc = null;
+    cacheRgb = null; cacheLuma = null; cacheMask = null; lastSrc = null; lastMaskSrc = null;
   }
-  hintText.value = cacheRgb ? "Live preview" : "Connect an image";
+  // Mask: (re)decode when it changes, or when the source grid it aligns to did.
+  const mimg = props.getMaskImg();
+  const msrc = mimg?.currentSrc || mimg?.src || null;
+  if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
+    decodeMask(mimg); lastMaskSrc = msrc;
+  } else if (!mimg && lastMaskSrc !== null) {
+    cacheMask = null; lastMaskSrc = null;
+  }
+  hintText.value = cacheRgb ? (cacheMask ? "Live preview · masked" : "Live preview") : "Connect an image";
   // Match the canvas box to the image aspect. When it changes, the element
   // resizes → the ResizeObserver re-syncs the buffer and redraws.
   const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
   if (wantAspect !== canvasAspect.value) { canvasAspect.value = wantAspect; return; }
   // Dirty-check: skip the (heavy) remap unless something the preview depends on
   // actually changed. This is what keeps the idle poll from pegging the CPU.
-  const sig = `${lastSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+  const sig = `${lastSrc}|${lastMaskSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
   if (sig !== lastSig) { lastSig = sig; redraw(); }
 }
 

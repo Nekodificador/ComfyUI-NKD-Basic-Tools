@@ -7,6 +7,7 @@
       @mousemove.stop="onMove"
       @mouseup.stop="onUp"
       @mouseleave.stop="onLeave"
+      @dblclick.stop.prevent="onDblClick"
     ></canvas>
     <div class="nkd-bar">
       <div class="nkd-row nkd-row--controls">
@@ -20,6 +21,7 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from "vue";
+import { buildRampLut, expandStops, parseInterp } from "./rampInterp";
 
 interface Pt { pos: number; color: string }
 type Vec = [number, number];
@@ -47,6 +49,7 @@ const HANDLE_LABELS: Record<string, [string, string]> = {
   Angular: ["Center", "Angle"],
   Diamond: ["Center", "Edge"],
 };
+const MID_MIN = 0.05, MID_MAX = 0.95;
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 let ctx: CanvasRenderingContext2D | null = null;
@@ -55,22 +58,36 @@ let dpr = window.devicePixelRatio || 1;
 
 const p0 = ref<Vec>([0, 0.5]);
 const p1 = ref<Vec>([1, 0.5]);
+const mid = ref(0.5);  // color-transition midpoint along p0->p1 (Photoshop bias)
 const hintText = ref("Drag the handles to set direction");
 let lastShape: string | null = null;
-let dragging: "p0" | "p1" | null = null;
-let hover: "p0" | "p1" | null = null;
+type Handle = "p0" | "p1" | "mid";
+let dragging: Handle | null = null;
+let hover: Handle | null = null;
 
 // fit rect (letterboxed image area) recomputed each redraw
 let fitX = PAD, fitY = PAD, fitW = BOX_W - PAD * 2, fitH = BOX_H - PAD * 2;
 
+const CANVAS_INSET = 5;  // keep handles a few px inside the canvas so they stay grabbable
 function toPx(pt: Vec): Vec {
   return [fitX + pt[0] * fitW, fitY + pt[1] * fitH];
 }
+// Clamp to the CANVAS (not the image rect): the letterbox around the image is
+// the pasteboard, so handles can sit outside the frame and the gradient
+// terminates off-image, exactly like dragging past the edge in Photoshop.
 function fromPx(x: number, y: number): Vec {
-  return [
-    Math.max(0, Math.min(1, (x - fitX) / fitW)),
-    Math.max(0, Math.min(1, (y - fitY) / fitH)),
-  ];
+  const cx = Math.max(CANVAS_INSET, Math.min(BOX_W - CANVAS_INSET, x));
+  const cy = Math.max(CANVAS_INSET, Math.min(BOX_H - CANVAS_INSET, y));
+  return [(cx - fitX) / fitW, (cy - fitY) / fitH];
+}
+function midPx(): Vec {
+  const a = toPx(p0.value), b = toPx(p1.value);
+  return [a[0] + (b[0] - a[0]) * mid.value, a[1] + (b[1] - a[1]) * mid.value];
+}
+// Warp exponent: t' = t^warpExp() (see _warp_position in nkd_color_ramp.py).
+function warpExp(): number {
+  const m = Math.min(MID_MAX, Math.max(MID_MIN, mid.value));
+  return Math.log(0.5) / Math.log(m);
 }
 function eventToLogical(e: MouseEvent): Vec {
   const rect = canvas.value!.getBoundingClientRect();
@@ -117,58 +134,49 @@ function computeFitRect() {
   fitW = fw; fitH = fh;
 }
 
+// Geometric position that a stop of ramp-value v maps to under the midpoint
+// warp: solving v = g^warpExp for g. Reproduces the warp exactly at each stop
+// (linear between them, which the native gradient does anyway).
+function warpStop(pos: number): number {
+  const g = Math.pow(Math.max(0, Math.min(1, pos)), 1 / warpExp());
+  return Math.max(0, Math.min(1, g));
+}
 function buildFill(shape: string, stops: Pt[], a: Vec, b: Vec): CanvasGradient | null {
   if (!ctx) return null;
+  if (shape === "Diamond") return null; // rendered via pixel loop below
+  // Bake interpolation (smooth/bezier/steps) + the midpoint bias into the
+  // color stops the native gradient renders.
+  const expanded = expandStops(stops, parseInterp(props.getRamp()), warpStop);
+  const add = (g: CanvasGradient) => {
+    expanded.forEach((s) => g.addColorStop(Math.max(0, Math.min(1, s.pos)), s.color));
+    return g;
+  };
   if (shape === "Radial") {
     const r = Math.max(Math.hypot(b[0] - a[0], b[1] - a[1]), 1);
-    const g = ctx.createRadialGradient(a[0], a[1], 0, a[0], a[1], r);
-    stops.forEach((s) => g.addColorStop(s.pos, s.color));
-    return g;
+    return add(ctx.createRadialGradient(a[0], a[1], 0, a[0], a[1], r));
   }
   if (shape === "Angular" && "createConicGradient" in ctx) {
     const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
-    const g = (ctx as any).createConicGradient(angle, a[0], a[1]);
-    stops.forEach((s) => g.addColorStop(s.pos, s.color));
-    return g;
+    return add((ctx as any).createConicGradient(angle, a[0], a[1]));
   }
-  if (shape === "Diamond") return null; // rendered via pixel loop below
-  const g = ctx.createLinearGradient(a[0], a[1], b[0], b[1]);
-  stops.forEach((s) => g.addColorStop(s.pos, s.color));
-  return g;
+  return add(ctx.createLinearGradient(a[0], a[1], b[0], b[1]));
 }
 
-function hexToRgb(hex: string): [number, number, number] {
-  return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
-}
-// 256-entry ramp LUT, rebuilt only when the ramp string changes — the Diamond
-// pixel loop then indexes it instead of searching the stops per pixel.
+// 256-entry ramp LUT (interp baked in), rebuilt only when the ramp string
+// changes — the Diamond pixel loop then indexes it instead of searching the
+// stops per pixel.
 let rampLut: Uint8ClampedArray | null = null;
 let lutKey = "";
-function buildLut(stops: Pt[]): Uint8ClampedArray {
-  const lut = new Uint8ClampedArray(256 * 3);
-  let si = 0;
-  for (let i = 0; i < 256; i++) {
-    const t = i / 255;
-    while (si < stops.length - 2 && t > stops[si + 1].pos) si++;
-    const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
-    const f = Math.max(0, Math.min(1, (t - a.pos) / Math.max(1e-6, b.pos - a.pos)));
-    const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
-    lut[i * 3] = r1 + (r2 - r1) * f;
-    lut[i * 3 + 1] = g1 + (g2 - g1) * f;
-    lut[i * 3 + 2] = b1 + (b2 - b1) * f;
-  }
-  return lut;
-}
 function rampLutFor(stops: Pt[]): Uint8ClampedArray {
-  const key = JSON.stringify(stops);
-  if (key !== lutKey) { rampLut = buildLut(stops); lutKey = key; }
+  const key = props.getRamp();
+  if (key !== lutKey) { rampLut = buildRampLut(stops, parseInterp(key)); lutKey = key; }
   return rampLut!;
 }
 
 // Diamond has no native canvas gradient — render at a small fixed
 // resolution offscreen, then scale up. The real node output is computed
 // at full resolution in Python; this is a preview only.
-const DIAMOND_RES = 96;
+const DIAMOND_RES = 160;
 let diamondCanvas: HTMLCanvasElement | null = null;
 let diamondCtx: CanvasRenderingContext2D | null = null;
 let diamondImg: ImageData | null = null;
@@ -184,6 +192,7 @@ function drawDiamond(stops: Pt[], a: Vec, b: Vec) {
     diamondImg = diamondCtx!.createImageData(dw, dh);
   }
   const lut = rampLutFor(stops);
+  const exp = warpExp();
   const data = diamondImg!.data;
   const p0n: Vec = [(a[0] - fitX) / fitW, (a[1] - fitY) / fitH];
   const p1n: Vec = [(b[0] - fitX) / fitW, (b[1] - fitY) / fitH];
@@ -193,7 +202,8 @@ function drawDiamond(stops: Pt[], a: Vec, b: Vec) {
     const ny = (py + 0.5) / dh;
     for (let px = 0; px < dw; px++) {
       const nx = (px + 0.5) / dw;
-      const t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
+      let t = Math.min(1, 0.5 * (Math.abs(nx - p0n[0]) / ex + Math.abs(ny - p0n[1]) / ey));
+      t = Math.pow(t, exp);
       let idx = (t * 255) | 0;
       if (idx > 255) idx = 255;
       const li = idx * 3;
@@ -239,15 +249,44 @@ function redraw() {
   ctx.setLineDash([]);
 
   const labels = HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear;
+  const m = midPx();
+  drawMidHandle(m);
   drawHandle(a, "p0", labels[0]);
   drawHandle(b, "p1", labels[1]);
 
   const tipWhich = dragging ?? hover;
-  if (tipWhich) {
+  if (tipWhich === "mid") {
+    drawTooltip(m, `Mid  ${Math.round(mid.value * 100)}%`);
+  } else if (tipWhich) {
     const pos = tipWhich === "p0" ? p0.value : p1.value;
     const label = tipWhich === "p0" ? labels[0] : labels[1];
     drawTooltip(tipWhich === "p0" ? a : b, `${label}  ${pos[0].toFixed(2)}, ${pos[1].toFixed(2)}`);
   }
+}
+
+function drawMidHandle(pos: Vec) {
+  if (!ctx) return;
+  const isDrag = dragging === "mid";
+  const isHover = hover === "mid";
+  const r = isDrag ? 6 : isHover ? 5.5 : 4;
+  ctx.save();
+  ctx.translate(pos[0], pos[1]);
+  ctx.rotate(Math.PI / 4);  // diamond, to echo Photoshop's midpoint marker
+  ctx.shadowColor = "rgba(0,0,0,0.6)";
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1;
+  ctx.beginPath();
+  ctx.rect(-r, -r, r * 2, r * 2);
+  ctx.fillStyle = "#e8eef8";
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  ctx.translate(pos[0], pos[1]);
+  ctx.rotate(Math.PI / 4);
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = "rgba(0,0,0,0.65)";
+  ctx.strokeRect(-r, -r, r * 2, r * 2);
+  ctx.restore();
 }
 
 function drawTooltip(at: Vec, text: string) {
@@ -306,12 +345,15 @@ function drawHandle(pos: Vec, which: "p0" | "p1", label: string) {
 
 // --- interaction -------------------------------------------------------
 
-function hitTest(x: number, y: number): "p0" | "p1" | null {
+function hitTest(x: number, y: number): Handle | null {
   const a = toPx(p0.value), b = toPx(p1.value);
   const da = Math.hypot(a[0] - x, a[1] - y);
   const db = Math.hypot(b[0] - x, b[1] - y);
+  // endpoints win ties against the midpoint so extremes stay reachable
   if (da <= HIT_R && da <= db) return "p0";
   if (db <= HIT_R) return "p1";
+  const m = midPx();
+  if (Math.hypot(m[0] - x, m[1] - y) <= HIT_R) return "mid";
   return null;
 }
 
@@ -322,6 +364,16 @@ function onDown(e: MouseEvent) {
 }
 function onMove(e: MouseEvent) {
   const [x, y] = eventToLogical(e);
+  if (dragging === "mid") {
+    const a = toPx(p0.value), b = toPx(p1.value);
+    const abx = b[0] - a[0], aby = b[1] - a[1];
+    const len2 = abx * abx + aby * aby || 1;
+    const f = ((x - a[0]) * abx + (y - a[1]) * aby) / len2;
+    mid.value = Math.min(MID_MAX, Math.max(MID_MIN, f));
+    emitChange();
+    redraw();
+    return;
+  }
   if (dragging) {
     const target = dragging === "p0" ? p0 : p1;
     target.value = fromPx(x, y);
@@ -338,6 +390,22 @@ function onUp() {
   dragging = null;
   redraw();
 }
+// Double-click a handle to reset it: endpoints snap to the shape default,
+// the midpoint back to center (neutral tension).
+function onDblClick(e: MouseEvent) {
+  const [x, y] = eventToLogical(e);
+  const which = hitTest(x, y);
+  if (!which) return;
+  if (which === "mid") {
+    mid.value = 0.5;
+  } else {
+    const def = SHAPE_DEFAULTS[props.getShape() || "Linear"] ?? SHAPE_DEFAULTS.Linear;
+    (which === "p0" ? p0 : p1).value = [...def[which]];
+  }
+  dragging = null;
+  emitChange();
+  redraw();
+}
 function onLeave() {
   dragging = null;
   hover = null;
@@ -349,6 +417,7 @@ function resetHandles() {
   const def = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
   p0.value = [...def.p0];
   p1.value = [...def.p1];
+  mid.value = 0.5;
   emitChange();
   redraw();
 }
@@ -359,12 +428,12 @@ let debounceTimer: number | undefined;
 function emitChange() {
   window.clearTimeout(debounceTimer);
   debounceTimer = window.setTimeout(() => {
-    props.onChange(JSON.stringify({ p0: p0.value, p1: p1.value }));
+    props.onChange(serialise());
   }, 40);
 }
 
 function serialise(): string {
-  return JSON.stringify({ p0: p0.value, p1: p1.value });
+  return JSON.stringify({ p0: p0.value, p1: p1.value, mid: mid.value });
 }
 
 function deserialise(json: string) {
@@ -373,6 +442,7 @@ function deserialise(json: string) {
     if (Array.isArray(data.p0) && Array.isArray(data.p1)) {
       p0.value = [Number(data.p0[0]), Number(data.p0[1])];
       p1.value = [Number(data.p1[0]), Number(data.p1[1])];
+      mid.value = Number.isFinite(data.mid) ? Number(data.mid) : 0.5;
       lastShape = props.getShape();
       redraw();
       return;
@@ -389,6 +459,7 @@ function refreshExternal() {
     const def = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
     p0.value = [...def.p0];
     p1.value = [...def.p1];
+    mid.value = 0.5;
     emitChange();
   }
   lastShape = shape;

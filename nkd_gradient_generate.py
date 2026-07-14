@@ -10,10 +10,13 @@ from .nkd_color_ramp import (
     _DEFAULT_HANDLES,
     _DEFAULT_RAMP,
     _parse_handles,
+    _parse_interp,
     _parse_ramp,
     _position_field,
     _sample_ramp,
+    _warp_position,
 )
+from .helpers import _luminance
 
 
 class NKDGradientGenerate(io.ComfyNode):
@@ -43,17 +46,20 @@ class NKDGradientGenerate(io.ComfyNode):
             outputs=[
                 io.Image.Output(display_name="image",
                                 tooltip="The generated gradient."),
+                io.Mask.Output(display_name="mask",
+                               tooltip="Luminance of the gradient — use it as a mask."),
             ],
         )
 
     @classmethod
     def execute(cls, width, height, shape, handles, ramp) -> io.NodeOutput:
         stops = _parse_ramp(ramp)
-        p0, p1 = _parse_handles(handles)
+        p0, p1, mid = _parse_handles(handles)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         t = _position_field(shape, width, height, p0, p1, device)
-        out = _sample_ramp(stops, t).unsqueeze(0).cpu()
-        return io.NodeOutput(out)
+        t = _warp_position(t, mid)
+        out = _sample_ramp(stops, t, _parse_interp(ramp)).unsqueeze(0).cpu()
+        return io.NodeOutput(out, _luminance(out))
 
 
 class NKDGradientGenerateExtension(ComfyExtension):

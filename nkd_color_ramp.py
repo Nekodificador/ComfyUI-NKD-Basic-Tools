@@ -25,9 +25,10 @@ def _hex_to_rgb(hex_color: str) -> Tuple[float, float, float]:
     return (int(h[0:2], 16) / 255.0, int(h[2:4], 16) / 255.0, int(h[4:6], 16) / 255.0)
 
 
-def _parse_ramp(ramp_json: str) -> List[Tuple[float, float, float, float]]:
-    """Returns sorted [(pos, r, g, b), ...], falling back to the default
-    black→white ramp on any malformed input."""
+def _parse_ramp(ramp_json: str) -> List[Tuple[float, float, float, float, float]]:
+    """Returns sorted [(pos, r, g, b, mid), ...], falling back to the default
+    black→white ramp on any malformed input. `mid` (0..1, default 0.5) is the
+    color-transition midpoint of the segment to the NEXT stop."""
     try:
         data = json.loads(ramp_json) if ramp_json else {}
         raw_stops = data.get("stops", [])
@@ -35,28 +36,58 @@ def _parse_ramp(ramp_json: str) -> List[Tuple[float, float, float, float]]:
         for s in raw_stops:
             pos = max(0.0, min(1.0, float(s["pos"])))
             r, g, b = _hex_to_rgb(str(s["color"]))
-            stops.append((pos, r, g, b))
+            mid = min(0.95, max(0.05, float(s.get("mid", 0.5))))
+            stops.append((pos, r, g, b, mid))
         stops.sort(key=lambda s: s[0])
         if len(stops) >= 2:
             return stops
     except (ValueError, KeyError, TypeError, json.JSONDecodeError):
         pass
-    return [(0.0, 0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0)]
+    return [(0.0, 0.0, 0.0, 0.0, 0.5), (1.0, 1.0, 1.0, 1.0, 0.5)]
+
+
+_INTERP_MODES = ("smooth", "bezier", "steps")
+
+
+def _parse_interp(ramp_json: str) -> str:
+    """The ramp's interpolation mode: 'smooth' (linear), 'bezier' (eased) or
+    'steps' (hard, no transition). Defaults to 'smooth'."""
+    try:
+        mode = str(json.loads(ramp_json).get("interp", "smooth")) if ramp_json else "smooth"
+    except (ValueError, TypeError, AttributeError, json.JSONDecodeError):
+        mode = "smooth"
+    return mode if mode in _INTERP_MODES else "smooth"
 
 
 def _sample_ramp(stops: List[Tuple[float, float, float, float]],
-                 t: torch.Tensor) -> torch.Tensor:
+                 t: torch.Tensor, interp: str = "smooth") -> torch.Tensor:
     """Sample the ramp at positions `t` (any shape, values in [0, 1]).
-    Returns a tensor of shape t.shape + (3,), linearly interpolated in sRGB."""
+    Returns a tensor of shape t.shape + (3,), interpolated in sRGB per `interp`:
+    'smooth' = linear, 'bezier' = smoothstep ease, 'steps' = hard blocks."""
     positions = torch.tensor([s[0] for s in stops], device=t.device, dtype=t.dtype)
     colors = torch.tensor([[s[1], s[2], s[3]] for s in stops],
                           device=t.device, dtype=t.dtype)
+    mids = torch.tensor([(s[4] if len(s) > 4 else 0.5) for s in stops],
+                        device=t.device, dtype=t.dtype)
     tc = t.clamp(0.0, 1.0)
+
+    if interp == "steps":
+        # Each stop's color holds until the next one (Blender "Constant").
+        idx = (torch.searchsorted(positions, tc, right=True) - 1).clamp(0, len(stops) - 1)
+        return colors[idx]
+
     idx = torch.bucketize(tc, positions).clamp(1, len(stops) - 1)
     lo, hi = idx - 1, idx
     p_lo, p_hi = positions[lo], positions[hi]
     span = (p_hi - p_lo).clamp_min(1e-6)
-    frac = ((tc - p_lo) / span).clamp(0.0, 1.0).unsqueeze(-1)
+    frac = ((tc - p_lo) / span).clamp(0.0, 1.0)
+    # Per-segment midpoint: sample at fraction `mid` reaches the 50% color.
+    m = mids[lo].clamp(0.05, 0.95)
+    exp = torch.log(torch.tensor(0.5, device=t.device, dtype=t.dtype)) / torch.log(m)
+    frac = frac.pow(exp)  # 0→0, 1→1; exp>0 so no NaN
+    if interp == "bezier":
+        frac = frac * frac * (3.0 - 2.0 * frac)  # smoothstep ease at each stop
+    frac = frac.unsqueeze(-1)
     return colors[lo] + (colors[hi] - colors[lo]) * frac
 
 
@@ -70,16 +101,31 @@ def _sample_ramp(stops: List[Tuple[float, float, float, float]],
 #   Diamond: p0 = center,         p1 = point where the ramp reaches its end
 # ---------------------------------------------------------------------------
 
-_DEFAULT_HANDLES = json.dumps({"p0": [0.0, 0.5], "p1": [1.0, 0.5]})
+_DEFAULT_HANDLES = json.dumps({"p0": [0.0, 0.5], "p1": [1.0, 0.5], "mid": 0.5})
 
 
 def _parse_handles(handles_json: str):
+    """Returns (p0, p1, mid). p0/p1 are NOT clamped to [0,1] — a handle may
+    sit outside the frame so the gradient terminates off-image (Photoshop
+    style). `mid` in (0,1) is the color-transition midpoint (0.5 = neutral)."""
     try:
         data = json.loads(handles_json) if handles_json else {}
         p0, p1 = data["p0"], data["p1"]
-        return (float(p0[0]), float(p0[1])), (float(p1[0]), float(p1[1]))
+        mid = float(data.get("mid", 0.5))
+        return (float(p0[0]), float(p0[1])), (float(p1[0]), float(p1[1])), mid
     except (ValueError, KeyError, TypeError, IndexError, json.JSONDecodeError):
-        return (0.0, 0.5), (1.0, 0.5)
+        return (0.0, 0.5), (1.0, 0.5), 0.5
+
+
+def _warp_position(t: torch.Tensor, mid: float) -> torch.Tensor:
+    """Photoshop-style gradient midpoint: bias where the ramp's 50% color
+    lands. A pixel at geometric fraction `mid` ends up sampling the ramp's
+    midpoint. `mid` = 0.5 is a no-op."""
+    mid = min(max(float(mid), 0.05), 0.95)
+    if abs(mid - 0.5) < 1e-4:
+        return t
+    exp = math.log(0.5) / math.log(mid)
+    return t.clamp(0.0, 1.0).pow(exp)
 
 
 def _position_field(shape: str, width: int, height: int, p0, p1, device) -> torch.Tensor:
@@ -165,10 +211,14 @@ def _sanitise_preset(payload: dict):
             color = str(s["color"])
             if not re.match(r"^#[0-9a-fA-F]{6}$", color):
                 return None
-            stops.append({"pos": pos, "color": color})
+            mid = min(0.95, max(0.05, float(s.get("mid", 0.5))))
+            stops.append({"pos": pos, "color": color, "mid": mid})
         except (KeyError, TypeError, ValueError):
             return None
-    return {"name": name, "stops": stops}
+    interp = str(payload.get("interp", "smooth"))
+    if interp not in _INTERP_MODES:
+        interp = "smooth"
+    return {"name": name, "stops": stops, "interp": interp}
 
 
 def _register_preset_routes() -> None:

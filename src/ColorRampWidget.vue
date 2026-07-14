@@ -10,8 +10,19 @@
     ></canvas>
     <div class="nkd-bar">
       <div class="nkd-row nkd-row--controls">
-        <span class="nkd-hint">Click bar: add stop · click stop: pick color · Shift+click: delete · drag: move</span>
+        <span class="nkd-hint">Click bar: add stop · click stop: color · Shift+click: delete · drag ◆: tension</span>
         <span class="nkd-spacer"></span>
+        <select
+          class="nkd-select nkd-select--interp"
+          :value="interp"
+          title="How colors blend between stops"
+          @change="onInterpChange(($event.target as HTMLSelectElement).value)"
+        >
+          <option value="smooth">Smooth</option>
+          <option value="bezier">Bezier</option>
+          <option value="steps">Steps</option>
+        </select>
+        <button class="nkd-btn" title="Reverse the color order" @click.stop="reverse">⇄</button>
         <button class="nkd-btn" @click.stop="reset">Reset</button>
       </div>
       <div class="nkd-row nkd-row--presets">
@@ -38,9 +49,10 @@
 
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from "vue";
+import { type Interp, expandStops, parseInterp } from "./rampInterp";
 
-interface Stop { pos: number; color: string }
-interface Preset { name: string; stops: Stop[] }
+interface Stop { pos: number; color: string; mid?: number }
+interface Preset { name: string; stops: Stop[]; interp?: Interp }
 
 const props = defineProps<{
   onChange: (json: string) => void;
@@ -72,8 +84,11 @@ let ro: ResizeObserver | null = null;
 let dpr = window.devicePixelRatio || 1;
 
 const stops = ref<Stop[]>([{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }]);
+const interp = ref<Interp>("smooth");
 let activeStop: Stop | null = null;
 let hoverStop: Stop | null = null;
+let draggingMid: Stop | null = null;  // the left stop of the segment being biased
+let hoverMid: Stop | null = null;
 let dragging = false;
 let dragOffsetX = 0;
 let downX = 0, downY = 0, moved = false;
@@ -137,10 +152,12 @@ function redraw() {
   ctx.fillStyle = C.bg;
   ctx.fillRect(0, 0, CW, CH);
 
-  // Gradient bar — rendered via the browser's own linear gradient, so it's
-  // pixel-identical to how a human reads the ramp.
+  // Gradient bar — the browser's own linear gradient, fed stops expanded for
+  // the current interpolation mode (smooth = native, steps = hard edges,
+  // bezier = subdivided ease), so it reads exactly like the output.
   const grad = ctx.createLinearGradient(PAD.left, 0, PAD.left + IW, 0);
-  for (const s of stops.value) grad.addColorStop(s.pos, s.color);
+  const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
+  for (const s of expandStops(sorted, interp.value)) grad.addColorStop(clamp01(s.pos), s.color);
   ctx.fillStyle = grad;
   roundRectPath(PAD.left, BAR_Y, IW, BAR_H, 5);
   ctx.fill();
@@ -148,6 +165,8 @@ function redraw() {
   ctx.lineWidth = 0.75;
   roundRectPath(PAD.left, BAR_Y, IW, BAR_H, 5);
   ctx.stroke();
+
+  drawMidDiamonds();
 
   for (const s of stops.value) {
     const x = toCanvasX(s.pos);
@@ -204,6 +223,47 @@ function drawTooltip(stop: Stop) {
   ctx.textBaseline = "alphabetic";
 }
 
+function sortedStops(): Stop[] {
+  return [...stops.value].sort((a, b) => a.pos - b.pos);
+}
+
+// A midpoint diamond sits between each pair of stops at the point where the
+// color reaches 50% (Photoshop/Blender). Drag it to bias the transition.
+function drawMidDiamonds() {
+  if (!ctx) return;
+  const sorted = sortedStops();
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i], b = sorted[i + 1];
+    const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
+    if (mx - toCanvasX(a.pos) < 5 || toCanvasX(b.pos) - mx < 5) continue; // too tight
+    const on = a === draggingMid || a === hoverMid;
+    const r = on ? 4.5 : 3.5;
+    ctx.save();
+    ctx.translate(mx, BAR_MID);
+    ctx.rotate(Math.PI / 4);
+    ctx.beginPath();
+    ctx.rect(-r, -r, r * 2, r * 2);
+    ctx.fillStyle = on ? "rgba(232,238,248,0.95)" : "rgba(232,238,248,0.6)";
+    ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Returns the LEFT stop of the segment whose midpoint diamond is under (x,y).
+function midpointAt(x: number, y: number): Stop | null {
+  if (Math.abs(y - BAR_MID) > HIT_R) return null;
+  const sorted = sortedStops();
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const a = sorted[i], b = sorted[i + 1];
+    const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
+    if (Math.abs(mx - x) <= HIT_R) return a;
+  }
+  return null;
+}
+
 function roundRectPath(x: number, y: number, w: number, h: number, r: number) {
   if (!ctx) return;
   ctx.beginPath();
@@ -256,9 +316,18 @@ function onDown(e: MouseEvent) {
     activeStop = hit;
     dragOffsetX = hit.pos - fromCanvasX(x);
     dragging = true;
-  } else if (y >= BAR_Y - HIT_R && y <= BAR_Y + BAR_H + HIT_R) {
+    redraw();
+    return;
+  }
+  const mp = midpointAt(x, y);
+  if (mp) {
+    draggingMid = mp;
+    redraw();
+    return;
+  }
+  if (y >= BAR_Y - HIT_R && y <= BAR_Y + BAR_H + HIT_R) {
     const pos = fromCanvasX(x);
-    const newStop: Stop = { pos, color: sampleColorAt(pos) };
+    const newStop: Stop = { pos, color: sampleColorAt(pos), mid: 0.5 };
     stops.value.push(newStop);
     activeStop = newStop;
     dragOffsetX = 0;
@@ -271,6 +340,18 @@ function onDown(e: MouseEvent) {
 function onMove(e: MouseEvent) {
   const { x, y } = eventToLogical(e);
   if (Math.abs(x - downX) > 3 || Math.abs(y - downY) > 3) moved = true;
+  if (draggingMid) {
+    const sorted = sortedStops();
+    const i = sorted.indexOf(draggingMid);
+    if (i >= 0 && i < sorted.length - 1) {
+      const a = sorted[i], b = sorted[i + 1];
+      const span = Math.max(1e-6, b.pos - a.pos);
+      draggingMid.mid = Math.min(0.95, Math.max(0.05, (fromCanvasX(x) - a.pos) / span));
+      emitChange();
+      redraw();
+    }
+    return;
+  }
   if (dragging && activeStop) {
     activeStop.pos = clamp01(fromCanvasX(x) + dragOffsetX);
     stops.value.sort((a, b) => a.pos - b.pos);
@@ -278,13 +359,15 @@ function onMove(e: MouseEvent) {
     redraw();
     return;
   }
-  const prevHover = hoverStop;
+  const prevHover = hoverStop, prevMid = hoverMid;
   hoverStop = stopAt(x);
-  if (hoverStop !== prevHover) redraw();
-  if (canvas.value) canvas.value.style.cursor = hoverStop ? "grab" : "crosshair";
+  hoverMid = hoverStop ? null : midpointAt(x, y);
+  if (hoverStop !== prevHover || hoverMid !== prevMid) redraw();
+  if (canvas.value) canvas.value.style.cursor = hoverStop ? "grab" : hoverMid ? "ew-resize" : "crosshair";
 }
 
 function onUp() {
+  if (draggingMid) { draggingMid = null; redraw(); return; }
   if (dragging && activeStop && !moved) {
     openPickerFor(activeStop);
   }
@@ -294,7 +377,9 @@ function onUp() {
 
 function onLeave() {
   if (dragging) onUp();
+  draggingMid = null;
   hoverStop = null;
+  hoverMid = null;
   redraw();
 }
 
@@ -315,7 +400,22 @@ function onColorInput(e: Event) {
 
 function reset() {
   stops.value = [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
+  interp.value = "smooth";
   activeStop = null;
+  emitChange();
+  redraw();
+}
+
+function reverse() {
+  stops.value = stops.value.map((s) => ({ pos: clamp01(1 - s.pos), color: s.color }))
+    .sort((a, b) => a.pos - b.pos);
+  activeStop = null;
+  emitChange();
+  redraw();
+}
+
+function onInterpChange(mode: string) {
+  interp.value = parseInterp(JSON.stringify({ interp: mode }));
   emitChange();
   redraw();
 }
@@ -323,15 +423,15 @@ function reset() {
 // --- serialisation -----------------------------------------------------------
 
 let debounceTimer: number | undefined;
+function serialise(): string {
+  return JSON.stringify({
+    stops: [...stops.value].sort((a, b) => a.pos - b.pos),
+    interp: interp.value,
+  });
+}
 function emitChange() {
   window.clearTimeout(debounceTimer);
-  debounceTimer = window.setTimeout(() => {
-    props.onChange(JSON.stringify({ stops: [...stops.value].sort((a, b) => a.pos - b.pos) }));
-  }, 60);
-}
-
-function serialise(): string {
-  return JSON.stringify({ stops: [...stops.value].sort((a, b) => a.pos - b.pos) });
+  debounceTimer = window.setTimeout(() => props.onChange(serialise()), 60);
 }
 
 function deserialise(json: string) {
@@ -341,7 +441,9 @@ function deserialise(json: string) {
       stops.value = data.stops.map((s: any) => ({
         pos: clamp01(Number(s.pos)),
         color: normalizeHex(String(s.color)),
+        mid: Number.isFinite(s.mid) ? Math.min(0.95, Math.max(0.05, Number(s.mid))) : 0.5,
       })).sort((a: Stop, b: Stop) => a.pos - b.pos);
+      interp.value = parseInterp(json);
       redraw();
       return;
     }
@@ -375,7 +477,11 @@ function onPresetSelect(name: string) {
   if (!name) return;
   const p = userPresets.value.find((x) => x.name === name);
   if (!p) return;
-  stops.value = p.stops.map((s) => ({ pos: clamp01(s.pos), color: normalizeHex(s.color) }));
+  stops.value = p.stops.map((s) => ({
+    pos: clamp01(s.pos), color: normalizeHex(s.color),
+    mid: Number.isFinite(s.mid) ? Math.min(0.95, Math.max(0.05, Number(s.mid))) : 0.5,
+  }));
+  if (p.interp) interp.value = parseInterp(JSON.stringify({ interp: p.interp }));
   activeStop = null;
   emitChange();
   redraw();
@@ -393,7 +499,7 @@ async function saveCurrentAsPreset(): Promise<void> {
   const exists = userPresets.value.some((p) => p.name.toLowerCase() === name.toLowerCase());
   if (exists && !window.confirm(`Overwrite existing preset "${name}"?`)) return;
 
-  const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos) };
+  const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos), interp: interp.value };
   try {
     const res = await fetch("/nkd_color_ramp/presets", {
       method: "POST",
@@ -505,6 +611,7 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
   white-space: nowrap;
 }
 .nkd-select--preset { flex: 1 1 auto; min-width: 0; max-width: 240px; }
+.nkd-select--interp { flex: 0 0 auto; padding: 2px 4px; font-size: 10px; }
 
 .nkd-btn, .nkd-select {
   background: var(--comfy-input-bg, #252830);

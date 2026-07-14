@@ -10,9 +10,9 @@ from nkd_color_ramp import _DEFAULT_RAMP, _hex_to_rgb, _parse_ramp, _sample_ramp
 
 
 def demo():
-    # Default ramp parses to black->white
+    # Default ramp parses to black->white, neutral midpoints (0.5)
     stops = _parse_ramp(_DEFAULT_RAMP)
-    assert stops == [(0.0, 0.0, 0.0, 0.0), (1.0, 1.0, 1.0, 1.0)]
+    assert stops == [(0.0, 0.0, 0.0, 0.0, 0.5), (1.0, 1.0, 1.0, 1.0, 0.5)]
 
     # Identity sampling: black->white ramp reproduces luminance as gray
     t = torch.tensor([0.0, 0.25, 0.5, 1.0])
@@ -37,6 +37,17 @@ def demo():
 
     # Hex parsing
     assert _hex_to_rgb("#ff8000") == (1.0, 128 / 255, 0.0)
+
+    # Per-segment midpoint: with mid=0.25 the 50% gray lands at geometric 0.25
+    biased = '{"stops":[{"pos":0.0,"color":"#000000","mid":0.25},' \
+             '{"pos":1.0,"color":"#ffffff"}]}'
+    bs = _parse_ramp(biased)
+    assert abs(bs[0][4] - 0.25) < 1e-6
+    v = _sample_ramp(bs, torch.tensor([0.25]))
+    assert abs(v[0, 0].item() - 0.5) < 1e-4
+    # neutral midpoint = plain linear (0.25 → 0.25)
+    lin = _sample_ramp(stops, torch.tensor([0.25]))
+    assert abs(lin[0, 0].item() - 0.25) < 1e-5
 
     # Works on arbitrary-shape tensors (e.g. an [H, W] luminance field)
     field = torch.rand(4, 6)
