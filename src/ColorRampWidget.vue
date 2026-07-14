@@ -451,13 +451,16 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
 .nkd-root {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 100%;
   box-sizing: border-box;
   background: var(--comfy-menu-bg, #1a1c22);
   border: 1px solid var(--border-color, #2a2d36);
   border-radius: 6px;
   overflow: hidden;
   font: 11px Inter, sans-serif;
+}
+.nkd-root, .nkd-root *, .nkd-root *::before, .nkd-root *::after {
+  box-sizing: border-box;
 }
 .nkd-canvas {
   width: 100%;
@@ -475,7 +478,7 @@ defineExpose({ serialise, deserialise, forceResize, cleanup });
   pointer-events: none;
 }
 .nkd-bar {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   background: var(--comfy-menu-bg, #1a1c22);
   border-top: 1px solid var(--border-color, #2a2d36);
 }

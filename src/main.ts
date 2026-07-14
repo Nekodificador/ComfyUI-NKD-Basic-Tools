@@ -14,11 +14,41 @@ const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
 const MIN_EDITOR_H = 190;
 
-// ComfyUI wraps every DOM widget in an element with ~20px of its own
-// margin/padding, so the content box our `height:100%` root fills is that
-// much shorter than the height we reserve via getHeight. Add it back or the
-// bottom bar of every widget clips. Measured at 20px; 24 leaves a cushion.
-const DOM_WIDGET_CHROME = 24;
+// Content-driven DOM-widget sizing (the NKD Relight / Lens Blur pattern).
+// The Vue root is NOT height:100% — it sizes to its content — so we measure
+// the real rendered height and report THAT as the widget height, resizing the
+// node to match. No fixed-formula reservation, so no clipping and no empty
+// space regardless of ComfyUI's wrapper margins or the content's aspect.
+const ROW_SAFETY = 8;
+
+function sizeDomWidgetToContent(
+  node: any, domWidget: any, container: HTMLElement, minW: number,
+  estimate: (width: number) => number,
+): ResizeObserver {
+  let measuredH = 0;
+  const inner = (container.firstElementChild as HTMLElement | null) ?? container;
+  domWidget.computeSize = (width: number) => {
+    const w = Math.max(width ?? minW, minW);
+    const h = (measuredH > 0 ? measuredH : estimate(w)) + ROW_SAFETY;
+    return [w, h];
+  };
+  const ro = new ResizeObserver(() => {
+    const h = inner.offsetHeight;
+    if (h > 0 && Math.abs(h - measuredH) > 1) {
+      measuredH = h;
+      requestAnimationFrame(() => {
+        if (!node.size) return;
+        const needed = node.computeSize();
+        if (Math.abs(needed[1] - node.size[1]) > 1) {
+          node.setSize([node.size[0], needed[1]]);
+          node.setDirtyCanvas(true, true);
+        }
+      });
+    }
+  });
+  ro.observe(inner);
+  return ro;
+}
 
 // Autogrow rebuilds its dynamic slots on load, dropping custom labels of every
 // socket after the first. Mirror renames into node.properties (which DOES
@@ -88,7 +118,7 @@ comfyApp.registerExtension({
       });
       instance = vueApp.mount(container) as any;
 
-      this.addDOMWidget("prompt_editor", "NKD_PROMPT_EDITOR", container, {
+      const domWidget = this.addDOMWidget("prompt_editor", "NKD_PROMPT_EDITOR", container, {
         getValue: () => textWidget.value,
         setValue: (v: string) => {
           textWidget.value = v;
@@ -96,9 +126,9 @@ comfyApp.registerExtension({
         },
         serialize: false,
         hideOnZoom: false,
-        getMinHeight: () => MIN_EDITOR_H + DOM_WIDGET_CHROME,
-        getHeight: () => MIN_EDITOR_H + DOM_WIDGET_CHROME,
       });
+      const promptRo = sizeDomWidgetToContent(this, domWidget, container, MIN_W,
+        () => MIN_EDITOR_H);
 
       const origResize = this.onResize;
       this.onResize = function (size: [number, number]) {
@@ -110,12 +140,6 @@ comfyApp.registerExtension({
       requestAnimationFrame(() => {
         instance?.deserialise(textWidget.value ?? "");
         instance?.setVariables(readVariables(this));
-        // Grow-only, finite-only: never shrink a restored size, never feed
-        // NaN into setSize (runaway node growth).
-        const sz = this.computeSize();
-        if (Number.isFinite(sz[0]) && Number.isFinite(sz[1])) {
-          this.setSize([Math.max(sz[0], this.size[0]), Math.max(sz[1], this.size[1])]);
-        }
         this.setDirtyCanvas(true, true);
       });
 
@@ -146,6 +170,7 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(varsTimer);
+        promptRo.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);
@@ -182,8 +207,6 @@ comfyApp.registerExtension({
       const result = origCreated?.apply(this, arguments);
 
       const container = document.createElement("div");
-      let barH = 30;
-
       const getRamp = () => this.widgets?.find((w: any) => w.name === "ramp")?.value ?? "{}";
       const getInvert = () => !!this.widgets?.find((w: any) => w.name === "invert")?.value;
       const getStrength = () => Number(this.widgets?.find((w: any) => w.name === "strength")?.value) || 0;
@@ -195,67 +218,36 @@ comfyApp.registerExtension({
       });
       instance = vueApp.mount(container) as any;
 
-      const PREVIEW_AR = 200 / 320;
-      const heightFor = (width: number) =>
-        Math.round(width * PREVIEW_AR) + barH + DOM_WIDGET_CHROME;
-
-      this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
+      const domWidget = this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
         getValue: () => "",
         setValue: () => {},
         serialize: false,
         hideOnZoom: false,
-        getMinHeight: () => heightFor(this.size?.[0] || 320),
-        getMaxHeight: () => heightFor(this.size?.[0] || 320),
-        getHeight: () => heightFor(this.size?.[0] || 320),
       });
+      // Estimate before first measure: the preview + a one-row bar.
+      const ro = sizeDomWidgetToContent(this, domWidget, container, 320,
+        (w) => Math.round(w * (200 / 320)) + 30);
 
       const origResize = this.onResize;
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < 320) size[0] = 320;
-        size[1] = this.computeSize(size[0])[1];
       };
 
-      const origComputeSize = this.computeSize.bind(this);
-      this.computeSize = function (_w?: number) {
-        const sz = origComputeSize();
-        const width = sz[0] || this.size[0];
-        const needed = heightFor(width);
-        if (sz[1] < needed) sz[1] = needed;
-        return sz;
-      };
-
-      let v1NeedsInit = true;
-      const origDrawBg = this.onDrawBackground;
-      this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
-        origDrawBg?.apply(this, arguments);
-        if (v1NeedsInit && instance?.forceResize?.()) v1NeedsInit = false;
-      };
-      // Poll: catches ramp/invert/strength edits (other widgets) and the
-      // upstream image changing (new file picked, link rewired, or the
-      // graph finishing a run that populates node.imgs for the first time).
       const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 300);
-
-      requestAnimationFrame(() => {
-        const barEl = container.querySelector(".nkd-bar");
-        const measured = barEl ? Math.ceil((barEl as HTMLElement).getBoundingClientRect().height) : 0;
-        if (measured > 0) barH = measured;
-        if (instance?.forceResize?.()) v1NeedsInit = false;
-        const sz = this.computeSize(this.size[0]);
-        this.setSize(sz);
-        this.setDirtyCanvas(true, true);
-      });
+      requestAnimationFrame(() => { instance?.forceResize?.(); });
 
       const origConfigure = this.onConfigure;
       this.onConfigure = function () {
         const r = origConfigure?.apply(this, arguments);
-        requestAnimationFrame(() => { if (instance?.forceResize?.()) v1NeedsInit = false; });
+        requestAnimationFrame(() => { instance?.forceResize?.(); });
         return r;
       };
 
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(refreshTimer);
+        ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);
@@ -288,7 +280,6 @@ comfyApp.registerExtension({
       handlesWidget.computeSize = () => [0, -4];
 
       const container = document.createElement("div");
-      let barH = 34;
 
       const getRamp = () => this.widgets?.find((w: any) => w.name === "ramp")?.value ?? "{}";
       const getShape = () => this.widgets?.find((w: any) => w.name === "shape")?.value ?? "Linear";
@@ -308,11 +299,7 @@ comfyApp.registerExtension({
       });
       instance = vueApp.mount(container) as any;
 
-      const PREVIEW_AR = 210 / 320;
-      const heightFor = (width: number) =>
-        Math.round(width * PREVIEW_AR) + barH + DOM_WIDGET_CHROME;
-
-      this.addDOMWidget("preview_editor", "NKD_GRADIENT_PREVIEW", container, {
+      const domWidget = this.addDOMWidget("preview_editor", "NKD_GRADIENT_PREVIEW", container, {
         getValue: () => handlesWidget.value,
         setValue: (v: string) => {
           handlesWidget.value = v;
@@ -320,45 +307,21 @@ comfyApp.registerExtension({
         },
         serialize: false,
         hideOnZoom: false,
-        getMinHeight: () => heightFor(this.size?.[0] || 320),
-        getMaxHeight: () => heightFor(this.size?.[0] || 320),
-        getHeight: () => heightFor(this.size?.[0] || 320),
       });
+      const ro = sizeDomWidgetToContent(this, domWidget, container, 320,
+        (w) => Math.round(w * (210 / 320)) + 34);
 
       const origResize = this.onResize;
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < 320) size[0] = 320;
-        size[1] = this.computeSize(size[0])[1];
       };
 
-      const origComputeSize = this.computeSize.bind(this);
-      this.computeSize = function (_w?: number) {
-        const sz = origComputeSize();
-        const width = sz[0] || this.size[0];
-        const needed = heightFor(width);
-        if (sz[1] < needed) sz[1] = needed;
-        return sz;
-      };
-
-      let v1NeedsInit = true;
-      const origDrawBg = this.onDrawBackground;
-      this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
-        origDrawBg?.apply(this, arguments);
-        if (v1NeedsInit && instance?.forceResize?.()) v1NeedsInit = false;
-      };
-      // Poll for ramp edits (other widget) and shape-combo changes.
       const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 400);
 
       requestAnimationFrame(() => {
-        const barEl = container.querySelector(".nkd-bar");
-        const measured = barEl ? Math.ceil((barEl as HTMLElement).getBoundingClientRect().height) : 0;
-        if (measured > 0) barH = measured;
         instance?.deserialise(handlesWidget.value ?? "");
-        if (instance?.forceResize?.()) v1NeedsInit = false;
-        const sz = this.computeSize(this.size[0]);
-        this.setSize(sz);
-        this.setDirtyCanvas(true, true);
+        instance?.forceResize?.();
       });
 
       const origConfigure = this.onConfigure;
@@ -366,7 +329,7 @@ comfyApp.registerExtension({
         const r = origConfigure?.apply(this, arguments);
         requestAnimationFrame(() => {
           instance?.deserialise(handlesWidget.value ?? "");
-          if (instance?.forceResize?.()) v1NeedsInit = false;
+          instance?.forceResize?.();
         });
         return r;
       };
@@ -374,6 +337,7 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(refreshTimer);
+        ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);
@@ -391,6 +355,7 @@ const RAMP_NODES = ["NKDGradientMap", "NKDGradientGenerate"];
 const RAMP_CANVAS_W = 380;
 const RAMP_CANVAS_AR = 64 / RAMP_CANVAS_W;
 const RAMP_MIN_W = 380;
+const RAMP_BAR_EST = 56; // two-row control/preset bar
 
 comfyApp.registerExtension({
   name: "NKD.BasicTools.ColorRamp.Vue",
@@ -410,7 +375,6 @@ comfyApp.registerExtension({
       rampWidget.computeSize = () => [0, -4];
 
       const container = document.createElement("div");
-      let barH = 70; // overestimate until measured
 
       let instance: any = null;
       const vueApp = createApp(ColorRampWidget, {
@@ -420,10 +384,7 @@ comfyApp.registerExtension({
       });
       instance = vueApp.mount(container) as any;
 
-      const heightFor = (width: number) =>
-        Math.round(width * RAMP_CANVAS_AR) + barH + DOM_WIDGET_CHROME;
-
-      this.addDOMWidget("ramp_editor", "NKD_RAMP_EDITOR", container, {
+      const domWidget = this.addDOMWidget("ramp_editor", "NKD_RAMP_EDITOR", container, {
         getValue: () => rampWidget.value,
         setValue: (v: string) => {
           rampWidget.value = v;
@@ -431,43 +392,19 @@ comfyApp.registerExtension({
         },
         serialize: false,
         hideOnZoom: false,
-        getMinHeight: () => heightFor(this.size?.[0] || RAMP_CANVAS_W),
-        getMaxHeight: () => heightFor(this.size?.[0] || RAMP_CANVAS_W),
-        getHeight: () => heightFor(this.size?.[0] || RAMP_CANVAS_W),
       });
+      const ro = sizeDomWidgetToContent(this, domWidget, container, RAMP_MIN_W,
+        (w) => Math.round(w * RAMP_CANVAS_AR) + RAMP_BAR_EST);
 
       const origResize = this.onResize;
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < RAMP_MIN_W) size[0] = RAMP_MIN_W;
-        size[1] = this.computeSize(size[0])[1];
-      };
-
-      const origComputeSize = this.computeSize.bind(this);
-      this.computeSize = function (_w?: number) {
-        const sz = origComputeSize();
-        const width = sz[0] || this.size[0];
-        const needed = heightFor(width);
-        if (sz[1] < needed) sz[1] = needed;
-        return sz;
-      };
-
-      let v1NeedsInit = true;
-      const origDrawBg = this.onDrawBackground;
-      this.onDrawBackground = function (ctx: CanvasRenderingContext2D) {
-        origDrawBg?.apply(this, arguments);
-        if (v1NeedsInit && instance?.forceResize?.()) v1NeedsInit = false;
       };
 
       requestAnimationFrame(() => {
-        const barEl = container.querySelector(".nkd-bar");
-        const measured = barEl ? Math.ceil((barEl as HTMLElement).getBoundingClientRect().height) : 0;
-        if (measured > 0) barH = measured;
         instance?.deserialise(rampWidget.value ?? "");
-        if (instance?.forceResize?.()) v1NeedsInit = false;
-        const sz = this.computeSize(this.size[0]);
-        this.setSize(sz);
-        this.setDirtyCanvas(true, true);
+        instance?.forceResize?.();
       });
 
       const origConfigure = this.onConfigure;
@@ -475,13 +412,14 @@ comfyApp.registerExtension({
         const r = origConfigure?.apply(this, arguments);
         requestAnimationFrame(() => {
           instance?.deserialise(rampWidget.value ?? "");
-          if (instance?.forceResize?.()) v1NeedsInit = false;
+          instance?.forceResize?.();
         });
         return r;
       };
 
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
+        ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();
         origRemoved?.apply(this, arguments);

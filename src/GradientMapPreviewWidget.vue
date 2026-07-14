@@ -1,6 +1,6 @@
 <template>
   <div class="nkd-root">
-    <canvas ref="canvas" class="nkd-canvas"></canvas>
+    <canvas ref="canvas" class="nkd-canvas" :style="{ aspectRatio: canvasAspect }"></canvas>
     <div class="nkd-bar">
       <div class="nkd-row nkd-row--controls">
         <span class="nkd-hint">{{ hintText }}</span>
@@ -21,16 +21,20 @@ const props = defineProps<{
   getSourceImg: () => HTMLImageElement | null;
 }>();
 
-const BOX_W = 320, BOX_H = 200, PAD = 10;
 const MIN_RENDER_SCALE = 2;
 const CACHE_RES = 220; // longest side of the cached source decode — preview only
+const DEFAULT_ASPECT = "16 / 10";
 
 const canvas = ref<HTMLCanvasElement | null>(null);
 let ctx: CanvasRenderingContext2D | null = null;
 let ro: ResizeObserver | null = null;
 let dpr = window.devicePixelRatio || 1;
+let logicalW = 0, logicalH = 0; // CSS display size of the canvas
 
 const hintText = ref("Connect an image");
+// The canvas matches the source image aspect (portrait image → portrait
+// canvas), so the remapped image fills it edge-to-edge — no letterbox waste.
+const canvasAspect = ref(DEFAULT_ASPECT);
 
 // Cached decode of the source image: RGB + luminance, at a small fixed
 // resolution so ramp/invert/strength edits redraw instantly with no
@@ -109,40 +113,35 @@ function syncCanvasSize(): boolean {
   if (!c) return false;
   const rect = c.getBoundingClientRect();
   if (rect.width < 1 || rect.height < 1) return false;
-  const sx = Math.max((rect.width / BOX_W) * dpr, MIN_RENDER_SCALE);
-  const sy = Math.max((rect.height / BOX_H) * dpr, MIN_RENDER_SCALE);
-  const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
+  logicalW = rect.width; logicalH = rect.height;
+  const s = Math.max(dpr, MIN_RENDER_SCALE);
+  const newW = Math.round(rect.width * s), newH = Math.round(rect.height * s);
   if (c.width !== newW || c.height !== newH) {
     c.width = newW; c.height = newH;
     ctx = c.getContext("2d");
-    ctx?.setTransform(sx, 0, 0, sy, 0, 0);
   }
+  // Uniform scale — canvas aspect matches the image, so no distortion.
+  ctx?.setTransform(newW / rect.width, 0, 0, newH / rect.height, 0, 0);
   redraw();
   return true;
 }
 
 function redraw() {
-  if (!ctx) return;
-  ctx.clearRect(0, 0, BOX_W, BOX_H);
+  if (!ctx || logicalW < 1) return;
+  ctx.clearRect(0, 0, logicalW, logicalH);
   ctx.fillStyle = "#111318";
-  ctx.fillRect(0, 0, BOX_W, BOX_H);
+  ctx.fillRect(0, 0, logicalW, logicalH);
 
-  const maxW = BOX_W - PAD * 2, maxH = BOX_H - PAD * 2;
   if (!cacheRgb || !cacheLuma) {
     ctx.font = "11px Inter, sans-serif";
     ctx.fillStyle = "rgba(255,255,255,0.32)";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillText("Connect an image", BOX_W / 2, BOX_H / 2);
+    ctx.fillText("Connect an image", logicalW / 2, logicalH / 2);
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
     return;
   }
-
-  const aspect = cacheW / cacheH;
-  let fw = maxW, fh = maxW / aspect;
-  if (fh > maxH) { fh = maxH; fw = maxH * aspect; }
-  const fitX = PAD + (maxW - fw) / 2, fitY = PAD + (maxH - fh) / 2;
 
   const rampStr = props.getRamp();
   const invert = props.getInvert();
@@ -172,11 +171,9 @@ function redraw() {
     data[i + 3] = 255;
   }
   outCtx!.putImageData(outImg!, 0, 0);
+  // Canvas aspect already matches the image, so fill it edge-to-edge.
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(outCanvas, fitX, fitY, fw, fh);
-  ctx.strokeStyle = "rgba(255,255,255,0.16)";
-  ctx.lineWidth = 0.75;
-  ctx.strokeRect(fitX + 0.5, fitY + 0.5, fw - 1, fh - 1);
+  ctx.drawImage(outCanvas, 0, 0, logicalW, logicalH);
 }
 
 function refreshExternal() {
@@ -189,6 +186,10 @@ function refreshExternal() {
     cacheRgb = null; cacheLuma = null; lastSrc = null;
   }
   hintText.value = cacheRgb ? "Live preview" : "Connect an image";
+  // Match the canvas box to the image aspect. When it changes, the element
+  // resizes → the ResizeObserver re-syncs the buffer and redraws.
+  const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
+  if (wantAspect !== canvasAspect.value) { canvasAspect.value = wantAspect; return; }
   // Dirty-check: skip the (heavy) remap unless something the preview depends on
   // actually changed. This is what keeps the idle poll from pegging the CPU.
   const sig = `${lastSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
@@ -217,7 +218,7 @@ defineExpose({ refreshExternal, forceResize, cleanup });
 .nkd-root {
   display: flex;
   flex-direction: column;
-  height: 100%;
+  width: 100%;
   box-sizing: border-box;
   background: var(--comfy-menu-bg, #1a1c22);
   border: 1px solid var(--border-color, #2a2d36);
@@ -225,15 +226,17 @@ defineExpose({ refreshExternal, forceResize, cleanup });
   overflow: hidden;
   font: 11px Inter, sans-serif;
 }
+.nkd-root, .nkd-root *, .nkd-root *::before, .nkd-root *::after {
+  box-sizing: border-box;
+}
 .nkd-canvas {
   width: 100%;
-  aspect-ratio: 320 / 200;
   height: auto;
   display: block;
   flex: 0 0 auto;
 }
 .nkd-bar {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
   background: var(--comfy-menu-bg, #1a1c22);
   border-top: 1px solid var(--border-color, #2a2d36);
 }
