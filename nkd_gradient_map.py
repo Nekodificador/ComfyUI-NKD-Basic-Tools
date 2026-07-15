@@ -6,6 +6,7 @@ from comfy_api.latest import ComfyExtension, io
 
 from .nkd_color_ramp import _DEFAULT_RAMP, _parse_interp, _parse_ramp, _sample_ramp
 from .helpers import _luminance, _resize_mask
+from .nkd_frequency import _send_source_to_widget
 
 
 class NKDGradientMap(io.ComfyNode):
@@ -15,6 +16,8 @@ class NKDGradientMap(io.ComfyNode):
             node_id="NKDGradientMap",
             display_name="😺NKD Gradient Map",
             category="😺NKD Nodes/Basic",
+            is_output_node=True,  # runnable on its own → loads the resolved source
+                                  # into the live preview (works behind resize/subgraph)
             description=(
                 "Recolor the image by brightness: darks become one end of "
                 "the ramp, lights the other. Classic duotone / color-grading "
@@ -37,6 +40,7 @@ class NKDGradientMap(io.ComfyNode):
                               tooltip="Optional — confine the recolor to the mask, "
                                       "feathered by its values (soft edges blend in)."),
             ],
+            hidden=[io.Hidden.unique_id],  # to target this node's preview widget
             outputs=[
                 io.Image.Output(display_name="image",
                                 tooltip="The recolored image."),
@@ -69,6 +73,11 @@ class NKDGradientMap(io.ComfyNode):
         mask_out = _luminance(out)
         if image.shape[-1] > 3:
             out = torch.cat([out, image[..., 3:]], dim=-1)
+        # Feed the resolved input to the live preview widget (it applies the
+        # ramp client-side); partial-execution loads the image even when it
+        # arrives via a resize/subgraph.
+        _send_source_to_widget(getattr(getattr(cls, "hidden", None), "unique_id", None),
+                               image, event="nkd-gradmap-source")
         return io.NodeOutput(out, mask_out)
 
 

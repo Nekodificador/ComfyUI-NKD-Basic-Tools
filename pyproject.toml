@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "comfyui-nkd-basic-tools"
-version = "1.0.0"
+version = "1.1.0"
 description = "Transversal utility nodes for ComfyUI: inpaint crop & stitch, and more to come."
 license = { text = "MIT" }
 requires-python = ">=3.10"

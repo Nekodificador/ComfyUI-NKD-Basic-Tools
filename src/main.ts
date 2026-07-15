@@ -2,12 +2,14 @@
 // Hides the raw `text` string widget and mounts a Vue contenteditable editor
 // that renders {variable_N} tokens as chips, one insert button per socket.
 import { app as comfyApp } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 import { createApp } from "vue";
 import PromptVariablesWidget from "./PromptVariablesWidget.vue";
 import ColorRampWidget from "./ColorRampWidget.vue";
 import GradientPreviewWidget from "./GradientPreviewWidget.vue";
 import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
 import NoisePreviewWidget from "./NoisePreviewWidget.vue";
+import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -30,6 +32,50 @@ function sizeDomWidgetToContent(
   let raf = 0;         // coalesce: at most one resize scheduled at a time
   let settling = false; // ignore the RO fire our own setSize may provoke
   const inner = (container.firstElementChild as HTMLElement | null) ?? container;
+  // ComfyUI's CLASSIC (LiteGraph) DOM-widget host mis-sizes on selection /
+  // re-layout in current frontends — the widget either balloons to the full
+  // graph-canvas width or collapses to ~half — while node.size[0] (the logical
+  // width) stays correct. Nodes 2.0 (Vue) lays out fine. Community diagnosis:
+  // Banodoco dev-chatter + ComfyUI-qwenmultiangle. Fix: in classic mode pin the
+  // container back to node.size[0] (the host is zoom-scaled by a CSS transform,
+  // so inside it CSS px == LiteGraph units). Two-directional so it follows both
+  // the collapse (too narrow) and legit node resizes (too wide). The margin is
+  // self-calibrated from the widest good sample and capped, so a node that
+  // loads already-collapsed still recovers. Fixes every NKD DOM widget at once.
+  const MAX_MARGIN = 40; // widest plausible horizontal inset of the widget
+  const vueMode = () => !!(window as any).LiteGraph?.vueNodesMode; // Kijai: the mode flag
+  let enforcingW = false;
+  let goodMargin = 15; // widget's horizontal inset; refined from clean samples
+  // Use the PARENT host (ComfyUI's div.dom-widget) width as an INDEPENDENT
+  // broken-state detector — independent of whatever width we force on our own
+  // container, so there is no observe/override oscillation.
+  //   host healthy  -> let width:100% ride (adapts to resize) AND read the
+  //                    natural width to calibrate `goodMargin`.
+  //   host ballooned or collapsed -> pin our container to node.size[0] − margin
+  //                    (the correct width, tracks resize, no ~15px overshoot).
+  const clampWidth = () => {
+    if (enforcingW) return;
+    if (vueMode()) { if (container.style.width) container.style.width = ""; return; }
+    const nodeW = node.size?.[0];
+    if (!nodeW) return;
+    const host = container.parentElement;
+    const hostW = host ? host.clientWidth : 0;
+    const broken = hostW > 0 && (hostW > nodeW * 1.2 || hostW < nodeW * 0.7);
+    if (!broken) {
+      if (container.style.width) { enforcingW = true; container.style.width = ""; requestAnimationFrame(() => { enforcingW = false; }); }
+      const cw = container.clientWidth; // natural width — calibrate the inset
+      if (cw > 0 && cw <= nodeW && cw >= nodeW - MAX_MARGIN) goodMargin = nodeW - cw;
+      return;
+    }
+    const ref = Math.round(nodeW - goodMargin);
+    if (ref > 0 && Math.abs(container.clientWidth - ref) > 2) {
+      enforcingW = true;
+      container.style.boxSizing = "border-box";
+      container.style.width = ref + "px";
+      requestAnimationFrame(() => { enforcingW = false; });
+    }
+  };
+  clampWidth();
   domWidget.computeSize = (width: number) => {
     const w = Math.max(width ?? minW, minW);
     const h = (measuredH > 0 ? measuredH : estimate(w)) + ROW_SAFETY;
@@ -38,6 +84,7 @@ function sizeDomWidgetToContent(
   const apply = () => {
     raf = 0;
     if (!node.size) return;
+    clampWidth();  // node may have been resized wider — track it
     const needed = node.computeSize();
     if (Math.abs(needed[1] - node.size[1]) > 1) {
       settling = true;
@@ -47,7 +94,9 @@ function sizeDomWidgetToContent(
     }
   };
   const ro = new ResizeObserver(() => {
-    if (settling) return;                       // don't chase our own resize
+    clampWidth();                    // width bracket is independent of the
+                                     // height-settling guard below — always run it
+    if (settling) return;                       // don't chase our own (height) resize
     const h = inner.offsetHeight;
     if (h < 1) return;                           // collapsed/hidden — keep last size
     if (Math.abs(h - measuredH) <= 1) return;    // sub-pixel jitter — ignore
@@ -55,6 +104,26 @@ function sizeDomWidgetToContent(
     if (!raf) raf = requestAnimationFrame(apply); // coalesce bursts into one pass
   });
   ro.observe(inner);
+  // Also watch the host container: ComfyUI's mis-size changes ITS width, which
+  // must trigger the width clamp even if inner's height didn't change.
+  if (container !== inner) ro.observe(container);
+  // Re-run the clamp on node resize — node.size[0] changed and the container
+  // may not resize on its own, so the ResizeObserver wouldn't fire.
+  const origOnResize = node.onResize;
+  node.onResize = function () {
+    origOnResize?.apply(this, arguments);
+    clampWidth();
+  };
+  // Low-rate poll as a backstop: the ResizeObserver is the primary trigger, but
+  // it can miss host mis-sizes that don't change OUR observed boxes (ComfyUI
+  // re-lays-out the host on selection/DOM interaction). Cheap — a couple of
+  // reads and, only when actually broken, one style write. Cleared on removal.
+  const iv = window.setInterval(clampWidth, 250);
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function () {
+    clearInterval(iv);
+    origRemoved?.apply(this, arguments);
+  };
   return ro;
 }
 
@@ -268,6 +337,21 @@ comfyApp.registerExtension({
       const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 300);
       requestAnimationFrame(() => { instance?.forceResize?.(); });
 
+      // Backend pushes the resolved input on partial-execution (handles sources
+      // behind a resize/subgraph). node.id is -1 until assigned → read lazily.
+      const node = this;
+      const onSource = (e: any) => {
+        const d = e?.detail;
+        if (!d || String(d.node_id) !== String(node.id)) return;
+        try {
+          const bin = atob(d.img);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          instance?.setSentImage?.(bytes, d.width, d.height);
+        } catch { /* ignore malformed */ }
+      };
+      api.addEventListener("nkd-gradmap-source", onSource);
+
       const origConfigure = this.onConfigure;
       this.onConfigure = function () {
         const r = origConfigure?.apply(this, arguments);
@@ -278,6 +362,89 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-gradmap-source", onSource);
+        ro.disconnect();
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Frequency Separate — live preview of the high-frequency layer, computed
+// client-side from the connected source image (no execution needed), reacting
+// to method/radius/edge/mode/detail/linear as you scrub.
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.FrequencyPreview.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDFrequencySeparate") return;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const container = document.createElement("div");
+      const wv = (n: string) => this.widgets?.find((w: any) => w.name === n)?.value;
+      let instance: any = null;
+      const vueApp = createApp(FrequencyPreviewWidget, {
+        getSourceImg: () => findSourceImg(this, "image"),
+        getMethod: () => wv("method") ?? "Guided",
+        getRadius: () => Number(wv("radius")) || 8,
+        getEdge: () => Number(wv("edge_threshold")) || 0.1,
+        getMode: () => wv("mode") ?? "Divide",
+        getDetail: () => wv("detail") ?? "Luminance",
+        getLinear: () => !!wv("linear"),
+      });
+      instance = vueApp.mount(container) as any;
+
+      const domWidget = this.addDOMWidget("freq_preview", "NKD_FREQUENCY_PREVIEW", container, {
+        getValue: () => "",
+        setValue: () => {},
+        serialize: false,
+        hideOnZoom: false,
+      });
+      const ro = sizeDomWidgetToContent(this, domWidget, container, 320,
+        (w) => Math.round(w * (200 / 320)) + 52); // preview + two-row bar
+
+      const origResize = this.onResize;
+      this.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < 320) size[0] = 320;
+      };
+
+      const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 300);
+      requestAnimationFrame(() => { instance?.forceResize?.(); });
+
+      // Backend pushes the resolved input image on partial-execution (handles
+      // sources behind a resize/subgraph). node.id is -1 until assigned, so read
+      // it lazily at event time.
+      const node = this;
+      const onSource = (e: any) => {
+        const d = e?.detail;
+        if (!d || String(d.node_id) !== String(node.id)) return;
+        try {
+          const bin = atob(d.img);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          instance?.setSentImage?.(bytes, d.width, d.height);
+        } catch { /* ignore malformed */ }
+      };
+      api.addEventListener("nkd-freq-source", onSource);
+
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        requestAnimationFrame(() => { instance?.forceResize?.(); });
+        return r;
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-freq-source", onSource);
         ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();
@@ -314,10 +481,12 @@ comfyApp.registerExtension({
 
       const getRamp = () => this.widgets?.find((w: any) => w.name === "ramp")?.value ?? "{}";
       const getShape = () => this.widgets?.find((w: any) => w.name === "shape")?.value ?? "Linear";
-      const getSize = (): [number, number] => [
-        resolveDim(this, "width", 1024),
-        resolveDim(this, "height", 1024),
-      ];
+      // Prefer the backend-reported resolved size (works for computed/constrained
+      // width·height that resolveDim can't read pre-execution); else read the
+      // connected inputs / widgets.
+      let knownSize: [number, number] | null = null;
+      const getSize = (): [number, number] =>
+        knownSize ?? [resolveDim(this, "width", 1024), resolveDim(this, "height", 1024)];
 
       let instance: any = null;
       const vueApp = createApp(GradientPreviewWidget, {
@@ -350,6 +519,16 @@ comfyApp.registerExtension({
 
       const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 400);
 
+      // Backend reports the resolved output size on execution → gizmo matches
+      // the real aspect even when width/height are computed upstream.
+      const gnode = this;
+      const onSize = (e: any) => {
+        const d = e?.detail;
+        if (!d || String(d.node_id) !== String(gnode.id)) return;
+        if (d.width > 0 && d.height > 0) { knownSize = [d.width, d.height]; instance?.refreshExternal?.(); }
+      };
+      api.addEventListener("nkd-gradient-size", onSize);
+
       requestAnimationFrame(() => {
         instance?.deserialise(handlesWidget.value ?? "");
         instance?.forceResize?.();
@@ -368,6 +547,7 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-gradient-size", onSize);
         ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();

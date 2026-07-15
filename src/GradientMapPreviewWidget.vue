@@ -117,6 +117,25 @@ function decodeMask(img: HTMLImageElement) {
   cacheMask = m;
 }
 
+// Backend push on partial-execution: raw RGB bytes of the resolved input, used
+// as the preview source when it arrives behind a resize/subgraph (no decoded
+// upstream img to read). A directly-connected Load Image still refreshes over it.
+function setSentImage(rgb: Uint8Array, w: number, h: number) {
+  const n = w * h;
+  const data = new Uint8ClampedArray(n * 4);
+  const luma = new Float32Array(n);
+  for (let p = 0, i = 0, j = 0; p < n; p++, i += 4, j += 3) {
+    data[i] = rgb[j]; data[i + 1] = rgb[j + 1]; data[i + 2] = rgb[j + 2]; data[i + 3] = 255;
+    luma[p] = (rgb[j] * LUMA_R + rgb[j + 1] * LUMA_G + rgb[j + 2] * LUMA_B) / 255;
+  }
+  cacheRgb = data; cacheLuma = luma; cacheMask = null;
+  cacheW = w; cacheH = h; lastSrc = "__sent__"; lastMaskSrc = null;
+  hintText.value = "Live preview";
+  const wantAspect = `${w} / ${h}`;
+  if (wantAspect !== canvasAspect.value) canvasAspect.value = wantAspect;
+  lastSig = "__force__"; redraw();
+}
+
 function syncCanvasSize(): boolean {
   const c = canvas.value;
   if (!c) return false;
@@ -193,7 +212,9 @@ function refreshExternal() {
   let srcChanged = false;
   if (img && img.complete && src && src !== lastSrc) {
     decodeSource(img); lastSrc = src; srcChanged = true;
-  } else if (!img && lastSrc !== null) {
+  } else if (!img && lastSrc !== null && lastSrc !== "__sent__") {
+    // Keep a backend-pushed image (source lives behind a resize/subgraph, so
+    // getSourceImg legitimately finds nothing); only clear a real disconnect.
     cacheRgb = null; cacheLuma = null; cacheMask = null; lastSrc = null; lastMaskSrc = null;
   }
   // Mask: (re)decode when it changes, or when the source grid it aligns to did.
@@ -230,7 +251,7 @@ onMounted(() => {
 });
 onBeforeUnmount(cleanup);
 
-defineExpose({ refreshExternal, forceResize, cleanup });
+defineExpose({ refreshExternal, forceResize, cleanup, setSentImage });
 </script>
 
 <style scoped>

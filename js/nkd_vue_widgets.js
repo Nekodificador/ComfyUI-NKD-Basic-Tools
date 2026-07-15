@@ -1,4 +1,5 @@
 import { app } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
 /**
 * @vue/shared v3.5.39
 * (c) 2018-present Yuxi (Evan) You and Vue contributors
@@ -2148,6 +2149,36 @@ function withCtx(fn, ctx = currentRenderingInstance, isNonScopedSlot) {
   renderFnWithContext._c = true;
   renderFnWithContext._d = true;
   return renderFnWithContext;
+}
+function withDirectives(vnode, directives) {
+  if (currentRenderingInstance === null) {
+    return vnode;
+  }
+  const instance = getComponentPublicInstance(currentRenderingInstance);
+  const bindings = vnode.dirs || (vnode.dirs = []);
+  for (let i = 0; i < directives.length; i++) {
+    let [dir, value, arg, modifiers = EMPTY_OBJ] = directives[i];
+    if (dir) {
+      if (isFunction(dir)) {
+        dir = {
+          mounted: dir,
+          updated: dir
+        };
+      }
+      if (dir.deep) {
+        traverse(value);
+      }
+      bindings.push({
+        dir,
+        instance,
+        value,
+        oldValue: void 0,
+        arg,
+        modifiers
+      });
+    }
+  }
+  return vnode;
 }
 function invokeDirectiveHook(vnode, prevVNode, instance, name) {
   const bindings = vnode.dirs;
@@ -6289,6 +6320,69 @@ function shouldSetAsPropForVueCE(el, key) {
   const camelKey = camelize(key);
   return Array.isArray(props) ? props.some((prop) => camelize(prop) === camelKey) : Object.keys(props).some((prop) => camelize(prop) === camelKey);
 }
+const getModelAssigner = (vnode) => {
+  const fn = vnode.props["onUpdate:modelValue"] || false;
+  return isArray(fn) ? (value) => invokeArrayFns(fn, value) : fn;
+};
+function onCompositionStart(e) {
+  e.target.composing = true;
+}
+function onCompositionEnd(e) {
+  const target = e.target;
+  if (target.composing) {
+    target.composing = false;
+    target.dispatchEvent(new Event("input"));
+  }
+}
+const assignKey = /* @__PURE__ */ Symbol("_assign");
+function castValue(value, trim, number) {
+  if (trim) value = value.trim();
+  if (number) value = looseToNumber(value);
+  return value;
+}
+const vModelText = {
+  created(el, { modifiers: { lazy, trim, number } }, vnode) {
+    el[assignKey] = getModelAssigner(vnode);
+    const castToNumber = number || vnode.props && vnode.props.type === "number";
+    addEventListener(el, lazy ? "change" : "input", (e) => {
+      if (e.target.composing) return;
+      el[assignKey](castValue(el.value, trim, castToNumber));
+    });
+    if (trim || castToNumber) {
+      addEventListener(el, "change", () => {
+        el.value = castValue(el.value, trim, castToNumber);
+      });
+    }
+    if (!lazy) {
+      addEventListener(el, "compositionstart", onCompositionStart);
+      addEventListener(el, "compositionend", onCompositionEnd);
+      addEventListener(el, "change", onCompositionEnd);
+    }
+  },
+  // set value on mounted so it's after min/max for type="range"
+  mounted(el, { value }) {
+    el.value = value == null ? "" : value;
+  },
+  beforeUpdate(el, { value, oldValue, modifiers: { lazy, trim, number } }, vnode) {
+    el[assignKey] = getModelAssigner(vnode);
+    if (el.composing) return;
+    const elValue = (number || el.type === "number") && !/^0\d/.test(el.value) ? looseToNumber(el.value) : el.value;
+    const newValue = value == null ? "" : value;
+    if (elValue === newValue) {
+      return;
+    }
+    const rootNode = el.getRootNode();
+    if ((rootNode instanceof Document || rootNode instanceof ShadowRoot) && rootNode.activeElement === el && el.type !== "range") {
+      if (lazy && value === oldValue) {
+        return;
+      }
+      if (trim && el.value.trim() === newValue) {
+        return;
+      }
+    }
+    el.value = newValue;
+  }
+};
 const systemModifiers = ["ctrl", "shift", "alt", "meta"];
 const modifierGuards = {
   stop: (e) => e.stopPropagation(),
@@ -6357,9 +6451,9 @@ function normalizeContainer(container) {
   }
   return container;
 }
-const _hoisted_1$4 = { class: "nkd-pv-bar" };
-const _hoisted_2$4 = ["title", "onClick"];
-const _sfc_main$4 = /* @__PURE__ */ defineComponent({
+const _hoisted_1$5 = { class: "nkd-pv-bar" };
+const _hoisted_2$5 = ["title", "onClick"];
+const _sfc_main$5 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function }
@@ -6588,14 +6682,14 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
           onContextmenu: _cache[0] || (_cache[0] = withModifiers(() => {
           }, ["stop"]))
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$4, [
+        createBaseVNode("div", _hoisted_1$5, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
               class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
-            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$4);
+            }, "+ " + toDisplayString(v.label), 11, _hoisted_2$5);
           }), 128))
         ])
       ], 32);
@@ -6609,7 +6703,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["__scopeId", "data-v-e3af9b8a"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-e3af9b8a"]]);
 const MODES = ["smooth", "bezier", "steps"];
 function midWarp(f, mid) {
   const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
@@ -6688,17 +6782,17 @@ function expandStops(stops, interp, remap = (p2) => p2) {
   }
   return out;
 }
-const _hoisted_1$3 = { class: "nkd-bar" };
-const _hoisted_2$3 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3$3 = ["value"];
-const _hoisted_4$2 = { class: "nkd-row nkd-row--presets" };
-const _hoisted_5 = ["value"];
+const _hoisted_1$4 = { class: "nkd-bar" };
+const _hoisted_2$4 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$4 = ["value"];
+const _hoisted_4$3 = { class: "nkd-row nkd-row--presets" };
+const _hoisted_5$1 = ["value"];
 const _hoisted_6 = ["value"];
 const _hoisted_7 = ["disabled"];
 const CW = 380, CH = 64;
 const HIT_R$1 = 10;
-const MIN_RENDER_SCALE$3 = 2;
-const _sfc_main$3 = /* @__PURE__ */ defineComponent({
+const MIN_RENDER_SCALE$4 = 2;
+const _sfc_main$4 = /* @__PURE__ */ defineComponent({
   __name: "ColorRampWidget",
   props: {
     onChange: { type: Function }
@@ -6769,8 +6863,8 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$3);
-      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$3);
+      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$4);
+      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$4);
       const newW = Math.round(CW * sx), newH = Math.round(CH * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -7168,8 +7262,8 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onLeave, ["stop"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$3, [
-          createBaseVNode("div", _hoisted_2$3, [
+        createBaseVNode("div", _hoisted_1$4, [
+          createBaseVNode("div", _hoisted_2$4, [
             _cache[7] || (_cache[7] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: color · Shift+click: delete · drag ◆: tension", -1)),
             _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("select", {
@@ -7181,7 +7275,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
               createBaseVNode("option", { value: "smooth" }, "Smooth", -1),
               createBaseVNode("option", { value: "bezier" }, "Bezier", -1),
               createBaseVNode("option", { value: "steps" }, "Steps", -1)
-            ])], 40, _hoisted_3$3),
+            ])], 40, _hoisted_3$4),
             createBaseVNode("button", {
               class: "nkd-btn",
               title: "Reverse the color order",
@@ -7192,7 +7286,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
               onClick: withModifiers(reset, ["stop"])
             }, "Reset")
           ]),
-          createBaseVNode("div", _hoisted_4$2, [
+          createBaseVNode("div", _hoisted_4$3, [
             _cache[10] || (_cache[10] = createBaseVNode("span", { class: "nkd-label" }, "Preset", -1)),
             createBaseVNode("select", {
               class: "nkd-select nkd-select--preset",
@@ -7206,7 +7300,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
                   value: p2.name
                 }, toDisplayString(p2.name), 9, _hoisted_6);
               }), 128))
-            ], 40, _hoisted_5),
+            ], 40, _hoisted_5$1),
             createBaseVNode("button", {
               class: "nkd-btn nkd-btn--preset",
               onClick: withModifiers(saveCurrentAsPreset, ["stop"])
@@ -7229,17 +7323,17 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-3d741d05"]]);
-const _hoisted_1$2 = { class: "nkd-bar" };
-const _hoisted_2$2 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3$2 = { class: "nkd-hint" };
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["__scopeId", "data-v-3d741d05"]]);
+const _hoisted_1$3 = { class: "nkd-bar" };
+const _hoisted_2$3 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$3 = { class: "nkd-hint" };
 const BOX_W = 320, BOX_H = 210, PAD = 14;
 const HIT_R = 11;
-const MIN_RENDER_SCALE$2 = 2;
+const MIN_RENDER_SCALE$3 = 2;
 const MID_MIN = 0.05, MID_MAX = 0.95;
 const CANVAS_INSET = 5;
 const DIAMOND_RES = 160;
-const _sfc_main$2 = /* @__PURE__ */ defineComponent({
+const _sfc_main$3 = /* @__PURE__ */ defineComponent({
   __name: "GradientPreviewWidget",
   props: {
     onChange: { type: Function },
@@ -7309,8 +7403,8 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE$2);
-      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE$2);
+      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE$3);
+      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE$3);
       const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -7677,9 +7771,9 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           onMouseleave: withModifiers(onLeave, ["stop"]),
           onDblclick: withModifiers(onDblClick, ["stop", "prevent"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$2, [
-          createBaseVNode("div", _hoisted_2$2, [
-            createBaseVNode("span", _hoisted_3$2, toDisplayString(hintText.value), 1),
+        createBaseVNode("div", _hoisted_1$3, [
+          createBaseVNode("div", _hoisted_2$3, [
+            createBaseVNode("span", _hoisted_3$3, toDisplayString(hintText.value), 1),
             _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("button", {
               class: "nkd-btn",
@@ -7691,16 +7785,16 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-45c56d8c"]]);
-const _hoisted_1$1 = { class: "nkd-root" };
-const _hoisted_2$1 = { class: "nkd-bar" };
-const _hoisted_3$1 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4$1 = { class: "nkd-hint" };
-const MIN_RENDER_SCALE$1 = 2;
-const CACHE_RES = 640;
-const DEFAULT_ASPECT = "16 / 10";
-const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
-const _sfc_main$1 = /* @__PURE__ */ defineComponent({
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-45c56d8c"]]);
+const _hoisted_1$2 = { class: "nkd-root" };
+const _hoisted_2$2 = { class: "nkd-bar" };
+const _hoisted_3$2 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4$2 = { class: "nkd-hint" };
+const MIN_RENDER_SCALE$2 = 2;
+const CACHE_RES$1 = 640;
+const DEFAULT_ASPECT$1 = "16 / 10";
+const LUMA_R$1 = 0.2126, LUMA_G$1 = 0.7152, LUMA_B$1 = 0.0722;
+const _sfc_main$2 = /* @__PURE__ */ defineComponent({
   __name: "GradientMapPreviewWidget",
   props: {
     getRamp: { type: Function },
@@ -7717,7 +7811,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     let dpr = window.devicePixelRatio || 1;
     let logicalW = 0, logicalH = 0;
     const hintText = /* @__PURE__ */ ref("Connect an image");
-    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT);
+    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT$1);
     let cacheW = 0, cacheH = 0;
     let cacheRgb = null;
     let cacheLuma = null;
@@ -7745,7 +7839,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     function decodeSource(img) {
       const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
       if (!iw || !ih) return;
-      const scale = CACHE_RES / Math.max(iw, ih);
+      const scale = CACHE_RES$1 / Math.max(iw, ih);
       cacheW = Math.max(1, Math.round(iw * scale));
       cacheH = Math.max(1, Math.round(ih * scale));
       if (!offscreen) offscreen = document.createElement("canvas");
@@ -7757,7 +7851,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       cacheRgb = data;
       cacheLuma = new Float32Array(cacheW * cacheH);
       for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) {
-        cacheLuma[p2] = (data[i] * LUMA_R + data[i + 1] * LUMA_G + data[i + 2] * LUMA_B) / 255;
+        cacheLuma[p2] = (data[i] * LUMA_R$1 + data[i + 1] * LUMA_G$1 + data[i + 2] * LUMA_B$1) / 255;
       }
     }
     function decodeMask(img) {
@@ -7782,6 +7876,30 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) m[p2] = 1 - data[i + 3] / 255;
       cacheMask = m;
     }
+    function setSentImage(rgb, w, h) {
+      const n = w * h;
+      const data = new Uint8ClampedArray(n * 4);
+      const luma = new Float32Array(n);
+      for (let p2 = 0, i = 0, j = 0; p2 < n; p2++, i += 4, j += 3) {
+        data[i] = rgb[j];
+        data[i + 1] = rgb[j + 1];
+        data[i + 2] = rgb[j + 2];
+        data[i + 3] = 255;
+        luma[p2] = (rgb[j] * LUMA_R$1 + rgb[j + 1] * LUMA_G$1 + rgb[j + 2] * LUMA_B$1) / 255;
+      }
+      cacheRgb = data;
+      cacheLuma = luma;
+      cacheMask = null;
+      cacheW = w;
+      cacheH = h;
+      lastSrc = "__sent__";
+      lastMaskSrc = null;
+      hintText.value = "Live preview";
+      const wantAspect = `${w} / ${h}`;
+      if (wantAspect !== canvasAspect.value) canvasAspect.value = wantAspect;
+      lastSig = "__force__";
+      redraw();
+    }
     function syncCanvasSize() {
       const c = canvas.value;
       if (!c) return false;
@@ -7789,7 +7907,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       if (rect.width < 1 || rect.height < 1) return false;
       logicalW = rect.width;
       logicalH = rect.height;
-      const s = Math.max(dpr, MIN_RENDER_SCALE$1);
+      const s = Math.max(dpr, MIN_RENDER_SCALE$2);
       const newW = Math.round(rect.width * s), newH = Math.round(rect.height * s);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -7856,7 +7974,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         decodeSource(img);
         lastSrc = src;
         srcChanged = true;
-      } else if (!img && lastSrc !== null) {
+      } else if (!img && lastSrc !== null && lastSrc !== "__sent__") {
         cacheRgb = null;
         cacheLuma = null;
         cacheMask = null;
@@ -7873,7 +7991,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
         lastMaskSrc = null;
       }
       hintText.value = cacheRgb ? cacheMask ? "Live preview · masked" : "Live preview" : "Connect an image";
-      const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
+      const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT$1;
       if (wantAspect !== canvasAspect.value) {
         canvasAspect.value = wantAspect;
         return;
@@ -7898,33 +8016,33 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       syncCanvasSize();
     });
     onBeforeUnmount(cleanup);
-    __expose({ refreshExternal, forceResize, cleanup });
+    __expose({ refreshExternal, forceResize, cleanup, setSentImage });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("div", _hoisted_1$1, [
+      return openBlock(), createElementBlock("div", _hoisted_1$2, [
         createBaseVNode("canvas", {
           ref_key: "canvas",
           ref: canvas,
           class: "nkd-canvas",
           style: normalizeStyle({ aspectRatio: canvasAspect.value })
         }, null, 4),
-        createBaseVNode("div", _hoisted_2$1, [
-          createBaseVNode("div", _hoisted_3$1, [
-            createBaseVNode("span", _hoisted_4$1, toDisplayString(hintText.value), 1)
+        createBaseVNode("div", _hoisted_2$2, [
+          createBaseVNode("div", _hoisted_3$2, [
+            createBaseVNode("span", _hoisted_4$2, toDisplayString(hintText.value), 1)
           ])
         ])
       ]);
     };
   }
 });
-const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-eb6979dd"]]);
-const _hoisted_1 = { class: "nkd-root" };
-const _hoisted_2 = { class: "nkd-bar" };
-const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4 = { class: "nkd-hint" };
+const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-aa41997d"]]);
+const _hoisted_1$1 = { class: "nkd-root" };
+const _hoisted_2$1 = { class: "nkd-bar" };
+const _hoisted_3$1 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4$1 = { class: "nkd-hint" };
 const PREVIEW_MAX = 256;
-const MIN_RENDER_SCALE = 2;
+const MIN_RENDER_SCALE$1 = 2;
 const LOOP_RADIUS = 1.5;
-const _sfc_main = /* @__PURE__ */ defineComponent({
+const _sfc_main$1 = /* @__PURE__ */ defineComponent({
   __name: "NoisePreviewWidget",
   props: {
     getParams: { type: Function }
@@ -7995,7 +8113,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       if (rect.width < 1 || rect.height < 1) return false;
       logicalW = rect.width;
       logicalH = rect.height;
-      const s = Math.max(dpr, MIN_RENDER_SCALE);
+      const s = Math.max(dpr, MIN_RENDER_SCALE$1);
       const nw = Math.round(rect.width * s), nh = Math.round(rect.height * s);
       if (c.width !== nw || c.height !== nh) {
         c.width = nw;
@@ -8074,23 +8192,416 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     onBeforeUnmount(cleanup);
     __expose({ refreshExternal, forceResize, cleanup });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("div", _hoisted_1, [
+      return openBlock(), createElementBlock("div", _hoisted_1$1, [
         createBaseVNode("canvas", {
           ref_key: "canvas",
           ref: canvas,
           class: "nkd-canvas",
           style: normalizeStyle({ aspectRatio: aspect.value })
         }, null, 4),
-        createBaseVNode("div", _hoisted_2, [
-          createBaseVNode("div", _hoisted_3, [
-            createBaseVNode("span", _hoisted_4, toDisplayString(hint.value), 1)
+        createBaseVNode("div", _hoisted_2$1, [
+          createBaseVNode("div", _hoisted_3$1, [
+            createBaseVNode("span", _hoisted_4$1, toDisplayString(hint.value), 1)
           ])
         ])
       ]);
     };
   }
 });
-const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-773b27a5"]]);
+const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-773b27a5"]]);
+const EPS = 1e-6;
+const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
+function srgbToLinear(v) {
+  return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+}
+function linearToSrgb(v) {
+  if (v <= 0) return 0;
+  return v <= 31308e-7 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
+}
+function boxMean(src, w, h, r) {
+  if (r < 1) return src;
+  const k = 2 * r + 1;
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) {
+    const row = y * w;
+    let acc = 0;
+    for (let i = -r; i <= r; i++) acc += src[row + Math.min(w - 1, Math.max(0, i))];
+    for (let x = 0; x < w; x++) {
+      tmp[row + x] = acc / k;
+      const add = row + Math.min(w - 1, x + r + 1);
+      const sub = row + Math.min(w - 1, Math.max(0, x - r));
+      acc += src[add] - src[sub];
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let i = -r; i <= r; i++) acc += tmp[Math.min(h - 1, Math.max(0, i)) * w + x];
+    for (let y = 0; y < h; y++) {
+      out[y * w + x] = acc / k;
+      const add = Math.min(h - 1, y + r + 1) * w + x;
+      const sub = Math.min(h - 1, Math.max(0, y - r)) * w + x;
+      acc += tmp[add] - tmp[sub];
+    }
+  }
+  return out;
+}
+function gaussian(src, w, h, r) {
+  if (r < 1) return src;
+  const sigma = Math.max(r / 2, 0.5);
+  const k = 2 * r + 1;
+  const ker = new Float32Array(k);
+  let sum = 0;
+  for (let i = 0; i < k; i++) {
+    const t = i - r;
+    ker[i] = Math.exp(-(t * t) / (2 * sigma * sigma));
+    sum += ker[i];
+  }
+  for (let i = 0; i < k; i++) ker[i] /= sum;
+  const tmp = new Float32Array(w * h);
+  const out = new Float32Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let i = -r; i <= r; i++) acc += ker[i + r] * src[y * w + Math.min(w - 1, Math.max(0, x + i))];
+    tmp[y * w + x] = acc;
+  }
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let acc = 0;
+    for (let i = -r; i <= r; i++) acc += ker[i + r] * tmp[Math.min(h - 1, Math.max(0, y + i)) * w + x];
+    out[y * w + x] = acc;
+  }
+  return out;
+}
+function guided(src, guide, w, h, r, eps) {
+  const n = w * h;
+  const meanG = boxMean(guide, w, h, r);
+  const meanX = boxMean(src, w, h, r);
+  const gg = new Float32Array(n), gx = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    gg[i] = guide[i] * guide[i];
+    gx[i] = guide[i] * src[i];
+  }
+  const corrGG = boxMean(gg, w, h, r);
+  const corrGX = boxMean(gx, w, h, r);
+  const a = new Float32Array(n), b = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const varG = corrGG[i] - meanG[i] * meanG[i];
+    const covGX = corrGX[i] - meanG[i] * meanX[i];
+    a[i] = covGX / (varG + eps);
+    b[i] = meanX[i] - a[i] * meanG[i];
+  }
+  const ma = boxMean(a, w, h, r), mb = boxMean(b, w, h, r);
+  const out = new Float32Array(n);
+  for (let i = 0; i < n; i++) out[i] = ma[i] * guide[i] + mb[i];
+  return out;
+}
+function rollingGuidance(src, w, h, r, eps) {
+  let g = gaussian(src, w, h, r);
+  for (let it = 0; it < 4; it++) g = guided(src, g, w, h, r, eps);
+  return g;
+}
+function median(src, w, h, r) {
+  if (r < 1) return src;
+  r = Math.min(r, 5);
+  const k = 2 * r + 1, area = k * k, mid = area >> 1;
+  const out = new Float32Array(w * h);
+  const win = new Float32Array(area);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    let m = 0;
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {
+      const yy = Math.min(h - 1, Math.max(0, y + dy));
+      const xx = Math.min(w - 1, Math.max(0, x + dx));
+      win[m++] = src[yy * w + xx];
+    }
+    out[y * w + x] = win.slice().sort()[mid];
+  }
+  return out;
+}
+function lowFreq(plane, w, h, method, r, edge) {
+  const eps = Math.pow(Math.max(edge, 1e-3), 2);
+  if (method === "Guided") return guided(plane, plane, w, h, r, eps);
+  if (method === "Rolling Guidance") return rollingGuidance(plane, w, h, r, eps);
+  if (method === "Median") return median(plane, w, h, r);
+  return gaussian(plane, w, h, r);
+}
+function computeSeparation(rgba, w, h, opts) {
+  const n = w * h;
+  const r = Math.max(1, Math.round(opts.radius));
+  const hf = new Uint8ClampedArray(n * 4);
+  const lf = new Uint8ClampedArray(n * 4);
+  const toWork = (v) => opts.linear ? srgbToLinear(v) : v;
+  const toDisp = (v) => opts.linear ? linearToSrgb(v) : v;
+  const planes = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
+  for (let p2 = 0, i = 0; p2 < n; p2++, i += 4) {
+    planes[0][p2] = toWork(rgba[i] / 255);
+    planes[1][p2] = toWork(rgba[i + 1] / 255);
+    planes[2][p2] = toWork(rgba[i + 2] / 255);
+  }
+  const lfs = planes.map((pl) => lowFreq(pl, w, h, opts.method, r, opts.edge));
+  for (let p2 = 0, i = 0; p2 < n; p2++, i += 4) {
+    lf[i] = Math.round(toDisp(lfs[0][p2]) * 255);
+    lf[i + 1] = Math.round(toDisp(lfs[1][p2]) * 255);
+    lf[i + 2] = Math.round(toDisp(lfs[2][p2]) * 255);
+    lf[i + 3] = 255;
+  }
+  if (opts.detail === "Luminance") {
+    const luma = new Float32Array(n);
+    for (let p2 = 0; p2 < n; p2++) luma[p2] = LUMA_R * planes[0][p2] + LUMA_G * planes[1][p2] + LUMA_B * planes[2][p2];
+    const lfl = lowFreq(luma, w, h, opts.method, r, opts.edge);
+    for (let p2 = 0, i = 0; p2 < n; p2++, i += 4) {
+      const v = opts.mode === "Divide" ? luma[p2] / (lfl[p2] + EPS) : luma[p2] - lfl[p2];
+      const g = v * 255;
+      hf[i] = hf[i + 1] = hf[i + 2] = g;
+      hf[i + 3] = 255;
+    }
+  } else {
+    for (let p2 = 0, i = 0; p2 < n; p2++, i += 4) {
+      for (let c = 0; c < 3; c++) {
+        const v = opts.mode === "Divide" ? planes[c][p2] / (lfs[c][p2] + EPS) : planes[c][p2] - lfs[c][p2];
+        hf[i + c] = v * 255;
+      }
+      hf[i + 3] = 255;
+    }
+  }
+  return { hf, lf };
+}
+const _hoisted_1 = { class: "nkd-root" };
+const _hoisted_2 = { class: "nkd-bar" };
+const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_5 = { class: "nkd-hint" };
+const MIN_RENDER_SCALE = 2;
+const CACHE_RES = 512;
+const DEFAULT_ASPECT = "16 / 10";
+const _sfc_main = /* @__PURE__ */ defineComponent({
+  __name: "FrequencyPreviewWidget",
+  props: {
+    getSourceImg: { type: Function },
+    getMethod: { type: Function },
+    getRadius: { type: Function },
+    getEdge: { type: Function },
+    getMode: { type: Function },
+    getDetail: { type: Function },
+    getLinear: { type: Function }
+  },
+  setup(__props, { expose: __expose }) {
+    const props = __props;
+    const canvas = /* @__PURE__ */ ref(null);
+    let ctx = null;
+    let ro = null;
+    let dpr = window.devicePixelRatio || 1;
+    let logicalW = 0, logicalH = 0;
+    const hintText = /* @__PURE__ */ ref("Connect an image");
+    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT);
+    const blend = /* @__PURE__ */ ref(1);
+    let cacheW = 0, cacheH = 0;
+    let cacheRgba = null;
+    let lastSrc = null;
+    let offscreen = null;
+    let sentRgba = null;
+    let sentW = 0, sentH = 0;
+    let sep = null;
+    let outCanvas = null;
+    let outCtx = null;
+    let outImg = null;
+    let lastSig = "";
+    function decodeSource(img) {
+      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+      if (!iw || !ih) return;
+      const scale = CACHE_RES / Math.max(iw, ih);
+      cacheW = Math.max(1, Math.round(iw * scale));
+      cacheH = Math.max(1, Math.round(ih * scale));
+      if (!offscreen) offscreen = document.createElement("canvas");
+      offscreen.width = cacheW;
+      offscreen.height = cacheH;
+      const octx = offscreen.getContext("2d");
+      octx.drawImage(img, 0, 0, cacheW, cacheH);
+      cacheRgba = octx.getImageData(0, 0, cacheW, cacheH).data;
+    }
+    function opts() {
+      return {
+        method: props.getMethod() || "Guided",
+        radius: Number(props.getRadius()) || 8,
+        edge: Number(props.getEdge()) || 0.1,
+        mode: props.getMode() || "Divide",
+        detail: props.getDetail() || "Luminance",
+        linear: !!props.getLinear()
+      };
+    }
+    function syncCanvasSize() {
+      const c = canvas.value;
+      if (!c) return false;
+      const rect = c.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return false;
+      logicalW = rect.width;
+      logicalH = rect.height;
+      const s = Math.max(dpr, MIN_RENDER_SCALE);
+      const newW = Math.round(rect.width * s), newH = Math.round(rect.height * s);
+      if (c.width !== newW || c.height !== newH) {
+        c.width = newW;
+        c.height = newH;
+        ctx = c.getContext("2d");
+      }
+      ctx == null ? void 0 : ctx.setTransform(newW / rect.width, 0, 0, newH / rect.height, 0, 0);
+      drawWipe();
+      return true;
+    }
+    function recompute() {
+      sep = cacheRgba ? computeSeparation(cacheRgba, cacheW, cacheH, opts()) : null;
+      drawWipe();
+    }
+    function drawWipe() {
+      if (!ctx || logicalW < 1) return;
+      ctx.clearRect(0, 0, logicalW, logicalH);
+      ctx.fillStyle = "#111318";
+      ctx.fillRect(0, 0, logicalW, logicalH);
+      if (!sep) {
+        ctx.font = "11px Inter, sans-serif";
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("Connect an image", logicalW / 2, logicalH / 2);
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        return;
+      }
+      if (!outCanvas || outCanvas.width !== cacheW || outCanvas.height !== cacheH) {
+        outCanvas = document.createElement("canvas");
+        outCanvas.width = cacheW;
+        outCanvas.height = cacheH;
+        outCtx = outCanvas.getContext("2d");
+        outImg = outCtx.createImageData(cacheW, cacheH);
+      }
+      const t = Math.max(0, Math.min(1, blend.value));
+      const split = Math.round(t * cacheW);
+      const d = outImg.data, hf = sep.hf, lf = sep.lf;
+      for (let y = 0; y < cacheH; y++) {
+        const row = y * cacheW;
+        for (let x = 0; x < cacheW; x++) {
+          const i = (row + x) * 4;
+          const s = x < split ? hf : lf;
+          d[i] = s[i];
+          d[i + 1] = s[i + 1];
+          d[i + 2] = s[i + 2];
+          d[i + 3] = 255;
+        }
+      }
+      outCtx.putImageData(outImg, 0, 0);
+      ctx.imageSmoothingEnabled = true;
+      ctx.drawImage(outCanvas, 0, 0, logicalW, logicalH);
+      if (split > 0 && split < cacheW) {
+        const dx = split / cacheW * logicalW;
+        ctx.strokeStyle = "rgba(255,255,255,0.7)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(dx, 0);
+        ctx.lineTo(dx, logicalH);
+        ctx.stroke();
+      }
+    }
+    function setSentImage(rgb, w, h) {
+      const n = w * h;
+      const rgba = new Uint8ClampedArray(n * 4);
+      for (let p2 = 0, i = 0, j = 0; p2 < n; p2++, i += 4, j += 3) {
+        rgba[i] = rgb[j];
+        rgba[i + 1] = rgb[j + 1];
+        rgba[i + 2] = rgb[j + 2];
+        rgba[i + 3] = 255;
+      }
+      sentRgba = rgba;
+      sentW = w;
+      sentH = h;
+      cacheRgba = rgba;
+      cacheW = w;
+      cacheH = h;
+      lastSrc = "__sent__";
+      const wantAspect = `${w} / ${h}`;
+      if (wantAspect !== canvasAspect.value) canvasAspect.value = wantAspect;
+      lastSig = "__force__";
+      recompute();
+    }
+    function refreshExternal() {
+      const img = props.getSourceImg();
+      const src = (img == null ? void 0 : img.currentSrc) || (img == null ? void 0 : img.src) || null;
+      if (img && img.complete && src && src !== lastSrc) {
+        decodeSource(img);
+        lastSrc = src;
+      } else if (!img && sentRgba && lastSrc !== "__sent__") {
+        cacheRgba = sentRgba;
+        cacheW = sentW;
+        cacheH = sentH;
+        lastSrc = "__sent__";
+      } else if (!img && !sentRgba && lastSrc !== null) {
+        cacheRgba = null;
+        lastSrc = null;
+      }
+      const o = opts();
+      const layer = blend.value >= 0.99 ? "all HF" : blend.value <= 0.01 ? "all LF" : "HF ◄ wipe ► LF";
+      hintText.value = cacheRgba ? `${layer} · ${o.method} · r${o.radius}` : "Connect an image";
+      const wantAspect = cacheRgba ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
+      if (wantAspect !== canvasAspect.value) {
+        canvasAspect.value = wantAspect;
+        return;
+      }
+      const sig = `${lastSrc}|${cacheW}x${cacheH}|${o.method}|${o.radius}|${o.edge}|${o.mode}|${o.detail}|${o.linear}`;
+      if (sig !== lastSig) {
+        lastSig = sig;
+        recompute();
+      }
+    }
+    function forceResize() {
+      return syncCanvasSize();
+    }
+    function cleanup() {
+      ro == null ? void 0 : ro.disconnect();
+    }
+    onMounted(() => {
+      var _a;
+      ctx = ((_a = canvas.value) == null ? void 0 : _a.getContext("2d")) ?? null;
+      ro = new ResizeObserver(() => syncCanvasSize());
+      if (canvas.value) ro.observe(canvas.value);
+      syncCanvasSize();
+    });
+    onBeforeUnmount(cleanup);
+    __expose({ refreshExternal, forceResize, cleanup, setSentImage });
+    return (_ctx, _cache) => {
+      return openBlock(), createElementBlock("div", _hoisted_1, [
+        createBaseVNode("canvas", {
+          ref_key: "canvas",
+          ref: canvas,
+          class: "nkd-canvas",
+          style: normalizeStyle({ aspectRatio: canvasAspect.value })
+        }, null, 4),
+        createBaseVNode("div", _hoisted_2, [
+          createBaseVNode("div", _hoisted_3, [
+            _cache[1] || (_cache[1] = createBaseVNode("span", { class: "nkd-label" }, "Low", -1)),
+            withDirectives(createBaseVNode("input", {
+              class: "nkd-slider",
+              type: "range",
+              min: "0",
+              max: "1",
+              step: "0.01",
+              "onUpdate:modelValue": _cache[0] || (_cache[0] = ($event) => blend.value = $event),
+              onInput: drawWipe
+            }, null, 544), [
+              [
+                vModelText,
+                blend.value,
+                void 0,
+                { number: true }
+              ]
+            ]),
+            _cache[2] || (_cache[2] = createBaseVNode("span", { class: "nkd-label" }, "High", -1))
+          ]),
+          createBaseVNode("div", _hoisted_4, [
+            createBaseVNode("span", _hoisted_5, toDisplayString(hintText.value), 1)
+          ])
+        ])
+      ]);
+    };
+  }
+});
+const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-602e4de7"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -8101,6 +8612,48 @@ function sizeDomWidgetToContent(node, domWidget, container, minW, estimate) {
   let raf = 0;
   let settling = false;
   const inner = container.firstElementChild ?? container;
+  const MAX_MARGIN = 40;
+  const vueMode = () => {
+    var _a;
+    return !!((_a = window.LiteGraph) == null ? void 0 : _a.vueNodesMode);
+  };
+  let enforcingW = false;
+  let goodMargin = 15;
+  const clampWidth = () => {
+    var _a;
+    if (enforcingW) return;
+    if (vueMode()) {
+      if (container.style.width) container.style.width = "";
+      return;
+    }
+    const nodeW = (_a = node.size) == null ? void 0 : _a[0];
+    if (!nodeW) return;
+    const host = container.parentElement;
+    const hostW = host ? host.clientWidth : 0;
+    const broken = hostW > 0 && (hostW > nodeW * 1.2 || hostW < nodeW * 0.7);
+    if (!broken) {
+      if (container.style.width) {
+        enforcingW = true;
+        container.style.width = "";
+        requestAnimationFrame(() => {
+          enforcingW = false;
+        });
+      }
+      const cw = container.clientWidth;
+      if (cw > 0 && cw <= nodeW && cw >= nodeW - MAX_MARGIN) goodMargin = nodeW - cw;
+      return;
+    }
+    const ref2 = Math.round(nodeW - goodMargin);
+    if (ref2 > 0 && Math.abs(container.clientWidth - ref2) > 2) {
+      enforcingW = true;
+      container.style.boxSizing = "border-box";
+      container.style.width = ref2 + "px";
+      requestAnimationFrame(() => {
+        enforcingW = false;
+      });
+    }
+  };
+  clampWidth();
   domWidget.computeSize = (width) => {
     const w = Math.max(width ?? minW, minW);
     const h = (measuredH > 0 ? measuredH : estimate(w)) + ROW_SAFETY;
@@ -8109,6 +8662,7 @@ function sizeDomWidgetToContent(node, domWidget, container, minW, estimate) {
   const apply2 = () => {
     raf = 0;
     if (!node.size) return;
+    clampWidth();
     const needed = node.computeSize();
     if (Math.abs(needed[1] - node.size[1]) > 1) {
       settling = true;
@@ -8120,6 +8674,7 @@ function sizeDomWidgetToContent(node, domWidget, container, minW, estimate) {
     }
   };
   const ro = new ResizeObserver(() => {
+    clampWidth();
     if (settling) return;
     const h = inner.offsetHeight;
     if (h < 1) return;
@@ -8128,6 +8683,18 @@ function sizeDomWidgetToContent(node, domWidget, container, minW, estimate) {
     if (!raf) raf = requestAnimationFrame(apply2);
   });
   ro.observe(inner);
+  if (container !== inner) ro.observe(container);
+  const origOnResize = node.onResize;
+  node.onResize = function() {
+    origOnResize == null ? void 0 : origOnResize.apply(this, arguments);
+    clampWidth();
+  };
+  const iv = window.setInterval(clampWidth, 250);
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function() {
+    clearInterval(iv);
+    origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+  };
   return ro;
 }
 function resolveDim(node, name, fallback) {
@@ -8322,6 +8889,20 @@ app.registerExtension({
         var _a;
         (_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance);
       });
+      const node = this;
+      const onSource = (e) => {
+        var _a;
+        const d = e == null ? void 0 : e.detail;
+        if (!d || String(d.node_id) !== String(node.id)) return;
+        try {
+          const bin = atob(d.img);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          (_a = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a.call(instance, bytes, d.width, d.height);
+        } catch {
+        }
+      };
+      api.addEventListener("nkd-gradmap-source", onSource);
       const origConfigure = this.onConfigure;
       this.onConfigure = function() {
         const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
@@ -8335,6 +8916,94 @@ app.registerExtension({
       this.onRemoved = function() {
         var _a;
         window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-gradmap-source", onSource);
+        ro.disconnect();
+        (_a = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a.call(instance);
+        vueApp.unmount();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
+app.registerExtension({
+  name: "NKD.BasicTools.FrequencyPreview.Vue",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDFrequencySeparate") return;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const container = document.createElement("div");
+      const wv = (n) => {
+        var _a, _b;
+        return (_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === n)) == null ? void 0 : _b.value;
+      };
+      let instance = null;
+      const vueApp = createApp(FrequencyPreviewWidget, {
+        getSourceImg: () => findSourceImg(this, "image"),
+        getMethod: () => wv("method") ?? "Guided",
+        getRadius: () => Number(wv("radius")) || 8,
+        getEdge: () => Number(wv("edge_threshold")) || 0.1,
+        getMode: () => wv("mode") ?? "Divide",
+        getDetail: () => wv("detail") ?? "Luminance",
+        getLinear: () => !!wv("linear")
+      });
+      instance = vueApp.mount(container);
+      const domWidget = this.addDOMWidget("freq_preview", "NKD_FREQUENCY_PREVIEW", container, {
+        getValue: () => "",
+        setValue: () => {
+        },
+        serialize: false,
+        hideOnZoom: false
+      });
+      const ro = sizeDomWidgetToContent(
+        this,
+        domWidget,
+        container,
+        320,
+        (w) => Math.round(w * (200 / 320)) + 52
+      );
+      const origResize = this.onResize;
+      this.onResize = function(size) {
+        origResize == null ? void 0 : origResize.apply(this, arguments);
+        if (size[0] < 320) size[0] = 320;
+      };
+      const refreshTimer = window.setInterval(() => {
+        var _a;
+        return (_a = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a.call(instance);
+      }, 300);
+      requestAnimationFrame(() => {
+        var _a;
+        (_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance);
+      });
+      const node = this;
+      const onSource = (e) => {
+        var _a;
+        const d = e == null ? void 0 : e.detail;
+        if (!d || String(d.node_id) !== String(node.id)) return;
+        try {
+          const bin = atob(d.img);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          (_a = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a.call(instance, bytes, d.width, d.height);
+        } catch {
+        }
+      };
+      api.addEventListener("nkd-freq-source", onSource);
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        requestAnimationFrame(() => {
+          var _a;
+          (_a = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a.call(instance);
+        });
+        return r;
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        var _a;
+        window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-freq-source", onSource);
         ro.disconnect();
         (_a = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a.call(instance);
         vueApp.unmount();
@@ -8368,10 +9037,8 @@ app.registerExtension({
         var _a2, _b;
         return ((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "shape")) == null ? void 0 : _b.value) ?? "Linear";
       };
-      const getSize = () => [
-        resolveDim(this, "width", 1024),
-        resolveDim(this, "height", 1024)
-      ];
+      let knownSize = null;
+      const getSize = () => knownSize ?? [resolveDim(this, "width", 1024), resolveDim(this, "height", 1024)];
       let instance = null;
       const vueApp = createApp(GradientPreviewWidget, {
         onChange: (json) => {
@@ -8407,6 +9074,17 @@ app.registerExtension({
         var _a2;
         return (_a2 = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a2.call(instance);
       }, 400);
+      const gnode = this;
+      const onSize = (e) => {
+        var _a2;
+        const d = e == null ? void 0 : e.detail;
+        if (!d || String(d.node_id) !== String(gnode.id)) return;
+        if (d.width > 0 && d.height > 0) {
+          knownSize = [d.width, d.height];
+          (_a2 = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a2.call(instance);
+        }
+      };
+      api.addEventListener("nkd-gradient-size", onSize);
       requestAnimationFrame(() => {
         var _a2;
         instance == null ? void 0 : instance.deserialise(handlesWidget.value ?? "");
@@ -8426,6 +9104,7 @@ app.registerExtension({
       this.onRemoved = function() {
         var _a2;
         window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-gradient-size", onSize);
         ro.disconnect();
         (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
         vueApp.unmount();
@@ -8600,7 +9279,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-45c56d8c] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-45c56d8c], .nkd-root[data-v-45c56d8c] *, .nkd-root[data-v-45c56d8c] *::before, .nkd-root[data-v-45c56d8c] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-45c56d8c] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-45c56d8c] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-45c56d8c] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-45c56d8c] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-45c56d8c] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-45c56d8c] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-45c56d8c] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-45c56d8c]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-eb6979dd] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-eb6979dd], .nkd-root[data-v-eb6979dd] *, .nkd-root[data-v-eb6979dd] *::before, .nkd-root[data-v-eb6979dd] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-eb6979dd] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-eb6979dd] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-eb6979dd] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-eb6979dd] { padding: 5px 8px;\n}\n.nkd-hint[data-v-eb6979dd] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-45c56d8c] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-45c56d8c], .nkd-root[data-v-45c56d8c] *, .nkd-root[data-v-45c56d8c] *::before, .nkd-root[data-v-45c56d8c] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-45c56d8c] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-45c56d8c] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-45c56d8c] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-45c56d8c] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-45c56d8c] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-45c56d8c] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-45c56d8c] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-45c56d8c]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-602e4de7] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-602e4de7], .nkd-root[data-v-602e4de7] *, .nkd-root[data-v-602e4de7] *::before, .nkd-root[data-v-602e4de7] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-602e4de7] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-602e4de7] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-602e4de7] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-602e4de7] { padding: 5px 8px;\n}\n.nkd-hint[data-v-602e4de7] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-602e4de7] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-602e4de7] {\n  flex: 1 1 auto;\n  min-width: 40px;\n  height: 3px;\n  accent-color: #4ab4ff;\n  cursor: ew-resize;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

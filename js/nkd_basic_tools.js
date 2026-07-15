@@ -69,6 +69,18 @@ const RULES = {
       refreshNode(node);
     },
   },
+  // edge_threshold only matters for the edge-preserving methods.
+  NKDFrequencySeparate: {
+    watch: ["method"],
+    apply(node) {
+      const method = node.widgets?.find((w) => w.name === "method")?.value;
+      const edge = node.widgets?.find((w) => w.name === "edge_threshold");
+      if (!edge) return;
+      if (method === "Guided" || method === "Rolling Guidance") showWidget(edge);
+      else hideWidget(edge);
+      refreshNode(node);
+    },
+  },
 };
 
 // widget.callback is the ONLY hook that fires in both renderers.

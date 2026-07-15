@@ -19,6 +19,21 @@ from .nkd_color_ramp import (
 from .helpers import _luminance
 
 
+def _send_size_to_widget(unique_id, width, height) -> None:
+    """Tell the preview widget the RESOLVED width/height so the gizmo can match
+    the output aspect — works even when the dims arrive computed (e.g. a
+    constrain-proportion node), which the frontend can't read before execution."""
+    if not unique_id:
+        return
+    try:
+        from server import PromptServer  # type: ignore
+    except Exception:
+        return
+    PromptServer.instance.send_sync(
+        "nkd-gradient-size",
+        {"node_id": unique_id, "width": int(width), "height": int(height)})
+
+
 class NKDGradientGenerate(io.ComfyNode):
     @classmethod
     def define_schema(cls) -> io.Schema:
@@ -43,6 +58,7 @@ class NKDGradientGenerate(io.ComfyNode):
                                 socketless=True,
                                 tooltip="The color ramp, edited above."),
             ],
+            hidden=[io.Hidden.unique_id],  # to tell the preview the resolved size
             outputs=[
                 io.Image.Output(display_name="image",
                                 tooltip="The generated gradient."),
@@ -59,6 +75,8 @@ class NKDGradientGenerate(io.ComfyNode):
         t = _position_field(shape, width, height, p0, p1, device)
         t = _warp_position(t, mid)
         out = _sample_ramp(stops, t, _parse_interp(ramp)).unsqueeze(0).cpu()
+        _send_size_to_widget(getattr(getattr(cls, "hidden", None), "unique_id", None),
+                             width, height)
         return io.NodeOutput(out, _luminance(out))
 
 

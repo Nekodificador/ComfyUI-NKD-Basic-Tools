@@ -96,6 +96,18 @@ def _luminance(image: torch.Tensor) -> torch.Tensor:
     return (rgb * w).sum(-1)
 
 
+# sRGB <-> linear light. Frequency separation (and any physically-correct
+# blend) must happen in linear: a per-pixel scalar multiply only preserves
+# chromaticity when the channels are linear. Reusable by future nodes.
+def _srgb_to_linear(x: torch.Tensor) -> torch.Tensor:
+    return torch.where(x <= 0.04045, x / 12.92, ((x + 0.055) / 1.055) ** 2.4)
+
+
+def _linear_to_srgb(x: torch.Tensor) -> torch.Tensor:
+    x = x.clamp(min=0.0)
+    return torch.where(x <= 0.0031308, x * 12.92, 1.055 * x ** (1.0 / 2.4) - 0.055)
+
+
 _HASH_M32 = 0xFFFFFFFF
 
 
