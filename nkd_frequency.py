@@ -6,7 +6,7 @@ with someone else's LF. The classic use is detail restoration after a relight:
 take the HF of the original (all the pores/texture) + the relit result as LF,
 recombine inside the subject mask -> relit image with the original micro-detail.
 
-Design notes (see the Micelio plan for the why):
+Design notes (the why):
   * The math runs in LINEAR light when `linear` is on. This matters for divide
     mode and for chroma-safe detail (a per-pixel scalar multiply only preserves
     hue/saturation when channels are linear).
