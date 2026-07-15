@@ -16,3 +16,4 @@ Repository = "https://github.com/Nekodificador/ComfyUI-NKD-Basic-Tools"
 [tool.comfy]
 PublisherId = "nekodificador"
 DisplayName = "NKD Basic Tools"
+Icon = ""
