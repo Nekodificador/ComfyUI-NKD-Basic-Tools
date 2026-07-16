@@ -131,10 +131,14 @@ def _warp_position(t: torch.Tensor, mid: float) -> torch.Tensor:
 def _position_field(shape: str, width: int, height: int, p0, p1, device) -> torch.Tensor:
     """Returns a [H, W] tensor in [0, 1] describing where each pixel falls
     along the gradient defined by handles p0->p1, per shape."""
+    # Work in aspect-corrected units (x scaled by w/h) so distances and angles
+    # are the same as on screen: a Radial stays a circle on a non-square canvas
+    # instead of an ellipse. Diamond is unaffected (the scale cancels in dx/ex).
+    aspect = width / height if height else 1.0
     ys = torch.linspace(0.0, 1.0, height, device=device).view(height, 1).expand(height, width)
-    xs = torch.linspace(0.0, 1.0, width, device=device).view(1, width).expand(height, width)
-    dx, dy = xs - p0[0], ys - p0[1]
-    ex, ey = p1[0] - p0[0], p1[1] - p0[1]
+    xs = torch.linspace(0.0, aspect, width, device=device).view(1, width).expand(height, width)
+    dx, dy = xs - p0[0] * aspect, ys - p0[1]
+    ex, ey = (p1[0] - p0[0]) * aspect, p1[1] - p0[1]
 
     if shape == "Radial":
         radius = max(math.hypot(ex, ey), 1e-4)

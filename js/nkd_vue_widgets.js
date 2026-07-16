@@ -6758,7 +6758,6 @@ function lerpHex(c1, c2, t) {
   return `#${hex(mix(r1, r2))}${hex(mix(g1, g2))}${hex(mix(b1, b2))}`;
 }
 function expandStops(stops, interp, remap = (p2) => p2) {
-  if (interp === "smooth") return stops.map((s) => ({ pos: remap(s.pos), color: s.color }));
   const out = [];
   if (interp === "steps") {
     for (let i = 0; i < stops.length; i++) {
@@ -6769,9 +6768,10 @@ function expandStops(stops, interp, remap = (p2) => p2) {
     return out;
   }
   const SUB = 12;
+  const warped = Math.abs(remap(0.25) - 0.25) > 1e-4;
   for (let i = 0; i < stops.length - 1; i++) {
     const a = stops[i], b = stops[i + 1];
-    const needsSub = interp === "bezier" || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
+    const needsSub = interp === "bezier" || warped || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
     const n = needsSub ? SUB : 1;
     for (let k = 0; k <= n; k++) {
       const u = k / n;
@@ -6786,7 +6786,7 @@ const _hoisted_1$4 = { class: "nkd-bar" };
 const _hoisted_2$4 = { class: "nkd-row nkd-row--controls" };
 const _hoisted_3$4 = ["value"];
 const _hoisted_4$3 = { class: "nkd-row nkd-row--presets" };
-const _hoisted_5$1 = ["value"];
+const _hoisted_5 = ["value"];
 const _hoisted_6 = ["value"];
 const _hoisted_7 = ["disabled"];
 const CW = 380, CH = 64;
@@ -7300,7 +7300,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
                   value: p2.name
                 }, toDisplayString(p2.name), 9, _hoisted_6);
               }), 128))
-            ], 40, _hoisted_5$1),
+            ], 40, _hoisted_5),
             createBaseVNode("button", {
               class: "nkd-btn nkd-btn--preset",
               onClick: withModifiers(saveCurrentAsPreset, ["stop"])
@@ -7339,10 +7339,26 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     onChange: { type: Function },
     getRamp: { type: Function },
     getShape: { type: Function },
-    getSize: { type: Function }
+    getSize: { type: Function },
+    getSourceImg: { type: Function },
+    getBlendMode: { type: Function },
+    getOpacity: { type: Function }
   },
   setup(__props, { expose: __expose }) {
     const props = __props;
+    const BLEND_OPS = {
+      "none": "source-over",
+      "normal": "source-over",
+      "multiply": "multiply",
+      "screen": "screen",
+      "overlay": "overlay",
+      "soft light": "soft-light",
+      "hard light": "hard-light",
+      "add": "lighter",
+      "difference": "difference",
+      "darken": "darken",
+      "lighten": "lighten"
+    };
     const SHAPE_DEFAULTS = {
       Linear: { p0: [0, 0.5], p1: [1, 0.5] },
       Radial: { p0: [0.5, 0.5], p1: [1, 0.5] },
@@ -7451,6 +7467,29 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       }
       return add(ctx.createLinearGradient(a[0], a[1], b[0], b[1]));
     }
+    let sentCanvas = null;
+    function setSentImage(rgb, w, h) {
+      const c = sentCanvas ?? document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const cx = c.getContext("2d");
+      const img = cx.createImageData(w, h);
+      for (let p2 = 0, i = 0, j = 0; p2 < w * h; p2++, i += 4, j += 3) {
+        img.data[i] = rgb[j];
+        img.data[i + 1] = rgb[j + 1];
+        img.data[i + 2] = rgb[j + 2];
+        img.data[i + 3] = 255;
+      }
+      cx.putImageData(img, 0, 0);
+      sentCanvas = c;
+      redraw();
+    }
+    function sourceCanvas() {
+      var _a;
+      const img = (_a = props.getSourceImg) == null ? void 0 : _a.call(props);
+      if (img && img.complete && img.naturalWidth > 0) return img;
+      return sentCanvas;
+    }
     let rampLut = null;
     let lutKey = "";
     function rampLutFor(stops) {
@@ -7503,6 +7542,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       ctx.drawImage(diamondCanvas, fitX, fitY, fitW, fitH);
     }
     function redraw() {
+      var _a, _b;
       if (!ctx) return;
       computeFitRect();
       ctx.clearRect(0, 0, BOX_W, BOX_H);
@@ -7511,12 +7551,24 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       const shape = props.getShape() || "Linear";
       const stops = parseRamp();
       const a = toPx(p0.value), b = toPx(p1.value);
+      const base = sourceCanvas();
+      if (base) ctx.drawImage(base, fitX, fitY, fitW, fitH);
+      const mode = ((_a = props.getBlendMode) == null ? void 0 : _a.call(props)) ?? "none";
+      const composite = !!base && mode !== "none";
+      if (composite) {
+        ctx.globalCompositeOperation = BLEND_OPS[mode] ?? "source-over";
+        ctx.globalAlpha = Math.min(1, Math.max(0, ((_b = props.getOpacity) == null ? void 0 : _b.call(props)) ?? 1));
+      }
       const fill = buildFill(shape, stops, a, b);
       if (fill) {
         ctx.fillStyle = fill;
         ctx.fillRect(fitX, fitY, fitW, fitH);
       } else {
         drawDiamond(stops, a, b);
+      }
+      if (composite) {
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
       }
       ctx.strokeStyle = "rgba(255,255,255,0.16)";
       ctx.lineWidth = 0.75;
@@ -7715,6 +7767,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       lastShape = props.getShape();
     }
     function refreshExternal() {
+      var _a, _b, _c;
       const shape = props.getShape();
       if (lastShape !== null && shape !== lastShape) {
         const def2 = SHAPE_DEFAULTS[shape] ?? SHAPE_DEFAULTS.Linear;
@@ -7726,7 +7779,8 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       lastShape = shape;
       hintText.value = `Drag ${(HANDLE_LABELS[shape] ?? HANDLE_LABELS.Linear).join(" / ")}`;
       const sz = props.getSize();
-      const sig = `${shape}|${props.getRamp()}|${sz[0]}x${sz[1]}`;
+      const src = (_a = props.getSourceImg) == null ? void 0 : _a.call(props);
+      const sig = `${shape}|${props.getRamp()}|${sz[0]}x${sz[1]}|${(_b = props.getBlendMode) == null ? void 0 : _b.call(props)}|${(_c = props.getOpacity) == null ? void 0 : _c.call(props)}|${(src == null ? void 0 : src.currentSrc) ?? (src == null ? void 0 : src.src) ?? ""}`;
       if (sig !== lastExtSig) {
         lastExtSig = sig;
         redraw();
@@ -7748,7 +7802,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       syncCanvasSize();
     });
     onBeforeUnmount(cleanup);
-    __expose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
+    __expose({ serialise, deserialise, refreshExternal, forceResize, cleanup, setSentImage });
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
         class: "nkd-root",
@@ -7785,7 +7839,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-45c56d8c"]]);
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-8ab4835f"]]);
 const _hoisted_1$2 = { class: "nkd-root" };
 const _hoisted_2$2 = { class: "nkd-bar" };
 const _hoisted_3$2 = { class: "nkd-row nkd-row--controls" };
@@ -8365,11 +8419,10 @@ function computeSeparation(rgba, w, h, opts) {
   }
   return { hf, lf };
 }
-const _hoisted_1 = { class: "nkd-root" };
-const _hoisted_2 = { class: "nkd-bar" };
+const _hoisted_1 = { class: "nkd-bar" };
+const _hoisted_2 = { class: "nkd-row nkd-row--controls" };
 const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_5 = { class: "nkd-hint" };
+const _hoisted_4 = { class: "nkd-hint" };
 const MIN_RENDER_SCALE = 2;
 const CACHE_RES = 512;
 const DEFAULT_ASPECT = "16 / 10";
@@ -8394,34 +8447,71 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     const hintText = /* @__PURE__ */ ref("Connect an image");
     const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT);
     const blend = /* @__PURE__ */ ref(1);
+    const zoom = /* @__PURE__ */ ref(false);
+    const pan = /* @__PURE__ */ ref([0.5, 0.5]);
+    const zoomLabel = /* @__PURE__ */ ref("1:1");
     let cacheW = 0, cacheH = 0;
     let cacheRgba = null;
     let lastSrc = null;
     let offscreen = null;
-    let sentRgba = null;
-    let sentW = 0, sentH = 0;
+    let cacheScale = 1;
+    let sentCanvas = null;
+    let sentW = 0, sentH = 0, sentSrcW = 0, sentSrcH = 0;
     let sep = null;
     let outCanvas = null;
     let outCtx = null;
     let outImg = null;
     let lastSig = "";
-    function decodeSource(img) {
-      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
-      if (!iw || !ih) return;
-      const scale = CACHE_RES / Math.max(iw, ih);
-      cacheW = Math.max(1, Math.round(iw * scale));
-      cacheH = Math.max(1, Math.round(ih * scale));
+    function source() {
+      const img = props.getSourceImg();
+      if ((img == null ? void 0 : img.complete) && img.naturalWidth > 0) {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        return { drawable: img, natW: w, natH: h, srcW: w, srcH: h };
+      }
+      if (sentCanvas) {
+        return {
+          drawable: sentCanvas,
+          natW: sentW,
+          natH: sentH,
+          srcW: sentSrcW || sentW,
+          srcH: sentSrcH || sentH
+        };
+      }
+      return null;
+    }
+    function buildCache() {
+      const s = source();
+      if (!s) {
+        cacheRgba = null;
+        return false;
+      }
       if (!offscreen) offscreen = document.createElement("canvas");
-      offscreen.width = cacheW;
-      offscreen.height = cacheH;
-      const octx = offscreen.getContext("2d");
-      octx.drawImage(img, 0, 0, cacheW, cacheH);
+      const octx = offscreen.getContext("2d", { willReadFrequently: true });
+      if (zoom.value) {
+        const cw = Math.max(16, Math.min(s.natW, Math.round(logicalW || 320)));
+        const ch = Math.max(16, Math.min(s.natH, Math.round(logicalH || 210)));
+        const sx = Math.round((s.natW - cw) * Math.min(1, Math.max(0, pan.value[0])));
+        const sy = Math.round((s.natH - ch) * Math.min(1, Math.max(0, pan.value[1])));
+        offscreen.width = cacheW = cw;
+        offscreen.height = cacheH = ch;
+        octx.drawImage(s.drawable, sx, sy, cw, ch, 0, 0, cw, ch);
+        cacheScale = s.natW / s.srcW;
+      } else {
+        const fit = Math.min(CACHE_RES / Math.max(s.natW, s.natH), 1);
+        offscreen.width = cacheW = Math.max(1, Math.round(s.natW * fit));
+        offscreen.height = cacheH = Math.max(1, Math.round(s.natH * fit));
+        octx.drawImage(s.drawable, 0, 0, cacheW, cacheH);
+        cacheScale = cacheW / s.srcW;
+      }
       cacheRgba = octx.getImageData(0, 0, cacheW, cacheH).data;
+      return true;
     }
     function opts() {
       return {
         method: props.getMethod() || "Guided",
-        radius: Number(props.getRadius()) || 8,
+        // Scaled to the cache — see cacheScale. Never below 1: a sub-pixel radius
+        // would mean "no filter at all", which is a worse lie than rounding up.
+        radius: Math.max(1, Math.round((Number(props.getRadius()) || 8) * cacheScale)),
         edge: Number(props.getEdge()) || 0.1,
         mode: props.getMode() || "Divide",
         detail: props.getDetail() || "Luminance",
@@ -8447,8 +8537,42 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       return true;
     }
     function recompute() {
-      sep = cacheRgba ? computeSeparation(cacheRgba, cacheW, cacheH, opts()) : null;
+      sep = buildCache() ? computeSeparation(cacheRgba, cacheW, cacheH, opts()) : null;
       drawWipe();
+    }
+    function toggleZoom() {
+      zoom.value = !zoom.value;
+      lastSig = "__force__";
+      recompute();
+    }
+    let dragging = false;
+    let dragX = 0, dragY = 0;
+    let panTimer;
+    function onDown(e) {
+      if (!zoom.value) return;
+      dragging = true;
+      dragX = e.clientX;
+      dragY = e.clientY;
+    }
+    function onMove(e) {
+      if (!dragging) return;
+      const s = source();
+      if (!s) return;
+      const spanX = Math.max(1, s.natW - cacheW), spanY = Math.max(1, s.natH - cacheH);
+      pan.value = [
+        Math.min(1, Math.max(0, pan.value[0] - (e.clientX - dragX) / spanX)),
+        Math.min(1, Math.max(0, pan.value[1] - (e.clientY - dragY) / spanY))
+      ];
+      dragX = e.clientX;
+      dragY = e.clientY;
+      window.clearTimeout(panTimer);
+      panTimer = window.setTimeout(() => {
+        lastSig = "__force__";
+        recompute();
+      }, 80);
+    }
+    function onUp() {
+      dragging = false;
     }
     function drawWipe() {
       if (!ctx || logicalW < 1) return;
@@ -8499,7 +8623,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         ctx.stroke();
       }
     }
-    function setSentImage(rgb, w, h) {
+    function setSentImage(rgb, w, h, srcW = 0, srcH = 0) {
       const n = w * h;
       const rgba = new Uint8ClampedArray(n * 4);
       for (let p2 = 0, i = 0, j = 0; p2 < n; p2++, i += 4, j += 3) {
@@ -8508,42 +8632,54 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         rgba[i + 2] = rgb[j + 2];
         rgba[i + 3] = 255;
       }
-      sentRgba = rgba;
       sentW = w;
       sentH = h;
-      cacheRgba = rgba;
-      cacheW = w;
-      cacheH = h;
+      sentSrcW = srcW || w;
+      sentSrcH = srcH || h;
+      const c = sentCanvas ?? document.createElement("canvas");
+      c.width = w;
+      c.height = h;
+      const cx = c.getContext("2d");
+      const id = cx.createImageData(w, h);
+      id.data.set(rgba);
+      cx.putImageData(id, 0, 0);
+      sentCanvas = c;
       lastSrc = "__sent__";
-      const wantAspect = `${w} / ${h}`;
+      const wantAspect = `${sentSrcW} / ${sentSrcH}`;
       if (wantAspect !== canvasAspect.value) canvasAspect.value = wantAspect;
       lastSig = "__force__";
       recompute();
     }
     function refreshExternal() {
+      const s = source();
       const img = props.getSourceImg();
-      const src = (img == null ? void 0 : img.currentSrc) || (img == null ? void 0 : img.src) || null;
-      if (img && img.complete && src && src !== lastSrc) {
-        decodeSource(img);
-        lastSrc = src;
-      } else if (!img && sentRgba && lastSrc !== "__sent__") {
-        cacheRgba = sentRgba;
-        cacheW = sentW;
-        cacheH = sentH;
-        lastSrc = "__sent__";
-      } else if (!img && !sentRgba && lastSrc !== null) {
+      const src = (img == null ? void 0 : img.currentSrc) || (img == null ? void 0 : img.src) || (s ? "__sent__" : null);
+      if (!s && lastSrc !== null) {
         cacheRgba = null;
+        sep = null;
         lastSrc = null;
-      }
-      const o = opts();
+      } else if (s) lastSrc = src;
       const layer = blend.value >= 0.99 ? "all HF" : blend.value <= 0.01 ? "all LF" : "HF ◄ wipe ► LF";
-      hintText.value = cacheRgba ? `${layer} · ${o.method} · r${o.radius}` : "Connect an image";
-      const wantAspect = cacheRgba ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
+      const rawR = Number(props.getRadius()) || 8;
+      if (!s) {
+        hintText.value = "Connect an image";
+        zoomLabel.value = "1:1";
+      } else if (zoom.value) {
+        const pct = Math.round(cacheScale * 100);
+        zoomLabel.value = "Fit";
+        hintText.value = cacheScale >= 0.999 ? `${layer} · ${props.getMethod()} · r${rawR} · 1:1 · drag to pan` : `${layer} · r${rawR} · ${pct}% max (source not local) · drag to pan`;
+      } else {
+        zoomLabel.value = "1:1";
+        const eff = Math.max(1, Math.round(rawR * cacheScale));
+        hintText.value = `${layer} · ${props.getMethod()} · r${rawR} → r${eff} @ ${Math.round(cacheScale * 100)}%`;
+      }
+      const wantAspect = s ? `${s.srcW} / ${s.srcH}` : DEFAULT_ASPECT;
       if (wantAspect !== canvasAspect.value) {
         canvasAspect.value = wantAspect;
         return;
       }
-      const sig = `${lastSrc}|${cacheW}x${cacheH}|${o.method}|${o.radius}|${o.edge}|${o.mode}|${o.detail}|${o.linear}`;
+      const o = opts();
+      const sig = `${lastSrc}|${zoom.value}|${pan.value.join()}|${Math.round(logicalW)}|${o.method}|${rawR}|${o.edge}|${o.mode}|${o.detail}|${o.linear}`;
       if (sig !== lastSig) {
         lastSig = sig;
         recompute();
@@ -8565,16 +8701,28 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     onBeforeUnmount(cleanup);
     __expose({ refreshExternal, forceResize, cleanup, setSentImage });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("div", _hoisted_1, [
+      return openBlock(), createElementBlock("div", {
+        class: "nkd-root",
+        onMousedown: _cache[1] || (_cache[1] = withModifiers(() => {
+        }, ["stop"])),
+        onMouseup: _cache[2] || (_cache[2] = withModifiers(() => {
+        }, ["stop"])),
+        onMousemove: _cache[3] || (_cache[3] = withModifiers(() => {
+        }, ["stop"]))
+      }, [
         createBaseVNode("canvas", {
           ref_key: "canvas",
           ref: canvas,
-          class: "nkd-canvas",
-          style: normalizeStyle({ aspectRatio: canvasAspect.value })
-        }, null, 4),
-        createBaseVNode("div", _hoisted_2, [
-          createBaseVNode("div", _hoisted_3, [
-            _cache[1] || (_cache[1] = createBaseVNode("span", { class: "nkd-label" }, "Low", -1)),
+          class: normalizeClass(["nkd-canvas", { "nkd-canvas--pan": zoom.value }]),
+          style: normalizeStyle({ aspectRatio: canvasAspect.value }),
+          onMousedown: withModifiers(onDown, ["stop", "prevent"]),
+          onMousemove: withModifiers(onMove, ["stop"]),
+          onMouseup: withModifiers(onUp, ["stop"]),
+          onMouseleave: withModifiers(onUp, ["stop"])
+        }, null, 38),
+        createBaseVNode("div", _hoisted_1, [
+          createBaseVNode("div", _hoisted_2, [
+            _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-label" }, "Low", -1)),
             withDirectives(createBaseVNode("input", {
               class: "nkd-slider",
               type: "range",
@@ -8591,17 +8739,22 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
                 { number: true }
               ]
             ]),
-            _cache[2] || (_cache[2] = createBaseVNode("span", { class: "nkd-label" }, "High", -1))
+            _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-label" }, "High", -1))
           ]),
-          createBaseVNode("div", _hoisted_4, [
-            createBaseVNode("span", _hoisted_5, toDisplayString(hintText.value), 1)
+          createBaseVNode("div", _hoisted_3, [
+            createBaseVNode("span", _hoisted_4, toDisplayString(hintText.value), 1),
+            _cache[6] || (_cache[6] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+            createBaseVNode("button", {
+              class: "nkd-btn",
+              onClick: withModifiers(toggleZoom, ["stop"])
+            }, toDisplayString(zoomLabel.value), 1)
           ])
         ])
-      ]);
+      ], 32);
     };
   }
 });
-const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-602e4de7"]]);
+const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-86ec67a6"]]);
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -8985,7 +9138,7 @@ app.registerExtension({
           const bin = atob(d.img);
           const bytes = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          (_a = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a.call(instance, bytes, d.width, d.height);
+          (_a = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a.call(instance, bytes, d.width, d.height, d.src_width, d.src_height);
         } catch {
         }
       };
@@ -9038,7 +9191,11 @@ app.registerExtension({
         return ((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "shape")) == null ? void 0 : _b.value) ?? "Linear";
       };
       let knownSize = null;
-      const getSize = () => knownSize ?? [resolveDim(this, "width", 1024), resolveDim(this, "height", 1024)];
+      const getSize = () => {
+        const img = findSourceImg(this, "image");
+        if (img == null ? void 0 : img.naturalWidth) return [img.naturalWidth, img.naturalHeight];
+        return knownSize ?? [resolveDim(this, "width", 1024), resolveDim(this, "height", 1024)];
+      };
       let instance = null;
       const vueApp = createApp(GradientPreviewWidget, {
         onChange: (json) => {
@@ -9046,7 +9203,17 @@ app.registerExtension({
         },
         getRamp,
         getShape,
-        getSize
+        getSize,
+        getSourceImg: () => findSourceImg(this, "image"),
+        getBlendMode: () => {
+          var _a2, _b;
+          return ((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "blend_mode")) == null ? void 0 : _b.value) ?? "none";
+        },
+        getOpacity: () => {
+          var _a2, _b;
+          const v = Number((_b = (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === "opacity")) == null ? void 0 : _b.value);
+          return Number.isFinite(v) ? v : 1;
+        }
       });
       instance = vueApp.mount(container);
       const domWidget = this.addDOMWidget("preview_editor", "NKD_GRADIENT_PREVIEW", container, {
@@ -9085,6 +9252,19 @@ app.registerExtension({
         }
       };
       api.addEventListener("nkd-gradient-size", onSize);
+      const onSource = (e) => {
+        var _a2;
+        const d = e == null ? void 0 : e.detail;
+        if (!d || String(d.node_id) !== String(gnode.id)) return;
+        try {
+          const bin = atob(d.img);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          (_a2 = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a2.call(instance, bytes, d.width, d.height);
+        } catch {
+        }
+      };
+      api.addEventListener("nkd-gradgen-source", onSource);
       requestAnimationFrame(() => {
         var _a2;
         instance == null ? void 0 : instance.deserialise(handlesWidget.value ?? "");
@@ -9105,6 +9285,7 @@ app.registerExtension({
         var _a2;
         window.clearInterval(refreshTimer);
         api.removeEventListener("nkd-gradient-size", onSize);
+        api.removeEventListener("nkd-gradgen-source", onSource);
         ro.disconnect();
         (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
         vueApp.unmount();
@@ -9279,7 +9460,7 @@ app.registerExtension({
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-45c56d8c] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-45c56d8c], .nkd-root[data-v-45c56d8c] *, .nkd-root[data-v-45c56d8c] *::before, .nkd-root[data-v-45c56d8c] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-45c56d8c] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-45c56d8c] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-45c56d8c] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-45c56d8c] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-45c56d8c] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-45c56d8c] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-45c56d8c] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-45c56d8c]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-602e4de7] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-602e4de7], .nkd-root[data-v-602e4de7] *, .nkd-root[data-v-602e4de7] *::before, .nkd-root[data-v-602e4de7] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-602e4de7] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-602e4de7] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-602e4de7] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-602e4de7] { padding: 5px 8px;\n}\n.nkd-hint[data-v-602e4de7] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-602e4de7] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-602e4de7] {\n  flex: 1 1 auto;\n  min-width: 40px;\n  height: 3px;\n  accent-color: #4ab4ff;\n  cursor: ew-resize;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-8ab4835f] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-8ab4835f], .nkd-root[data-v-8ab4835f] *, .nkd-root[data-v-8ab4835f] *::before, .nkd-root[data-v-8ab4835f] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-8ab4835f] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-8ab4835f] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-8ab4835f] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-8ab4835f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-8ab4835f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-8ab4835f] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-8ab4835f] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-8ab4835f]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-86ec67a6] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-86ec67a6], .nkd-root[data-v-86ec67a6] *, .nkd-root[data-v-86ec67a6] *::before, .nkd-root[data-v-86ec67a6] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-86ec67a6] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-86ec67a6] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-86ec67a6]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-86ec67a6] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-86ec67a6] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 1px 7px;\n  font-size: 10px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-86ec67a6]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-86ec67a6] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-86ec67a6] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-86ec67a6] { padding: 5px 8px;\n}\n.nkd-hint[data-v-86ec67a6] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-86ec67a6] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-86ec67a6] {\n  flex: 1 1 auto;\n  min-width: 40px;\n  height: 3px;\n  accent-color: #4ab4ff;\n  cursor: ew-resize;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

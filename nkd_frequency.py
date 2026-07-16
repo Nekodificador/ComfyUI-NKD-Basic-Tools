@@ -147,7 +147,9 @@ def _send_source_to_widget(unique_id, image: torch.Tensor,
     """Push the RESOLVED input image (post resize/subgraph) to this node's live
     preview widget, so partial-executing the node loads the image into the
     preview even when the source isn't a directly-connected Load Image. Sends
-    raw RGB bytes (≤512px) as base64 — no ui.PreviewImage, so no thumbnails."""
+    raw RGB bytes (≤512px) as base64 — no ui.PreviewImage, so no thumbnails.
+    `src_width`/`src_height` carry the FULL resolution the node actually renders
+    at, so a preview can scale radius-like params to its own downscale."""
     if not unique_id:
         return
     try:
@@ -166,7 +168,8 @@ def _send_source_to_widget(unique_id, image: torch.Tensor,
     arr = s.clamp(0.0, 1.0).mul(255).byte().cpu().numpy()
     b64 = base64.b64encode(arr.tobytes()).decode("ascii")
     PromptServer.instance.send_sync(
-        event, {"node_id": unique_id, "img": b64, "width": pw, "height": ph})
+        event, {"node_id": unique_id, "img": b64, "width": pw, "height": ph,
+                "src_width": w, "src_height": h})
 
 
 class NKDFrequencySeparate(io.ComfyNode):

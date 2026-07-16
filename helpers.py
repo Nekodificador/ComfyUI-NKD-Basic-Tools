@@ -108,6 +108,42 @@ def _linear_to_srgb(x: torch.Tensor) -> torch.Tensor:
     return torch.where(x <= 0.0031308, x * 12.92, 1.055 * x ** (1.0 / 2.4) - 0.055)
 
 
+# ---------------------------------------------------------------------------
+# Layer blend modes — b = base (bottom), t = top layer, both [..., 3] in 0..1.
+# Photoshop's formulas, applied on sRGB values like every other Comfy blend
+# node (a "correct" linear-light blend would not match what users expect from
+# Photoshop, which also blends in gamma space).
+# ---------------------------------------------------------------------------
+
+_BLEND_MODES = {
+    "normal":     lambda b, t: t,
+    "multiply":   lambda b, t: b * t,
+    "screen":     lambda b, t: 1.0 - (1.0 - b) * (1.0 - t),
+    "overlay":    lambda b, t: torch.where(b <= 0.5, 2 * b * t,
+                                           1.0 - 2 * (1.0 - b) * (1.0 - t)),
+    "soft light": lambda b, t: torch.where(
+        t <= 0.5, b - (1.0 - 2 * t) * b * (1.0 - b),
+        b + (2 * t - 1.0) * (torch.where(b <= 0.25,
+                                         ((16 * b - 12) * b + 4) * b,
+                                         b.clamp_min(0.0).sqrt()) - b)),
+    "hard light": lambda b, t: torch.where(t <= 0.5, 2 * b * t,
+                                           1.0 - 2 * (1.0 - b) * (1.0 - t)),
+    "add":        lambda b, t: b + t,
+    "difference": lambda b, t: (b - t).abs(),
+    "darken":     lambda b, t: torch.minimum(b, t),
+    "lighten":    lambda b, t: torch.maximum(b, t),
+}
+
+
+def _blend(base: torch.Tensor, top: torch.Tensor, mode: str,
+           opacity: float = 1.0) -> torch.Tensor:
+    """Composite `top` over `base` ([..., 3], 0..1) in `mode` at `opacity`.
+    Unknown mode falls back to normal."""
+    fn = _BLEND_MODES.get(mode.lower(), _BLEND_MODES["normal"])
+    out = fn(base, top).clamp(0.0, 1.0)
+    return base + (out - base) * float(opacity)
+
+
 _HASH_M32 = 0xFFFFFFFF
 
 

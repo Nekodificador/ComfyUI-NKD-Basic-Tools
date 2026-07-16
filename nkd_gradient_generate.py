@@ -16,7 +16,8 @@ from .nkd_color_ramp import (
     _sample_ramp,
     _warp_position,
 )
-from .helpers import _luminance
+from .helpers import _BLEND_MODES, _blend, _luminance
+from .nkd_frequency import _send_source_to_widget
 
 
 def _send_size_to_widget(unique_id, width, height) -> None:
@@ -57,6 +58,20 @@ class NKDGradientGenerate(io.ComfyNode):
                 io.String.Input("ramp", multiline=False, default=_DEFAULT_RAMP,
                                 socketless=True,
                                 tooltip="The color ramp, edited above."),
+                io.Image.Input("image", optional=True,
+                               tooltip="Optional — the gradient takes this image's "
+                                       "size (width/height are ignored). Composite "
+                                       "over it with blend_mode, or leave blend_mode "
+                                       "on 'none' to use it as a size reference only."),
+                io.Combo.Input("blend_mode",
+                               options=["none"] + list(_BLEND_MODES),
+                               default="none",
+                               tooltip="How the gradient composites over the optional "
+                                       "image. 'none' outputs the bare gradient (the "
+                                       "image only sets the size)."),
+                io.Float.Input("opacity", default=1.0, min=0.0, max=1.0, step=0.01,
+                               tooltip="How much of the composited gradient shows "
+                                       "through. Ignored when blend_mode is 'none'."),
             ],
             hidden=[io.Hidden.unique_id],  # to tell the preview the resolved size
             outputs=[
@@ -68,16 +83,30 @@ class NKDGradientGenerate(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, width, height, shape, handles, ramp) -> io.NodeOutput:
+    def execute(cls, width, height, shape, handles, ramp,
+                image=None, blend_mode="none", opacity=1.0) -> io.NodeOutput:
+        if image is not None:  # an image always dictates the size
+            height, width = int(image.shape[1]), int(image.shape[2])
         stops = _parse_ramp(ramp)
         p0, p1, mid = _parse_handles(handles)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        device = image.device if image is not None else torch.device(
+            "cuda" if torch.cuda.is_available() else "cpu")
         t = _position_field(shape, width, height, p0, p1, device)
         t = _warp_position(t, mid)
-        out = _sample_ramp(stops, t, _parse_interp(ramp)).unsqueeze(0).cpu()
-        _send_size_to_widget(getattr(getattr(cls, "hidden", None), "unique_id", None),
-                             width, height)
-        return io.NodeOutput(out, _luminance(out))
+        grad = _sample_ramp(stops, t, _parse_interp(ramp)).unsqueeze(0)  # [1, H, W, 3]
+
+        out = grad
+        if image is not None and blend_mode != "none":
+            # The gradient is the top layer; broadcasting handles a batched base.
+            out = _blend(image[..., :3], grad, blend_mode, opacity)
+        out = out.cpu()
+        uid = getattr(getattr(cls, "hidden", None), "unique_id", None)
+        _send_size_to_widget(uid, width, height)
+        if image is not None:  # so the gizmo can preview the composite live
+            _send_source_to_widget(uid, image, event="nkd-gradgen-source")
+        # The mask is the GRADIENT's luminance, not the composite's — that's the
+        # falloff you drew, which is what you'd feed a mask input.
+        return io.NodeOutput(out, _luminance(grad.cpu()))
 
 
 class NKDGradientGenerateExtension(ComfyExtension):

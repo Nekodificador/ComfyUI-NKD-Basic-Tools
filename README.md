@@ -86,6 +86,11 @@ original ─▶ 😺NKD Frequency Separate ─┬─ high_frequency ─▶ 😺N
 - Live in-node preview with a **wipe slider** (high frequency ◄ | ► low
   frequency) so you can see exactly what each layer holds. Run its blue play
   button to preview even when the source arrives through a resize or subgraph.
+- The preview's **`1:1` button** crops the visible area at native resolution and
+  drag-pans it — the only honest way to judge the detail layer, since a fitted
+  view destroys the very high frequency you're looking at. The fitted view
+  scales `radius` to its own downscale and shows the effective value in the hint
+  (`r8 → r2 @ 31%`), so it never lies about the frequency you're getting.
 - Optional `mask` output confines the detail to a region (e.g. skin only).
 
 ---
@@ -110,7 +115,16 @@ https://github.com/user-attachments/assets/909d881d-3b09-41d2-88ba-aff797db9898
 needed) as a background, mask, or ramp source — `Linear`, `Radial`, `Angular`
 (conic) or `Diamond`. A Photoshop-style **on-canvas gizmo** lets you drag two
 handles right on the preview to set direction, center and extent instead of
-typing numbers. Feed it width/height and the gizmo adapts to that aspect ratio.
+typing numbers — plus a midpoint diamond to bias where the 50% color lands.
+Feed it width/height and the gizmo adapts to that aspect ratio.
+
+Connect the optional `image` and it takes that image's size, so you don't have
+to wire width/height by hand. Pick a `blend_mode` (multiply, screen, overlay,
+soft/hard light, add, difference, darken, lighten) and the gradient composites
+straight over it at `opacity` — no separate blend node needed for light leaks,
+vignettes or sky grads. Leave `blend_mode` on `none` to use the image purely as
+a size reference and get the bare gradient. The preview shows the composite
+live. The `mask` output is always the gradient's own falloff.
 
 https://github.com/user-attachments/assets/1826bb38-fe14-46a2-9d62-92cee798560e
 

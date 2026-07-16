@@ -76,8 +76,6 @@ export function expandStops(
   interp: Interp,
   remap: (pos: number) => number = (p) => p,
 ): Stop[] {
-  if (interp === "smooth") return stops.map((s) => ({ pos: remap(s.pos), color: s.color }));
-
   const out: Stop[] = [];
   if (interp === "steps") {
     for (let i = 0; i < stops.length; i++) {
@@ -87,13 +85,15 @@ export function expandStops(
     }
     return out;
   }
-  // Subdivide each segment that isn't a plain linear blend (bezier, or a
-  // midpoint ≠ 0.5) so the native gradient reproduces the warp. Junctions may
-  // repeat with the same color — harmless for addColorStop.
+  // Subdivide each segment that isn't a plain linear blend (bezier, a segment
+  // midpoint ≠ 0.5, or a non-identity `remap` — the gradient midpoint diamond,
+  // which is invisible if only the endpoint positions are remapped). Junctions
+  // may repeat with the same color — harmless for addColorStop.
   const SUB = 12;
+  const warped = Math.abs(remap(0.25) - 0.25) > 1e-4;
   for (let i = 0; i < stops.length - 1; i++) {
     const a = stops[i], b = stops[i + 1];
-    const needsSub = interp === "bezier" || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
+    const needsSub = interp === "bezier" || warped || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
     const n = needsSub ? SUB : 1;
     for (let k = 0; k <= n; k++) {
       const u = k / n;

@@ -429,7 +429,9 @@ comfyApp.registerExtension({
           const bin = atob(d.img);
           const bytes = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          instance?.setSentImage?.(bytes, d.width, d.height);
+          // src_width/src_height = the node's real render size (the bytes come
+          // downscaled), so the preview can scale radius to its own cache.
+          instance?.setSentImage?.(bytes, d.width, d.height, d.src_width, d.src_height);
         } catch { /* ignore malformed */ }
       };
       api.addEventListener("nkd-freq-source", onSource);
@@ -485,8 +487,13 @@ comfyApp.registerExtension({
       // width·height that resolveDim can't read pre-execution); else read the
       // connected inputs / widgets.
       let knownSize: [number, number] | null = null;
-      const getSize = (): [number, number] =>
-        knownSize ?? [resolveDim(this, "width", 1024), resolveDim(this, "height", 1024)];
+      const getSize = (): [number, number] => {
+        // A connected image dictates the output size (see execute()), and its
+        // own dims are readable before any run — so they win over both.
+        const img = findSourceImg(this, "image");
+        if (img?.naturalWidth) return [img.naturalWidth, img.naturalHeight];
+        return knownSize ?? [resolveDim(this, "width", 1024), resolveDim(this, "height", 1024)];
+      };
 
       let instance: any = null;
       const vueApp = createApp(GradientPreviewWidget, {
@@ -496,6 +503,12 @@ comfyApp.registerExtension({
         getRamp,
         getShape,
         getSize,
+        getSourceImg: () => findSourceImg(this, "image"),
+        getBlendMode: () => this.widgets?.find((w: any) => w.name === "blend_mode")?.value ?? "none",
+        getOpacity: () => {
+          const v = Number(this.widgets?.find((w: any) => w.name === "opacity")?.value);
+          return Number.isFinite(v) ? v : 1;
+        },
       });
       instance = vueApp.mount(container) as any;
 
@@ -529,6 +542,20 @@ comfyApp.registerExtension({
       };
       api.addEventListener("nkd-gradient-size", onSize);
 
+      // Resolved input image pushed on execution — the only route when the
+      // source sits behind a resize/subgraph (a plain link is read live above).
+      const onSource = (e: any) => {
+        const d = e?.detail;
+        if (!d || String(d.node_id) !== String(gnode.id)) return;
+        try {
+          const bin = atob(d.img);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          instance?.setSentImage?.(bytes, d.width, d.height);
+        } catch { /* ignore malformed */ }
+      };
+      api.addEventListener("nkd-gradgen-source", onSource);
+
       requestAnimationFrame(() => {
         instance?.deserialise(handlesWidget.value ?? "");
         instance?.forceResize?.();
@@ -548,6 +575,7 @@ comfyApp.registerExtension({
       this.onRemoved = function () {
         window.clearInterval(refreshTimer);
         api.removeEventListener("nkd-gradient-size", onSize);
+        api.removeEventListener("nkd-gradgen-source", onSource);
         ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();

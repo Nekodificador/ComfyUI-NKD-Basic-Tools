@@ -7,6 +7,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from helpers import _blend
 from nkd_color_ramp import (
     _DEFAULT_HANDLES,
     _parse_handles,
@@ -93,6 +94,23 @@ def demo():
     # Malformed / missing handles fall back to the default sweep + neutral mid
     assert _parse_handles("not json") == ((0.0, 0.5), (1.0, 0.5), 0.5)
     assert _parse_handles('{"p0":[0,0.5]}') == ((0.0, 0.5), (1.0, 0.5), 0.5)  # missing p1
+
+    # Radial must stay circular on a non-square canvas: at equal ON-SCREEN
+    # distance from the center, t matches (was elliptical when the field was
+    # computed in normalised units).
+    tr = _position_field("Radial", 200, 100, [0.5, 0.5], [1.0, 0.5], torch.device("cpu"))
+    assert abs(tr[50, 150].item() - tr[0, 100].item()) < 0.02  # 50px right vs 50px up
+
+    # Blend modes: screen lightens, multiply darkens, opacity fades to the base.
+    base = torch.full((1, 1, 1, 3), 0.5)
+    top = torch.full((1, 1, 1, 3), 0.25)
+    assert abs(_blend(base, top, "screen")[0, 0, 0, 0].item() - 0.625) < 1e-6
+    assert abs(_blend(base, top, "multiply")[0, 0, 0, 0].item() - 0.125) < 1e-6
+    assert abs(_blend(base, top, "normal")[0, 0, 0, 0].item() - 0.25) < 1e-6
+    assert abs(_blend(base, top, "multiply", 0.0)[0, 0, 0, 0].item() - 0.5) < 1e-6
+    assert abs(_blend(base, top, "add")[0, 0, 0, 0].item() - 0.75) < 1e-6
+    assert _blend(base, top, "add", 1.0).max().item() <= 1.0  # clamped
+    assert abs(_blend(base, top, "nonsense")[0, 0, 0, 0].item() - 0.25) < 1e-6  # → normal
 
     print("gradient generate self-check OK")
 

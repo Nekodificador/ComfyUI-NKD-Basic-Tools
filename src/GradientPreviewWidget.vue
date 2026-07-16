@@ -31,7 +31,28 @@ const props = defineProps<{
   getRamp: () => string;
   getShape: () => string;
   getSize: () => [number, number];
+  getSourceImg: () => HTMLImageElement | null;
+  getBlendMode: () => string;
+  getOpacity: () => number;
 }>();
+
+// Node blend mode -> canvas globalCompositeOperation. The W3C compositing
+// formula for these ops with globalAlpha is exactly `_blend`'s lerp in
+// helpers.py, so the preview matches the render. ('add' -> 'lighter' is the
+// one approximation: it adds before clamping rather than after.)
+const BLEND_OPS: Record<string, string> = {
+  "none": "source-over",
+  "normal": "source-over",
+  "multiply": "multiply",
+  "screen": "screen",
+  "overlay": "overlay",
+  "soft light": "soft-light",
+  "hard light": "hard-light",
+  "add": "lighter",
+  "difference": "difference",
+  "darken": "darken",
+  "lighten": "lighten",
+};
 
 const BOX_W = 320, BOX_H = 210, PAD = 14;
 const HIT_R = 11;
@@ -162,6 +183,32 @@ function buildFill(shape: string, stops: Pt[], a: Vec, b: Vec): CanvasGradient |
   return add(ctx.createLinearGradient(a[0], a[1], b[0], b[1]));
 }
 
+// --- optional source image ---------------------------------------------
+// Two ways in: a directly-connected image node (its decoded <img>), or raw RGB
+// pushed by the backend on execution — the only route when the source sits
+// behind a resize/subgraph node, where getSourceImg legitimately finds nothing.
+let sentCanvas: HTMLCanvasElement | null = null;
+
+function setSentImage(rgb: Uint8Array, w: number, h: number) {
+  const c = sentCanvas ?? document.createElement("canvas");
+  c.width = w; c.height = h;
+  const cx = c.getContext("2d")!;
+  const img = cx.createImageData(w, h);
+  for (let p = 0, i = 0, j = 0; p < w * h; p++, i += 4, j += 3) {
+    img.data[i] = rgb[j]; img.data[i + 1] = rgb[j + 1];
+    img.data[i + 2] = rgb[j + 2]; img.data[i + 3] = 255;
+  }
+  cx.putImageData(img, 0, 0);
+  sentCanvas = c;
+  redraw();
+}
+
+function sourceCanvas(): CanvasImageSource | null {
+  const img = props.getSourceImg?.();
+  if (img && img.complete && img.naturalWidth > 0) return img;  // live, no run needed
+  return sentCanvas;
+}
+
 // 256-entry ramp LUT (interp baked in), rebuilt only when the ramp string
 // changes — the Diamond pixel loop then indexes it instead of searching the
 // stops per pixel.
@@ -227,12 +274,28 @@ function redraw() {
   const stops = parseRamp();
   const a = toPx(p0.value), b = toPx(p1.value);
 
+  // Optional image underneath: the gradient then composites over it in the
+  // node's blend mode, so the gizmo shows the actual output. With mode 'none'
+  // the opaque gradient hides it — again matching the render.
+  const base = sourceCanvas();
+  if (base) ctx.drawImage(base, fitX, fitY, fitW, fitH);
+  const mode = props.getBlendMode?.() ?? "none";
+  const composite = !!base && mode !== "none";
+  if (composite) {
+    ctx.globalCompositeOperation = (BLEND_OPS[mode] ?? "source-over") as GlobalCompositeOperation;
+    ctx.globalAlpha = Math.min(1, Math.max(0, props.getOpacity?.() ?? 1));
+  }
+
   const fill = buildFill(shape, stops, a, b);
   if (fill) {
     ctx.fillStyle = fill;
     ctx.fillRect(fitX, fitY, fitW, fitH);
   } else {
     drawDiamond(stops, a, b);
+  }
+  if (composite) {
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;  // handles and chrome always draw plain
   }
   ctx.strokeStyle = "rgba(255,255,255,0.16)";
   ctx.lineWidth = 0.75;
@@ -468,7 +531,9 @@ function refreshExternal() {
   // shape actually changed. Handle drags repaint through onMove directly, so the
   // idle poll costs a string compare, not a full gradient fill.
   const sz = props.getSize();
-  const sig = `${shape}|${props.getRamp()}|${sz[0]}x${sz[1]}`;
+  const src = props.getSourceImg?.();
+  const sig = `${shape}|${props.getRamp()}|${sz[0]}x${sz[1]}`
+    + `|${props.getBlendMode?.()}|${props.getOpacity?.()}|${src?.currentSrc ?? src?.src ?? ""}`;
   if (sig !== lastExtSig) { lastExtSig = sig; redraw(); }
 }
 let lastExtSig = "";
@@ -490,7 +555,7 @@ onMounted(() => {
 });
 onBeforeUnmount(cleanup);
 
-defineExpose({ serialise, deserialise, refreshExternal, forceResize, cleanup });
+defineExpose({ serialise, deserialise, refreshExternal, forceResize, cleanup, setSentImage });
 </script>
 
 <style scoped>
