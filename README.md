@@ -7,9 +7,6 @@ whole batch of prompts. Each node shows a **live preview in the node itself**, s
 you tune it while you look at it — no separate preview node, and most update
 without even running the graph.
 
-> **Screenshots:** the `![…]` slots below point at `assets/`. Drop a PNG of each
-> node there (same filename) and it shows up here — nothing else to change.
-
 ---
 
 ## Detailing & inpainting
