@@ -6,6 +6,7 @@
 // open, written back on change/close.
 import { Mesh, meshFromDict, meshIdentity, meshToDict } from "./colorCore";
 import { ColorWarpGrid } from "./colorWarpGrid";
+import { ColorWarpPreview } from "./colorWarpPreview";
 
 export interface ColorWarpViewerOpts {
   image: HTMLImageElement | HTMLCanvasElement | null;
@@ -99,36 +100,14 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   host.append(bar, body);
   document.body.appendChild(host);
 
-  // --- render (grid left; plain image preview right until Phase 4) ---------
-  const dpr = Math.max(window.devicePixelRatio || 1, 1);
+  // --- render engines: RYB grid (left) + WebGL LUT preview (right) ---------
   const grid = new ColorWarpGrid(gridCanvas);
+  const preview = new ColorWarpPreview(previewCanvas);
   grid.setMesh(mesh);
-  if (sourceCanvas) grid.setSource(sourceCanvas);
+  preview.setMesh(mesh);
+  if (sourceCanvas) { grid.setSource(sourceCanvas); preview.setSource(sourceCanvas); }
 
-  function drawPreview() {
-    const w = rightPane.clientWidth, h = rightPane.clientHeight;
-    if (w < 2 || h < 2) return;
-    previewCanvas.width = Math.round(w * dpr);
-    previewCanvas.height = Math.round(h * dpr);
-    const ctx = previewCanvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    if (!sourceCanvas) {
-      ctx.fillStyle = "rgba(200,208,224,0.5)";
-      ctx.font = "12px Inter,system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("Connect an image and run once", w / 2, h / 2);
-      return;
-    }
-    // Letterbox-fit the source into the pane.
-    const iw = sourceCanvas.width, ih = sourceCanvas.height;
-    const r = Math.min(w / iw, h / ih);
-    const dw = iw * r, dh = ih * r;
-    ctx.drawImage(sourceCanvas, (w - dw) / 2, (h - dh) / 2, dw, dh);
-  }
-
-  function render() { grid.resize(); drawPreview(); }
+  function render() { grid.resize(); preview.resize(); }
 
   const ro = new ResizeObserver(render);
   ro.observe(body);
@@ -141,6 +120,8 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     destroyed = true;
     ro.disconnect();
     window.removeEventListener("keydown", onKey, true);
+    grid.dispose();
+    preview.dispose();
     host.remove();
     if (active && active.destroy === destroy) active = null;
   }
@@ -165,6 +146,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
       if (!c) return;
       sourceCanvas = c;
       grid.setSource(c);
+      preview.setSource(c);
       render();
     },
     close() { closeWith(false); },

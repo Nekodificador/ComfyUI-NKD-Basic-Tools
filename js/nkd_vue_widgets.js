@@ -8268,10 +8268,10 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
 const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-773b27a5"]]);
 const EPS = 1e-6;
 const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
-function srgbToLinear(v) {
+function srgbToLinear$1(v) {
   return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
 }
-function linearToSrgb(v) {
+function linearToSrgb$1(v) {
   if (v <= 0) return 0;
   return v <= 31308e-7 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055;
 }
@@ -8386,8 +8386,8 @@ function computeSeparation(rgba, w, h, opts) {
   const r = Math.max(1, Math.round(opts.radius));
   const hf = new Uint8ClampedArray(n * 4);
   const lf = new Uint8ClampedArray(n * 4);
-  const toWork = (v) => opts.linear ? srgbToLinear(v) : v;
-  const toDisp = (v) => opts.linear ? linearToSrgb(v) : v;
+  const toWork = (v) => opts.linear ? srgbToLinear$1(v) : v;
+  const toDisp = (v) => opts.linear ? linearToSrgb$1(v) : v;
   const planes = [new Float32Array(n), new Float32Array(n), new Float32Array(n)];
   for (let p2 = 0, i = 0; p2 < n; p2++, i += 4) {
     planes[0][p2] = toWork(rgba[i] / 255);
@@ -8758,8 +8758,67 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
   }
 });
 const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-cf839f24"]]);
+const _M1 = [
+  [0.4122214708, 0.5363325363, 0.0514459929],
+  [0.2119034982, 0.6806995451, 0.1073969566],
+  [0.0883024619, 0.2817188376, 0.6299787005]
+];
+const _M2 = [
+  [0.2104542553, 0.793617785, -0.0040720468],
+  [1.9779984951, -2.428592205, 0.4505937099],
+  [0.0259040371, 0.7827717662, -0.808675766]
+];
+const _M1_INV = [
+  [4.076741661347994, -3.3077115904081933, 0.23096992872942793],
+  [-1.2684380040921763, 2.6097574006633715, -0.3413193963102196],
+  [-0.004196086541837079, -0.7034186144594495, 1.7076147009309446]
+];
+const _M2_INV = [
+  [0.9999999984505196, 0.39633779217376774, 0.2158037580607588],
+  [1.0000000088817607, -0.10556134232365633, -0.0638541747717059],
+  [1.0000000546724108, -0.08948418209496574, -1.2914855378640917]
+];
+function matVec(m, v) {
+  return [
+    m[0][0] * v[0] + m[0][1] * v[1] + m[0][2] * v[2],
+    m[1][0] * v[0] + m[1][1] * v[1] + m[1][2] * v[2],
+    m[2][0] * v[0] + m[2][1] * v[1] + m[2][2] * v[2]
+  ];
+}
+const cbrt = Math.cbrt;
+function srgbToLinear(c) {
+  return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+function linearToSrgb(c) {
+  return c <= 31308e-7 ? c * 12.92 : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055;
+}
+function srgbToOklab(rgb) {
+  const lin = [srgbToLinear(rgb[0]), srgbToLinear(rgb[1]), srgbToLinear(rgb[2])];
+  const lms = matVec(_M1, lin);
+  const lms_ = [cbrt(lms[0]), cbrt(lms[1]), cbrt(lms[2])];
+  return matVec(_M2, lms_);
+}
+function oklabToSrgb(lab) {
+  const lms_ = matVec(_M2_INV, lab);
+  const lms = [lms_[0] ** 3, lms_[1] ** 3, lms_[2] ** 3];
+  const lin = matVec(_M1_INV, lms);
+  return [linearToSrgb(lin[0]), linearToSrgb(lin[1]), linearToSrgb(lin[2])];
+}
+const DEG = 180 / Math.PI;
+const RAD$1 = Math.PI / 180;
 function mod(a, n) {
   return (a % n + n) % n;
+}
+function oklabToOklch(lab) {
+  const [L, a, b] = lab;
+  const C = Math.hypot(a, b);
+  const h = mod(Math.atan2(b, a) * DEG, 360);
+  return [L, C, h];
+}
+function oklchToOklab(lch) {
+  const [L, C, h] = lch;
+  const r = h * RAD$1;
+  return [L, C * Math.cos(r), C * Math.sin(r)];
 }
 function hslToSrgb(hsl) {
   const h = mod(hsl[0], 360);
@@ -8858,6 +8917,93 @@ function meshToDict(m) {
     sat_rings: m.sat_rings,
     offsets: m.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]))
   };
+}
+function meshSample(m, hueDeg, satNorm) {
+  const off = m.offsets;
+  const R = m.sat_rings;
+  const S = m.hue_segments;
+  const hue = mod(hueDeg, 360);
+  const sat = Math.min(Math.max(satNorm, 0), 1);
+  const rf = sat * R;
+  let ri = Math.floor(rf);
+  ri = Math.min(Math.max(ri, 0), R - 1);
+  const rt = rf - ri;
+  const sf = hue / 360 * S;
+  const sj = mod(Math.floor(sf), S);
+  const st = sf - Math.floor(sf);
+  const sj1 = mod(sj + 1, S);
+  const c00 = off[ri][sj];
+  const c01 = off[ri][sj1];
+  const c10 = off[ri + 1][sj];
+  const c11 = off[ri + 1][sj1];
+  const val = [0, 0, 0];
+  for (let k = 0; k < 3; k++) {
+    const top = c00[k] * (1 - st) + c01[k] * st;
+    const bot = c10[k] * (1 - st) + c11[k] * st;
+    val[k] = top * (1 - rt) + bot * rt;
+  }
+  const dh = val[0] * sat;
+  const ds = val[1];
+  const dl = val[2];
+  return [dh, ds, dl];
+}
+const C_REF = 0.35;
+function clamp(x, lo, hi) {
+  return x < lo ? lo : x > hi ? hi : x;
+}
+function bakeLut(m, size = 33) {
+  const out = new Float64Array(size * size * size * 3);
+  const step = size > 1 ? 1 / (size - 1) : 0;
+  for (let ri = 0; ri < size; ri++) {
+    const r = ri * step;
+    for (let gi = 0; gi < size; gi++) {
+      const g = gi * step;
+      for (let bi = 0; bi < size; bi++) {
+        const b = bi * step;
+        const lab = srgbToOklab([r, g, b]);
+        const [L, C, h] = oklabToOklch(lab);
+        const sat = C / C_REF;
+        const [dh, ds, dl] = meshSample(m, h, sat);
+        const h2 = mod(h + dh, 360);
+        const sat2 = Math.max(sat + ds, 0);
+        const C2 = sat2 * C_REF;
+        const L2 = clamp(L + dl, 0, 1);
+        const rgb = oklabToSrgb(oklchToOklab([L2, C2, h2]));
+        const idx = ((ri * size + gi) * size + bi) * 3;
+        out[idx] = clamp(rgb[0], 0, 1);
+        out[idx + 1] = clamp(rgb[1], 0, 1);
+        out[idx + 2] = clamp(rgb[2], 0, 1);
+      }
+    }
+  }
+  return out;
+}
+function applyRgb(lut, size, rgb) {
+  const N = size;
+  const r = clamp(rgb[0], 0, 1);
+  const g = clamp(rgb[1], 0, 1);
+  const b = clamp(rgb[2], 0, 1);
+  const pr = r * (N - 1);
+  const pg = g * (N - 1);
+  const pb = b * (N - 1);
+  const r0 = clamp(Math.floor(pr), 0, N - 2);
+  const g0 = clamp(Math.floor(pg), 0, N - 2);
+  const b0 = clamp(Math.floor(pb), 0, N - 2);
+  const fr = pr - r0;
+  const fg = pg - g0;
+  const fb = pb - b0;
+  const at = (dr, dg, db, c) => lut[(((r0 + dr) * N + (g0 + dg)) * N + (b0 + db)) * 3 + c];
+  const res = [0, 0, 0];
+  for (let c = 0; c < 3; c++) {
+    const c00 = at(0, 0, 0, c) * (1 - fr) + at(1, 0, 0, c) * fr;
+    const c01 = at(0, 0, 1, c) * (1 - fr) + at(1, 0, 1, c) * fr;
+    const c10 = at(0, 1, 0, c) * (1 - fr) + at(1, 1, 0, c) * fr;
+    const c11 = at(0, 1, 1, c) * (1 - fr) + at(1, 1, 1, c) * fr;
+    const c0 = c00 * (1 - fg) + c10 * fg;
+    const c1 = c01 * (1 - fg) + c11 * fg;
+    res[c] = c0 * (1 - fb) + c1 * fb;
+  }
+  return res;
 }
 const GRID_LINE = "rgba(120,180,255,0.35)";
 const WEB_LINE = "rgba(120,180,255,0.55)";
@@ -9084,6 +9230,264 @@ class ColorWarpGrid {
     drawHandle(cx0, cy0, 6);
   }
 }
+const LUT_SIZE = 33;
+const VERT = `#version 300 es
+in vec2 aPos;
+out vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+const FRAG = `#version 300 es
+precision highp float;
+precision highp sampler3D;
+in vec2 vUv;
+uniform sampler2D uImg;
+uniform highp sampler3D uLut;
+uniform float uN;
+out vec4 outColor;
+void main() {
+  vec3 c = clamp(texture(uImg, vUv).rgb, 0.0, 1.0);
+  // Half-texel scale/offset so grid endpoints hit texel centers — matches the
+  // CPU applyRgb which samples on the [0, N-1] integer lattice.
+  vec3 coord = (c * (uN - 1.0) + 0.5) / uN;
+  outColor = vec4(texture(uLut, coord).rgb, 1.0);
+}`;
+class ColorWarpPreview {
+  constructor(canvas) {
+    __publicField(this, "canvas");
+    __publicField(this, "dpr", Math.max(window.devicePixelRatio || 1, 1));
+    __publicField(this, "mesh", null);
+    __publicField(this, "source", null);
+    __publicField(this, "gl", null);
+    __publicField(this, "prog", null);
+    __publicField(this, "imgTex", null);
+    __publicField(this, "lutTex", null);
+    __publicField(this, "vao", null);
+    __publicField(this, "uImg", -1);
+    __publicField(this, "uLut", -1);
+    __publicField(this, "uN", -1);
+    __publicField(this, "cpu", false);
+    __publicField(this, "ctx2d", null);
+    __publicField(this, "lutDirty", true);
+    __publicField(this, "raf", 0);
+    this.canvas = canvas;
+    const gl = canvas.getContext("webgl2");
+    if (gl && this.initGL(gl)) {
+      this.gl = gl;
+    } else {
+      this.cpu = true;
+      this.ctx2d = canvas.getContext("2d");
+    }
+  }
+  initGL(gl) {
+    const compile = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.warn("[ColorWarp] shader compile failed:", gl.getShaderInfoLog(s));
+        return null;
+      }
+      return s;
+    };
+    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) return false;
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.warn("[ColorWarp] program link failed:", gl.getProgramInfoLog(prog));
+      return false;
+    }
+    this.prog = prog;
+    this.uImg = gl.getUniformLocation(prog, "uImg");
+    this.uLut = gl.getUniformLocation(prog, "uLut");
+    this.uN = gl.getUniformLocation(prog, "uN");
+    const vao = gl.createVertexArray();
+    gl.bindVertexArray(vao);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+      -1,
+      -1,
+      1,
+      -1,
+      -1,
+      1,
+      -1,
+      1,
+      1,
+      -1,
+      1,
+      1
+    ]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, "aPos");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    gl.bindVertexArray(null);
+    this.vao = vao;
+    this.imgTex = gl.createTexture();
+    this.lutTex = gl.createTexture();
+    return true;
+  }
+  setMesh(mesh) {
+    this.mesh = mesh;
+    this.lutDirty = true;
+    this.schedule();
+  }
+  setSource(src) {
+    this.source = src;
+    if (this.gl) this.uploadImage();
+    this.schedule();
+  }
+  resize() {
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (w < 2 || h < 2) return;
+    this.canvas.width = Math.round(w * this.dpr);
+    this.canvas.height = Math.round(h * this.dpr);
+    this.render();
+  }
+  dispose() {
+    if (this.raf) cancelAnimationFrame(this.raf);
+    const gl = this.gl;
+    if (!gl) return;
+    if (this.imgTex) gl.deleteTexture(this.imgTex);
+    if (this.lutTex) gl.deleteTexture(this.lutTex);
+    if (this.vao) gl.deleteVertexArray(this.vao);
+    if (this.prog) gl.deleteProgram(this.prog);
+    const lose = gl.getExtension("WEBGL_lose_context");
+    lose == null ? void 0 : lose.loseContext();
+  }
+  // Debounce rebake/re-upload + render into one rAF (Phase 4.2).
+  schedule() {
+    if (this.raf) return;
+    this.raf = requestAnimationFrame(() => {
+      this.raf = 0;
+      this.render();
+    });
+  }
+  uploadImage() {
+    const gl = this.gl;
+    if (!gl || !this.source) return;
+    gl.bindTexture(gl.TEXTURE_2D, this.imgTex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this.source);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+  // Rebake the 3D LUT and upload as an RGBA8 TEXTURE_3D. RGBA8 is always
+  // LINEAR-filterable (float 3D textures need OES_texture_float_linear, which
+  // isn't guaranteed) — 8-bit precision is ample for a screen preview.
+  uploadLut() {
+    const gl = this.gl;
+    if (!gl || !this.mesh) return;
+    const size = LUT_SIZE;
+    const lut = bakeLut(this.mesh, size);
+    const data = new Uint8Array(size * size * size * 4);
+    for (let r = 0; r < size; r++) {
+      for (let g = 0; g < size; g++) {
+        for (let b = 0; b < size; b++) {
+          const s = ((r * size + g) * size + b) * 3;
+          const d = (r + g * size + b * size * size) * 4;
+          data[d] = Math.round(lut[s] * 255);
+          data[d + 1] = Math.round(lut[s + 1] * 255);
+          data[d + 2] = Math.round(lut[s + 2] * 255);
+          data[d + 3] = 255;
+        }
+      }
+    }
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
+    gl.texImage3D(
+      gl.TEXTURE_3D,
+      0,
+      gl.RGBA8,
+      size,
+      size,
+      size,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      data
+    );
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_3D, gl.TEXTURE_WRAP_R, gl.CLAMP_TO_EDGE);
+    this.lutDirty = false;
+  }
+  render() {
+    if (this.cpu) return this.renderCPU();
+    const gl = this.gl;
+    if (!gl || !this.prog) return;
+    const W = this.canvas.width, H = this.canvas.height;
+    gl.viewport(0, 0, W, H);
+    gl.clearColor(0.067, 0.075, 0.094, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    if (!this.source || !this.mesh) return;
+    if (this.lutDirty) this.uploadLut();
+    const iw = this.source.width, ih = this.source.height;
+    const r = Math.min(W / iw, H / ih);
+    const dw = iw * r, dh = ih * r;
+    gl.viewport(
+      Math.round((W - dw) / 2),
+      Math.round((H - dh) / 2),
+      Math.round(dw),
+      Math.round(dh)
+    );
+    gl.useProgram(this.prog);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.imgTex);
+    gl.uniform1i(this.uImg, 0);
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
+    gl.uniform1i(this.uLut, 1);
+    gl.uniform1f(this.uN, LUT_SIZE);
+    gl.bindVertexArray(this.vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    gl.bindVertexArray(null);
+  }
+  // CPU fallback: apply the LUT to a ≤512px copy and blit letterboxed.
+  renderCPU() {
+    const ctx = this.ctx2d;
+    if (!ctx) return;
+    const W = this.canvas.width, H = this.canvas.height;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#111318";
+    ctx.fillRect(0, 0, W, H);
+    if (!this.source || !this.mesh) return;
+    const lut = bakeLut(this.mesh, LUT_SIZE);
+    const iw = this.source.width, ih = this.source.height;
+    const longest = Math.max(iw, ih);
+    const scale = longest > 512 ? 512 / longest : 1;
+    const sw = Math.max(1, Math.round(iw * scale));
+    const sh = Math.max(1, Math.round(ih * scale));
+    const tmp = document.createElement("canvas");
+    tmp.width = sw;
+    tmp.height = sh;
+    const tctx = tmp.getContext("2d");
+    tctx.drawImage(this.source, 0, 0, sw, sh);
+    const img = tctx.getImageData(0, 0, sw, sh);
+    const px = img.data;
+    for (let k = 0; k < px.length; k += 4) {
+      const rgb = applyRgb(lut, LUT_SIZE, [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255]);
+      px[k] = Math.round(rgb[0] * 255);
+      px[k + 1] = Math.round(rgb[1] * 255);
+      px[k + 2] = Math.round(rgb[2] * 255);
+    }
+    tctx.putImageData(img, 0, 0);
+    const r = Math.min(W / iw, H / ih);
+    const dw = iw * r, dh = ih * r;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(tmp, (W - dw) / 2, (H - dh) / 2, dw, dh);
+  }
+}
 let active = null;
 const PANEL = "#111318";
 const BAR_BG = "#1a1c22";
@@ -9149,34 +9553,17 @@ function openColorWarpViewer(opts) {
   rightPane.appendChild(previewCanvas);
   host.append(bar, body);
   document.body.appendChild(host);
-  const dpr = Math.max(window.devicePixelRatio || 1, 1);
   const grid = new ColorWarpGrid(gridCanvas);
+  const preview = new ColorWarpPreview(previewCanvas);
   grid.setMesh(mesh);
-  if (sourceCanvas) grid.setSource(sourceCanvas);
-  function drawPreview() {
-    const w = rightPane.clientWidth, h = rightPane.clientHeight;
-    if (w < 2 || h < 2) return;
-    previewCanvas.width = Math.round(w * dpr);
-    previewCanvas.height = Math.round(h * dpr);
-    const ctx = previewCanvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    if (!sourceCanvas) {
-      ctx.fillStyle = "rgba(200,208,224,0.5)";
-      ctx.font = "12px Inter,system-ui";
-      ctx.textAlign = "center";
-      ctx.fillText("Connect an image and run once", w / 2, h / 2);
-      return;
-    }
-    const iw = sourceCanvas.width, ih = sourceCanvas.height;
-    const r = Math.min(w / iw, h / ih);
-    const dw = iw * r, dh = ih * r;
-    ctx.drawImage(sourceCanvas, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  preview.setMesh(mesh);
+  if (sourceCanvas) {
+    grid.setSource(sourceCanvas);
+    preview.setSource(sourceCanvas);
   }
   function render() {
     grid.resize();
-    drawPreview();
+    preview.resize();
   }
   const ro = new ResizeObserver(render);
   ro.observe(body);
@@ -9187,6 +9574,8 @@ function openColorWarpViewer(opts) {
     destroyed = true;
     ro.disconnect();
     window.removeEventListener("keydown", onKey, true);
+    grid.dispose();
+    preview.dispose();
     host.remove();
     if (active && active.destroy === destroy) active = null;
   }
@@ -9215,6 +9604,7 @@ function openColorWarpViewer(opts) {
       if (!c) return;
       sourceCanvas = c;
       grid.setSource(c);
+      preview.setSource(c);
       render();
     },
     close() {
