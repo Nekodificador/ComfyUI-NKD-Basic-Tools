@@ -10,6 +10,7 @@ from .nkd_gradient_generate import NKDGradientGenerate
 from .nkd_film_grain import NKDFilmGrain
 from .nkd_noise import NKDNoise
 from .nkd_frequency import NKDFrequencySeparate, NKDFrequencyCombine
+from .nkd_color_warp import NKDColorWarp
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
@@ -30,6 +31,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDNoise,
             NKDFrequencySeparate,
             NKDFrequencyCombine,
+            NKDColorWarp,
         ]
 
 
@@ -49,6 +51,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDNoise": NKDNoise,
     "NKDFrequencySeparate": NKDFrequencySeparate,
     "NKDFrequencyCombine": NKDFrequencyCombine,
+    "NKDColorWarp": NKDColorWarp,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -62,6 +65,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDNoise": "😺NKD Noise",
     "NKDFrequencySeparate": "😺NKD Frequency Separate",
     "NKDFrequencyCombine": "😺NKD Frequency Combine",
+    "NKDColorWarp": "😺NKD Color Warp",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
