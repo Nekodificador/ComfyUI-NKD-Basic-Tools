@@ -7839,7 +7839,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-8ab4835f"]]);
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-f11c2d3f"]]);
 const _hoisted_1$2 = { class: "nkd-root" };
 const _hoisted_2$2 = { class: "nkd-bar" };
 const _hoisted_3$2 = { class: "nkd-row nkd-row--controls" };
@@ -8754,7 +8754,193 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-86ec67a6"]]);
+const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-cf839f24"]]);
+function meshIdentity(hueSegments = 12, satRings = 6) {
+  const offsets = [];
+  for (let r = 0; r <= satRings; r++) {
+    const ring = [];
+    for (let s = 0; s < hueSegments; s++) ring.push([0, 0, 0]);
+    offsets.push(ring);
+  }
+  return { hue_segments: hueSegments | 0, sat_rings: satRings | 0, offsets };
+}
+function meshFromDict(d) {
+  return {
+    hue_segments: d.hue_segments | 0,
+    sat_rings: d.sat_rings | 0,
+    offsets: d.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]))
+  };
+}
+function meshToDict(m) {
+  return {
+    hue_segments: m.hue_segments,
+    sat_rings: m.sat_rings,
+    offsets: m.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]))
+  };
+}
+let active = null;
+const PANEL = "#111318";
+const BAR_BG = "#1a1c22";
+const ACCENT = "#4ab4ff";
+const BORDER = "#3a3d46";
+const TEXT = "#c8d0e0";
+function meshJson(m) {
+  return JSON.stringify(meshToDict(m));
+}
+function toCanvas(src, w, h) {
+  if (!src) return null;
+  const width = w || src.naturalWidth || src.width || 0;
+  const height = h || src.naturalHeight || src.height || 0;
+  if (!width || !height) return null;
+  const c = document.createElement("canvas");
+  c.width = width;
+  c.height = height;
+  const ctx = c.getContext("2d");
+  if (!ctx) return null;
+  try {
+    ctx.drawImage(src, 0, 0, width, height);
+  } catch {
+    return null;
+  }
+  return c;
+}
+function openColorWarpViewer(opts) {
+  if (active) active.destroy();
+  let mesh;
+  try {
+    mesh = meshFromDict(JSON.parse(opts.mesh));
+  } catch {
+    mesh = meshIdentity();
+  }
+  let sourceCanvas = toCanvas(opts.image);
+  const host = document.createElement("div");
+  host.style.cssText = `position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;background:${PANEL};color:${TEXT};font:11px Inter,system-ui,sans-serif;`;
+  const bar = document.createElement("div");
+  bar.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px;background:${BAR_BG};border-bottom:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
+  const title = document.createElement("span");
+  title.textContent = "😺 Color Warp";
+  title.style.cssText = "font-weight:600;font-size:13px";
+  const hint = document.createElement("span");
+  hint.textContent = "RYB polar net over the pixel cloud · live LUT preview";
+  hint.style.cssText = "opacity:0.7;font-size:11px";
+  const spacer = document.createElement("span");
+  spacer.style.cssText = "flex:1 1 auto";
+  const saveBtn = mkBtn("Save & close", ACCENT);
+  const closeBtn = mkBtn("✕", TEXT);
+  closeBtn.style.padding = "4px 9px";
+  bar.append(title, hint, spacer, saveBtn, closeBtn);
+  const body = document.createElement("div");
+  body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
+  const leftPane = mkPane();
+  const rightPane = mkPane();
+  leftPane.style.borderRight = `1px solid ${BORDER}`;
+  body.append(leftPane, rightPane);
+  const gridCanvas = document.createElement("canvas");
+  gridCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+  leftPane.appendChild(gridCanvas);
+  const previewCanvas = document.createElement("canvas");
+  previewCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+  rightPane.appendChild(previewCanvas);
+  host.append(bar, body);
+  document.body.appendChild(host);
+  const dpr = Math.max(window.devicePixelRatio || 1, 1);
+  function drawPlaceholderGrid() {
+    const w = leftPane.clientWidth, h = leftPane.clientHeight;
+    if (w < 2 || h < 2) return;
+    gridCanvas.width = Math.round(w * dpr);
+    gridCanvas.height = Math.round(h * dpr);
+    const ctx = gridCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "rgba(120,180,255,0.5)";
+    ctx.font = "12px Inter,system-ui";
+    ctx.textAlign = "center";
+    ctx.fillText("RYB polar net (Phase 2)", w / 2, h / 2);
+  }
+  function drawPreview() {
+    const w = rightPane.clientWidth, h = rightPane.clientHeight;
+    if (w < 2 || h < 2) return;
+    previewCanvas.width = Math.round(w * dpr);
+    previewCanvas.height = Math.round(h * dpr);
+    const ctx = previewCanvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    if (!sourceCanvas) {
+      ctx.fillStyle = "rgba(200,208,224,0.5)";
+      ctx.font = "12px Inter,system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("Connect an image and run once", w / 2, h / 2);
+      return;
+    }
+    const iw = sourceCanvas.width, ih = sourceCanvas.height;
+    const r = Math.min(w / iw, h / ih);
+    const dw = iw * r, dh = ih * r;
+    ctx.drawImage(sourceCanvas, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
+  function render() {
+    drawPlaceholderGrid();
+    drawPreview();
+  }
+  const ro = new ResizeObserver(render);
+  ro.observe(body);
+  requestAnimationFrame(render);
+  let destroyed = false;
+  function destroy() {
+    if (destroyed) return;
+    destroyed = true;
+    ro.disconnect();
+    window.removeEventListener("keydown", onKey, true);
+    host.remove();
+    if (active && active.destroy === destroy) active = null;
+  }
+  function closeWith(commit) {
+    var _a;
+    const json = meshJson(mesh);
+    destroy();
+    if (commit) (_a = opts.onClose) == null ? void 0 : _a.call(opts, json);
+  }
+  const onKey = (e) => {
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      closeWith(true);
+    }
+  };
+  window.addEventListener("keydown", onKey, true);
+  host.addEventListener("pointerdown", (e) => {
+    if (e.target === host) closeWith(true);
+  });
+  saveBtn.onclick = () => closeWith(true);
+  closeBtn.onclick = () => closeWith(true);
+  active = { destroy };
+  return {
+    setImage(src, w, h) {
+      const c = toCanvas(src, w, h);
+      if (!c) return;
+      sourceCanvas = c;
+      render();
+    },
+    close() {
+      closeWith(false);
+    }
+  };
+}
+function mkBtn(label, color) {
+  const b = document.createElement("button");
+  b.textContent = label;
+  b.style.cssText = `background:#252830;border:1px solid ${BORDER};color:${color};border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit`;
+  if (color === ACCENT) {
+    b.style.borderColor = ACCENT;
+    b.style.fontWeight = "600";
+  }
+  return b;
+}
+function mkPane() {
+  const p2 = document.createElement("div");
+  p2.style.cssText = `position:relative;flex:1 1 0;min-width:0;overflow:hidden;background:${PANEL}`;
+  return p2;
+}
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -9455,12 +9641,90 @@ app.registerExtension({
     };
   }
 });
+let activeColorWarp = null;
+function rgbBytesToCanvas(bytes, w, h) {
+  const c = document.createElement("canvas");
+  c.width = w;
+  c.height = h;
+  const ctx = c.getContext("2d");
+  const img = ctx.createImageData(w, h);
+  for (let i = 0, j = 0, k = 0; i < w * h; i++, j += 3, k += 4) {
+    img.data[k] = bytes[j];
+    img.data[k + 1] = bytes[j + 1];
+    img.data[k + 2] = bytes[j + 2];
+    img.data[k + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+app.registerExtension({
+  name: "NKD.ColorWarp",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDColorWarp") return;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      var _a;
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const meshW = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "mesh");
+      if (meshW) {
+        meshW.type = "hidden";
+        meshW.hidden = true;
+        if (meshW.options) meshW.options.hidden = true;
+        meshW.computedHeight = 0;
+        meshW.computeSize = () => [0, -4];
+      }
+      const node = this;
+      const btn = this.addWidget("button", "🎨 Open Color Warper", null, () => {
+        const img = findSourceImg(node, "image");
+        const handle = openColorWarpViewer({
+          image: img,
+          mesh: (meshW == null ? void 0 : meshW.value) || "",
+          onChange: (json) => {
+            if (meshW) meshW.value = json;
+            node.setDirtyCanvas(true, true);
+          },
+          onClose: (json) => {
+            if (json && meshW) meshW.value = json;
+            node.setDirtyCanvas(true, true);
+            if ((activeColorWarp == null ? void 0 : activeColorWarp.handle) === handle) activeColorWarp = null;
+          }
+        });
+        activeColorWarp = { nodeId: String(node.id), handle };
+      });
+      btn.serialize = false;
+      const onSource = (e) => {
+        const d = e == null ? void 0 : e.detail;
+        if (!d || !activeColorWarp || activeColorWarp.nodeId !== String(node.id)) return;
+        if (String(d.node) !== String(node.id)) return;
+        try {
+          const bin = atob(d.data);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const c = rgbBytesToCanvas(bytes, d.width, d.height);
+          activeColorWarp.handle.setImage(c, d.width, d.height);
+        } catch {
+        }
+      };
+      api.addEventListener("nkd-colorwarp-source", onSource);
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        api.removeEventListener("nkd-colorwarp-source", onSource);
+        if ((activeColorWarp == null ? void 0 : activeColorWarp.nodeId) === String(node.id)) {
+          activeColorWarp.handle.close();
+          activeColorWarp = null;
+        }
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
 (function() {
   "use strict";
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-8ab4835f] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-8ab4835f], .nkd-root[data-v-8ab4835f] *, .nkd-root[data-v-8ab4835f] *::before, .nkd-root[data-v-8ab4835f] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-8ab4835f] {\n  width: 100%;\n  aspect-ratio: 320 / 210;\n  height: auto;\n  display: block;\n  cursor: default;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-8ab4835f] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-8ab4835f] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-8ab4835f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-8ab4835f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-8ab4835f] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n.nkd-btn[data-v-8ab4835f] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-8ab4835f]:hover {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-86ec67a6] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-86ec67a6], .nkd-root[data-v-86ec67a6] *, .nkd-root[data-v-86ec67a6] *::before, .nkd-root[data-v-86ec67a6] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-86ec67a6] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-86ec67a6] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-86ec67a6]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-86ec67a6] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-86ec67a6] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 1px 7px;\n  font-size: 10px;\n  cursor: pointer;\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-86ec67a6]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-86ec67a6] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-86ec67a6] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-86ec67a6] { padding: 5px 8px;\n}\n.nkd-hint[data-v-86ec67a6] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-86ec67a6] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-86ec67a6] {\n  flex: 1 1 auto;\n  min-width: 40px;\n  height: 3px;\n  accent-color: #4ab4ff;\n  cursor: ew-resize;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-e3af9b8a] {\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-e3af9b8a] {\n  height: 150px;\n  min-height: 90px;\n  resize: vertical;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 8px 10px;\n  color: #c8d0e0;\n  font-size: 13px;\n  line-height: 1.7;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-e3af9b8a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-e3af9b8a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-e3af9b8a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-e3af9b8a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-e3af9b8a] {\n  color: #4ab4ff;\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 11px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 17px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

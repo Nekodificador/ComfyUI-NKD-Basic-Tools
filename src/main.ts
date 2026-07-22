@@ -10,6 +10,7 @@ import GradientPreviewWidget from "./GradientPreviewWidget.vue";
 import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
 import NoisePreviewWidget from "./NoisePreviewWidget.vue";
 import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
+import { openColorWarpViewer, ColorWarpViewerHandle } from "./colorWarpViewer";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -731,6 +732,98 @@ comfyApp.registerExtension({
         ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Color Warp — opens a fullscreen RYB polar-net editor + live LUT preview.
+// The node's hidden `mesh` string widget is the single source of truth; a button
+// widget launches the vanilla-TS overlay (src/colorWarpViewer.ts). The resolved
+// source frame is read live via findSourceImg, with the backend
+// `nkd-colorwarp-source` push as a fallback for sources behind resizes/subgraphs.
+let activeColorWarp: { nodeId: string; handle: ColorWarpViewerHandle } | null = null;
+
+// Build a canvas from the pushed RGB (uint8, 3 bytes/px) frame.
+function rgbBytesToCanvas(bytes: Uint8Array, w: number, h: number): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d")!;
+  const img = ctx.createImageData(w, h);
+  for (let i = 0, j = 0, k = 0; i < w * h; i++, j += 3, k += 4) {
+    img.data[k] = bytes[j];
+    img.data[k + 1] = bytes[j + 1];
+    img.data[k + 2] = bytes[j + 2];
+    img.data[k + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return c;
+}
+
+comfyApp.registerExtension({
+  name: "NKD.ColorWarp",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDColorWarp") return;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const meshW = this.widgets?.find((w: any) => w.name === "mesh");
+      if (meshW) {
+        meshW.type = "hidden";
+        meshW.hidden = true;
+        if (meshW.options) meshW.options.hidden = true;
+        meshW.computedHeight = 0;
+        meshW.computeSize = () => [0, -4];
+      }
+
+      const node = this;
+      const btn = this.addWidget("button", "🎨 Open Color Warper", null, () => {
+        const img = findSourceImg(node, "image");
+        const handle = openColorWarpViewer({
+          image: img,
+          mesh: meshW?.value || "",
+          onChange: (json: string) => {
+            if (meshW) meshW.value = json;
+            node.setDirtyCanvas(true, true);
+          },
+          onClose: (json: string) => {
+            if (json && meshW) meshW.value = json;
+            node.setDirtyCanvas(true, true);
+            if (activeColorWarp?.handle === handle) activeColorWarp = null;
+          },
+        });
+        activeColorWarp = { nodeId: String(node.id), handle };
+      });
+      btn.serialize = false;
+
+      // Backend push of the resolved input frame (handles sources behind a
+      // resize/subgraph). Payload: {node,width,height,data} — RGB uint8 base64.
+      const onSource = (e: any) => {
+        const d = e?.detail;
+        if (!d || !activeColorWarp || activeColorWarp.nodeId !== String(node.id)) return;
+        if (String(d.node) !== String(node.id)) return;
+        try {
+          const bin = atob(d.data);
+          const bytes = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          const c = rgbBytesToCanvas(bytes, d.width, d.height);
+          activeColorWarp.handle.setImage(c, d.width, d.height);
+        } catch { /* ignore malformed */ }
+      };
+      api.addEventListener("nkd-colorwarp-source", onSource);
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        api.removeEventListener("nkd-colorwarp-source", onSource);
+        if (activeColorWarp?.nodeId === String(node.id)) {
+          activeColorWarp.handle.close();
+          activeColorWarp = null;
+        }
         origRemoved?.apply(this, arguments);
       };
 
