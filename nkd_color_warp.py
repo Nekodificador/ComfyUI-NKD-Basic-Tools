@@ -67,5 +67,23 @@ except Exception:  # not inside ComfyUI (e.g. running unit tests)
 
 
 def _push_source(unique_id, np_img):
-    """Filled in Task 7."""
-    return
+    if unique_id is None:
+        return
+    try:
+        from server import PromptServer
+        import base64
+        frame = np.clip(np_img[0], 0.0, 1.0)  # first frame, HWC
+        h, w = frame.shape[:2]
+        longest = max(h, w)
+        if longest > 1024:
+            step = int(np.ceil(longest / 1024))
+            frame = frame[::step, ::step]
+            h, w = frame.shape[:2]
+        buf = (frame * 255.0 + 0.5).astype(np.uint8).tobytes()
+        PromptServer.instance.send_sync("nkd-colorwarp-source", {
+            "node": str(unique_id),
+            "width": w, "height": h,
+            "data": base64.b64encode(buf).decode("ascii"),
+        })
+    except Exception:
+        pass
