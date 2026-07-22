@@ -8995,6 +8995,7 @@ class ColorWarpGrid {
     this.buildWheel();
     if (this.wheel) ctx.putImageData(this.wheel, 0, 0);
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.drawScatter(ctx);
     this.drawReferenceGrid(ctx);
     if (this.mesh) this.drawWeb(ctx, this.mesh);
   }

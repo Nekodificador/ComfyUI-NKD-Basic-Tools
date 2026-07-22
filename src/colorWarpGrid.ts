@@ -154,7 +154,7 @@ export class ColorWarpGrid {
     // Vector layers in CSS px.
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-    // this.drawScatter(ctx); // enabled in Phase 3
+    this.drawScatter(ctx);
     this.drawReferenceGrid(ctx);
     if (this.mesh) this.drawWeb(ctx, this.mesh);
   }
