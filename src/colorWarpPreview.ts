@@ -4,7 +4,7 @@
 // to match the LUT layout in colorCore. If WebGL2 / 3D textures are unavailable
 // it falls back to a CPU applyRgb pass at reduced resolution (still correct,
 // just slower). Mesh changes rebake + re-upload the LUT, debounced with rAF.
-import { Mesh, bakeLut, applyRgb } from "./colorCore";
+import { Mesh, bakeLut, applyRgb, srgbToHsl } from "./colorCore";
 
 const LUT_SIZE = 33;
 
@@ -23,13 +23,45 @@ in vec2 vUv;
 uniform sampler2D uImg;
 uniform highp sampler3D uLut;
 uniform float uN;
+uniform float uMask;    // 0 = off, 1 = affected-region mask
+uniform float uMaskHue; // target hue in turns [0,1)
+uniform float uMaskSat; // target HSL sat [0,1]
 out vec4 outColor;
+
+// HSL hue (turns) & sat of a color — matches the wheel/scatter convention so
+// the mask lines up with where the pixel sits on the grid.
+float hueTurns(vec3 c) {
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b), d = mx - mn;
+  float h = 0.0;
+  if (d > 1e-5) {
+    if (mx == c.r) h = mod((c.g - c.b) / d, 6.0);
+    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
+    else h = (c.r - c.g) / d + 4.0;
+  }
+  return mod(h / 6.0, 1.0);
+}
+float hslSat(vec3 c) {
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
+  float L = (mx + mn) * 0.5, d = mx - mn;
+  return d < 1e-5 ? 0.0 : d / (1.0 - abs(2.0 * L - 1.0) + 1e-6);
+}
+
 void main() {
   vec3 c = clamp(texture(uImg, vUv).rgb, 0.0, 1.0);
   // Half-texel scale/offset so grid endpoints hit texel centers — matches the
   // CPU applyRgb which samples on the [0, N-1] integer lattice.
   vec3 coord = (c * (uN - 1.0) + 0.5) / uN;
-  outColor = vec4(texture(uLut, coord).rgb, 1.0);
+  vec3 graded = texture(uLut, coord).rgb;
+  if (uMask > 0.5) {
+    // Weight the SOURCE pixel by how close its (hue,sat) is to the grid cursor
+    // cell; show that region in colour over a grayscale base.
+    float dh = abs(hueTurns(c) - uMaskHue); dh = min(dh, 1.0 - dh);
+    float w = smoothstep(0.11, 0.0, dh) * smoothstep(0.33, 0.0, abs(hslSat(c) - uMaskSat));
+    float g = dot(graded, vec3(0.299, 0.587, 0.114));
+    outColor = vec4(mix(vec3(g), graded, w), 1.0);
+    return;
+  }
+  outColor = vec4(graded, 1.0);
 }`;
 
 export class ColorWarpPreview {
@@ -44,10 +76,19 @@ export class ColorWarpPreview {
   private lutTex: WebGLTexture | null = null;
   private vao: WebGLVertexArrayObject | null = null;
   private uImg = -1; private uLut = -1; private uN = -1;
+  private uMask = -1; private uMaskHue = -1; private uMaskSat = -1;
   private cpu = false;
   private ctx2d: CanvasRenderingContext2D | null = null;
   private lutDirty = true;
   private raf = 0;
+
+  // Baked LUT cache (Float64) — reused by GL upload, CPU render and readPixel.
+  private lutF: Float64Array | null = null;
+  // Cached source pixels (for the hover readout) + last draw geometry (device px).
+  private srcData: ImageData | null = null;
+  private rect = { x: 0, y: 0, w: 0, h: 0, iw: 0, ih: 0 };
+  // Alt affected-region mask target (HSL): null = off.
+  private mask: { hue: number; sat: number } | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -87,6 +128,9 @@ export class ColorWarpPreview {
     this.uImg = gl.getUniformLocation(prog, "uImg") as any;
     this.uLut = gl.getUniformLocation(prog, "uLut") as any;
     this.uN = gl.getUniformLocation(prog, "uN") as any;
+    this.uMask = gl.getUniformLocation(prog, "uMask") as any;
+    this.uMaskHue = gl.getUniformLocation(prog, "uMaskHue") as any;
+    this.uMaskSat = gl.getUniformLocation(prog, "uMaskSat") as any;
 
     // Fullscreen quad.
     const vao = gl.createVertexArray();
@@ -109,14 +153,54 @@ export class ColorWarpPreview {
 
   setMesh(mesh: Mesh) {
     this.mesh = mesh;
+    this.lutF = bakeLut(mesh, LUT_SIZE); // one bake, shared by GL/CPU/readPixel
     this.lutDirty = true;
     this.schedule();
   }
 
   setSource(src: HTMLCanvasElement) {
     this.source = src;
+    // Cache source pixels for the hover readout (full res, one-time per source).
+    try {
+      const tc = document.createElement("canvas");
+      tc.width = src.width; tc.height = src.height;
+      const tx = tc.getContext("2d")!;
+      tx.drawImage(src, 0, 0);
+      this.srcData = tx.getImageData(0, 0, src.width, src.height);
+    } catch { this.srcData = null; }
     if (this.gl) this.uploadImage();
     this.schedule();
+  }
+
+  // Alt affected-region mask (Phase 7.2). hueDeg = target real hue; sat = HSL sat.
+  setMask(hueDeg: number, sat: number) {
+    const next = { hue: hueDeg, sat };
+    if (this.mask && this.mask.hue === hueDeg && this.mask.sat === sat) return;
+    this.mask = next;
+    this.schedule();
+  }
+  clearMask() {
+    if (!this.mask) return;
+    this.mask = null;
+    this.schedule();
+  }
+
+  // Read the GRADED colour under a client point (for the hover HSL readout).
+  // Computed from cached source pixels + baked LUT so it's exact and independent
+  // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
+  readPixel(clientX: number, clientY: number): [number, number, number] | null {
+    if (!this.srcData || !this.lutF) return null;
+    const r = this.canvas.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    const dx = (clientX - r.left) * (this.canvas.width / r.width);
+    const dy = (clientY - r.top) * (this.canvas.height / r.height);
+    const { x, y, w, h, iw, ih } = this.rect;
+    if (w < 1 || h < 1 || dx < x || dy < y || dx >= x + w || dy >= y + h) return null;
+    const sx = Math.min(iw - 1, Math.floor((dx - x) / w * iw));
+    const sy = Math.min(ih - 1, Math.floor((dy - y) / h * ih));
+    const k = (sy * iw + sx) * 4;
+    const d = this.srcData.data;
+    return applyRgb(this.lutF, LUT_SIZE, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
   }
 
   resize() {
@@ -168,7 +252,7 @@ export class ColorWarpPreview {
     const gl = this.gl;
     if (!gl || !this.mesh) return;
     const size = LUT_SIZE;
-    const lut = bakeLut(this.mesh, size); // Float64Array, idx ((r*size+g)*size+b)*3
+    const lut = this.lutF || bakeLut(this.mesh, size); // idx ((r*size+g)*size+b)*3
     // Repack so the texel at (x,y,z)=(r,g,b) — data order x fastest — holds
     // lut[r,g,b]. dst index = (r + g*size + b*size*size)*4.
     const data = new Uint8Array(size * size * size * 4);
@@ -210,8 +294,11 @@ export class ColorWarpPreview {
     const iw = this.source.width, ih = this.source.height;
     const r = Math.min(W / iw, H / ih);
     const dw = iw * r, dh = ih * r;
-    gl.viewport(Math.round((W - dw) / 2), Math.round((H - dh) / 2),
-      Math.round(dw), Math.round(dh));
+    const ox = Math.round((W - dw) / 2), oy = Math.round((H - dh) / 2);
+    // Record draw geometry for readPixel (device px; y measured from top-left,
+    // GL's oy is from the bottom so flip it).
+    this.rect = { x: ox, y: H - oy - Math.round(dh), w: Math.round(dw), h: Math.round(dh), iw, ih };
+    gl.viewport(ox, oy, Math.round(dw), Math.round(dh));
 
     gl.useProgram(this.prog);
     gl.activeTexture(gl.TEXTURE0);
@@ -221,6 +308,9 @@ export class ColorWarpPreview {
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.uniform1i(this.uLut, 1);
     gl.uniform1f(this.uN, LUT_SIZE);
+    gl.uniform1f(this.uMask, this.mask ? 1 : 0);
+    gl.uniform1f(this.uMaskHue, this.mask ? ((this.mask.hue % 360 + 360) % 360) / 360 : 0);
+    gl.uniform1f(this.uMaskSat, this.mask ? this.mask.sat : 0);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
@@ -236,7 +326,7 @@ export class ColorWarpPreview {
     ctx.fillRect(0, 0, W, H);
     if (!this.source || !this.mesh) return;
 
-    const lut = bakeLut(this.mesh, LUT_SIZE);
+    const lut = this.lutF || bakeLut(this.mesh, LUT_SIZE);
     const iw = this.source.width, ih = this.source.height;
     const longest = Math.max(iw, ih);
     const scale = longest > 512 ? 512 / longest : 1;
@@ -248,8 +338,21 @@ export class ColorWarpPreview {
     tctx.drawImage(this.source, 0, 0, sw, sh);
     const img = tctx.getImageData(0, 0, sw, sh);
     const px = img.data;
+    const maskHue = this.mask ? (this.mask.hue % 360 + 360) % 360 : 0;
     for (let k = 0; k < px.length; k += 4) {
-      const rgb = applyRgb(lut, LUT_SIZE, [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255]);
+      const src: [number, number, number] = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
+      const rgb = applyRgb(lut, LUT_SIZE, src);
+      if (this.mask) {
+        const [h, s] = srgbToHsl(src);
+        let dh = Math.abs(h - maskHue); dh = Math.min(dh, 360 - dh) / 180; // 0..1 (turns*2)
+        const wh = Math.max(0, 1 - dh / 0.22);
+        const ws = Math.max(0, 1 - Math.abs(s - this.mask.sat) / 0.33);
+        const w = wh * ws;
+        const g = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
+        rgb[0] = g + (rgb[0] - g) * w;
+        rgb[1] = g + (rgb[1] - g) * w;
+        rgb[2] = g + (rgb[2] - g) * w;
+      }
       px[k] = Math.round(rgb[0] * 255);
       px[k + 1] = Math.round(rgb[1] * 255);
       px[k + 2] = Math.round(rgb[2] * 255);
@@ -258,7 +361,9 @@ export class ColorWarpPreview {
 
     const r = Math.min(W / iw, H / ih);
     const dw = iw * r, dh = ih * r;
+    const ox = (W - dw) / 2, oy = (H - dh) / 2;
+    this.rect = { x: ox, y: oy, w: dw, h: dh, iw, ih };
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(tmp, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.drawImage(tmp, ox, oy, dw, dh);
   }
 }

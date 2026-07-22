@@ -8820,6 +8820,26 @@ function oklchToOklab(lch) {
   const r = h * RAD$1;
   return [L, C * Math.cos(r), C * Math.sin(r)];
 }
+function srgbToHsl(rgb) {
+  const [r, g, b] = rgb;
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  const d = mx - mn;
+  const L = (mx + mn) / 2;
+  const S = d === 0 ? 0 : d / (1 - Math.abs(2 * L - 1) + 1e-12);
+  let h = 0;
+  if (d !== 0) {
+    if (mx === r) {
+      h = mod((g - b) / (d + 1e-12), 6);
+    } else if (mx === g) {
+      h = (b - r) / (d + 1e-12) + 2;
+    } else if (mx === b) {
+      h = (r - g) / (d + 1e-12) + 4;
+    }
+  }
+  h = mod(h * 60, 360);
+  return [h, S, L];
+}
 function hslToSrgb(hsl) {
   const h = mod(hsl[0], 360);
   const s = hsl[1];
@@ -9009,11 +9029,22 @@ const GRID_LINE = "rgba(120,180,255,0.35)";
 const WEB_LINE = "rgba(120,180,255,0.55)";
 const ACCENT$1 = "#4ab4ff";
 const RAD = Math.PI / 180;
+const R_IDLE = 6;
+const R_HOVER = 7;
+const R_CENTER = 4.5;
+const HIT_PX = 14;
+const SMOOTH_SIGMA = 1.2;
+const SHIFT_ROT_PER_PX = 0.25;
+const SHIFT_SAT_PER_PX = 3e-3;
+const LUMA_PER_WHEEL = 15e-4;
 function angleRad(displayDeg) {
   return (displayDeg - 90) * RAD;
 }
 function clamp01(x) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+function wrapDeg(d) {
+  return ((d + 180) % 360 + 360) % 360 - 180;
 }
 class ColorWarpGrid {
   constructor(canvas) {
@@ -9022,6 +9053,10 @@ class ColorWarpGrid {
     __publicField(this, "dpr", Math.max(window.devicePixelRatio || 1, 2));
     __publicField(this, "mesh", null);
     __publicField(this, "source", null);
+    // Public interaction toggles (viewer toolbar drives these).
+    __publicField(this, "smooth", true);
+    __publicField(this, "pin", false);
+    __publicField(this, "cb", {});
     // Geometry in CSS px, recomputed on resize.
     __publicField(this, "cx", 0);
     __publicField(this, "cy", 0);
@@ -9033,16 +9068,117 @@ class ColorWarpGrid {
     __publicField(this, "wheelKey", "");
     // Cached scatter: [displayDeg, sat] per sampled pixel, source-independent of size.
     __publicField(this, "scatter", null);
+    // Drag / hover state.
+    __publicField(this, "hover", null);
+    // [ri, sj] under cursor
+    __publicField(this, "drag", null);
+    // Preview-hover indicator: [displayDeg, sat, cssColor] or null.
+    __publicField(this, "indicator", null);
+    __publicField(this, "onDown", (e) => {
+      if (!this.mesh || this.R < 2) return;
+      const [x, y] = this.localXY(e);
+      if (e.shiftKey) {
+        const [disp, sat] = this.toPolar(x, y);
+        const S = this.mesh.hue_segments, R = this.mesh.sat_rings;
+        const ri = Math.min(Math.max(Math.round(sat * R), 1), R);
+        const sj = (Math.round(disp / (360 / S)) % S + S) % S;
+        this.drag = { kind: "shift", ri, sj, startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+      } else {
+        const hit = this.hitTest(x, y);
+        if (!hit) return;
+        this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+      }
+      this.canvas.setPointerCapture(e.pointerId);
+      e.preventDefault();
+    });
+    __publicField(this, "onMove", (e) => {
+      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      if (!this.mesh || this.R < 2) return;
+      const [x, y] = this.localXY(e);
+      if (this.drag) {
+        if (this.drag.kind === "node") this.dragNode(x, y);
+        else this.dragShift(x, y);
+        this.draw();
+        this.emit(false);
+        const { ri, sj } = this.drag;
+        const off = this.mesh.offsets[ri][sj];
+        (_b = (_a = this.cb).onHover) == null ? void 0 : _b.call(_a, { ri, sj, dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
+        return;
+      }
+      const hit = this.hitTest(x, y);
+      const changed = (hit == null ? void 0 : hit[0]) !== ((_c = this.hover) == null ? void 0 : _c[0]) || (hit == null ? void 0 : hit[1]) !== ((_d = this.hover) == null ? void 0 : _d[1]);
+      this.hover = hit;
+      if (changed) this.draw();
+      if (hit) {
+        const off = this.mesh.offsets[hit[0]][hit[1]];
+        (_f = (_e = this.cb).onHover) == null ? void 0 : _f.call(_e, { ri: hit[0], sj: hit[1], dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
+      } else {
+        (_h = (_g = this.cb).onHover) == null ? void 0 : _h.call(_g, null, e.clientX, e.clientY);
+      }
+      const [disp, sat] = this.toPolar(x, y);
+      const inside = Math.hypot(x - this.cx, y - this.cy) <= this.R;
+      (_j = (_i = this.cb).onGridCursor) == null ? void 0 : _j.call(_i, disp, sat, e.altKey, inside);
+    });
+    __publicField(this, "onUp", (e) => {
+      if (!this.drag) return;
+      try {
+        this.canvas.releasePointerCapture(this.drag.pointerId);
+      } catch {
+      }
+      this.drag = null;
+      this.draw();
+      this.emit(true);
+    });
+    __publicField(this, "onDblClick", (e) => {
+      if (!this.mesh) return;
+      const [x, y] = this.localXY(e);
+      const hit = this.hitTest(x, y);
+      if (!hit) return;
+      const o = this.mesh.offsets[hit[0]][hit[1]];
+      o[0] = 0;
+      o[1] = 0;
+      o[2] = 0;
+      this.draw();
+      this.emit(true);
+      e.preventDefault();
+    });
+    // Alt+wheel over a node adjusts its luma (dl ∈ [-1,1]) (Phase 6.2).
+    __publicField(this, "onWheel", (e) => {
+      if (!this.mesh || !e.altKey) return;
+      const [x, y] = this.localXY(e);
+      const hit = this.hitTest(x, y);
+      if (!hit) return;
+      e.preventDefault();
+      const o = this.mesh.offsets[hit[0]][hit[1]];
+      o[2] = Math.min(Math.max(o[2] - e.deltaY * LUMA_PER_WHEEL, -1), 1);
+      this.draw();
+      this.emit(true);
+    });
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
+    canvas.style.touchAction = "none";
+    canvas.addEventListener("pointerdown", this.onDown);
+    canvas.addEventListener("pointermove", this.onMove);
+    canvas.addEventListener("pointerup", this.onUp);
+    canvas.addEventListener("pointercancel", this.onUp);
+    canvas.addEventListener("dblclick", this.onDblClick);
+    canvas.addEventListener("wheel", this.onWheel, { passive: false });
   }
   setMesh(mesh) {
     this.mesh = mesh;
     this.draw();
   }
+  getMesh() {
+    return this.mesh;
+  }
   setSource(src) {
     this.source = src;
     this.scatter = null;
+    this.draw();
+  }
+  // Preview → grid indicator dot (Phase 7.1). Pass null to clear.
+  setIndicator(displayDeg, sat = 0, css = "#fff") {
+    this.indicator = displayDeg == null ? null : [displayDeg, sat, css];
     this.draw();
   }
   resize() {
@@ -9058,13 +9194,160 @@ class ColorWarpGrid {
     this.draw();
   }
   dispose() {
+    const c = this.canvas;
+    c.removeEventListener("pointerdown", this.onDown);
+    c.removeEventListener("pointermove", this.onMove);
+    c.removeEventListener("pointerup", this.onUp);
+    c.removeEventListener("pointercancel", this.onUp);
+    c.removeEventListener("dblclick", this.onDblClick);
+    c.removeEventListener("wheel", this.onWheel);
   }
+  // --- geometry ------------------------------------------------------------
   // display angle + normalized sat → CSS-px screen point.
   polar(displayDeg, sat) {
     const a = angleRad(displayDeg);
     const r = sat * this.R;
     return [this.cx + r * Math.cos(a), this.cy + r * Math.sin(a)];
   }
+  // Inverse: CSS-px screen point → [displayDeg, sat] (sat clamped to [0,1]).
+  toPolar(x, y) {
+    const dx = x - this.cx, dy = y - this.cy;
+    const sat = clamp01(Math.hypot(dx, dy) / (this.R || 1));
+    let disp = Math.atan2(dy, dx) / RAD + 90;
+    disp = (disp % 360 + 360) % 360;
+    return [disp, sat];
+  }
+  // A mesh node's warped on-screen position (matches meshSample's center-safe
+  // hue push: warpedHue = baseHue + dhRaw*baseSat). This is THE hit-test/inverse
+  // reference used by every drag path.
+  nodePt(ri, sj) {
+    const m = this.mesh;
+    const S = m.hue_segments, R = m.sat_rings;
+    const baseDisp = sj * 360 / S;
+    const baseSat = ri / R;
+    const off = m.offsets[ri][sj];
+    const hue = displayToHue(baseDisp);
+    const warpedHue = hue + off[0] * baseSat;
+    const warpedDisp = hueToDisplay(warpedHue);
+    const warpedSat = clamp01(baseSat + off[1]);
+    return this.polar(warpedDisp, warpedSat);
+  }
+  // Nearest control node to a CSS-px point, within HIT_PX. Center (ri=0) counted
+  // once. Returns [ri, sj] or null.
+  hitTest(x, y) {
+    const m = this.mesh;
+    if (!m) return null;
+    const R = m.sat_rings, S = m.hue_segments;
+    let best = null;
+    let bestD = HIT_PX * HIT_PX;
+    const consider = (ri, sj) => {
+      const [px, py] = this.nodePt(ri, sj);
+      const d = (px - x) * (px - x) + (py - y) * (py - y);
+      if (d < bestD) {
+        bestD = d;
+        best = [ri, sj];
+      }
+    };
+    for (let ri = 1; ri <= R; ri++) for (let sj = 0; sj < S; sj++) consider(ri, sj);
+    consider(0, 0);
+    return best;
+  }
+  // --- interaction ---------------------------------------------------------
+  localXY(e) {
+    const r = this.canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+  cloneOffsets() {
+    return this.mesh.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]));
+  }
+  emit(commit) {
+    var _a, _b;
+    (_b = (_a = this.cb).onEdit) == null ? void 0 : _b.call(_a, JSON.stringify(meshToDict(this.mesh)), commit);
+  }
+  // Drag a single node to follow the cursor; Smooth spreads the delta to
+  // neighbours with a Gaussian falloff, Pin freezes them.
+  dragNode(x, y) {
+    const m = this.mesh;
+    const S = m.hue_segments, R = m.sat_rings;
+    const { ri, sj, start } = this.drag;
+    const [disp, sat] = this.toPolar(x, y);
+    let tgtDh, tgtDs;
+    if (ri === 0) {
+      tgtDh = 0;
+      tgtDs = sat;
+    } else {
+      const baseHue = displayToHue(sj * 360 / S);
+      const baseSat = ri / R;
+      const targetHue = displayToHue(disp);
+      tgtDh = wrapDeg(targetHue - baseHue) / baseSat;
+      tgtDs = sat - baseSat;
+    }
+    const dDh = tgtDh - start[ri][sj][0];
+    const dDs = tgtDs - start[ri][sj][1];
+    const apply2 = (rr, ss, w) => {
+      const o = m.offsets[rr][ss], s0 = start[rr][ss];
+      o[0] = s0[0] + dDh * w;
+      o[1] = s0[1] + dDs * w;
+      o[2] = s0[2];
+    };
+    if (ri === 0) {
+      for (let ss = 0; ss < S; ss++) apply2(0, ss, 1);
+      return;
+    }
+    if (this.pin || !this.smooth) {
+      apply2(ri, sj, 1);
+      return;
+    }
+    for (let rr = 1; rr <= R; rr++) {
+      for (let ss = 0; ss < S; ss++) {
+        const dRing = rr - ri;
+        let dSeg = Math.abs(ss - sj);
+        dSeg = Math.min(dSeg, S - dSeg);
+        const w = Math.exp(-(dRing * dRing + dSeg * dSeg) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
+        apply2(rr, ss, w);
+      }
+    }
+  }
+  // Shift gesture: horizontal rotates the grabbed sector's hue (dh on every ring
+  // of that spoke), vertical expands/contracts the grabbed ring's sat (ds on
+  // every segment of that ring). Both act off the grab snapshot.
+  dragShift(x, y) {
+    const m = this.mesh;
+    const S = m.hue_segments, R = m.sat_rings;
+    const { ri, sj, startX, startY, start } = this.drag;
+    const dx = x - startX, dy = y - startY;
+    const dDh = dx * SHIFT_ROT_PER_PX;
+    const dDs = -dy * SHIFT_SAT_PER_PX;
+    for (let rr = 0; rr <= R; rr++)
+      for (let ss = 0; ss < S; ss++) {
+        const o = m.offsets[rr][ss], s0 = start[rr][ss];
+        o[0] = s0[0];
+        o[1] = s0[1];
+        o[2] = s0[2];
+      }
+    for (let rr = 1; rr <= R; rr++) m.offsets[rr][sj][0] = start[rr][sj][0] + dDh;
+    for (let ss = 0; ss < S; ss++) m.offsets[ri][ss][1] = start[ri][ss][1] + dDs;
+  }
+  // Reset all offsets to identity (keeps current density) (Phase 8).
+  resetAll() {
+    if (!this.mesh) return;
+    const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
+    for (let rr = 0; rr <= R; rr++)
+      for (let ss = 0; ss < S; ss++) this.mesh.offsets[rr][ss] = [0, 0, 0];
+    this.draw();
+    this.emit(true);
+  }
+  // Change hue-segment density (8/12). Resets offsets to identity at the new
+  // resolution — remapping arbitrary warps across densities isn't meaningful.
+  setDensity(hueSegments) {
+    var _a;
+    const rings = ((_a = this.mesh) == null ? void 0 : _a.sat_rings) ?? 6;
+    this.mesh = meshIdentity(hueSegments, rings);
+    this.hover = null;
+    this.draw();
+    this.emit(true);
+  }
+  // --- rendering -----------------------------------------------------------
   buildWheel() {
     const dw = this.canvas.width, dh = this.canvas.height;
     const key = `${dw}x${dh}`;
@@ -9144,6 +9427,7 @@ class ColorWarpGrid {
     this.drawScatter(ctx);
     this.drawReferenceGrid(ctx);
     if (this.mesh) this.drawWeb(ctx, this.mesh);
+    this.drawIndicator(ctx);
   }
   drawScatter(ctx) {
     this.buildScatter();
@@ -9179,20 +9463,11 @@ class ColorWarpGrid {
     }
   }
   // The deformable mesh web: each control node placed at its warped position,
-  // ring polylines + spoke polylines through them, plus handles. Identity mesh
-  // ⇒ nodes sit on the reference intersections (undistorted web centered).
+  // ring polylines + spoke polylines through them, plus handles.
   drawWeb(ctx, mesh) {
+    var _a, _b;
     const R = mesh.sat_rings, S = mesh.hue_segments;
-    const pt = (ri, sj) => {
-      const baseDisp = sj * 360 / S;
-      const baseSat = ri / R;
-      const off = mesh.offsets[ri][sj];
-      const hue = displayToHue(baseDisp);
-      const warpedHue = hue + off[0] * baseSat;
-      const warpedDisp = hueToDisplay(warpedHue);
-      const warpedSat = clamp01(baseSat + off[1]);
-      return this.polar(warpedDisp, warpedSat);
-    };
+    const pt = (ri, sj) => this.nodePt(ri, sj);
     ctx.strokeStyle = WEB_LINE;
     ctx.lineWidth = 1;
     for (let ri = 1; ri <= R; ri++) {
@@ -9211,24 +9486,66 @@ class ColorWarpGrid {
       }
       ctx.stroke();
     }
-    ctx.fillStyle = ACCENT$1;
     ctx.strokeStyle = "rgba(0,0,0,0.6)";
     ctx.lineWidth = 1.5;
-    const drawHandle = (x, y, r) => {
+    const hovRi = this.drag ? this.drag.ri : (_a = this.hover) == null ? void 0 : _a[0];
+    const hovSj = this.drag ? this.drag.sj : (_b = this.hover) == null ? void 0 : _b[1];
+    const drawHandle = (x, y, ri, sj, base) => {
+      const isHot = ri === hovRi && sj === hovSj;
+      const r = isHot ? R_HOVER : base;
+      const dl = mesh.offsets[ri][sj][2];
+      ctx.fillStyle = dl === 0 ? ACCENT$1 : mixLuma(ACCENT$1, dl);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      if (isHot) {
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      }
     };
     for (let ri = 1; ri <= R; ri++) {
       for (let sj = 0; sj < S; sj++) {
         const [x, y] = pt(ri, sj);
-        drawHandle(x, y, 6);
+        drawHandle(x, y, ri, sj, R_IDLE);
       }
     }
     const [cx0, cy0] = pt(0, 0);
-    drawHandle(cx0, cy0, 6);
+    drawHandle(cx0, cy0, 0, 0, R_CENTER);
   }
+  drawIndicator(ctx) {
+    if (!this.indicator) return;
+    const [disp, sat, css] = this.indicator;
+    const [x, y] = this.polar(disp, sat);
+    ctx.save();
+    ctx.fillStyle = css;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(x, y, 5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(x, y, 7, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+function mixLuma(hex, dl) {
+  const n = parseInt(hex.slice(1), 16);
+  let r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  const t = Math.min(Math.abs(dl), 1) * 0.7;
+  const tgt = dl < 0 ? 0 : 255;
+  r = Math.round(r + (tgt - r) * t);
+  g = Math.round(g + (tgt - g) * t);
+  b = Math.round(b + (tgt - b) * t);
+  return `rgb(${r},${g},${b})`;
 }
 const LUT_SIZE = 33;
 const VERT = `#version 300 es
@@ -9245,13 +9562,45 @@ in vec2 vUv;
 uniform sampler2D uImg;
 uniform highp sampler3D uLut;
 uniform float uN;
+uniform float uMask;    // 0 = off, 1 = affected-region mask
+uniform float uMaskHue; // target hue in turns [0,1)
+uniform float uMaskSat; // target HSL sat [0,1]
 out vec4 outColor;
+
+// HSL hue (turns) & sat of a color — matches the wheel/scatter convention so
+// the mask lines up with where the pixel sits on the grid.
+float hueTurns(vec3 c) {
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b), d = mx - mn;
+  float h = 0.0;
+  if (d > 1e-5) {
+    if (mx == c.r) h = mod((c.g - c.b) / d, 6.0);
+    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
+    else h = (c.r - c.g) / d + 4.0;
+  }
+  return mod(h / 6.0, 1.0);
+}
+float hslSat(vec3 c) {
+  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
+  float L = (mx + mn) * 0.5, d = mx - mn;
+  return d < 1e-5 ? 0.0 : d / (1.0 - abs(2.0 * L - 1.0) + 1e-6);
+}
+
 void main() {
   vec3 c = clamp(texture(uImg, vUv).rgb, 0.0, 1.0);
   // Half-texel scale/offset so grid endpoints hit texel centers — matches the
   // CPU applyRgb which samples on the [0, N-1] integer lattice.
   vec3 coord = (c * (uN - 1.0) + 0.5) / uN;
-  outColor = vec4(texture(uLut, coord).rgb, 1.0);
+  vec3 graded = texture(uLut, coord).rgb;
+  if (uMask > 0.5) {
+    // Weight the SOURCE pixel by how close its (hue,sat) is to the grid cursor
+    // cell; show that region in colour over a grayscale base.
+    float dh = abs(hueTurns(c) - uMaskHue); dh = min(dh, 1.0 - dh);
+    float w = smoothstep(0.11, 0.0, dh) * smoothstep(0.33, 0.0, abs(hslSat(c) - uMaskSat));
+    float g = dot(graded, vec3(0.299, 0.587, 0.114));
+    outColor = vec4(mix(vec3(g), graded, w), 1.0);
+    return;
+  }
+  outColor = vec4(graded, 1.0);
 }`;
 class ColorWarpPreview {
   constructor(canvas) {
@@ -9267,10 +9616,20 @@ class ColorWarpPreview {
     __publicField(this, "uImg", -1);
     __publicField(this, "uLut", -1);
     __publicField(this, "uN", -1);
+    __publicField(this, "uMask", -1);
+    __publicField(this, "uMaskHue", -1);
+    __publicField(this, "uMaskSat", -1);
     __publicField(this, "cpu", false);
     __publicField(this, "ctx2d", null);
     __publicField(this, "lutDirty", true);
     __publicField(this, "raf", 0);
+    // Baked LUT cache (Float64) — reused by GL upload, CPU render and readPixel.
+    __publicField(this, "lutF", null);
+    // Cached source pixels (for the hover readout) + last draw geometry (device px).
+    __publicField(this, "srcData", null);
+    __publicField(this, "rect", { x: 0, y: 0, w: 0, h: 0, iw: 0, ih: 0 });
+    // Alt affected-region mask target (HSL): null = off.
+    __publicField(this, "mask", null);
     this.canvas = canvas;
     const gl = canvas.getContext("webgl2");
     if (gl && this.initGL(gl)) {
@@ -9306,6 +9665,9 @@ class ColorWarpPreview {
     this.uImg = gl.getUniformLocation(prog, "uImg");
     this.uLut = gl.getUniformLocation(prog, "uLut");
     this.uN = gl.getUniformLocation(prog, "uN");
+    this.uMask = gl.getUniformLocation(prog, "uMask");
+    this.uMaskHue = gl.getUniformLocation(prog, "uMaskHue");
+    this.uMaskSat = gl.getUniformLocation(prog, "uMaskSat");
     const vao = gl.createVertexArray();
     gl.bindVertexArray(vao);
     const buf = gl.createBuffer();
@@ -9335,13 +9697,53 @@ class ColorWarpPreview {
   }
   setMesh(mesh) {
     this.mesh = mesh;
+    this.lutF = bakeLut(mesh, LUT_SIZE);
     this.lutDirty = true;
     this.schedule();
   }
   setSource(src) {
     this.source = src;
+    try {
+      const tc = document.createElement("canvas");
+      tc.width = src.width;
+      tc.height = src.height;
+      const tx = tc.getContext("2d");
+      tx.drawImage(src, 0, 0);
+      this.srcData = tx.getImageData(0, 0, src.width, src.height);
+    } catch {
+      this.srcData = null;
+    }
     if (this.gl) this.uploadImage();
     this.schedule();
+  }
+  // Alt affected-region mask (Phase 7.2). hueDeg = target real hue; sat = HSL sat.
+  setMask(hueDeg, sat) {
+    const next = { hue: hueDeg, sat };
+    if (this.mask && this.mask.hue === hueDeg && this.mask.sat === sat) return;
+    this.mask = next;
+    this.schedule();
+  }
+  clearMask() {
+    if (!this.mask) return;
+    this.mask = null;
+    this.schedule();
+  }
+  // Read the GRADED colour under a client point (for the hover HSL readout).
+  // Computed from cached source pixels + baked LUT so it's exact and independent
+  // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
+  readPixel(clientX, clientY) {
+    if (!this.srcData || !this.lutF) return null;
+    const r = this.canvas.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) return null;
+    const dx = (clientX - r.left) * (this.canvas.width / r.width);
+    const dy = (clientY - r.top) * (this.canvas.height / r.height);
+    const { x, y, w, h, iw, ih } = this.rect;
+    if (w < 1 || h < 1 || dx < x || dy < y || dx >= x + w || dy >= y + h) return null;
+    const sx = Math.min(iw - 1, Math.floor((dx - x) / w * iw));
+    const sy = Math.min(ih - 1, Math.floor((dy - y) / h * ih));
+    const k = (sy * iw + sx) * 4;
+    const d = this.srcData.data;
+    return applyRgb(this.lutF, LUT_SIZE, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
   }
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
@@ -9388,7 +9790,7 @@ class ColorWarpPreview {
     const gl = this.gl;
     if (!gl || !this.mesh) return;
     const size = LUT_SIZE;
-    const lut = bakeLut(this.mesh, size);
+    const lut = this.lutF || bakeLut(this.mesh, size);
     const data = new Uint8Array(size * size * size * 4);
     for (let r = 0; r < size; r++) {
       for (let g = 0; g < size; g++) {
@@ -9435,12 +9837,9 @@ class ColorWarpPreview {
     const iw = this.source.width, ih = this.source.height;
     const r = Math.min(W / iw, H / ih);
     const dw = iw * r, dh = ih * r;
-    gl.viewport(
-      Math.round((W - dw) / 2),
-      Math.round((H - dh) / 2),
-      Math.round(dw),
-      Math.round(dh)
-    );
+    const ox = Math.round((W - dw) / 2), oy = Math.round((H - dh) / 2);
+    this.rect = { x: ox, y: H - oy - Math.round(dh), w: Math.round(dw), h: Math.round(dh), iw, ih };
+    gl.viewport(ox, oy, Math.round(dw), Math.round(dh));
     gl.useProgram(this.prog);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.imgTex);
@@ -9449,6 +9848,9 @@ class ColorWarpPreview {
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.uniform1i(this.uLut, 1);
     gl.uniform1f(this.uN, LUT_SIZE);
+    gl.uniform1f(this.uMask, this.mask ? 1 : 0);
+    gl.uniform1f(this.uMaskHue, this.mask ? (this.mask.hue % 360 + 360) % 360 / 360 : 0);
+    gl.uniform1f(this.uMaskSat, this.mask ? this.mask.sat : 0);
     gl.bindVertexArray(this.vao);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     gl.bindVertexArray(null);
@@ -9462,7 +9864,7 @@ class ColorWarpPreview {
     ctx.fillStyle = "#111318";
     ctx.fillRect(0, 0, W, H);
     if (!this.source || !this.mesh) return;
-    const lut = bakeLut(this.mesh, LUT_SIZE);
+    const lut = this.lutF || bakeLut(this.mesh, LUT_SIZE);
     const iw = this.source.width, ih = this.source.height;
     const longest = Math.max(iw, ih);
     const scale = longest > 512 ? 512 / longest : 1;
@@ -9475,8 +9877,22 @@ class ColorWarpPreview {
     tctx.drawImage(this.source, 0, 0, sw, sh);
     const img = tctx.getImageData(0, 0, sw, sh);
     const px = img.data;
+    const maskHue = this.mask ? (this.mask.hue % 360 + 360) % 360 : 0;
     for (let k = 0; k < px.length; k += 4) {
-      const rgb = applyRgb(lut, LUT_SIZE, [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255]);
+      const src = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
+      const rgb = applyRgb(lut, LUT_SIZE, src);
+      if (this.mask) {
+        const [h, s] = srgbToHsl(src);
+        let dh2 = Math.abs(h - maskHue);
+        dh2 = Math.min(dh2, 360 - dh2) / 180;
+        const wh = Math.max(0, 1 - dh2 / 0.22);
+        const ws = Math.max(0, 1 - Math.abs(s - this.mask.sat) / 0.33);
+        const w = wh * ws;
+        const g = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
+        rgb[0] = g + (rgb[0] - g) * w;
+        rgb[1] = g + (rgb[1] - g) * w;
+        rgb[2] = g + (rgb[2] - g) * w;
+      }
       px[k] = Math.round(rgb[0] * 255);
       px[k + 1] = Math.round(rgb[1] * 255);
       px[k + 2] = Math.round(rgb[2] * 255);
@@ -9484,8 +9900,10 @@ class ColorWarpPreview {
     tctx.putImageData(img, 0, 0);
     const r = Math.min(W / iw, H / ih);
     const dw = iw * r, dh = ih * r;
+    const ox = (W - dw) / 2, oy = (H - dh) / 2;
+    this.rect = { x: ox, y: oy, w: dw, h: dh, iw, ih };
     ctx.imageSmoothingEnabled = true;
-    ctx.drawImage(tmp, (W - dw) / 2, (H - dh) / 2, dw, dh);
+    ctx.drawImage(tmp, ox, oy, dw, dh);
   }
 }
 let active = null;
@@ -9531,14 +9949,18 @@ function openColorWarpViewer(opts) {
   title.textContent = "😺 Color Warp";
   title.style.cssText = "font-weight:600;font-size:13px";
   const hint = document.createElement("span");
-  hint.textContent = "RYB polar net over the pixel cloud · live LUT preview";
+  hint.textContent = "drag nodes · Shift = ring/sector · Alt+wheel = luma · Alt over grid = mask · dbl-click resets";
   hint.style.cssText = "opacity:0.7;font-size:11px";
   const spacer = document.createElement("span");
   spacer.style.cssText = "flex:1 1 auto";
+  const smoothBtn = mkToggle("Smooth", true);
+  const pinBtn = mkToggle("Pin", false);
+  const resetBtn = mkBtn("Reset all", TEXT);
+  const densBtn = mkBtn("Segments: 12", TEXT);
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
   closeBtn.style.padding = "4px 9px";
-  bar.append(title, hint, spacer, saveBtn, closeBtn);
+  bar.append(title, hint, spacer, smoothBtn, pinBtn, resetBtn, densBtn, saveBtn, closeBtn);
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
   const leftPane = mkPane();
@@ -9551,16 +9973,78 @@ function openColorWarpViewer(opts) {
   const previewCanvas = document.createElement("canvas");
   previewCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
   rightPane.appendChild(previewCanvas);
-  host.append(bar, body);
+  const tip = document.createElement("div");
+  tip.style.cssText = `position:fixed;pointer-events:none;z-index:100001;display:none;background:${BAR_BG};border:1px solid ${BORDER};border-radius:4px;padding:4px 7px;font:11px Inter,system-ui,sans-serif;color:${TEXT};white-space:pre;box-shadow:0 2px 8px rgba(0,0,0,0.4)`;
+  const readout = document.createElement("div");
+  readout.style.cssText = `position:absolute;top:10px;left:10px;pointer-events:none;display:none;background:rgba(20,22,28,0.92);border:1px solid ${BORDER};border-radius:6px;padding:8px 11px;font:11px Inter,system-ui,sans-serif;color:${TEXT};box-shadow:0 2px 10px rgba(0,0,0,0.5);min-width:120px`;
+  rightPane.appendChild(readout);
+  host.append(bar, body, tip);
   document.body.appendChild(host);
   const grid = new ColorWarpGrid(gridCanvas);
   const preview = new ColorWarpPreview(previewCanvas);
+  grid.cb.onEdit = (json, commit) => {
+    var _a;
+    try {
+      mesh = meshFromDict(JSON.parse(json));
+    } catch {
+    }
+    preview.setMesh(mesh);
+    (_a = opts.onChange) == null ? void 0 : _a.call(opts, json);
+  };
+  grid.cb.onHover = (info, cx, cy) => {
+    if (!info) {
+      tip.style.display = "none";
+      return;
+    }
+    tip.textContent = `ring ${info.ri} · seg ${info.sj}
+dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
+    tip.style.display = "block";
+    tip.style.left = cx + 14 + "px";
+    tip.style.top = cy + 14 + "px";
+  };
+  grid.cb.onGridCursor = (disp, sat, alt, inside) => {
+    if (alt && inside) preview.setMask(displayToHue(disp), sat);
+    else preview.clearMask();
+  };
   grid.setMesh(mesh);
   preview.setMesh(mesh);
   if (sourceCanvas) {
     grid.setSource(sourceCanvas);
     preview.setSource(sourceCanvas);
   }
+  smoothBtn.onclick = () => {
+    grid.smooth = !grid.smooth;
+    setToggle(smoothBtn, grid.smooth);
+  };
+  pinBtn.onclick = () => {
+    grid.pin = !grid.pin;
+    setToggle(pinBtn, grid.pin);
+  };
+  resetBtn.onclick = () => grid.resetAll();
+  densBtn.onclick = () => {
+    var _a;
+    const cur = ((_a = grid.getMesh()) == null ? void 0 : _a.hue_segments) ?? 12;
+    const next = cur === 12 ? 8 : 12;
+    grid.setDensity(next);
+    densBtn.textContent = `Segments: ${next}`;
+  };
+  previewCanvas.addEventListener("pointermove", (e) => {
+    const rgb = preview.readPixel(e.clientX, e.clientY);
+    if (!rgb) {
+      readout.style.display = "none";
+      grid.setIndicator(null);
+      return;
+    }
+    const [h, s, l] = srgbToHsl(rgb);
+    const R = Math.round(rgb[0] * 255), G = Math.round(rgb[1] * 255), B = Math.round(rgb[2] * 255);
+    readout.innerHTML = `<div style="font-size:22px;font-weight:700;color:${ACCENT};line-height:1">${h.toFixed(0)}°</div><div style="opacity:0.75;margin-top:2px">hue</div><div style="margin-top:6px">S ${(s * 100).toFixed(0)}%  L ${(l * 100).toFixed(0)}%</div><div style="opacity:0.75;margin-top:2px">rgb ${R}, ${G}, ${B}</div>`;
+    readout.style.display = "block";
+    grid.setIndicator(hueToDisplay(h), s, `rgb(${R},${G},${B})`);
+  });
+  previewCanvas.addEventListener("pointerleave", () => {
+    readout.style.display = "none";
+    grid.setIndicator(null);
+  });
   function render() {
     grid.resize();
     preview.resize();
@@ -9621,6 +10105,18 @@ function mkBtn(label, color) {
     b.style.fontWeight = "600";
   }
   return b;
+}
+function mkToggle(label, on) {
+  const b = mkBtn(label, TEXT);
+  b._label = label;
+  setToggle(b, on);
+  return b;
+}
+function setToggle(b, on) {
+  b.style.color = on ? "#0b0d12" : TEXT;
+  b.style.background = on ? ACCENT : "#252830";
+  b.style.borderColor = on ? ACCENT : BORDER;
+  b.style.fontWeight = on ? "600" : "400";
 }
 function mkPane() {
   const p2 = document.createElement("div");
