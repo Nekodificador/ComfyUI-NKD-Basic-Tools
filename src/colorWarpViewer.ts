@@ -5,6 +5,7 @@
 // The node's `mesh` string widget is the single source of truth — parsed on
 // open, written back on change/close.
 import { Mesh, meshFromDict, meshIdentity, meshToDict } from "./colorCore";
+import { ColorWarpGrid } from "./colorWarpGrid";
 
 export interface ColorWarpViewerOpts {
   image: HTMLImageElement | HTMLCanvasElement | null;
@@ -98,23 +99,11 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   host.append(bar, body);
   document.body.appendChild(host);
 
-  // --- render (Phase 1: placeholder grid + plain image preview) ------------
+  // --- render (grid left; plain image preview right until Phase 4) ---------
   const dpr = Math.max(window.devicePixelRatio || 1, 1);
-
-  function drawPlaceholderGrid() {
-    const w = leftPane.clientWidth, h = leftPane.clientHeight;
-    if (w < 2 || h < 2) return;
-    gridCanvas.width = Math.round(w * dpr);
-    gridCanvas.height = Math.round(h * dpr);
-    const ctx = gridCanvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(120,180,255,0.5)";
-    ctx.font = "12px Inter,system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("RYB polar net (Phase 2)", w / 2, h / 2);
-  }
+  const grid = new ColorWarpGrid(gridCanvas);
+  grid.setMesh(mesh);
+  if (sourceCanvas) grid.setSource(sourceCanvas);
 
   function drawPreview() {
     const w = rightPane.clientWidth, h = rightPane.clientHeight;
@@ -139,7 +128,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     ctx.drawImage(sourceCanvas, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
 
-  function render() { drawPlaceholderGrid(); drawPreview(); }
+  function render() { grid.resize(); drawPreview(); }
 
   const ro = new ResizeObserver(render);
   ro.observe(body);
@@ -175,6 +164,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
       const c = toCanvas(src, w, h);
       if (!c) return;
       sourceCanvas = c;
+      grid.setSource(c);
       render();
     },
     close() { closeWith(false); },

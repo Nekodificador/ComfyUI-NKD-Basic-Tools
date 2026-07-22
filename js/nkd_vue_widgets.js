@@ -1,3 +1,6 @@
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 /**
@@ -6725,12 +6728,12 @@ function parseInterp(rampJson) {
 function hexToRgb(hex) {
   return [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
 }
-function buildRampLut(stops, interp) {
+function buildRampLut(stops, interp2) {
   const lut = new Uint8ClampedArray(256 * 3);
   let si = 0;
   for (let i = 0; i < 256; i++) {
     const t = i / 255;
-    if (interp === "steps") {
+    if (interp2 === "steps") {
       let k = 0;
       while (k < stops.length - 1 && stops[k + 1].pos <= t) k++;
       const [r, g, b3] = hexToRgb(stops[k].color);
@@ -6743,7 +6746,7 @@ function buildRampLut(stops, interp) {
     const a = stops[si], b = stops[Math.min(si + 1, stops.length - 1)];
     let f = Math.max(0, Math.min(1, (t - a.pos) / Math.max(1e-6, b.pos - a.pos)));
     f = midWarp(f, a.mid);
-    if (interp === "bezier") f = smoothstep(f);
+    if (interp2 === "bezier") f = smoothstep(f);
     const [r1, g1, b1] = hexToRgb(a.color), [r2, g2, b2] = hexToRgb(b.color);
     lut[i * 3] = r1 + (r2 - r1) * f;
     lut[i * 3 + 1] = g1 + (g2 - g1) * f;
@@ -6757,9 +6760,9 @@ function lerpHex(c1, c2, t) {
   const hex = (v) => v.toString(16).padStart(2, "0");
   return `#${hex(mix(r1, r2))}${hex(mix(g1, g2))}${hex(mix(b1, b2))}`;
 }
-function expandStops(stops, interp, remap = (p2) => p2) {
+function expandStops(stops, interp2, remap = (p2) => p2) {
   const out = [];
-  if (interp === "steps") {
+  if (interp2 === "steps") {
     for (let i = 0; i < stops.length; i++) {
       const s = stops[i];
       if (i > 0) out.push({ pos: remap(s.pos), color: stops[i - 1].color });
@@ -6771,12 +6774,12 @@ function expandStops(stops, interp, remap = (p2) => p2) {
   const warped = Math.abs(remap(0.25) - 0.25) > 1e-4;
   for (let i = 0; i < stops.length - 1; i++) {
     const a = stops[i], b = stops[i + 1];
-    const needsSub = interp === "bezier" || warped || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
+    const needsSub = interp2 === "bezier" || warped || Math.abs((a.mid ?? 0.5) - 0.5) > 1e-4;
     const n = needsSub ? SUB : 1;
     for (let k = 0; k <= n; k++) {
       const u = k / n;
       let e = midWarp(u, a.mid);
-      if (interp === "bezier") e = smoothstep(e);
+      if (interp2 === "bezier") e = smoothstep(e);
       out.push({ pos: remap(a.pos + (b.pos - a.pos) * u), color: lerpHex(a.color, b.color, e) });
     }
   }
@@ -6819,7 +6822,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     let ro = null;
     let dpr = window.devicePixelRatio || 1;
     const stops = /* @__PURE__ */ ref([{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }]);
-    const interp = /* @__PURE__ */ ref("smooth");
+    const interp2 = /* @__PURE__ */ ref("smooth");
     let activeStop = null;
     let hoverStop = null;
     let draggingMid = null;
@@ -6827,7 +6830,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     let dragging = false;
     let dragOffsetX = 0;
     let downX = 0, downY = 0, moved = false;
-    function clamp01(v) {
+    function clamp012(v) {
       return Math.max(0, Math.min(1, v));
     }
     function normalizeHex(c) {
@@ -6837,7 +6840,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       return PAD2.left + pos * IW;
     }
     function fromCanvasX(x) {
-      return clamp01((x - PAD2.left) / IW);
+      return clamp012((x - PAD2.left) / IW);
     }
     function eventToLogical(e) {
       const rect = canvas.value.getBoundingClientRect();
@@ -6882,7 +6885,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       ctx.fillRect(0, 0, CW, CH);
       const grad = ctx.createLinearGradient(PAD2.left, 0, PAD2.left + IW, 0);
       const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
-      for (const s of expandStops(sorted, interp.value)) grad.addColorStop(clamp01(s.pos), s.color);
+      for (const s of expandStops(sorted, interp2.value)) grad.addColorStop(clamp012(s.pos), s.color);
       ctx.fillStyle = grad;
       roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.fill();
@@ -7063,7 +7066,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
         return;
       }
       if (dragging && activeStop) {
-        activeStop.pos = clamp01(fromCanvasX(x) + dragOffsetX);
+        activeStop.pos = clamp012(fromCanvasX(x) + dragOffsetX);
         stops.value.sort((a, b) => a.pos - b.pos);
         emitChange();
         redraw();
@@ -7109,19 +7112,19 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     }
     function reset() {
       stops.value = [{ pos: 0, color: "#000000" }, { pos: 1, color: "#ffffff" }];
-      interp.value = "smooth";
+      interp2.value = "smooth";
       activeStop = null;
       emitChange();
       redraw();
     }
     function reverse() {
-      stops.value = stops.value.map((s) => ({ pos: clamp01(1 - s.pos), color: s.color })).sort((a, b) => a.pos - b.pos);
+      stops.value = stops.value.map((s) => ({ pos: clamp012(1 - s.pos), color: s.color })).sort((a, b) => a.pos - b.pos);
       activeStop = null;
       emitChange();
       redraw();
     }
     function onInterpChange(mode) {
-      interp.value = parseInterp(JSON.stringify({ interp: mode }));
+      interp2.value = parseInterp(JSON.stringify({ interp: mode }));
       emitChange();
       redraw();
     }
@@ -7129,7 +7132,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     function serialise() {
       return JSON.stringify({
         stops: [...stops.value].sort((a, b) => a.pos - b.pos),
-        interp: interp.value
+        interp: interp2.value
       });
     }
     function emitChange() {
@@ -7141,11 +7144,11 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
         const data = JSON.parse(json);
         if (Array.isArray(data.stops) && data.stops.length >= 2) {
           stops.value = data.stops.map((s) => ({
-            pos: clamp01(Number(s.pos)),
+            pos: clamp012(Number(s.pos)),
             color: normalizeHex(String(s.color)),
             mid: Number.isFinite(s.mid) ? Math.min(0.95, Math.max(0.05, Number(s.mid))) : 0.5
           })).sort((a, b) => a.pos - b.pos);
-          interp.value = parseInterp(json);
+          interp2.value = parseInterp(json);
           redraw();
           return;
         }
@@ -7172,11 +7175,11 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       const p2 = userPresets.value.find((x) => x.name === name);
       if (!p2) return;
       stops.value = p2.stops.map((s) => ({
-        pos: clamp01(s.pos),
+        pos: clamp012(s.pos),
         color: normalizeHex(s.color),
         mid: Number.isFinite(s.mid) ? Math.min(0.95, Math.max(0.05, Number(s.mid))) : 0.5
       }));
-      if (p2.interp) interp.value = parseInterp(JSON.stringify({ interp: p2.interp }));
+      if (p2.interp) interp2.value = parseInterp(JSON.stringify({ interp: p2.interp }));
       activeStop = null;
       emitChange();
       redraw();
@@ -7192,7 +7195,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       }
       const exists = userPresets.value.some((p2) => p2.name.toLowerCase() === name.toLowerCase());
       if (exists && !window.confirm(`Overwrite existing preset "${name}"?`)) return;
-      const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos), interp: interp.value };
+      const payload = { name, stops: [...stops.value].sort((a, b) => a.pos - b.pos), interp: interp2.value };
       try {
         const res = await fetch("/nkd_color_ramp/presets", {
           method: "POST",
@@ -7268,7 +7271,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
             _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("select", {
               class: "nkd-select nkd-select--interp",
-              value: interp.value,
+              value: interp2.value,
               title: "How colors blend between stops",
               onChange: _cache[0] || (_cache[0] = ($event) => onInterpChange($event.target.value))
             }, [..._cache[6] || (_cache[6] = [
@@ -8755,6 +8758,84 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
   }
 });
 const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-cf839f24"]]);
+function mod(a, n) {
+  return (a % n + n) % n;
+}
+function hslToSrgb(hsl) {
+  const h = mod(hsl[0], 360);
+  const s = hsl[1];
+  const L = hsl[2];
+  const c = (1 - Math.abs(2 * L - 1)) * s;
+  const x = c * (1 - Math.abs(mod(h / 60, 2) - 1));
+  const m = L - c / 2;
+  const z = 0;
+  const seg = mod(Math.trunc(h / 60), 6);
+  let rp, gp, bp;
+  switch (seg) {
+    case 0:
+      rp = c;
+      gp = x;
+      bp = z;
+      break;
+    case 1:
+      rp = x;
+      gp = c;
+      bp = z;
+      break;
+    case 2:
+      rp = z;
+      gp = c;
+      bp = x;
+      break;
+    case 3:
+      rp = z;
+      gp = x;
+      bp = c;
+      break;
+    case 4:
+      rp = x;
+      gp = z;
+      bp = c;
+      break;
+    default:
+      rp = c;
+      gp = z;
+      bp = x;
+      break;
+  }
+  return [rp + m, gp + m, bp + m];
+}
+const DEFAULT_ANCHORS = [
+  [0, 0],
+  [60, 30],
+  [120, 60],
+  [180, 120],
+  [240, 240],
+  [300, 290],
+  [360, 360]
+];
+function interp(x, xs, ys) {
+  if (x <= xs[0]) return ys[0];
+  const n = xs.length;
+  if (x >= xs[n - 1]) return ys[n - 1];
+  for (let i = 1; i < n; i++) {
+    if (x <= xs[i]) {
+      const t = (x - xs[i - 1]) / (xs[i] - xs[i - 1]);
+      return ys[i - 1] + t * (ys[i] - ys[i - 1]);
+    }
+  }
+  return ys[n - 1];
+}
+function displayToHue(displayDeg, anchors = DEFAULT_ANCHORS) {
+  const xs = anchors.map((a) => a[0]);
+  const ys = anchors.map((a) => a[1]);
+  return mod(interp(mod(displayDeg, 360), xs, ys), 360);
+}
+function hueToDisplay(hueDeg, anchors = DEFAULT_ANCHORS) {
+  const xs = anchors.map((a) => a[0]);
+  const ys = anchors.map((a) => a[1]);
+  return mod(interp(mod(hueDeg, 360), ys, xs), 360);
+}
 function meshIdentity(hueSegments = 12, satRings = 6) {
   const offsets = [];
   for (let r = 0; r <= satRings; r++) {
@@ -8777,6 +8858,230 @@ function meshToDict(m) {
     sat_rings: m.sat_rings,
     offsets: m.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]))
   };
+}
+const GRID_LINE = "rgba(120,180,255,0.35)";
+const WEB_LINE = "rgba(120,180,255,0.55)";
+const ACCENT$1 = "#4ab4ff";
+const RAD = Math.PI / 180;
+function angleRad(displayDeg) {
+  return (displayDeg - 90) * RAD;
+}
+function clamp01(x) {
+  return x < 0 ? 0 : x > 1 ? 1 : x;
+}
+class ColorWarpGrid {
+  constructor(canvas) {
+    __publicField(this, "canvas");
+    __publicField(this, "ctx");
+    __publicField(this, "dpr", Math.max(window.devicePixelRatio || 1, 2));
+    __publicField(this, "mesh", null);
+    __publicField(this, "source", null);
+    // Geometry in CSS px, recomputed on resize.
+    __publicField(this, "cx", 0);
+    __publicField(this, "cy", 0);
+    __publicField(this, "R", 0);
+    __publicField(this, "cssW", 0);
+    __publicField(this, "cssH", 0);
+    // Cached wheel (device-px ImageData) keyed by device size.
+    __publicField(this, "wheel", null);
+    __publicField(this, "wheelKey", "");
+    // Cached scatter: [displayDeg, sat] per sampled pixel, source-independent of size.
+    __publicField(this, "scatter", null);
+    this.canvas = canvas;
+    this.ctx = canvas.getContext("2d");
+  }
+  setMesh(mesh) {
+    this.mesh = mesh;
+    this.draw();
+  }
+  setSource(src) {
+    this.source = src;
+    this.scatter = null;
+    this.draw();
+  }
+  resize() {
+    const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
+    if (w < 2 || h < 2) return;
+    this.cssW = w;
+    this.cssH = h;
+    this.canvas.width = Math.round(w * this.dpr);
+    this.canvas.height = Math.round(h * this.dpr);
+    this.cx = w / 2;
+    this.cy = h / 2;
+    this.R = Math.min(w, h) / 2 * 0.9;
+    this.draw();
+  }
+  dispose() {
+  }
+  // display angle + normalized sat → CSS-px screen point.
+  polar(displayDeg, sat) {
+    const a = angleRad(displayDeg);
+    const r = sat * this.R;
+    return [this.cx + r * Math.cos(a), this.cy + r * Math.sin(a)];
+  }
+  buildWheel() {
+    const dw = this.canvas.width, dh = this.canvas.height;
+    const key = `${dw}x${dh}`;
+    if (this.wheel && this.wheelKey === key) return;
+    const img = new ImageData(dw, dh);
+    const data = img.data;
+    const cx = this.cx * this.dpr, cy = this.cy * this.dpr, R = this.R * this.dpr;
+    for (let y = 0; y < dh; y++) {
+      const dy = y - cy;
+      for (let x = 0; x < dw; x++) {
+        const dx = x - cx;
+        const dist = Math.hypot(dx, dy);
+        const k = (y * dw + x) * 4;
+        if (dist > R) {
+          data[k + 3] = 0;
+          continue;
+        }
+        const sat = dist / R;
+        let disp = Math.atan2(dy, dx) / RAD + 90;
+        disp = (disp % 360 + 360) % 360;
+        const hue = displayToHue(disp);
+        const rgb = hslToSrgb([hue, sat, 0.5]);
+        data[k] = Math.round(clamp01(rgb[0]) * 255);
+        data[k + 1] = Math.round(clamp01(rgb[1]) * 255);
+        data[k + 2] = Math.round(clamp01(rgb[2]) * 255);
+        data[k + 3] = 255;
+      }
+    }
+    this.wheel = img;
+    this.wheelKey = key;
+  }
+  // Sample source pixels → [displayDeg, sat] cloud (Phase 3). Downsample longest
+  // side to ≤256. Uses HSL to match the wheel's hue/sat mapping.
+  buildScatter() {
+    if (this.scatter || !this.source) return;
+    const iw = this.source.width, ih = this.source.height;
+    if (!iw || !ih) return;
+    const longest = Math.max(iw, ih);
+    const scale = longest > 256 ? 256 / longest : 1;
+    const sw = Math.max(1, Math.round(iw * scale));
+    const sh = Math.max(1, Math.round(ih * scale));
+    const tmp = document.createElement("canvas");
+    tmp.width = sw;
+    tmp.height = sh;
+    const tctx = tmp.getContext("2d");
+    tctx.drawImage(this.source, 0, 0, sw, sh);
+    const px = tctx.getImageData(0, 0, sw, sh).data;
+    const out = new Float32Array(sw * sh * 2);
+    let n = 0;
+    for (let i = 0, k = 0; i < sw * sh; i++, k += 4) {
+      const r = px[k] / 255, g = px[k + 1] / 255, b = px[k + 2] / 255;
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      const L = (mx + mn) / 2;
+      const S = d === 0 ? 0 : d / (1 - Math.abs(2 * L - 1) + 1e-12);
+      let h = 0;
+      if (d !== 0) {
+        if (mx === r) h = ((g - b) / d % 6 + 6) % 6;
+        else if (mx === g) h = (b - r) / d + 2;
+        else h = (r - g) / d + 4;
+      }
+      h = (h * 60 % 360 + 360) % 360;
+      out[n++] = hueToDisplay(h);
+      out[n++] = clamp01(S);
+    }
+    this.scatter = out.subarray(0, n);
+  }
+  draw() {
+    if (!this.ctx || this.cssW < 2) return;
+    const ctx = this.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    ctx.fillStyle = "#111318";
+    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.buildWheel();
+    if (this.wheel) ctx.putImageData(this.wheel, 0, 0);
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    this.drawReferenceGrid(ctx);
+    if (this.mesh) this.drawWeb(ctx, this.mesh);
+  }
+  drawScatter(ctx) {
+    this.buildScatter();
+    if (!this.scatter) return;
+    ctx.save();
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = "rgba(255,255,255,0.9)";
+    const s = this.scatter;
+    for (let i = 0; i < s.length; i += 2) {
+      const [x, y] = this.polar(s[i], s[i + 1]);
+      ctx.fillRect(x, y, 1, 1);
+    }
+    ctx.restore();
+  }
+  // Static reference net: sat_rings concentric circles + hue_segments spokes.
+  drawReferenceGrid(ctx) {
+    if (!this.mesh) return;
+    const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
+    ctx.strokeStyle = GRID_LINE;
+    ctx.lineWidth = 1;
+    for (let i = 1; i <= R; i++) {
+      const rad = i / R * this.R;
+      ctx.beginPath();
+      ctx.arc(this.cx, this.cy, rad, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (let j = 0; j < S; j++) {
+      const [x, y] = this.polar(j * 360 / S, 1);
+      ctx.beginPath();
+      ctx.moveTo(this.cx, this.cy);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+  }
+  // The deformable mesh web: each control node placed at its warped position,
+  // ring polylines + spoke polylines through them, plus handles. Identity mesh
+  // ⇒ nodes sit on the reference intersections (undistorted web centered).
+  drawWeb(ctx, mesh) {
+    const R = mesh.sat_rings, S = mesh.hue_segments;
+    const pt = (ri, sj) => {
+      const baseDisp = sj * 360 / S;
+      const baseSat = ri / R;
+      const off = mesh.offsets[ri][sj];
+      const hue = displayToHue(baseDisp);
+      const warpedHue = hue + off[0] * baseSat;
+      const warpedDisp = hueToDisplay(warpedHue);
+      const warpedSat = clamp01(baseSat + off[1]);
+      return this.polar(warpedDisp, warpedSat);
+    };
+    ctx.strokeStyle = WEB_LINE;
+    ctx.lineWidth = 1;
+    for (let ri = 1; ri <= R; ri++) {
+      ctx.beginPath();
+      for (let sj = 0; sj <= S; sj++) {
+        const [x, y] = pt(ri, sj % S);
+        sj ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+    for (let sj = 0; sj < S; sj++) {
+      ctx.beginPath();
+      for (let ri = 0; ri <= R; ri++) {
+        const [x, y] = pt(ri, sj);
+        ri ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle = ACCENT$1;
+    ctx.strokeStyle = "rgba(0,0,0,0.6)";
+    ctx.lineWidth = 1.5;
+    const drawHandle = (x, y, r) => {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    };
+    for (let ri = 1; ri <= R; ri++) {
+      for (let sj = 0; sj < S; sj++) {
+        const [x, y] = pt(ri, sj);
+        drawHandle(x, y, 6);
+      }
+    }
+    const [cx0, cy0] = pt(0, 0);
+    drawHandle(cx0, cy0, 6);
+  }
 }
 let active = null;
 const PANEL = "#111318";
@@ -8844,20 +9149,9 @@ function openColorWarpViewer(opts) {
   host.append(bar, body);
   document.body.appendChild(host);
   const dpr = Math.max(window.devicePixelRatio || 1, 1);
-  function drawPlaceholderGrid() {
-    const w = leftPane.clientWidth, h = leftPane.clientHeight;
-    if (w < 2 || h < 2) return;
-    gridCanvas.width = Math.round(w * dpr);
-    gridCanvas.height = Math.round(h * dpr);
-    const ctx = gridCanvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "rgba(120,180,255,0.5)";
-    ctx.font = "12px Inter,system-ui";
-    ctx.textAlign = "center";
-    ctx.fillText("RYB polar net (Phase 2)", w / 2, h / 2);
-  }
+  const grid = new ColorWarpGrid(gridCanvas);
+  grid.setMesh(mesh);
+  if (sourceCanvas) grid.setSource(sourceCanvas);
   function drawPreview() {
     const w = rightPane.clientWidth, h = rightPane.clientHeight;
     if (w < 2 || h < 2) return;
@@ -8880,7 +9174,7 @@ function openColorWarpViewer(opts) {
     ctx.drawImage(sourceCanvas, (w - dw) / 2, (h - dh) / 2, dw, dh);
   }
   function render() {
-    drawPlaceholderGrid();
+    grid.resize();
     drawPreview();
   }
   const ro = new ResizeObserver(render);
@@ -8919,6 +9213,7 @@ function openColorWarpViewer(opts) {
       const c = toCanvas(src, w, h);
       if (!c) return;
       sourceCanvas = c;
+      grid.setSource(c);
       render();
     },
     close() {
