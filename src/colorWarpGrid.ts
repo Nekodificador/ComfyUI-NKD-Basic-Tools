@@ -4,14 +4,34 @@
 // deformable mesh web (nodes at their warped positions) → control handles.
 // HiDPI. Wheel + scatter are cached and recomputed only on resize / source
 // change; the vector layers redraw per frame (cheap) so drag edits stay live.
+//
+// Interaction (Phases 5–8): pointer-capture drag of the nearest node warps the
+// mesh live; Smooth (default) spreads the delta to neighbours with a Gaussian
+// falloff, Pin freezes them. Shift turns the drag into the DaVinci ring/sector
+// gesture (horizontal = rotate a sector's hue, vertical = expand/contract a
+// ring's sat). Alt+wheel nudges per-node luma. Double-click resets a node.
+// Edits are written back through `onEdit(json, commit)`.
 import {
-  Mesh, hslToSrgb, displayToHue, hueToDisplay,
+  Mesh, hslToSrgb, displayToHue, hueToDisplay, meshToDict, meshIdentity,
 } from "./colorCore";
 
 const GRID_LINE = "rgba(120,180,255,0.35)";
 const WEB_LINE = "rgba(120,180,255,0.55)";
 const ACCENT = "#4ab4ff";
 const RAD = Math.PI / 180;
+
+// nkd-curve-style handle radii.
+const R_IDLE = 6;
+const R_HOVER = 7;
+const R_CENTER = 4.5;
+const HIT_PX = 14; // hit-test tolerance in CSS px
+
+// ponytail: interaction tuning knobs — the drag/gesture "feel" Neko will want
+// to eyeball. Grouped here so they're one edit away.
+const SMOOTH_SIGMA = 1.2;     // Gaussian falloff width in (ring,seg) grid units
+const SHIFT_ROT_PER_PX = 0.25; // deg of sector hue rotation per px (Shift horiz)
+const SHIFT_SAT_PER_PX = 0.003; // ring sat expand/contract per px (Shift vert)
+const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
 
 // Angle convention: display 0° at top (12 o'clock), increasing clockwise.
 // (Canvas y is down, so +sin points down.) Flagged for Neko to eyeball — this
@@ -21,6 +41,23 @@ function angleRad(displayDeg: number): number {
 }
 
 function clamp01(x: number): number { return x < 0 ? 0 : x > 1 ? 1 : x; }
+// Wrap a degree delta into [-180, 180) so hue placement takes the short way.
+function wrapDeg(d: number): number {
+  return ((d + 180) % 360 + 360) % 360 - 180;
+}
+
+interface HoverInfo { ri: number; sj: number; dh: number; ds: number; dl: number; }
+
+export interface GridCallbacks {
+  // Fired on every mesh mutation. commit=false during a drag (repaint preview
+  // only), commit=true on drag end / discrete edit (also write back to node).
+  onEdit?: (json: string, commit: boolean) => void;
+  // Node hover (for tooltip). null = nothing under cursor.
+  onHover?: (info: HoverInfo | null, clientX: number, clientY: number) => void;
+  // Grid cursor in polar space every move, plus whether Alt is held — the
+  // viewer uses this to drive the Alt affected-region mask on the preview.
+  onGridCursor?: (displayDeg: number, sat: number, alt: boolean, inside: boolean) => void;
+}
 
 export class ColorWarpGrid {
   private canvas: HTMLCanvasElement;
@@ -28,6 +65,11 @@ export class ColorWarpGrid {
   private dpr = Math.max(window.devicePixelRatio || 1, 2);
   private mesh: Mesh | null = null;
   private source: HTMLCanvasElement | null = null;
+
+  // Public interaction toggles (viewer toolbar drives these).
+  smooth = true;
+  pin = false;
+  cb: GridCallbacks = {};
 
   // Geometry in CSS px, recomputed on resize.
   private cx = 0; private cy = 0; private R = 0;
@@ -40,16 +82,43 @@ export class ColorWarpGrid {
   // Cached scatter: [displayDeg, sat] per sampled pixel, source-independent of size.
   private scatter: Float32Array | null = null;
 
+  // Drag / hover state.
+  private hover: [number, number] | null = null; // [ri, sj] under cursor
+  private drag: null | {
+    kind: "node" | "shift";
+    ri: number; sj: number;
+    startX: number; startY: number;          // pointer down (CSS px)
+    start: number[][][];                       // deep copy of offsets at grab
+    pointerId: number;
+  } = null;
+
+  // Preview-hover indicator: [displayDeg, sat, cssColor] or null.
+  private indicator: [number, number, string] | null = null;
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
+    canvas.style.touchAction = "none";
+    canvas.addEventListener("pointerdown", this.onDown);
+    canvas.addEventListener("pointermove", this.onMove);
+    canvas.addEventListener("pointerup", this.onUp);
+    canvas.addEventListener("pointercancel", this.onUp);
+    canvas.addEventListener("dblclick", this.onDblClick);
+    canvas.addEventListener("wheel", this.onWheel, { passive: false });
   }
 
   setMesh(mesh: Mesh) { this.mesh = mesh; this.draw(); }
+  getMesh(): Mesh | null { return this.mesh; }
 
   setSource(src: HTMLCanvasElement) {
     this.source = src;
     this.scatter = null; // recompute lazily in draw()
+    this.draw();
+  }
+
+  // Preview → grid indicator dot (Phase 7.1). Pass null to clear.
+  setIndicator(displayDeg: number | null, sat = 0, css = "#fff") {
+    this.indicator = displayDeg == null ? null : [displayDeg, sat, css];
     this.draw();
   }
 
@@ -64,7 +133,17 @@ export class ColorWarpGrid {
     this.draw();
   }
 
-  dispose() { /* no listeners of our own */ }
+  dispose() {
+    const c = this.canvas;
+    c.removeEventListener("pointerdown", this.onDown);
+    c.removeEventListener("pointermove", this.onMove);
+    c.removeEventListener("pointerup", this.onUp);
+    c.removeEventListener("pointercancel", this.onUp);
+    c.removeEventListener("dblclick", this.onDblClick);
+    c.removeEventListener("wheel", this.onWheel);
+  }
+
+  // --- geometry ------------------------------------------------------------
 
   // display angle + normalized sat → CSS-px screen point.
   private polar(displayDeg: number, sat: number): [number, number] {
@@ -72,6 +151,242 @@ export class ColorWarpGrid {
     const r = sat * this.R;
     return [this.cx + r * Math.cos(a), this.cy + r * Math.sin(a)];
   }
+
+  // Inverse: CSS-px screen point → [displayDeg, sat] (sat clamped to [0,1]).
+  private toPolar(x: number, y: number): [number, number] {
+    const dx = x - this.cx, dy = y - this.cy;
+    const sat = clamp01(Math.hypot(dx, dy) / (this.R || 1));
+    let disp = Math.atan2(dy, dx) / RAD + 90;
+    disp = ((disp % 360) + 360) % 360;
+    return [disp, sat];
+  }
+
+  // A mesh node's warped on-screen position (matches meshSample's center-safe
+  // hue push: warpedHue = baseHue + dhRaw*baseSat). This is THE hit-test/inverse
+  // reference used by every drag path.
+  private nodePt(ri: number, sj: number): [number, number] {
+    const m = this.mesh!;
+    const S = m.hue_segments, R = m.sat_rings;
+    const baseDisp = sj * 360 / S;
+    const baseSat = ri / R;
+    const off = m.offsets[ri][sj];
+    const hue = displayToHue(baseDisp);
+    const warpedHue = hue + off[0] * baseSat;
+    const warpedDisp = hueToDisplay(warpedHue);
+    const warpedSat = clamp01(baseSat + off[1]);
+    return this.polar(warpedDisp, warpedSat);
+  }
+
+  // Nearest control node to a CSS-px point, within HIT_PX. Center (ri=0) counted
+  // once. Returns [ri, sj] or null.
+  private hitTest(x: number, y: number): [number, number] | null {
+    const m = this.mesh;
+    if (!m) return null;
+    const R = m.sat_rings, S = m.hue_segments;
+    let best: [number, number] | null = null;
+    let bestD = HIT_PX * HIT_PX;
+    const consider = (ri: number, sj: number) => {
+      const [px, py] = this.nodePt(ri, sj);
+      const d = (px - x) * (px - x) + (py - y) * (py - y);
+      if (d < bestD) { bestD = d; best = [ri, sj]; }
+    };
+    for (let ri = 1; ri <= R; ri++) for (let sj = 0; sj < S; sj++) consider(ri, sj);
+    consider(0, 0); // center
+    return best;
+  }
+
+  // --- interaction ---------------------------------------------------------
+
+  private localXY(e: PointerEvent | MouseEvent): [number, number] {
+    const r = this.canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+
+  private cloneOffsets(): number[][][] {
+    return this.mesh!.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]));
+  }
+
+  private emit(commit: boolean) {
+    this.cb.onEdit?.(JSON.stringify(meshToDict(this.mesh!)), commit);
+  }
+
+  private onDown = (e: PointerEvent) => {
+    if (!this.mesh || this.R < 2) return;
+    const [x, y] = this.localXY(e);
+    if (e.shiftKey) {
+      // DaVinci ring/sector gesture — grab the ring & sector under the cursor.
+      const [disp, sat] = this.toPolar(x, y);
+      const S = this.mesh.hue_segments, R = this.mesh.sat_rings;
+      const ri = Math.min(Math.max(Math.round(sat * R), 1), R);
+      const sj = ((Math.round(disp / (360 / S)) % S) + S) % S;
+      this.drag = { kind: "shift", ri, sj, startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+    } else {
+      const hit = this.hitTest(x, y);
+      if (!hit) return;
+      this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+    }
+    this.canvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  };
+
+  private onMove = (e: PointerEvent) => {
+    if (!this.mesh || this.R < 2) return;
+    const [x, y] = this.localXY(e);
+
+    if (this.drag) {
+      if (this.drag.kind === "node") this.dragNode(x, y);
+      else this.dragShift(x, y);
+      this.draw();
+      this.emit(false);
+      // Live tooltip on the dragged node.
+      const { ri, sj } = this.drag;
+      const off = this.mesh.offsets[ri][sj];
+      this.cb.onHover?.({ ri, sj, dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
+      return;
+    }
+
+    // Hover: track nearest node for handle highlight + tooltip.
+    const hit = this.hitTest(x, y);
+    const changed = (hit?.[0] !== this.hover?.[0]) || (hit?.[1] !== this.hover?.[1]);
+    this.hover = hit;
+    if (changed) this.draw();
+    if (hit) {
+      const off = this.mesh.offsets[hit[0]][hit[1]];
+      this.cb.onHover?.({ ri: hit[0], sj: hit[1], dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
+    } else {
+      this.cb.onHover?.(null, e.clientX, e.clientY);
+    }
+
+    // Feed the grid cursor to the viewer (drives the Alt mask on the preview).
+    const [disp, sat] = this.toPolar(x, y);
+    const inside = Math.hypot(x - this.cx, y - this.cy) <= this.R;
+    this.cb.onGridCursor?.(disp, sat, e.altKey, inside);
+  };
+
+  private onUp = (e: PointerEvent) => {
+    if (!this.drag) return;
+    try { this.canvas.releasePointerCapture(this.drag.pointerId); } catch { /* ignore */ }
+    this.drag = null;
+    this.draw();
+    this.emit(true); // write back to node on drag end
+  };
+
+  // Drag a single node to follow the cursor; Smooth spreads the delta to
+  // neighbours with a Gaussian falloff, Pin freezes them.
+  private dragNode(x: number, y: number) {
+    const m = this.mesh!;
+    const S = m.hue_segments, R = m.sat_rings;
+    const { ri, sj, start } = this.drag!;
+    const [disp, sat] = this.toPolar(x, y);
+
+    // Target offset that places node (ri,sj) exactly under the cursor.
+    let tgtDh: number, tgtDs: number;
+    if (ri === 0) {
+      // Center collapses to a point — only radius (ds) is meaningful; apply it
+      // uniformly across ring 0 so it stays a single point.
+      tgtDh = 0; tgtDs = sat; // baseSat(0)=0 → ds = sat
+    } else {
+      const baseHue = displayToHue(sj * 360 / S);
+      const baseSat = ri / R;
+      const targetHue = displayToHue(disp);
+      tgtDh = wrapDeg(targetHue - baseHue) / baseSat;
+      tgtDs = sat - baseSat;
+    }
+    const dDh = tgtDh - start[ri][sj][0];
+    const dDs = tgtDs - start[ri][sj][1];
+
+    const apply = (rr: number, ss: number, w: number) => {
+      const o = m.offsets[rr][ss], s0 = start[rr][ss];
+      o[0] = s0[0] + dDh * w;
+      o[1] = s0[1] + dDs * w;
+      o[2] = s0[2];
+    };
+
+    if (ri === 0) {
+      for (let ss = 0; ss < S; ss++) apply(0, ss, 1); // keep center a point
+      return;
+    }
+    if (this.pin || !this.smooth) { apply(ri, sj, 1); return; }
+    // Smooth: Gaussian over grid distance (seg wraps).
+    for (let rr = 1; rr <= R; rr++) {
+      for (let ss = 0; ss < S; ss++) {
+        const dRing = rr - ri;
+        let dSeg = Math.abs(ss - sj); dSeg = Math.min(dSeg, S - dSeg);
+        const w = Math.exp(-(dRing * dRing + dSeg * dSeg) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
+        apply(rr, ss, w);
+      }
+    }
+  }
+
+  // Shift gesture: horizontal rotates the grabbed sector's hue (dh on every ring
+  // of that spoke), vertical expands/contracts the grabbed ring's sat (ds on
+  // every segment of that ring). Both act off the grab snapshot.
+  private dragShift(x: number, y: number) {
+    const m = this.mesh!;
+    const S = m.hue_segments, R = m.sat_rings;
+    const { ri, sj, startX, startY, start } = this.drag!;
+    const dx = x - startX, dy = y - startY;
+    const dDh = dx * SHIFT_ROT_PER_PX;   // + = clockwise-ish hue push
+    const dDs = -dy * SHIFT_SAT_PER_PX;  // up = expand sat
+
+    // Reset to snapshot, then apply the two independent gestures.
+    for (let rr = 0; rr <= R; rr++)
+      for (let ss = 0; ss < S; ss++) {
+        const o = m.offsets[rr][ss], s0 = start[rr][ss];
+        o[0] = s0[0]; o[1] = s0[1]; o[2] = s0[2];
+      }
+    // Rotate hue of sector sj across all rings.
+    for (let rr = 1; rr <= R; rr++) m.offsets[rr][sj][0] = start[rr][sj][0] + dDh;
+    // Expand/contract sat of ring ri across all segments.
+    for (let ss = 0; ss < S; ss++) m.offsets[ri][ss][1] = start[ri][ss][1] + dDs;
+  }
+
+  private onDblClick = (e: MouseEvent) => {
+    if (!this.mesh) return;
+    const [x, y] = this.localXY(e);
+    const hit = this.hitTest(x, y);
+    if (!hit) return;
+    const o = this.mesh.offsets[hit[0]][hit[1]];
+    o[0] = 0; o[1] = 0; o[2] = 0;
+    this.draw();
+    this.emit(true);
+    e.preventDefault();
+  };
+
+  // Alt+wheel over a node adjusts its luma (dl ∈ [-1,1]) (Phase 6.2).
+  private onWheel = (e: WheelEvent) => {
+    if (!this.mesh || !e.altKey) return;
+    const [x, y] = this.localXY(e);
+    const hit = this.hitTest(x, y);
+    if (!hit) return;
+    e.preventDefault();
+    const o = this.mesh.offsets[hit[0]][hit[1]];
+    o[2] = Math.min(Math.max(o[2] - e.deltaY * LUMA_PER_WHEEL, -1), 1);
+    this.draw();
+    this.emit(true);
+  };
+
+  // Reset all offsets to identity (keeps current density) (Phase 8).
+  resetAll() {
+    if (!this.mesh) return;
+    const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
+    for (let rr = 0; rr <= R; rr++)
+      for (let ss = 0; ss < S; ss++) this.mesh.offsets[rr][ss] = [0, 0, 0];
+    this.draw();
+    this.emit(true);
+  }
+
+  // Change hue-segment density (8/12). Resets offsets to identity at the new
+  // resolution — remapping arbitrary warps across densities isn't meaningful.
+  setDensity(hueSegments: number) {
+    const rings = this.mesh?.sat_rings ?? 6;
+    this.mesh = meshIdentity(hueSegments, rings);
+    this.hover = null;
+    this.draw();
+    this.emit(true);
+  }
+
+  // --- rendering -----------------------------------------------------------
 
   private buildWheel() {
     const dw = this.canvas.width, dh = this.canvas.height;
@@ -88,7 +403,6 @@ export class ColorWarpGrid {
         const k = (y * dw + x) * 4;
         if (dist > R) { data[k + 3] = 0; continue; }
         const sat = dist / R;
-        // atan2(dy,dx) with our convention: displayDeg = atan2 angle + 90.
         let disp = Math.atan2(dy, dx) / RAD + 90;
         disp = ((disp % 360) + 360) % 360;
         const hue = displayToHue(disp);
@@ -122,7 +436,6 @@ export class ColorWarpGrid {
     let n = 0;
     for (let i = 0, k = 0; i < sw * sh; i++, k += 4) {
       const r = px[k] / 255, g = px[k + 1] / 255, b = px[k + 2] / 255;
-      // HSL inline (S,L only need max/min); reuse srgbToHsl mapping.
       const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
       const L = (mx + mn) / 2;
       const S = d === 0 ? 0 : d / (1 - Math.abs(2 * L - 1) + 1e-12);
@@ -157,6 +470,7 @@ export class ColorWarpGrid {
     this.drawScatter(ctx);
     this.drawReferenceGrid(ctx);
     if (this.mesh) this.drawWeb(ctx, this.mesh);
+    this.drawIndicator(ctx);
   }
 
   private drawScatter(ctx: CanvasRenderingContext2D) {
@@ -195,24 +509,13 @@ export class ColorWarpGrid {
   }
 
   // The deformable mesh web: each control node placed at its warped position,
-  // ring polylines + spoke polylines through them, plus handles. Identity mesh
-  // ⇒ nodes sit on the reference intersections (undistorted web centered).
+  // ring polylines + spoke polylines through them, plus handles.
   private drawWeb(ctx: CanvasRenderingContext2D, mesh: Mesh) {
     const R = mesh.sat_rings, S = mesh.hue_segments;
-    const pt = (ri: number, sj: number): [number, number] => {
-      const baseDisp = sj * 360 / S;
-      const baseSat = ri / R;
-      const off = mesh.offsets[ri][sj]; // [dhRaw, ds, dl]
-      const hue = displayToHue(baseDisp);
-      const warpedHue = hue + off[0] * baseSat; // center-safe (matches meshSample)
-      const warpedDisp = hueToDisplay(warpedHue);
-      const warpedSat = clamp01(baseSat + off[1]);
-      return this.polar(warpedDisp, warpedSat);
-    };
+    const pt = (ri: number, sj: number) => this.nodePt(ri, sj);
 
     ctx.strokeStyle = WEB_LINE;
     ctx.lineWidth = 1;
-    // Ring polylines (closed) for ri ≥ 1 (ri 0 is the center point).
     for (let ri = 1; ri <= R; ri++) {
       ctx.beginPath();
       for (let sj = 0; sj <= S; sj++) {
@@ -221,7 +524,6 @@ export class ColorWarpGrid {
       }
       ctx.stroke();
     }
-    // Spoke polylines from center out.
     for (let sj = 0; sj < S; sj++) {
       ctx.beginPath();
       for (let ri = 0; ri <= R; ri++) {
@@ -231,25 +533,62 @@ export class ColorWarpGrid {
       ctx.stroke();
     }
 
-    // Handles (nkd-curve-style radius 6). Skip the R+1 center duplicates —
-    // ri 0 collapses to one point; draw it once.
-    ctx.fillStyle = ACCENT;
+    // Handles. Hovered / dragged node grows to R_HOVER; luma shows as a fill
+    // tint (dark = -dl, light = +dl) so per-node brightness reads on the grid.
     ctx.strokeStyle = "rgba(0,0,0,0.6)";
     ctx.lineWidth = 1.5;
-    const drawHandle = (x: number, y: number, r: number) => {
+    const hovRi = this.drag ? this.drag.ri : this.hover?.[0];
+    const hovSj = this.drag ? this.drag.sj : this.hover?.[1];
+    const drawHandle = (x: number, y: number, ri: number, sj: number, base: number) => {
+      const isHot = ri === hovRi && sj === hovSj;
+      const r = isHot ? R_HOVER : base;
+      const dl = mesh.offsets[ri][sj][2];
+      ctx.fillStyle = dl === 0 ? ACCENT : mixLuma(ACCENT, dl);
       ctx.beginPath();
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
+      if (isHot) { // bright ring on the active node
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(x, y, r + 2, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      }
     };
     for (let ri = 1; ri <= R; ri++) {
       for (let sj = 0; sj < S; sj++) {
         const [x, y] = pt(ri, sj);
-        drawHandle(x, y, 6);
+        drawHandle(x, y, ri, sj, R_IDLE);
       }
     }
-    // Single center handle.
     const [cx0, cy0] = pt(0, 0);
-    drawHandle(cx0, cy0, 6);
+    drawHandle(cx0, cy0, 0, 0, R_CENTER);
   }
+
+  private drawIndicator(ctx: CanvasRenderingContext2D) {
+    if (!this.indicator) return;
+    const [disp, sat, css] = this.indicator;
+    const [x, y] = this.polar(disp, sat);
+    ctx.save();
+    ctx.fillStyle = css;
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// Tint the accent toward black (dl<0) or white (dl>0) to show per-node luma.
+function mixLuma(hex: string, dl: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  let r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+  const t = Math.min(Math.abs(dl), 1) * 0.7;
+  const tgt = dl < 0 ? 0 : 255;
+  r = Math.round(r + (tgt - r) * t);
+  g = Math.round(g + (tgt - g) * t);
+  b = Math.round(b + (tgt - b) * t);
+  return `rgb(${r},${g},${b})`;
 }
