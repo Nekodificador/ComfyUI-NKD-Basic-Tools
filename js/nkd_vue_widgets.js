@@ -9364,14 +9364,10 @@ class ColorWarpGrid {
       const t = (rr - blo) / (abv - blo);
       let angle, sat;
       if (blo === 0) {
-        const [angC, satC] = this.centerPolar();
-        if (satC < 1e-4) {
-          angle = angA;
-          sat = satA * t;
-        } else {
-          angle = angC + wrapDeg(angA - angC) * t;
-          sat = satC + (satA - satC) * t;
-        }
+        const [bx, by] = this.polar(angA, satA * t);
+        const [vx, vy] = this.centerDisp();
+        const w = 1 - t;
+        [angle, sat] = this.toPolar(bx + vx * w, by + vy * w);
       } else {
         const [angB, satB] = this.nodePolar(blo, sj);
         angle = angB + wrapDeg(angA - angB) * t;
@@ -9422,12 +9418,11 @@ class ColorWarpGrid {
     }
     return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
   }
-  // The centre's polar position [displayAngle, sat] derived from the neutral cast.
-  centerPolar() {
-    const n = this.mesh.neutral ?? [0, 0];
-    const C = Math.hypot(n[0], n[1]);
-    const hue = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
-    return [hueToDisplay(hue), Math.min(C / C_REF, 1)];
+  // The centre node's screen-space displacement from the canvas origin (the
+  // vector by which the centre was dragged), used to stretch — not collapse — the web.
+  centerDisp() {
+    const [px, py] = this.nodePt(0, 0);
+    return [px - this.cx, py - this.cy];
   }
   // Snapshot selected nodes' current screen positions (for group/scale/rotate).
   selectionSnapshot() {

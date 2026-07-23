@@ -259,10 +259,11 @@ export class ColorWarpGrid {
       const [angA, satA] = this.nodePolar(abv, sj);
       const t = (rr - blo) / (abv - blo);
       let angle: number, sat: number;
-      if (blo === 0) {          // inner bracket = the centre node
-        const [angC, satC] = this.centerPolar();
-        if (satC < 1e-4) { angle = angA; sat = satA * t; }       // centre at origin → radial line
-        else { angle = angC + wrapDeg(angA - angC) * t; sat = satC + (satA - satC) * t; } // follow the moved centre
+      if (blo === 0) {          // inner bracket = the centre node → stretch, don't collapse
+        const [bx, by] = this.polar(angA, satA * t);   // base radial position (centre at origin)
+        const [vx, vy] = this.centerDisp();            // how far the centre was dragged
+        const w = 1 - t;                                // full at the centre, 0 at the outer anchor
+        [angle, sat] = this.toPolar(bx + vx * w, by + vy * w);
       } else {
         const [angB, satB] = this.nodePolar(blo, sj);
         angle = angB + wrapDeg(angA - angB) * t;
@@ -313,12 +314,11 @@ export class ColorWarpGrid {
     return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
   }
 
-  // The centre's polar position [displayAngle, sat] derived from the neutral cast.
-  private centerPolar(): [number, number] {
-    const n = this.mesh!.neutral ?? [0, 0];
-    const C = Math.hypot(n[0], n[1]);
-    const hue = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
-    return [hueToDisplay(hue), Math.min(C / C_REF, 1)];
+  // The centre node's screen-space displacement from the canvas origin (the
+  // vector by which the centre was dragged), used to stretch — not collapse — the web.
+  private centerDisp(): [number, number] {
+    const [px, py] = this.nodePt(0, 0);
+    return [px - this.cx, py - this.cy];
   }
 
   // Snapshot selected nodes' current screen positions (for group/scale/rotate).
