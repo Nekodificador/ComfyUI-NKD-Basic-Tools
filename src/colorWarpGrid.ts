@@ -31,6 +31,7 @@ const R_HOVER = 7;
 const R_CENTER = 4.5;
 const R_DEP = 3;   // dependent (non-autonomous) node → small dot (3DLC-style)
 const HIT_PX = 14; // hit-test tolerance in CSS px
+const MARQUEE_MIN = 4; // px: a rect smaller than this is a click (clears selection)
 
 // ponytail: interaction tuning knobs — the drag "feel" Neko will eyeball.
 // Model (3DLC A/B, confirmed with Neko 2026-07-23): grabbing a node swings its
@@ -94,12 +95,17 @@ export class ColorWarpGrid {
   // Drag / hover state.
   private hover: [number, number] | null = null; // [ri, sj] under cursor
   private drag: null | {
-    kind: "node" | "shift";
+    kind: "node" | "shift" | "group" | "marquee";
     ri: number; sj: number;
     startX: number; startY: number;          // pointer down (CSS px)
     start: number[][][];                       // deep copy of offsets at grab
     pointerId: number;
+    groupStart?: { ri: number; sj: number; x: number; y: number }[]; // group-drag snapshot
   } = null;
+
+  // Box-select: nodes moved together + the live marquee rect [x0,y0,x1,y1].
+  private selected = new Set<string>();
+  private marquee: [number, number, number, number] | null = null;
 
   // Preview-hover indicator: [displayDeg, sat, cssColor] or null.
   private indicator: [number, number, string] | null = null;
@@ -295,8 +301,22 @@ export class ColorWarpGrid {
       this.drag = { kind: "shift", ri, sj, startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
     } else {
       const hit = this.hitTest(x, y);
-      if (!hit) return;
-      this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+      if (hit && this.selected.has(this.key(hit[0], hit[1]))) {
+        // Grab a selected node → translate the whole selection together.
+        const snap = [...this.selected].map((k) => {
+          const [ri, sj] = k.split(",").map(Number);
+          const [px, py] = this.nodePt(ri, sj);
+          return { ri, sj, x: px, y: py };
+        });
+        this.drag = { kind: "group", ri: hit[0], sj: hit[1], startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: snap };
+      } else if (hit) {
+        if (this.selected.size) { this.selected.clear(); this.draw(); } // plain grab clears selection
+        this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+      } else {
+        // Empty space → start a marquee box-select.
+        this.drag = { kind: "marquee", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId };
+        this.marquee = [x, y, x, y];
+      }
     }
     this.canvas.setPointerCapture(e.pointerId);
     e.preventDefault();
@@ -307,7 +327,13 @@ export class ColorWarpGrid {
     const [x, y] = this.localXY(e);
 
     if (this.drag) {
+      if (this.drag.kind === "marquee") {
+        this.marquee = [this.drag.startX, this.drag.startY, x, y];
+        this.draw();
+        return;
+      }
       if (this.drag.kind === "node") this.dragNode(x, y);
+      else if (this.drag.kind === "group") this.dragGroup(x, y);
       else this.dragShift(x, y);
       this.draw();
       this.emit(false);
@@ -339,10 +365,51 @@ export class ColorWarpGrid {
   private onUp = (e: PointerEvent) => {
     if (!this.drag) return;
     try { this.canvas.releasePointerCapture(this.drag.pointerId); } catch { /* ignore */ }
+    const wasMarquee = this.drag.kind === "marquee";
     this.drag = null;
+    if (wasMarquee) { this.finishMarquee(); this.marquee = null; this.draw(); return; }
     this.draw();
     this.emit(true); // write back to node on drag end
   };
+
+  // Move every selected node by the same screen delta (box-select group drag).
+  private dragGroup(x: number, y: number) {
+    const d = this.drag!;
+    const dx = x - d.startX, dy = y - d.startY;
+    const spokes = new Set<number>();
+    for (const g of d.groupStart!) {
+      if (g.ri === 0) continue; // leave the centre out of group moves
+      const [disp, sat] = this.toPolar(g.x + dx, g.y + dy);
+      this.autonomous.add(this.key(g.ri, g.sj));
+      this.setNodePolar(g.ri, g.sj, disp, sat);
+      spokes.add(g.sj);
+    }
+    for (const sj of spokes) this.recomputeSpoke(sj);
+  }
+
+  // Select every node whose handle falls inside the marquee rect. A tiny rect
+  // (a click, not a drag) clears the selection instead.
+  private finishMarquee() {
+    const m = this.marquee; if (!m || !this.mesh) return;
+    const x0 = Math.min(m[0], m[2]), x1 = Math.max(m[0], m[2]);
+    const y0 = Math.min(m[1], m[3]), y1 = Math.max(m[1], m[3]);
+    this.selected.clear();
+    if (x1 - x0 < MARQUEE_MIN && y1 - y0 < MARQUEE_MIN) return; // click → just clear
+    const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
+    for (let ri = 1; ri <= R; ri++)
+      for (let sj = 0; sj < S; sj++) {
+        const [px, py] = this.nodePt(ri, sj);
+        if (px >= x0 && px <= x1 && py >= y0 && py <= y1) this.selected.add(this.key(ri, sj));
+      }
+  }
+
+  // Clear the selection; returns whether there was one (Esc handling).
+  clearSelection(): boolean {
+    if (!this.selected.size) return false;
+    this.selected.clear();
+    this.draw();
+    return true;
+  }
 
   // Drag a node → it becomes AUTONOMOUS (fixed at the cursor); the dependent nodes
   // on its arm re-interpolate between the autonomous anchors (nearest inward/centre
@@ -526,6 +593,22 @@ export class ColorWarpGrid {
     if (this.mesh) this.drawWeb(ctx, this.mesh);
     if (DEBUG_LABELS && this.mesh) this.drawLabels(ctx);
     this.drawIndicator(ctx);
+    this.drawMarquee(ctx);
+  }
+
+  private drawMarquee(ctx: CanvasRenderingContext2D) {
+    if (!this.marquee) return;
+    const [x0, y0, x1, y1] = this.marquee;
+    const rx = Math.min(x0, x1), ry = Math.min(y0, y1);
+    const rw = Math.abs(x1 - x0), rh = Math.abs(y1 - y0);
+    ctx.save();
+    ctx.fillStyle = "rgba(74,180,255,0.10)";
+    ctx.fillRect(rx, ry, rw, rh);
+    ctx.strokeStyle = ACCENT;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.restore();
   }
 
   // TEMP: coordinate labels A1–F4 (letter = spoke, number = ring) next to each
@@ -633,6 +716,12 @@ export class ColorWarpGrid {
         ctx.lineWidth = 1.5;
         ctx.beginPath(); ctx.arc(x, y, r + 2, 0, Math.PI * 2); ctx.stroke();
         ctx.strokeStyle = "rgba(0,0,0,0.6)";
+      } else if (this.selected.has(this.key(ri, sj))) { // box-selected
+        ctx.strokeStyle = ACCENT;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.stroke();
+        ctx.strokeStyle = "rgba(0,0,0,0.6)";
+        ctx.lineWidth = 1.5;
       }
     };
     for (let ri = 1; ri <= R; ri++) {

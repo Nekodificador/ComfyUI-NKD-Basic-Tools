@@ -213,7 +213,12 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     if (commit) opts.onClose?.(json);
   }
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") { e.stopPropagation(); closeWith(true); return; }
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      if (grid.clearSelection()) return; // first Esc clears a box-selection
+      closeWith(true);
+      return;
+    }
     const k = e.key.toLowerCase();
     if (k === "r") { e.stopPropagation(); grid.resetAll(); }
     else if (k === "s") { e.stopPropagation(); grid.smooth = !grid.smooth; setToggle(smoothBtn, grid.smooth); }
