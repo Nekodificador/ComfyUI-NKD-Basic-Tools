@@ -9207,8 +9207,12 @@ class ColorWarpGrid {
       o[1] = 0;
       o[2] = 0;
       if (ri !== this.mesh.sat_rings) this.autonomous.delete(this.key(ri, sj));
-      if (ri === 0) this.mesh.neutral = [0, 0];
-      else this.recomputeSpoke(sj);
+      if (ri === 0) {
+        this.mesh.neutral = [0, 0];
+        for (let s = 0; s < this.mesh.hue_segments; s++) this.recomputeSpoke(s);
+      } else {
+        this.recomputeSpoke(sj);
+      }
       this.draw();
       this.emit(true);
       e.preventDefault();
