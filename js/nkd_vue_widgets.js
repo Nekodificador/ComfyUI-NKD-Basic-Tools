@@ -9268,8 +9268,8 @@ class ColorWarpGrid {
   // Drag a node to follow the cursor, spreading the edit with the 3DLC A/B
   // influence model: a RIM node (ri===R) reaches down its whole radius so the
   // spoke moves together; an inner node is a local bump; neighbouring spokes
-  // follow with an angular Gaussian falloff. Pin All (or Smooth off) restricts
-  // the edit to the grabbed node.
+  // follow with an angular Gaussian falloff. Pin All restricts the edit to the
+  // grabbed node; the spread is otherwise always on.
   dragNode(x, y) {
     const m = this.mesh;
     const S = m.hue_segments, R = m.sat_rings;
@@ -9291,7 +9291,7 @@ class ColorWarpGrid {
     const dDh = tgtDh - start[ri][sj][0];
     const dDs = tgtDs - start[ri][sj][1];
     const isRim = ri === R;
-    const single = this.pin || !this.smooth;
+    const single = this.pin;
     const angW = (ss) => {
       let d = Math.abs(ss - sj);
       d = Math.min(d, S - d);

@@ -8,7 +8,7 @@
 // Interaction: pointer-capture drag of the nearest node warps the mesh live,
 // with a 3DLC-style influence model — a RIM node drives its whole radius, an
 // inner node is local, and neighbouring spokes follow with an angular falloff
-// (Pin All, or Smooth off, = only the grabbed node). Shift = DaVinci ring/sector
+// (always on; Pin All = only the grabbed node). Shift = DaVinci ring/sector
 // gesture (horizontal = rotate a sector's hue, vertical = expand/contract a
 // ring's sat). Alt+wheel nudges per-node luma. Double-click resets a node.
 // Edits are written back through `onEdit(json, commit)`.
@@ -30,8 +30,9 @@ const HIT_PX = 14; // hit-test tolerance in CSS px
 // ponytail: interaction tuning knobs — the drag "feel" Neko will eyeball.
 // Model (3DLC A/B, observed with Neko 2026-07-23): a RIM node drives its WHOLE
 // radius (full radial reach → the spoke moves together), an inner node is local,
-// and neighbouring spokes follow with an angular falloff. Pin All (or Smooth
-// off) = only the grabbed node moves.
+// and neighbouring spokes follow with an angular falloff. This spread is
+// INHERENT (always on); only Pin All restricts the edit to the grabbed node.
+// (Smooth is a future relax tool à la 3DLC, not a drag falloff.)
 const ANG_SIGMA = 2.5;         // angular influence width in segment units (neighbour spokes)
 const RAD_SIGMA = 1.1;         // radial influence width for INNER-node drags (ring units)
 const SHIFT_ROT_PER_PX = 0.25; // deg of sector hue rotation per px (Shift horiz)
@@ -279,8 +280,8 @@ export class ColorWarpGrid {
   // Drag a node to follow the cursor, spreading the edit with the 3DLC A/B
   // influence model: a RIM node (ri===R) reaches down its whole radius so the
   // spoke moves together; an inner node is a local bump; neighbouring spokes
-  // follow with an angular Gaussian falloff. Pin All (or Smooth off) restricts
-  // the edit to the grabbed node.
+  // follow with an angular Gaussian falloff. Pin All restricts the edit to the
+  // grabbed node; the spread is otherwise always on.
   private dragNode(x: number, y: number) {
     const m = this.mesh!;
     const S = m.hue_segments, R = m.sat_rings;
@@ -306,7 +307,7 @@ export class ColorWarpGrid {
     const dDs = tgtDs - start[ri][sj][1];
 
     const isRim = ri === R;
-    const single = this.pin || !this.smooth;
+    const single = this.pin; // influence is inherent (3DLC); only Pin All isolates a node
     const angW = (ss: number) => {
       let d = Math.abs(ss - sj); d = Math.min(d, S - d);
       return Math.exp(-(d * d) / (2 * ANG_SIGMA * ANG_SIGMA));
