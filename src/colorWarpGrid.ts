@@ -20,6 +20,11 @@ const WEB_LINE = "rgba(120,180,255,0.55)";
 const ACCENT = "#4ab4ff";
 const RAD = Math.PI / 180;
 
+// TEMP debug (2026-07-23): draw A1–F4 coordinate labels on each node so Neko can
+// name exact nodes over text. Radius letter = segment (A at top, clockwise);
+// number = ring (1 = inner … 4 = rim). Flip to false to remove.
+const DEBUG_LABELS = true;
+
 // nkd-curve-style handle radii.
 const R_IDLE = 6;
 const R_HOVER = 7;
@@ -463,7 +468,33 @@ export class ColorWarpGrid {
     this.drawScatter(ctx);
     this.drawReferenceGrid(ctx);
     if (this.mesh) this.drawWeb(ctx, this.mesh);
+    if (DEBUG_LABELS && this.mesh) this.drawLabels(ctx);
     this.drawIndicator(ctx);
+  }
+
+  // TEMP: coordinate labels A1–F4 (letter = spoke, number = ring) next to each
+  // node, so drag behaviour can be discussed by exact node name.
+  private drawLabels(ctx: CanvasRenderingContext2D) {
+    const R = this.mesh!.sat_rings, S = this.mesh!.hue_segments;
+    ctx.save();
+    ctx.font = "600 11px Inter, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const label = (x: number, y: number, text: string) => {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(text, x + 9, y - 9);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(text, x + 9, y - 9);
+    };
+    for (let ri = 1; ri <= R; ri++)
+      for (let sj = 0; sj < S; sj++) {
+        const [x, y] = this.nodePt(ri, sj);
+        label(x, y, `${String.fromCharCode(65 + sj)}${ri}`);
+      }
+    const [cx, cy] = this.nodePt(0, 0);
+    label(cx, cy, "0");
+    ctx.restore();
   }
 
   private drawScatter(ctx: CanvasRenderingContext2D) {

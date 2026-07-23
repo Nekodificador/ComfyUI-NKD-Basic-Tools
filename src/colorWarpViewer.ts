@@ -30,6 +30,10 @@ const ACCENT = "#4ab4ff";
 const BORDER = "#3a3d46";
 const TEXT = "#c8d0e0";
 
+// TEMP debug (2026-07-23): force a 6-radius × 4-point grid so Neko can reference
+// exact nodes (A1–F4) over text. Flip to false to restore the saved density.
+const DEBUG_GRID = true;
+
 function meshJson(m: Mesh): string {
   return JSON.stringify(meshToDict(m));
 }
@@ -55,6 +59,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   let mesh: Mesh;
   try { mesh = meshFromDict(JSON.parse(opts.mesh)); }
   catch { mesh = meshIdentity(); }
+  if (DEBUG_GRID) mesh = meshIdentity(6, 4); // TEMP 6×4 debug grid (A1–F4)
 
   let sourceCanvas = toCanvas(opts.image);
 
@@ -72,7 +77,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   title.textContent = "😺 Color Warp";
   title.style.cssText = "font-weight:600;font-size:13px";
   const hint = document.createElement("span");
-  hint.textContent = "drag nodes · Shift = ring/sector · Alt+wheel = luma · Alt over grid = mask · dbl-click resets";
+  hint.textContent = "DEBUG 6×4 grid — nodes A1–F4 (A top, clockwise; 1 inner…4 rim) · drag · Pin = single node · dbl-click resets";
   hint.style.cssText = "opacity:0.7;font-size:11px";
   const spacer = document.createElement("span");
   spacer.style.cssText = "flex:1 1 auto";

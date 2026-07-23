@@ -9414,7 +9414,32 @@ class ColorWarpGrid {
     this.drawScatter(ctx);
     this.drawReferenceGrid(ctx);
     if (this.mesh) this.drawWeb(ctx, this.mesh);
+    if (this.mesh) this.drawLabels(ctx);
     this.drawIndicator(ctx);
+  }
+  // TEMP: coordinate labels A1–F4 (letter = spoke, number = ring) next to each
+  // node, so drag behaviour can be discussed by exact node name.
+  drawLabels(ctx) {
+    const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
+    ctx.save();
+    ctx.font = "600 11px Inter, system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    const label = (x, y, text) => {
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(0,0,0,0.85)";
+      ctx.strokeText(text, x + 9, y - 9);
+      ctx.fillStyle = "#fff";
+      ctx.fillText(text, x + 9, y - 9);
+    };
+    for (let ri = 1; ri <= R; ri++)
+      for (let sj = 0; sj < S; sj++) {
+        const [x, y] = this.nodePt(ri, sj);
+        label(x, y, `${String.fromCharCode(65 + sj)}${ri}`);
+      }
+    const [cx, cy] = this.nodePt(0, 0);
+    label(cx, cy, "0");
+    ctx.restore();
   }
   drawScatter(ctx) {
     this.buildScatter();
@@ -9927,6 +9952,7 @@ function openColorWarpViewer(opts) {
   } catch {
     mesh = meshIdentity();
   }
+  mesh = meshIdentity(6, 4);
   let sourceCanvas = toCanvas(opts.image);
   const host = document.createElement("div");
   host.style.cssText = `position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;background:${PANEL};color:${TEXT};font:11px Inter,system-ui,sans-serif;`;
@@ -9936,7 +9962,7 @@ function openColorWarpViewer(opts) {
   title.textContent = "😺 Color Warp";
   title.style.cssText = "font-weight:600;font-size:13px";
   const hint = document.createElement("span");
-  hint.textContent = "drag nodes · Shift = ring/sector · Alt+wheel = luma · Alt over grid = mask · dbl-click resets";
+  hint.textContent = "DEBUG 6×4 grid — nodes A1–F4 (A top, clockwise; 1 inner…4 rim) · drag · Pin = single node · dbl-click resets";
   hint.style.cssText = "opacity:0.7;font-size:11px";
   const spacer = document.createElement("span");
   spacer.style.cssText = "flex:1 1 auto";
