@@ -5,10 +5,9 @@
 // HiDPI. Wheel + scatter are cached and recomputed only on resize / source
 // change; the vector layers redraw per frame (cheap) so drag edits stay live.
 //
-// Interaction: pointer-capture drag of the nearest node warps the mesh live,
-// with a 3DLC-style influence model — a RIM node drives its whole radius, an
-// inner node is local, and neighbouring spokes follow with an angular falloff
-// (always on; Pin All = only the grabbed node). Shift = DaVinci ring/sector
+// Interaction: pointer-capture drag of a node swings its OWN radial column to
+// the cursor (straight radial line; only that spoke moves — no angular spread),
+// à la 3DLC A/B. Pin All = only the grabbed node. Shift = DaVinci ring/sector
 // gesture (horizontal = rotate a sector's hue, vertical = expand/contract a
 // ring's sat). Alt+wheel nudges per-node luma. Double-click resets a node.
 // Edits are written back through `onEdit(json, commit)`.
@@ -28,13 +27,11 @@ const R_CENTER = 4.5;
 const HIT_PX = 14; // hit-test tolerance in CSS px
 
 // ponytail: interaction tuning knobs — the drag "feel" Neko will eyeball.
-// Model (3DLC A/B, observed with Neko 2026-07-23): a RIM node drives its WHOLE
-// radius (full radial reach → the spoke moves together), an inner node is local,
-// and neighbouring spokes follow with an angular falloff. This spread is
-// INHERENT (always on); only Pin All restricts the edit to the grabbed node.
+// Model (3DLC A/B, confirmed with Neko 2026-07-23): grabbing a node swings its
+// OWN radial column to the cursor as a straight radial line (angle = cursor hue,
+// sat scales from the centre through the cursor). ONLY that spoke moves — no
+// angular spread to neighbours. Pin All = only the grabbed node.
 // (Smooth is a future relax tool à la 3DLC, not a drag falloff.)
-const ANG_SIGMA = 2.5;         // angular influence width in segment units (neighbour spokes)
-const RAD_SIGMA = 1.1;         // radial influence width for INNER-node drags (ring units)
 const SHIFT_ROT_PER_PX = 0.25; // deg of sector hue rotation per px (Shift horiz)
 const SHIFT_SAT_PER_PX = 0.003; // ring sat expand/contract per px (Shift vert)
 const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
@@ -277,56 +274,40 @@ export class ColorWarpGrid {
     this.emit(true); // write back to node on drag end
   };
 
-  // Drag a node to follow the cursor, spreading the edit with the 3DLC A/B
-  // influence model: a RIM node (ri===R) reaches down its whole radius so the
-  // spoke moves together; an inner node is a local bump; neighbouring spokes
-  // follow with an angular Gaussian falloff. Pin All restricts the edit to the
-  // grabbed node; the spread is otherwise always on.
+  // Drag a node → swing its OWN radial column to the cursor as a straight radial
+  // line: every node on that spoke takes the cursor's hue (rigid — the column
+  // reorients as one arm pivoting at the centre) and a saturation that scales
+  // linearly from the centre through the cursor. ONLY that spoke moves. Pin All
+  // isolates the grabbed node. (3DLC A/B behaviour, confirmed with Neko.)
   private dragNode(x: number, y: number) {
     const m = this.mesh!;
     const S = m.hue_segments, R = m.sat_rings;
-    const { ri, sj, start } = this.drag!;
+    const { ri, sj } = this.drag!;
     const [disp, sat] = this.toPolar(x, y);
 
-    // Center (ri=0) collapses to a point — apply its radius uniformly so it
-    // stays one node. (Global neutral-cast is the follow-up engine change.)
+    // Center (ri=0) collapses to a point — apply its radius uniformly.
     if (ri === 0) {
-      for (let ss = 0; ss < S; ss++) {
-        const o = m.offsets[0][ss];
-        o[0] = 0; o[1] = sat; o[2] = start[0][ss][2];
-      }
+      for (let ss = 0; ss < S; ss++) { const o = m.offsets[0][ss]; o[0] = 0; o[1] = sat; }
       return;
     }
 
-    // Delta that places the grabbed node exactly under the cursor.
     const baseHue = displayToHue(sj * 360 / S);
-    const baseSat = ri / R;
-    const tgtDh = wrapDeg(displayToHue(disp) - baseHue) / baseSat;
-    const tgtDs = sat - baseSat;
-    const dDh = tgtDh - start[ri][sj][0];
-    const dDs = tgtDs - start[ri][sj][1];
+    const dTheta = wrapDeg(displayToHue(disp) - baseHue);
 
-    const isRim = ri === R;
-    const single = this.pin; // influence is inherent (3DLC); only Pin All isolates a node
-    const angW = (ss: number) => {
-      let d = Math.abs(ss - sj); d = Math.min(d, S - d);
-      return Math.exp(-(d * d) / (2 * ANG_SIGMA * ANG_SIGMA));
-    };
+    // Pin All: only the grabbed node moves.
+    if (this.pin) {
+      const o = m.offsets[ri][sj];
+      o[0] = dTheta * R / ri;      // warpedHue = baseHue + o[0]*(ri/R) = targetHue
+      o[1] = sat - ri / R;
+      return;
+    }
 
+    // The whole column (spoke sj, only it) becomes a straight radial line at the
+    // cursor's hue, scaled so it passes through the cursor at ring ri.
     for (let rr = 1; rr <= R; rr++) {
-      // Rim node → full radial reach (whole spoke); inner node → local bump.
-      const dr = rr - ri;
-      const radW = isRim ? 1 : Math.exp(-(dr * dr) / (2 * RAD_SIGMA * RAD_SIGMA));
-      for (let ss = 0; ss < S; ss++) {
-        const w = single ? (rr === ri && ss === sj ? 1 : 0) : radW * angW(ss);
-        if (w === 0) continue;
-        const o = m.offsets[rr][ss], s0 = start[rr][ss];
-        o[0] = s0[0] + dDh * w;
-        // Sat: for the rim's whole-spoke case scale by ring radius so the spoke
-        // scales toward the centre (neutral stays put); inner drags are local.
-        o[1] = s0[1] + dDs * w * (isRim ? rr / R : 1);
-        o[2] = s0[2];
-      }
+      const o = m.offsets[rr][sj];
+      o[0] = dTheta * R / rr;                     // warpedHue(rr) = targetHue (rigid column)
+      o[1] = clamp01(sat * rr / ri) - rr / R;     // warpedSat scales through the cursor
     }
   }
 

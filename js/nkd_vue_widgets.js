@@ -9033,8 +9033,6 @@ const R_IDLE = 6;
 const R_HOVER = 7;
 const R_CENTER = 4.5;
 const HIT_PX = 14;
-const ANG_SIGMA = 2.5;
-const RAD_SIGMA = 1.1;
 const SHIFT_ROT_PER_PX = 0.25;
 const SHIFT_SAT_PER_PX = 3e-3;
 const LUMA_PER_WHEEL = 15e-4;
@@ -9265,49 +9263,36 @@ class ColorWarpGrid {
     var _a, _b;
     (_b = (_a = this.cb).onEdit) == null ? void 0 : _b.call(_a, JSON.stringify(meshToDict(this.mesh)), commit);
   }
-  // Drag a node to follow the cursor, spreading the edit with the 3DLC A/B
-  // influence model: a RIM node (ri===R) reaches down its whole radius so the
-  // spoke moves together; an inner node is a local bump; neighbouring spokes
-  // follow with an angular Gaussian falloff. Pin All restricts the edit to the
-  // grabbed node; the spread is otherwise always on.
+  // Drag a node → swing its OWN radial column to the cursor as a straight radial
+  // line: every node on that spoke takes the cursor's hue (rigid — the column
+  // reorients as one arm pivoting at the centre) and a saturation that scales
+  // linearly from the centre through the cursor. ONLY that spoke moves. Pin All
+  // isolates the grabbed node. (3DLC A/B behaviour, confirmed with Neko.)
   dragNode(x, y) {
     const m = this.mesh;
     const S = m.hue_segments, R = m.sat_rings;
-    const { ri, sj, start } = this.drag;
+    const { ri, sj } = this.drag;
     const [disp, sat] = this.toPolar(x, y);
     if (ri === 0) {
       for (let ss = 0; ss < S; ss++) {
         const o = m.offsets[0][ss];
         o[0] = 0;
         o[1] = sat;
-        o[2] = start[0][ss][2];
       }
       return;
     }
     const baseHue = displayToHue(sj * 360 / S);
-    const baseSat = ri / R;
-    const tgtDh = wrapDeg(displayToHue(disp) - baseHue) / baseSat;
-    const tgtDs = sat - baseSat;
-    const dDh = tgtDh - start[ri][sj][0];
-    const dDs = tgtDs - start[ri][sj][1];
-    const isRim = ri === R;
-    const single = this.pin;
-    const angW = (ss) => {
-      let d = Math.abs(ss - sj);
-      d = Math.min(d, S - d);
-      return Math.exp(-(d * d) / (2 * ANG_SIGMA * ANG_SIGMA));
-    };
+    const dTheta = wrapDeg(displayToHue(disp) - baseHue);
+    if (this.pin) {
+      const o = m.offsets[ri][sj];
+      o[0] = dTheta * R / ri;
+      o[1] = sat - ri / R;
+      return;
+    }
     for (let rr = 1; rr <= R; rr++) {
-      const dr = rr - ri;
-      const radW = isRim ? 1 : Math.exp(-(dr * dr) / (2 * RAD_SIGMA * RAD_SIGMA));
-      for (let ss = 0; ss < S; ss++) {
-        const w = single ? rr === ri && ss === sj ? 1 : 0 : radW * angW(ss);
-        if (w === 0) continue;
-        const o = m.offsets[rr][ss], s0 = start[rr][ss];
-        o[0] = s0[0] + dDh * w;
-        o[1] = s0[1] + dDs * w * (isRim ? rr / R : 1);
-        o[2] = s0[2];
-      }
+      const o = m.offsets[rr][sj];
+      o[0] = dTheta * R / rr;
+      o[1] = clamp01(sat * rr / ri) - rr / R;
     }
   }
   // Shift gesture: horizontal rotates the grabbed sector's hue (dh on every ring
