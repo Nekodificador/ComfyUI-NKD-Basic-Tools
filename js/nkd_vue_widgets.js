@@ -9263,11 +9263,10 @@ class ColorWarpGrid {
     var _a, _b;
     (_b = (_a = this.cb).onEdit) == null ? void 0 : _b.call(_a, JSON.stringify(meshToDict(this.mesh)), commit);
   }
-  // Drag a node → swing its OWN radial column to the cursor as a straight radial
-  // line: every node on that spoke takes the cursor's hue (rigid — the column
-  // reorients as one arm pivoting at the centre) and a saturation that scales
-  // linearly from the centre through the cursor. ONLY that spoke moves. Pin All
-  // isolates the grabbed node. (3DLC A/B behaviour, confirmed with Neko.)
+  // Drag a node → the segment BELOW it (rings 1..ri on its spoke, itself + inner)
+  // swings to the cursor as a straight radial line; the outer rings and every
+  // other spoke stay put — each node governs only what's below it (3DLC/DaVinci
+  // hierarchy). Pin All isolates the grabbed node.
   dragNode(x, y) {
     const m = this.mesh;
     const S = m.hue_segments, R = m.sat_rings;
@@ -9289,7 +9288,7 @@ class ColorWarpGrid {
       o[1] = sat - ri / R;
       return;
     }
-    for (let rr = 1; rr <= R; rr++) {
+    for (let rr = 1; rr <= ri; rr++) {
       const o = m.offsets[rr][sj];
       o[0] = dTheta * R / rr;
       o[1] = clamp01(sat * rr / ri) - rr / R;
@@ -10086,6 +10085,16 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     if (e.key === "Escape") {
       e.stopPropagation();
       closeWith(true);
+      return;
+    }
+    const k = e.key.toLowerCase();
+    if (k === "r") {
+      e.stopPropagation();
+      grid.resetAll();
+    } else if (k === "s") {
+      e.stopPropagation();
+      grid.smooth = !grid.smooth;
+      setToggle(smoothBtn, grid.smooth);
     }
   };
   window.addEventListener("keydown", onKey, true);

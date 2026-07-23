@@ -279,11 +279,10 @@ export class ColorWarpGrid {
     this.emit(true); // write back to node on drag end
   };
 
-  // Drag a node → swing its OWN radial column to the cursor as a straight radial
-  // line: every node on that spoke takes the cursor's hue (rigid — the column
-  // reorients as one arm pivoting at the centre) and a saturation that scales
-  // linearly from the centre through the cursor. ONLY that spoke moves. Pin All
-  // isolates the grabbed node. (3DLC A/B behaviour, confirmed with Neko.)
+  // Drag a node → the segment BELOW it (rings 1..ri on its spoke, itself + inner)
+  // swings to the cursor as a straight radial line; the outer rings and every
+  // other spoke stay put — each node governs only what's below it (3DLC/DaVinci
+  // hierarchy). Pin All isolates the grabbed node.
   private dragNode(x: number, y: number) {
     const m = this.mesh!;
     const S = m.hue_segments, R = m.sat_rings;
@@ -307,11 +306,11 @@ export class ColorWarpGrid {
       return;
     }
 
-    // The whole column (spoke sj, only it) becomes a straight radial line at the
-    // cursor's hue, scaled so it passes through the cursor at ring ri.
-    for (let rr = 1; rr <= R; rr++) {
+    // Only rings 1..ri (the grabbed node + inner) swing to the cursor as a
+    // straight radial line; outer rings (ri+1..R) are left untouched.
+    for (let rr = 1; rr <= ri; rr++) {
       const o = m.offsets[rr][sj];
-      o[0] = dTheta * R / rr;                     // warpedHue(rr) = targetHue (rigid column)
+      o[0] = dTheta * R / rr;                     // warpedHue(rr) = targetHue (rigid)
       o[1] = clamp01(sat * rr / ri) - rr / R;     // warpedSat scales through the cursor
     }
   }
