@@ -108,6 +108,7 @@ export class ColorWarpGrid {
     corner?: number;  // scale: dragged corner 0=TL 1=TR 2=BR 3=BL
     box?: { x0: number; y0: number; x1: number; y1: number; cx: number; cy: number }; // scale/rotate snapshot
     startAng?: number; // rotate: initial cursor angle from box centre
+    xform?: (x: number, y: number) => [number, number]; // live scale/rotate map (for drawing the box)
   } = null;
 
   // Box-select: nodes moved together + the live marquee rect [x0,y0,x1,y1].
@@ -463,6 +464,7 @@ export class ColorWarpGrid {
   // Map every snapshot node's screen position through `f`, write it back as an
   // autonomous node, and recompute the affected spokes. Shared by scale/rotate.
   private applyGroupXform(f: (x: number, y: number) => [number, number]) {
+    this.drag!.xform = f; // remember it so drawGizmo can show the box transformed
     const spokes = new Set<number>();
     for (const g of this.drag!.groupStart!) {
       if (g.ri === 0) continue;
@@ -685,23 +687,39 @@ export class ColorWarpGrid {
     this.drawMarquee(ctx);
   }
 
-  // Free-transform box around a box-selection: dashed rect, corner scale dots,
-  // and a top lever with a rotate handle.
+  // Free-transform box around a box-selection: a dashed quad, corner scale dots,
+  // and a top lever with a rotate handle. While a scale/rotate drag is live, the
+  // box is drawn as the SNAPSHOT box mapped through the current transform — so it
+  // visibly rotates/scales with the lever (not a re-fitted axis-aligned bbox).
   private drawGizmo(ctx: CanvasRenderingContext2D) {
-    const box = this.selectionBox();
-    if (!box || this.drag?.kind === "marquee") return;
-    const { x0, y0, x1, y1, cx } = box;
+    if (this.drag?.kind === "marquee") return;
+    const active = (this.drag?.kind === "scale" || this.drag?.kind === "rotate") ? this.drag : null;
+    let corners: [number, number][];
+    if (active?.box && active.xform) {
+      const b = active.box, f = active.xform;
+      corners = ([[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]] as [number, number][]).map(([px, py]) => f(px, py));
+    } else {
+      const box = this.selectionBox();
+      if (!box) return;
+      corners = [[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1]];
+    }
+    const [TL, TR] = corners;
     ctx.save();
     ctx.strokeStyle = ACCENT; ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
-    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.beginPath();
+    ctx.moveTo(corners[0][0], corners[0][1]);
+    for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+    ctx.closePath(); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, y0 - ROT_LEVER); ctx.stroke();
+    // Lever from the (possibly rotated) top-edge midpoint, perpendicular outward.
+    const midX = (TL[0] + TR[0]) / 2, midY = (TL[1] + TR[1]) / 2;
+    const ex = TR[0] - TL[0], ey = TR[1] - TL[1], len = Math.hypot(ex, ey) || 1;
+    const tipX = midX + (ey / len) * ROT_LEVER, tipY = midY + (-ex / len) * ROT_LEVER;
+    ctx.beginPath(); ctx.moveTo(midX, midY); ctx.lineTo(tipX, tipY); ctx.stroke();
     ctx.fillStyle = "#fff"; ctx.lineWidth = 1.5;
-    for (const [hx, hy] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] as [number, number][]) {
-      ctx.beginPath(); ctx.arc(hx, hy, GIZMO_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-    }
-    ctx.beginPath(); ctx.arc(cx, y0 - ROT_LEVER, ROT_HANDLE_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    for (const [hx, hy] of corners) { ctx.beginPath(); ctx.arc(hx, hy, GIZMO_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke(); }
+    ctx.beginPath(); ctx.arc(tipX, tipY, ROT_HANDLE_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
 
