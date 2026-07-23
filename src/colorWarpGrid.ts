@@ -5,9 +5,10 @@
 // HiDPI. Wheel + scatter are cached and recomputed only on resize / source
 // change; the vector layers redraw per frame (cheap) so drag edits stay live.
 //
-// Interaction (Phases 5–8): pointer-capture drag of the nearest node warps the
-// mesh live; Smooth (default) spreads the delta to neighbours with a Gaussian
-// falloff, Pin freezes them. Shift turns the drag into the DaVinci ring/sector
+// Interaction: pointer-capture drag of the nearest node warps the mesh live,
+// with a 3DLC-style influence model — a RIM node drives its whole radius, an
+// inner node is local, and neighbouring spokes follow with an angular falloff
+// (Pin All, or Smooth off, = only the grabbed node). Shift = DaVinci ring/sector
 // gesture (horizontal = rotate a sector's hue, vertical = expand/contract a
 // ring's sat). Alt+wheel nudges per-node luma. Double-click resets a node.
 // Edits are written back through `onEdit(json, commit)`.
@@ -26,9 +27,13 @@ const R_HOVER = 7;
 const R_CENTER = 4.5;
 const HIT_PX = 14; // hit-test tolerance in CSS px
 
-// ponytail: interaction tuning knobs — the drag/gesture "feel" Neko will want
-// to eyeball. Grouped here so they're one edit away.
-const SMOOTH_SIGMA = 1.2;     // Gaussian falloff width in (ring,seg) grid units
+// ponytail: interaction tuning knobs — the drag "feel" Neko will eyeball.
+// Model (3DLC A/B, observed with Neko 2026-07-23): a RIM node drives its WHOLE
+// radius (full radial reach → the spoke moves together), an inner node is local,
+// and neighbouring spokes follow with an angular falloff. Pin All (or Smooth
+// off) = only the grabbed node moves.
+const ANG_SIGMA = 2.5;         // angular influence width in segment units (neighbour spokes)
+const RAD_SIGMA = 1.1;         // radial influence width for INNER-node drags (ring units)
 const SHIFT_ROT_PER_PX = 0.25; // deg of sector hue rotation per px (Shift horiz)
 const SHIFT_SAT_PER_PX = 0.003; // ring sat expand/contract per px (Shift vert)
 const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
@@ -271,49 +276,55 @@ export class ColorWarpGrid {
     this.emit(true); // write back to node on drag end
   };
 
-  // Drag a single node to follow the cursor; Smooth spreads the delta to
-  // neighbours with a Gaussian falloff, Pin freezes them.
+  // Drag a node to follow the cursor, spreading the edit with the 3DLC A/B
+  // influence model: a RIM node (ri===R) reaches down its whole radius so the
+  // spoke moves together; an inner node is a local bump; neighbouring spokes
+  // follow with an angular Gaussian falloff. Pin All (or Smooth off) restricts
+  // the edit to the grabbed node.
   private dragNode(x: number, y: number) {
     const m = this.mesh!;
     const S = m.hue_segments, R = m.sat_rings;
     const { ri, sj, start } = this.drag!;
     const [disp, sat] = this.toPolar(x, y);
 
-    // Target offset that places node (ri,sj) exactly under the cursor.
-    let tgtDh: number, tgtDs: number;
+    // Center (ri=0) collapses to a point — apply its radius uniformly so it
+    // stays one node. (Global neutral-cast is the follow-up engine change.)
     if (ri === 0) {
-      // Center collapses to a point — only radius (ds) is meaningful; apply it
-      // uniformly across ring 0 so it stays a single point.
-      tgtDh = 0; tgtDs = sat; // baseSat(0)=0 → ds = sat
-    } else {
-      const baseHue = displayToHue(sj * 360 / S);
-      const baseSat = ri / R;
-      const targetHue = displayToHue(disp);
-      tgtDh = wrapDeg(targetHue - baseHue) / baseSat;
-      tgtDs = sat - baseSat;
+      for (let ss = 0; ss < S; ss++) {
+        const o = m.offsets[0][ss];
+        o[0] = 0; o[1] = sat; o[2] = start[0][ss][2];
+      }
+      return;
     }
+
+    // Delta that places the grabbed node exactly under the cursor.
+    const baseHue = displayToHue(sj * 360 / S);
+    const baseSat = ri / R;
+    const tgtDh = wrapDeg(displayToHue(disp) - baseHue) / baseSat;
+    const tgtDs = sat - baseSat;
     const dDh = tgtDh - start[ri][sj][0];
     const dDs = tgtDs - start[ri][sj][1];
 
-    const apply = (rr: number, ss: number, w: number) => {
-      const o = m.offsets[rr][ss], s0 = start[rr][ss];
-      o[0] = s0[0] + dDh * w;
-      o[1] = s0[1] + dDs * w;
-      o[2] = s0[2];
+    const isRim = ri === R;
+    const single = this.pin || !this.smooth;
+    const angW = (ss: number) => {
+      let d = Math.abs(ss - sj); d = Math.min(d, S - d);
+      return Math.exp(-(d * d) / (2 * ANG_SIGMA * ANG_SIGMA));
     };
 
-    if (ri === 0) {
-      for (let ss = 0; ss < S; ss++) apply(0, ss, 1); // keep center a point
-      return;
-    }
-    if (this.pin || !this.smooth) { apply(ri, sj, 1); return; }
-    // Smooth: Gaussian over grid distance (seg wraps).
     for (let rr = 1; rr <= R; rr++) {
+      // Rim node → full radial reach (whole spoke); inner node → local bump.
+      const dr = rr - ri;
+      const radW = isRim ? 1 : Math.exp(-(dr * dr) / (2 * RAD_SIGMA * RAD_SIGMA));
       for (let ss = 0; ss < S; ss++) {
-        const dRing = rr - ri;
-        let dSeg = Math.abs(ss - sj); dSeg = Math.min(dSeg, S - dSeg);
-        const w = Math.exp(-(dRing * dRing + dSeg * dSeg) / (2 * SMOOTH_SIGMA * SMOOTH_SIGMA));
-        apply(rr, ss, w);
+        const w = single ? (rr === ri && ss === sj ? 1 : 0) : radW * angW(ss);
+        if (w === 0) continue;
+        const o = m.offsets[rr][ss], s0 = start[rr][ss];
+        o[0] = s0[0] + dDh * w;
+        // Sat: for the rim's whole-spoke case scale by ring radius so the spoke
+        // scales toward the centre (neutral stays put); inner drags are local.
+        o[1] = s0[1] + dDs * w * (isRim ? rr / R : 1);
+        o[2] = s0[2];
       }
     }
   }
