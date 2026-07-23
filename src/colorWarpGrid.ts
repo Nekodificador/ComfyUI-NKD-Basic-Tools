@@ -43,7 +43,9 @@ const ROT_HANDLE_R = 5;  // rotation handle radius
 // sat scales from the centre through the cursor). ONLY that spoke moves — no
 // angular spread to neighbours. Pin All = only the grabbed node.
 // (Smooth is a future relax tool à la 3DLC, not a drag falloff.)
-const SHIFT_AXIS_MIN = 4; // px of travel before a Shift-drag locks to the hue or sat axis
+const SHIFT_ROT_PER_PX = 0.3;   // deg of hue pivot per px (Shift horizontal)
+const SHIFT_SAT_PER_PX = 0.003; // sat change per px (Shift vertical; up = away from centre)
+const SHIFT_AXIS_MIN = 4;       // px of travel before a Shift-drag locks to the hue or sat axis
 const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
 
 // Angle convention: display 0° at top (12 o'clock), increasing clockwise.
@@ -539,9 +541,9 @@ export class ColorWarpGrid {
     if (!this.pin) this.recomputeSpoke(sj); // dependents follow; Pin = only this node
   }
 
-  // Shift = a normal node drag (dependents follow exactly the same way) but LOCKED
-  // to one axis: radial → saturation, tangential → hue, chosen by the first move.
-  // You move only the grabbed node; its arm recomputes as usual.
+  // Shift = a normal node drag (dependents follow the same) but on locked SCREEN
+  // axes, independent of the node's position: horizontal mouse pivots the hue
+  // (rotate around the circle at constant radius), vertical moves it in/out (sat).
   private dragShift(x: number, y: number) {
     const m = this.mesh!;
     const S = m.hue_segments, R = m.sat_rings;
@@ -549,19 +551,15 @@ export class ColorWarpGrid {
     const { ri, sj, startX, startY, start } = d;
     if (ri === 0) return;
     const dx = x - startX, dy = y - startY;
+    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) d.axis = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
     const baseSat = ri / R;
     const snapAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[ri][sj][0] * baseSat);
     const snapSat = clamp01(baseSat + start[ri][sj][1]);
-    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) {
-      // Lock by whether the cursor moved radially (sat) or tangentially (hue).
-      const [nx, ny] = this.polar(snapAngle, snapSat);
-      let rx = nx - this.cx, ry = ny - this.cy; const rl = Math.hypot(rx, ry) || 1; rx /= rl; ry /= rl;
-      d.axis = Math.abs(dx * rx + dy * ry) >= Math.abs(dx * -ry + dy * rx) ? "v" : "h";
-    }
-    const [disp, sat] = this.toPolar(x, y);
+    const angle = d.axis === "h" ? snapAngle + dx * SHIFT_ROT_PER_PX : snapAngle; // pivot hue
+    const sat = d.axis === "v" ? clamp01(snapSat - dy * SHIFT_SAT_PER_PX) : snapSat; // in/out
     this.autonomous.add(this.key(ri, sj));
-    this.setNodePolar(ri, sj, d.axis === "v" ? snapAngle : disp, d.axis === "h" ? snapSat : sat);
-    if (!this.pin) this.recomputeSpoke(sj); // dependents follow, exactly like a normal drag
+    this.setNodePolar(ri, sj, angle, sat);
+    if (!this.pin) this.recomputeSpoke(sj); // dependents follow, like a normal drag
   }
 
   private onDblClick = (e: MouseEvent) => {

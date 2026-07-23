@@ -9045,6 +9045,8 @@ const GIZMO_R = 4;
 const GIZMO_HIT = 10;
 const ROT_LEVER = 26;
 const ROT_HANDLE_R = 5;
+const SHIFT_ROT_PER_PX = 0.3;
+const SHIFT_SAT_PER_PX = 3e-3;
 const SHIFT_AXIS_MIN = 4;
 const LUMA_PER_WHEEL = 15e-4;
 function angleRad(displayDeg) {
@@ -9538,9 +9540,9 @@ class ColorWarpGrid {
     this.setNodePolar(ri, sj, disp, sat);
     if (!this.pin) this.recomputeSpoke(sj);
   }
-  // Shift = a normal node drag (dependents follow exactly the same way) but LOCKED
-  // to one axis: radial → saturation, tangential → hue, chosen by the first move.
-  // You move only the grabbed node; its arm recomputes as usual.
+  // Shift = a normal node drag (dependents follow the same) but on locked SCREEN
+  // axes, independent of the node's position: horizontal mouse pivots the hue
+  // (rotate around the circle at constant radius), vertical moves it in/out (sat).
   dragShift(x, y) {
     const m = this.mesh;
     const S = m.hue_segments, R = m.sat_rings;
@@ -9548,20 +9550,14 @@ class ColorWarpGrid {
     const { ri, sj, startX, startY, start } = d;
     if (ri === 0) return;
     const dx = x - startX, dy = y - startY;
+    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) d.axis = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
     const baseSat = ri / R;
     const snapAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[ri][sj][0] * baseSat);
     const snapSat = clamp01(baseSat + start[ri][sj][1]);
-    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) {
-      const [nx, ny] = this.polar(snapAngle, snapSat);
-      let rx = nx - this.cx, ry = ny - this.cy;
-      const rl = Math.hypot(rx, ry) || 1;
-      rx /= rl;
-      ry /= rl;
-      d.axis = Math.abs(dx * rx + dy * ry) >= Math.abs(dx * -ry + dy * rx) ? "v" : "h";
-    }
-    const [disp, sat] = this.toPolar(x, y);
+    const angle = d.axis === "h" ? snapAngle + dx * SHIFT_ROT_PER_PX : snapAngle;
+    const sat = d.axis === "v" ? clamp01(snapSat - dy * SHIFT_SAT_PER_PX) : snapSat;
     this.autonomous.add(this.key(ri, sj));
-    this.setNodePolar(ri, sj, d.axis === "v" ? snapAngle : disp, d.axis === "h" ? snapSat : sat);
+    this.setNodePolar(ri, sj, angle, sat);
     if (!this.pin) this.recomputeSpoke(sj);
   }
   // Reset all offsets to identity (keeps current density) (Phase 8).
