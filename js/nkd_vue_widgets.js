@@ -9373,8 +9373,9 @@ class ColorWarpGrid {
         [angle, sat] = this.toPolar(bx + vx * w, by + vy * w);
       } else {
         const [angB, satB] = this.nodePolar(blo, sj);
-        angle = angB + wrapDeg(angA - angB) * t;
-        sat = satB + (satA - satB) * t;
+        const [axS, ayS] = this.polar(angA, satA);
+        const [bxS, byS] = this.polar(angB, satB);
+        [angle, sat] = this.toPolar(bxS + (axS - bxS) * t, byS + (ayS - byS) * t);
       }
       this.setNodePolar(rr, sj, angle, sat);
     }

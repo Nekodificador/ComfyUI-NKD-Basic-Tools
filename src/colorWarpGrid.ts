@@ -267,9 +267,12 @@ export class ColorWarpGrid {
         const w = 1 - t;                                // full at the centre, 0 at the outer anchor
         [angle, sat] = this.toPolar(bx + vx * w, by + vy * w);
       } else {
+        // Straight line (screen space) between the two bracketing anchors — polar
+        // interpolation would bow the arm; 3DLC keeps it straight.
         const [angB, satB] = this.nodePolar(blo, sj);
-        angle = angB + wrapDeg(angA - angB) * t;
-        sat = satB + (satA - satB) * t;
+        const [axS, ayS] = this.polar(angA, satA);
+        const [bxS, byS] = this.polar(angB, satB);
+        [angle, sat] = this.toPolar(bxS + (axS - bxS) * t, byS + (ayS - byS) * t);
       }
       this.setNodePolar(rr, sj, angle, sat);
     }
