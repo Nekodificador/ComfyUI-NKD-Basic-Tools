@@ -32,6 +32,10 @@ const R_CENTER = 4.5;
 const R_DEP = 3;   // dependent (non-autonomous) node → small dot (3DLC-style)
 const HIT_PX = 14; // hit-test tolerance in CSS px
 const MARQUEE_MIN = 4; // px: a rect smaller than this is a click (clears selection)
+const GIZMO_R = 4;       // transform-box corner handle radius
+const GIZMO_HIT = 10;    // corner / rotate handle hit tolerance (px)
+const ROT_LEVER = 26;    // rotation lever length above the box (px)
+const ROT_HANDLE_R = 5;  // rotation handle radius
 
 // ponytail: interaction tuning knobs — the drag "feel" Neko will eyeball.
 // Model (3DLC A/B, confirmed with Neko 2026-07-23): grabbing a node swings its
@@ -100,7 +104,10 @@ export class ColorWarpGrid {
     startX: number; startY: number;          // pointer down (CSS px)
     start: number[][][];                       // deep copy of offsets at grab
     pointerId: number;
-    groupStart?: { ri: number; sj: number; x: number; y: number }[]; // group-drag snapshot
+    groupStart?: { ri: number; sj: number; x: number; y: number }[]; // group/scale/rotate snapshot
+    corner?: number;  // scale: dragged corner 0=TL 1=TR 2=BR 3=BL
+    box?: { x0: number; y0: number; x1: number; y1: number; cx: number; cy: number }; // scale/rotate snapshot
+    startAng?: number; // rotate: initial cursor angle from box centre
   } = null;
 
   // Box-select: nodes moved together + the live marquee rect [x0,y0,x1,y1].
@@ -285,6 +292,27 @@ export class ColorWarpGrid {
     return this.mesh!.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]));
   }
 
+  // Screen-space bbox + centre of the current box-selection (≥2 nodes), or null.
+  private selectionBox() {
+    if (this.selected.size < 2 || !this.mesh) return null;
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    for (const k of this.selected) {
+      const [ri, sj] = k.split(",").map(Number);
+      const [px, py] = this.nodePt(ri, sj);
+      if (px < x0) x0 = px; if (py < y0) y0 = py; if (px > x1) x1 = px; if (py > y1) y1 = py;
+    }
+    return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  }
+
+  // Snapshot selected nodes' current screen positions (for group/scale/rotate).
+  private selectionSnapshot() {
+    return [...this.selected].map((k) => {
+      const [ri, sj] = k.split(",").map(Number);
+      const [x, y] = this.nodePt(ri, sj);
+      return { ri, sj, x, y };
+    });
+  }
+
   private emit(commit: boolean) {
     this.cb.onEdit?.(JSON.stringify(meshToDict(this.mesh!)), commit);
   }
@@ -300,22 +328,36 @@ export class ColorWarpGrid {
       const sj = ((Math.round(disp / (360 / S)) % S) + S) % S;
       this.drag = { kind: "shift", ri, sj, startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
     } else {
-      const hit = this.hitTest(x, y);
-      if (hit && this.selected.has(this.key(hit[0], hit[1]))) {
-        // Grab a selected node → translate the whole selection together.
-        const snap = [...this.selected].map((k) => {
-          const [ri, sj] = k.split(",").map(Number);
-          const [px, py] = this.nodePt(ri, sj);
-          return { ri, sj, x: px, y: py };
-        });
-        this.drag = { kind: "group", ri: hit[0], sj: hit[1], startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: snap };
-      } else if (hit) {
-        if (this.selected.size) { this.selected.clear(); this.draw(); } // plain grab clears selection
-        this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
-      } else {
-        // Empty space → start a marquee box-select.
-        this.drag = { kind: "marquee", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId };
-        this.marquee = [x, y, x, y];
+      const box = this.selectionBox();
+      let handled = false;
+      if (box) {
+        // Transform gizmo: corners scale, the top lever rotates.
+        const cxs = [box.x0, box.x1, box.x1, box.x0], cys = [box.y0, box.y0, box.y1, box.y1];
+        let corner = -1, bd = GIZMO_HIT * GIZMO_HIT;
+        for (let c = 0; c < 4; c++) { const ax = x - cxs[c], ay = y - cys[c], dd = ax * ax + ay * ay; if (dd < bd) { bd = dd; corner = c; } }
+        const rhx = box.cx, rhy = box.y0 - ROT_LEVER;
+        if (corner >= 0) {
+          this.drag = { kind: "scale", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId, corner, box, groupStart: this.selectionSnapshot() };
+          handled = true;
+        } else if ((x - rhx) * (x - rhx) + (y - rhy) * (y - rhy) < GIZMO_HIT * GIZMO_HIT) {
+          this.drag = { kind: "rotate", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId, box, startAng: Math.atan2(y - box.cy, x - box.cx), groupStart: this.selectionSnapshot() };
+          handled = true;
+        }
+      }
+      if (!handled) {
+        const hit = this.hitTest(x, y);
+        if (hit && this.selected.has(this.key(hit[0], hit[1]))) {
+          this.drag = { kind: "group", ri: hit[0], sj: hit[1], startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: this.selectionSnapshot() };
+        } else if (hit) {
+          if (this.selected.size) { this.selected.clear(); this.draw(); } // plain grab clears selection
+          this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+        } else if (box && x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1) {
+          // Inside the selection box → translate the whole group.
+          this.drag = { kind: "group", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: this.selectionSnapshot() };
+        } else {
+          this.drag = { kind: "marquee", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId };
+          this.marquee = [x, y, x, y];
+        }
       }
     }
     this.canvas.setPointerCapture(e.pointerId);
@@ -334,6 +376,8 @@ export class ColorWarpGrid {
       }
       if (this.drag.kind === "node") this.dragNode(x, y);
       else if (this.drag.kind === "group") this.dragGroup(x, y);
+      else if (this.drag.kind === "scale") this.dragScale(x, y, e);
+      else if (this.drag.kind === "rotate") this.dragRotate(x, y);
       else this.dragShift(x, y);
       this.draw();
       this.emit(false);
@@ -380,6 +424,50 @@ export class ColorWarpGrid {
     for (const g of d.groupStart!) {
       if (g.ri === 0) continue; // leave the centre out of group moves
       const [disp, sat] = this.toPolar(g.x + dx, g.y + dy);
+      this.autonomous.add(this.key(g.ri, g.sj));
+      this.setNodePolar(g.ri, g.sj, disp, sat);
+      spokes.add(g.sj);
+    }
+    for (const sj of spokes) this.recomputeSpoke(sj);
+  }
+
+  // Transform-box SCALE: drag a corner. Anchor = opposite corner, or the box
+  // centre with Alt; Shift keeps it proportional (uniform by distance ratio).
+  private dragScale(x: number, y: number, e: PointerEvent) {
+    const d = this.drag!, b = d.box!, corner = d.corner!;
+    const cx = [b.x0, b.x1, b.x1, b.x0], cy = [b.y0, b.y0, b.y1, b.y1];
+    const p0x = cx[corner], p0y = cy[corner];
+    let ax: number, ay: number;
+    if (e.altKey) { ax = b.cx; ay = b.cy; }
+    else { const opp = (corner + 2) % 4; ax = cx[opp]; ay = cy[opp]; }
+    let sx = (p0x - ax) !== 0 ? (x - ax) / (p0x - ax) : 1;
+    let sy = (p0y - ay) !== 0 ? (y - ay) / (p0y - ay) : 1;
+    if (e.shiftKey) {
+      const s = Math.hypot(x - ax, y - ay) / (Math.hypot(p0x - ax, p0y - ay) || 1);
+      sx = s; sy = s;
+    }
+    this.applyGroupXform((gx, gy) => [ax + (gx - ax) * sx, ay + (gy - ay) * sy]);
+  }
+
+  // Transform-box ROTATE: the top lever pivots the selection around the centre.
+  private dragRotate(x: number, y: number) {
+    const d = this.drag!, b = d.box!;
+    const delta = Math.atan2(y - b.cy, x - b.cx) - d.startAng!;
+    const cos = Math.cos(delta), sin = Math.sin(delta);
+    this.applyGroupXform((gx, gy) => {
+      const ox = gx - b.cx, oy = gy - b.cy;
+      return [b.cx + ox * cos - oy * sin, b.cy + ox * sin + oy * cos];
+    });
+  }
+
+  // Map every snapshot node's screen position through `f`, write it back as an
+  // autonomous node, and recompute the affected spokes. Shared by scale/rotate.
+  private applyGroupXform(f: (x: number, y: number) => [number, number]) {
+    const spokes = new Set<number>();
+    for (const g of this.drag!.groupStart!) {
+      if (g.ri === 0) continue;
+      const [nx, ny] = f(g.x, g.y);
+      const [disp, sat] = this.toPolar(nx, ny);
       this.autonomous.add(this.key(g.ri, g.sj));
       this.setNodePolar(g.ri, g.sj, disp, sat);
       spokes.add(g.sj);
@@ -593,7 +681,28 @@ export class ColorWarpGrid {
     if (this.mesh) this.drawWeb(ctx, this.mesh);
     if (DEBUG_LABELS && this.mesh) this.drawLabels(ctx);
     this.drawIndicator(ctx);
+    this.drawGizmo(ctx);
     this.drawMarquee(ctx);
+  }
+
+  // Free-transform box around a box-selection: dashed rect, corner scale dots,
+  // and a top lever with a rotate handle.
+  private drawGizmo(ctx: CanvasRenderingContext2D) {
+    const box = this.selectionBox();
+    if (!box || this.drag?.kind === "marquee") return;
+    const { x0, y0, x1, y1, cx } = box;
+    ctx.save();
+    ctx.strokeStyle = ACCENT; ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(x0, y0, x1 - x0, y1 - y0);
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(cx, y0); ctx.lineTo(cx, y0 - ROT_LEVER); ctx.stroke();
+    ctx.fillStyle = "#fff"; ctx.lineWidth = 1.5;
+    for (const [hx, hy] of [[x0, y0], [x1, y0], [x1, y1], [x0, y1]] as [number, number][]) {
+      ctx.beginPath(); ctx.arc(hx, hy, GIZMO_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, y0 - ROT_LEVER, ROT_HANDLE_R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
   }
 
   private drawMarquee(ctx: CanvasRenderingContext2D) {
