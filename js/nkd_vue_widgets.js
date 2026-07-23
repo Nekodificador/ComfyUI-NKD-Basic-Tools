@@ -9075,8 +9075,8 @@ class ColorWarpGrid {
     // Preview-hover indicator: [displayDeg, sat, cssColor] or null.
     __publicField(this, "indicator", null);
     // Autonomy: nodes the user has fixed ("ri,sj"). Rim nodes are autonomous by
-    // default (each arm's root). A dependent node follows its nearest autonomous
-    // ancestor outward; dragging a node makes it autonomous.
+    // default (each arm's root). A dependent node is interpolated between its two
+    // bracketing autonomous nodes on its arm; dragging a node makes it autonomous.
     __publicField(this, "autonomous", /* @__PURE__ */ new Set());
     __publicField(this, "onDown", (e) => {
       if (!this.mesh || this.R < 2) return;
@@ -9270,21 +9270,37 @@ class ColorWarpGrid {
     if (!m) return;
     for (let sj = 0; sj < m.hue_segments; sj++) this.autonomous.add(this.key(m.sat_rings, sj));
   }
-  // Reposition one spoke's dependent nodes: each follows its nearest autonomous
-  // ancestor outward (toward the rim), on that ancestor's radial line with sat
-  // scaled from the centre. Autonomous nodes keep their explicit position.
+  // Reposition one spoke's dependent nodes: each is INTERPOLATED between its two
+  // bracketing autonomous nodes on this arm — the nearest inward (or the centre,
+  // sat 0) and the nearest outward (the rim is a default anchor). Autonomous
+  // nodes keep their explicit position.
   recomputeSpoke(sj) {
     const m = this.mesh, R = m.sat_rings;
     for (let rr = 1; rr <= R; rr++) {
       if (this.autonomous.has(this.key(rr, sj))) continue;
-      let a = -1;
+      let abv = -1;
       for (let aa = rr + 1; aa <= R; aa++) if (this.autonomous.has(this.key(aa, sj))) {
-        a = aa;
+        abv = aa;
         break;
       }
-      if (a < 0) continue;
-      const [angA, satA] = this.nodePolar(a, sj);
-      this.setNodePolar(rr, sj, angA, satA * rr / a);
+      if (abv < 0) continue;
+      let blo = 0;
+      for (let bb = rr - 1; bb >= 1; bb--) if (this.autonomous.has(this.key(bb, sj))) {
+        blo = bb;
+        break;
+      }
+      const [angA, satA] = this.nodePolar(abv, sj);
+      const t = (rr - blo) / (abv - blo);
+      let angle, sat;
+      if (blo === 0) {
+        angle = angA;
+        sat = satA * t;
+      } else {
+        const [angB, satB] = this.nodePolar(blo, sj);
+        angle = angB + wrapDeg(angA - angB) * t;
+        sat = satB + (satA - satB) * t;
+      }
+      this.setNodePolar(rr, sj, angle, sat);
     }
   }
   // Nearest control node to a CSS-px point, within HIT_PX. Center (ri=0) counted
@@ -9319,11 +9335,10 @@ class ColorWarpGrid {
     var _a, _b;
     (_b = (_a = this.cb).onEdit) == null ? void 0 : _b.call(_a, JSON.stringify(meshToDict(this.mesh)), commit);
   }
-  // Drag a node → it becomes AUTONOMOUS (fixed at the cursor); only its dependent
-  // descendants (the nodes below whose nearest autonomous ancestor outward is now
-  // this node) follow, on a straight radial line scaled from the centre. Outer
-  // rings, other autonomous nodes, and other spokes stay put (3DLC hierarchy).
-  // Pin All moves only the grabbed node.
+  // Drag a node → it becomes AUTONOMOUS (fixed at the cursor); the dependent nodes
+  // on its arm re-interpolate between the autonomous anchors (nearest inward/centre
+  // ↔ nearest outward/rim). Other spokes stay put (3DLC hierarchy). Pin All moves
+  // only the grabbed node.
   dragNode(x, y) {
     const m = this.mesh;
     const S = m.hue_segments;
