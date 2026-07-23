@@ -9046,7 +9046,7 @@ const GIZMO_HIT = 10;
 const ROT_LEVER = 26;
 const ROT_HANDLE_R = 5;
 const SHIFT_ROT_PER_PX = 0.25;
-const SHIFT_SAT_PER_PX = 3e-3;
+const SHIFT_SCALE_PER_PX = 4e-3;
 const LUMA_PER_WHEEL = 15e-4;
 function angleRad(displayDeg) {
   return (displayDeg - 90) * RAD;
@@ -9541,25 +9541,22 @@ class ColorWarpGrid {
     this.setNodePolar(ri, sj, disp, sat);
     if (!this.pin) this.recomputeSpoke(sj);
   }
-  // Shift gesture: horizontal rotates the grabbed sector's hue (dh on every ring
-  // of that spoke), vertical expands/contracts the grabbed ring's sat (ds on
-  // every segment of that ring). Both act off the grab snapshot.
+  // Shift gesture on a node = transform its whole ARM (spoke): horizontal rotates
+  // the arm's hue, vertical scales the arm's saturation from the centre. Every
+  // ring of that arm becomes user-controlled (autonomous). Acts off the snapshot.
   dragShift(x, y) {
     const m = this.mesh;
-    const S = m.hue_segments, R = m.sat_rings;
-    const { ri, sj, startX, startY, start } = this.drag;
-    const dx = x - startX, dy = y - startY;
-    const dDh = dx * SHIFT_ROT_PER_PX;
-    const dDs = -dy * SHIFT_SAT_PER_PX;
-    for (let rr = 0; rr <= R; rr++)
-      for (let ss = 0; ss < S; ss++) {
-        const o = m.offsets[rr][ss], s0 = start[rr][ss];
-        o[0] = s0[0];
-        o[1] = s0[1];
-        o[2] = s0[2];
-      }
-    for (let rr = 1; rr <= R; rr++) m.offsets[rr][sj][0] = start[rr][sj][0] + dDh;
-    for (let ss = 0; ss < S; ss++) m.offsets[ri][ss][1] = start[ri][ss][1] + dDs;
+    const R = m.sat_rings;
+    const { sj, startX, startY, start } = this.drag;
+    const dDh = (x - startX) * SHIFT_ROT_PER_PX;
+    const s = Math.max(0, 1 - (y - startY) * SHIFT_SCALE_PER_PX);
+    for (let rr = 1; rr <= R; rr++) {
+      const baseSat = rr / R, o = m.offsets[rr][sj], s0 = start[rr][sj];
+      o[0] = s0[0] + dDh;
+      o[1] = (baseSat + s0[1]) * s - baseSat;
+      o[2] = s0[2];
+      this.autonomous.add(this.key(rr, sj));
+    }
   }
   // Reset all offsets to identity (keeps current density) (Phase 8).
   resetAll() {

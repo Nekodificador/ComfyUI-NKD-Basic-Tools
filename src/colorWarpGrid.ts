@@ -43,8 +43,8 @@ const ROT_HANDLE_R = 5;  // rotation handle radius
 // sat scales from the centre through the cursor). ONLY that spoke moves — no
 // angular spread to neighbours. Pin All = only the grabbed node.
 // (Smooth is a future relax tool à la 3DLC, not a drag falloff.)
-const SHIFT_ROT_PER_PX = 0.25; // deg of sector hue rotation per px (Shift horiz)
-const SHIFT_SAT_PER_PX = 0.003; // ring sat expand/contract per px (Shift vert)
+const SHIFT_ROT_PER_PX = 0.25;    // deg of arm hue rotation per px (Shift horizontal)
+const SHIFT_SCALE_PER_PX = 0.004; // arm sat scale per px (Shift vertical)
 const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
 
 // Angle convention: display 0° at top (12 o'clock), increasing clockwise.
@@ -541,27 +541,22 @@ export class ColorWarpGrid {
     if (!this.pin) this.recomputeSpoke(sj); // dependents follow; Pin = only this node
   }
 
-  // Shift gesture: horizontal rotates the grabbed sector's hue (dh on every ring
-  // of that spoke), vertical expands/contracts the grabbed ring's sat (ds on
-  // every segment of that ring). Both act off the grab snapshot.
+  // Shift gesture on a node = transform its whole ARM (spoke): horizontal rotates
+  // the arm's hue, vertical scales the arm's saturation from the centre. Every
+  // ring of that arm becomes user-controlled (autonomous). Acts off the snapshot.
   private dragShift(x: number, y: number) {
     const m = this.mesh!;
-    const S = m.hue_segments, R = m.sat_rings;
-    const { ri, sj, startX, startY, start } = this.drag!;
-    const dx = x - startX, dy = y - startY;
-    const dDh = dx * SHIFT_ROT_PER_PX;   // + = clockwise-ish hue push
-    const dDs = -dy * SHIFT_SAT_PER_PX;  // up = expand sat
-
-    // Reset to snapshot, then apply the two independent gestures.
-    for (let rr = 0; rr <= R; rr++)
-      for (let ss = 0; ss < S; ss++) {
-        const o = m.offsets[rr][ss], s0 = start[rr][ss];
-        o[0] = s0[0]; o[1] = s0[1]; o[2] = s0[2];
-      }
-    // Rotate hue of sector sj across all rings.
-    for (let rr = 1; rr <= R; rr++) m.offsets[rr][sj][0] = start[rr][sj][0] + dDh;
-    // Expand/contract sat of ring ri across all segments.
-    for (let ss = 0; ss < S; ss++) m.offsets[ri][ss][1] = start[ri][ss][1] + dDs;
+    const R = m.sat_rings;
+    const { sj, startX, startY, start } = this.drag!;
+    const dDh = (x - startX) * SHIFT_ROT_PER_PX;                  // horizontal → rotate hue
+    const s = Math.max(0, 1 - (y - startY) * SHIFT_SCALE_PER_PX); // up → expand sat
+    for (let rr = 1; rr <= R; rr++) {
+      const baseSat = rr / R, o = m.offsets[rr][sj], s0 = start[rr][sj];
+      o[0] = s0[0] + dDh;
+      o[1] = (baseSat + s0[1]) * s - baseSat;
+      o[2] = s0[2];
+      this.autonomous.add(this.key(rr, sj));
+    }
   }
 
   private onDblClick = (e: MouseEvent) => {
