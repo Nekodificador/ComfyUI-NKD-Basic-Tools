@@ -10275,7 +10275,12 @@ function openColorWarpViewer(opts) {
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
   closeBtn.style.padding = "4px 9px";
-  bar.append(title, hint, spacer, smoothBtn, pinBtn, resetBtn, densBtn, saveBtn, closeBtn);
+  bar.append(title, hint, spacer, closeBtn);
+  const bottomBar = document.createElement("div");
+  bottomBar.style.cssText = `display:flex;align-items:center;gap:12px;padding:8px 14px;background:${BAR_BG};border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
+  const barSpacer = document.createElement("span");
+  barSpacer.style.cssText = "flex:1 1 auto";
+  bottomBar.append(barSpacer, smoothBtn, pinBtn, resetBtn, densBtn, saveBtn);
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
   const leftPane = mkPane();
@@ -10293,7 +10298,7 @@ function openColorWarpViewer(opts) {
   const readout = document.createElement("div");
   readout.style.cssText = `position:absolute;top:10px;left:10px;pointer-events:none;display:none;background:rgba(20,22,28,0.92);border:1px solid ${BORDER};border-radius:6px;padding:8px 11px;font:11px Inter,system-ui,sans-serif;color:${TEXT};box-shadow:0 2px 10px rgba(0,0,0,0.5);min-width:120px`;
   rightPane.appendChild(readout);
-  host.append(bar, body, tip);
+  host.append(bar, body, bottomBar, tip);
   document.body.appendChild(host);
   const grid = new ColorWarpGrid(gridCanvas);
   const preview = new ColorWarpPreview(previewCanvas);

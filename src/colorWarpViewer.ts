@@ -91,7 +91,17 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
   closeBtn.style.padding = "4px 9px";
-  bar.append(title, hint, spacer, smoothBtn, pinBtn, resetBtn, densBtn, saveBtn, closeBtn);
+  // Top head = title + hint + close; the tool controls live in a bottom bar
+  // (consistency with the VFX Tools overlays).
+  bar.append(title, hint, spacer, closeBtn);
+
+  const bottomBar = document.createElement("div");
+  bottomBar.style.cssText =
+    `display:flex;align-items:center;gap:12px;padding:8px 14px;background:${BAR_BG};` +
+    `border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
+  const barSpacer = document.createElement("span");
+  barSpacer.style.cssText = "flex:1 1 auto";
+  bottomBar.append(barSpacer, smoothBtn, pinBtn, resetBtn, densBtn, saveBtn);
 
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
@@ -127,7 +137,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     `box-shadow:0 2px 10px rgba(0,0,0,0.5);min-width:120px`;
   rightPane.appendChild(readout);
 
-  host.append(bar, body, tip);
+  host.append(bar, body, bottomBar, tip);
   document.body.appendChild(host);
 
   // --- render engines: RYB grid (left) + WebGL LUT preview (right) ---------
