@@ -3,7 +3,10 @@ import json
 import os
 import numpy as np
 
-from color_core import mesh as _mesh, lut as _lut, cube as _cube
+try:
+    from .color_core import mesh as _mesh, lut as _lut, cube as _cube  # ComfyUI (package)
+except ImportError:
+    from color_core import mesh as _mesh, lut as _lut, cube as _cube   # standalone tests (sys.path)
 
 _LUT_SIZE = 33
 _IDENTITY = json.dumps(_mesh.to_dict(_mesh.identity()))
