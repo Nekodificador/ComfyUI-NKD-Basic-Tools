@@ -43,9 +43,7 @@ const ROT_HANDLE_R = 5;  // rotation handle radius
 // sat scales from the centre through the cursor). ONLY that spoke moves — no
 // angular spread to neighbours. Pin All = only the grabbed node.
 // (Smooth is a future relax tool à la 3DLC, not a drag falloff.)
-const SHIFT_ROT_PER_PX = 0.25;    // deg of arm hue rotation per px (Shift horizontal)
-const SHIFT_SCALE_PER_PX = 0.004; // arm sat scale per px (Shift vertical)
-const SHIFT_AXIS_MIN = 4;         // px of travel before Shift locks to the hue or sat axis
+const SHIFT_AXIS_MIN = 4; // px of travel before a Shift-drag locks to the hue or sat axis
 const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
 
 // Angle convention: display 0° at top (12 o'clock), increasing clockwise.
@@ -340,12 +338,10 @@ export class ColorWarpGrid {
     if (!this.mesh || this.R < 2) return;
     const [x, y] = this.localXY(e);
     if (e.shiftKey) {
-      // DaVinci ring/sector gesture — grab the ring & sector under the cursor.
-      const [disp, sat] = this.toPolar(x, y);
-      const S = this.mesh.hue_segments, R = this.mesh.sat_rings;
-      const ri = Math.min(Math.max(Math.round(sat * R), 1), R);
-      const sj = ((Math.round(disp / (360 / S)) % S) + S) % S;
-      this.drag = { kind: "shift", ri, sj, startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+      // Shift = axis-locked nudge of the node under the cursor (only that node).
+      const hit = this.hitTest(x, y);
+      if (!hit) return;
+      this.drag = { kind: "shift", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
     } else {
       const box = this.selectionBox();
       let handled = false;
@@ -543,29 +539,29 @@ export class ColorWarpGrid {
     if (!this.pin) this.recomputeSpoke(sj); // dependents follow; Pin = only this node
   }
 
-  // Shift gesture on a node = transform its whole ARM (spoke) as a STRAIGHT line:
-  // horizontal rotates the arm's hue, vertical scales its saturation. The axis is
-  // locked to whichever the cursor moved in first (never both). The rim can't
-  // cross the gamut border. Every ring of the arm becomes autonomous.
+  // Shift gesture = axis-locked nudge of ONLY the grabbed node: the axis locks to
+  // radial (saturation) or tangential (hue) — whichever the cursor first moved in
+  // — so you tweak one dimension at a time. Only that node becomes autonomous; no
+  // other node moves. (Group Shift over a bbox selection is a future addition.)
   private dragShift(x: number, y: number) {
     const m = this.mesh!;
     const S = m.hue_segments, R = m.sat_rings;
     const d = this.drag!;
-    const { sj, startX, startY, start } = d;
+    const { ri, sj, startX, startY, start } = d;
+    if (ri === 0) return;
     const dx = x - startX, dy = y - startY;
-    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) d.axis = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
-    const dDeg = d.axis === "h" ? dx * SHIFT_ROT_PER_PX : 0;
-    let s = d.axis === "v" ? Math.max(0, 1 - dy * SHIFT_SCALE_PER_PX) : 1;
-    // Cap so the rim stays inside the wheel (100% saturation maps at the edge).
-    const rimSnap = 1 + start[R][sj][1];
-    if (rimSnap > 1e-6 && s > 1 / rimSnap) s = 1 / rimSnap;
-    // One radial line at the arm's angle → the arm stays straight (like 3DLC).
-    const armAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[R][sj][0]) + dDeg;
-    for (let rr = 1; rr <= R; rr++) {
-      this.setNodePolar(rr, sj, armAngle, (rr / R + start[rr][sj][1]) * s);
-      m.offsets[rr][sj][2] = start[rr][sj][2]; // keep luma
-      this.autonomous.add(this.key(rr, sj));
+    const baseSat = ri / R;
+    const snapAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[ri][sj][0] * baseSat);
+    const snapSat = clamp01(baseSat + start[ri][sj][1]);
+    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) {
+      // Lock by whether the cursor moved radially (sat) or tangentially (hue).
+      const [nx, ny] = this.polar(snapAngle, snapSat);
+      let rx = nx - this.cx, ry = ny - this.cy; const rl = Math.hypot(rx, ry) || 1; rx /= rl; ry /= rl;
+      d.axis = Math.abs(dx * rx + dy * ry) >= Math.abs(dx * -ry + dy * rx) ? "v" : "h";
     }
+    const [disp, sat] = this.toPolar(x, y);
+    this.autonomous.add(this.key(ri, sj));
+    this.setNodePolar(ri, sj, d.axis === "v" ? snapAngle : disp, d.axis === "h" ? snapSat : sat);
   }
 
   private onDblClick = (e: MouseEvent) => {

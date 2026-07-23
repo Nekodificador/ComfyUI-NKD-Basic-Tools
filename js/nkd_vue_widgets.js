@@ -9045,8 +9045,6 @@ const GIZMO_R = 4;
 const GIZMO_HIT = 10;
 const ROT_LEVER = 26;
 const ROT_HANDLE_R = 5;
-const SHIFT_ROT_PER_PX = 0.25;
-const SHIFT_SCALE_PER_PX = 4e-3;
 const SHIFT_AXIS_MIN = 4;
 const LUMA_PER_WHEEL = 15e-4;
 function angleRad(displayDeg) {
@@ -9097,11 +9095,9 @@ class ColorWarpGrid {
       if (!this.mesh || this.R < 2) return;
       const [x, y] = this.localXY(e);
       if (e.shiftKey) {
-        const [disp, sat] = this.toPolar(x, y);
-        const S = this.mesh.hue_segments, R = this.mesh.sat_rings;
-        const ri = Math.min(Math.max(Math.round(sat * R), 1), R);
-        const sj = (Math.round(disp / (360 / S)) % S + S) % S;
-        this.drag = { kind: "shift", ri, sj, startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+        const hit = this.hitTest(x, y);
+        if (!hit) return;
+        this.drag = { kind: "shift", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
       } else {
         const box = this.selectionBox();
         let handled = false;
@@ -9542,27 +9538,31 @@ class ColorWarpGrid {
     this.setNodePolar(ri, sj, disp, sat);
     if (!this.pin) this.recomputeSpoke(sj);
   }
-  // Shift gesture on a node = transform its whole ARM (spoke) as a STRAIGHT line:
-  // horizontal rotates the arm's hue, vertical scales its saturation. The axis is
-  // locked to whichever the cursor moved in first (never both). The rim can't
-  // cross the gamut border. Every ring of the arm becomes autonomous.
+  // Shift gesture = axis-locked nudge of ONLY the grabbed node: the axis locks to
+  // radial (saturation) or tangential (hue) — whichever the cursor first moved in
+  // — so you tweak one dimension at a time. Only that node becomes autonomous; no
+  // other node moves. (Group Shift over a bbox selection is a future addition.)
   dragShift(x, y) {
     const m = this.mesh;
     const S = m.hue_segments, R = m.sat_rings;
     const d = this.drag;
-    const { sj, startX, startY, start } = d;
+    const { ri, sj, startX, startY, start } = d;
+    if (ri === 0) return;
     const dx = x - startX, dy = y - startY;
-    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) d.axis = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
-    const dDeg = d.axis === "h" ? dx * SHIFT_ROT_PER_PX : 0;
-    let s = d.axis === "v" ? Math.max(0, 1 - dy * SHIFT_SCALE_PER_PX) : 1;
-    const rimSnap = 1 + start[R][sj][1];
-    if (rimSnap > 1e-6 && s > 1 / rimSnap) s = 1 / rimSnap;
-    const armAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[R][sj][0]) + dDeg;
-    for (let rr = 1; rr <= R; rr++) {
-      this.setNodePolar(rr, sj, armAngle, (rr / R + start[rr][sj][1]) * s);
-      m.offsets[rr][sj][2] = start[rr][sj][2];
-      this.autonomous.add(this.key(rr, sj));
+    const baseSat = ri / R;
+    const snapAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[ri][sj][0] * baseSat);
+    const snapSat = clamp01(baseSat + start[ri][sj][1]);
+    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) {
+      const [nx, ny] = this.polar(snapAngle, snapSat);
+      let rx = nx - this.cx, ry = ny - this.cy;
+      const rl = Math.hypot(rx, ry) || 1;
+      rx /= rl;
+      ry /= rl;
+      d.axis = Math.abs(dx * rx + dy * ry) >= Math.abs(dx * -ry + dy * rx) ? "v" : "h";
     }
+    const [disp, sat] = this.toPolar(x, y);
+    this.autonomous.add(this.key(ri, sj));
+    this.setNodePolar(ri, sj, d.axis === "v" ? snapAngle : disp, d.axis === "h" ? snapSat : sat);
   }
   // Reset all offsets to identity (keeps current density) (Phase 8).
   resetAll() {
