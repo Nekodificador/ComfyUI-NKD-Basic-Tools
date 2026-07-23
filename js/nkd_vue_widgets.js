@@ -9364,8 +9364,14 @@ class ColorWarpGrid {
       const t = (rr - blo) / (abv - blo);
       let angle, sat;
       if (blo === 0) {
-        angle = angA;
-        sat = satA * t;
+        const [angC, satC] = this.centerPolar();
+        if (satC < 1e-4) {
+          angle = angA;
+          sat = satA * t;
+        } else {
+          angle = angC + wrapDeg(angA - angC) * t;
+          sat = satC + (satA - satC) * t;
+        }
       } else {
         const [angB, satB] = this.nodePolar(blo, sj);
         angle = angB + wrapDeg(angA - angB) * t;
@@ -9415,6 +9421,13 @@ class ColorWarpGrid {
       if (py > y1) y1 = py;
     }
     return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  }
+  // The centre's polar position [displayAngle, sat] derived from the neutral cast.
+  centerPolar() {
+    const n = this.mesh.neutral ?? [0, 0];
+    const C = Math.hypot(n[0], n[1]);
+    const hue = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
+    return [hueToDisplay(hue), Math.min(C / C_REF, 1)];
   }
   // Snapshot selected nodes' current screen positions (for group/scale/rotate).
   selectionSnapshot() {
@@ -9526,6 +9539,7 @@ class ColorWarpGrid {
       const rad = displayToHue(disp) * Math.PI / 180;
       const C = sat * C_REF;
       m.neutral = [C * Math.cos(rad), C * Math.sin(rad)];
+      for (let s = 0; s < m.hue_segments; s++) this.recomputeSpoke(s);
       return;
     }
     this.autonomous.add(this.key(ri, sj));

@@ -259,8 +259,10 @@ export class ColorWarpGrid {
       const [angA, satA] = this.nodePolar(abv, sj);
       const t = (rr - blo) / (abv - blo);
       let angle: number, sat: number;
-      if (blo === 0) {          // centre has no angle → radial line at the outward anchor
-        angle = angA; sat = satA * t;
+      if (blo === 0) {          // inner bracket = the centre node
+        const [angC, satC] = this.centerPolar();
+        if (satC < 1e-4) { angle = angA; sat = satA * t; }       // centre at origin → radial line
+        else { angle = angC + wrapDeg(angA - angC) * t; sat = satC + (satA - satC) * t; } // follow the moved centre
       } else {
         const [angB, satB] = this.nodePolar(blo, sj);
         angle = angB + wrapDeg(angA - angB) * t;
@@ -309,6 +311,14 @@ export class ColorWarpGrid {
       if (px < x0) x0 = px; if (py < y0) y0 = py; if (px > x1) x1 = px; if (py > y1) y1 = py;
     }
     return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+  }
+
+  // The centre's polar position [displayAngle, sat] derived from the neutral cast.
+  private centerPolar(): [number, number] {
+    const n = this.mesh!.neutral ?? [0, 0];
+    const C = Math.hypot(n[0], n[1]);
+    const hue = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
+    return [hueToDisplay(hue), Math.min(C / C_REF, 1)];
   }
 
   // Snapshot selected nodes' current screen positions (for group/scale/rotate).
@@ -522,6 +532,7 @@ export class ColorWarpGrid {
       const rad = displayToHue(disp) * Math.PI / 180;
       const C = sat * C_REF;
       m.neutral = [C * Math.cos(rad), C * Math.sin(rad)];
+      for (let s = 0; s < m.hue_segments; s++) this.recomputeSpoke(s); // web follows the centre
       return;
     }
 
