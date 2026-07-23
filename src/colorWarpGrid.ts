@@ -45,6 +45,7 @@ const ROT_HANDLE_R = 5;  // rotation handle radius
 // (Smooth is a future relax tool à la 3DLC, not a drag falloff.)
 const SHIFT_ROT_PER_PX = 0.25;    // deg of arm hue rotation per px (Shift horizontal)
 const SHIFT_SCALE_PER_PX = 0.004; // arm sat scale per px (Shift vertical)
+const SHIFT_AXIS_MIN = 4;         // px of travel before Shift locks to the hue or sat axis
 const LUMA_PER_WHEEL = 0.0015;  // dl per wheel delta unit (Alt+wheel)
 
 // Angle convention: display 0° at top (12 o'clock), increasing clockwise.
@@ -109,6 +110,7 @@ export class ColorWarpGrid {
     box?: { x0: number; y0: number; x1: number; y1: number; cx: number; cy: number }; // scale/rotate snapshot
     startAng?: number; // rotate: initial cursor angle from box centre
     xform?: (x: number, y: number) => [number, number]; // live scale/rotate map (for drawing the box)
+    axis?: "h" | "v"; // Shift gesture: axis locked to hue (h) or saturation (v)
   } = null;
 
   // Box-select: nodes moved together + the live marquee rect [x0,y0,x1,y1].
@@ -541,20 +543,27 @@ export class ColorWarpGrid {
     if (!this.pin) this.recomputeSpoke(sj); // dependents follow; Pin = only this node
   }
 
-  // Shift gesture on a node = transform its whole ARM (spoke): horizontal rotates
-  // the arm's hue, vertical scales the arm's saturation from the centre. Every
-  // ring of that arm becomes user-controlled (autonomous). Acts off the snapshot.
+  // Shift gesture on a node = transform its whole ARM (spoke) as a STRAIGHT line:
+  // horizontal rotates the arm's hue, vertical scales its saturation. The axis is
+  // locked to whichever the cursor moved in first (never both). The rim can't
+  // cross the gamut border. Every ring of the arm becomes autonomous.
   private dragShift(x: number, y: number) {
     const m = this.mesh!;
-    const R = m.sat_rings;
-    const { sj, startX, startY, start } = this.drag!;
-    const dDh = (x - startX) * SHIFT_ROT_PER_PX;                  // horizontal → rotate hue
-    const s = Math.max(0, 1 - (y - startY) * SHIFT_SCALE_PER_PX); // up → expand sat
+    const S = m.hue_segments, R = m.sat_rings;
+    const d = this.drag!;
+    const { sj, startX, startY, start } = d;
+    const dx = x - startX, dy = y - startY;
+    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) d.axis = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
+    const dDeg = d.axis === "h" ? dx * SHIFT_ROT_PER_PX : 0;
+    let s = d.axis === "v" ? Math.max(0, 1 - dy * SHIFT_SCALE_PER_PX) : 1;
+    // Cap so the rim stays inside the wheel (100% saturation maps at the edge).
+    const rimSnap = 1 + start[R][sj][1];
+    if (rimSnap > 1e-6 && s > 1 / rimSnap) s = 1 / rimSnap;
+    // One radial line at the arm's angle → the arm stays straight (like 3DLC).
+    const armAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[R][sj][0]) + dDeg;
     for (let rr = 1; rr <= R; rr++) {
-      const baseSat = rr / R, o = m.offsets[rr][sj], s0 = start[rr][sj];
-      o[0] = s0[0] + dDh;
-      o[1] = (baseSat + s0[1]) * s - baseSat;
-      o[2] = s0[2];
+      this.setNodePolar(rr, sj, armAngle, (rr / R + start[rr][sj][1]) * s);
+      m.offsets[rr][sj][2] = start[rr][sj][2]; // keep luma
       this.autonomous.add(this.key(rr, sj));
     }
   }

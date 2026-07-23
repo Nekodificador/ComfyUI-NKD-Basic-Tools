@@ -9047,6 +9047,7 @@ const ROT_LEVER = 26;
 const ROT_HANDLE_R = 5;
 const SHIFT_ROT_PER_PX = 0.25;
 const SHIFT_SCALE_PER_PX = 4e-3;
+const SHIFT_AXIS_MIN = 4;
 const LUMA_PER_WHEEL = 15e-4;
 function angleRad(displayDeg) {
   return (displayDeg - 90) * RAD;
@@ -9541,20 +9542,25 @@ class ColorWarpGrid {
     this.setNodePolar(ri, sj, disp, sat);
     if (!this.pin) this.recomputeSpoke(sj);
   }
-  // Shift gesture on a node = transform its whole ARM (spoke): horizontal rotates
-  // the arm's hue, vertical scales the arm's saturation from the centre. Every
-  // ring of that arm becomes user-controlled (autonomous). Acts off the snapshot.
+  // Shift gesture on a node = transform its whole ARM (spoke) as a STRAIGHT line:
+  // horizontal rotates the arm's hue, vertical scales its saturation. The axis is
+  // locked to whichever the cursor moved in first (never both). The rim can't
+  // cross the gamut border. Every ring of the arm becomes autonomous.
   dragShift(x, y) {
     const m = this.mesh;
-    const R = m.sat_rings;
-    const { sj, startX, startY, start } = this.drag;
-    const dDh = (x - startX) * SHIFT_ROT_PER_PX;
-    const s = Math.max(0, 1 - (y - startY) * SHIFT_SCALE_PER_PX);
+    const S = m.hue_segments, R = m.sat_rings;
+    const d = this.drag;
+    const { sj, startX, startY, start } = d;
+    const dx = x - startX, dy = y - startY;
+    if (!d.axis && Math.hypot(dx, dy) > SHIFT_AXIS_MIN) d.axis = Math.abs(dx) >= Math.abs(dy) ? "h" : "v";
+    const dDeg = d.axis === "h" ? dx * SHIFT_ROT_PER_PX : 0;
+    let s = d.axis === "v" ? Math.max(0, 1 - dy * SHIFT_SCALE_PER_PX) : 1;
+    const rimSnap = 1 + start[R][sj][1];
+    if (rimSnap > 1e-6 && s > 1 / rimSnap) s = 1 / rimSnap;
+    const armAngle = hueToDisplay(displayToHue(sj * 360 / S) + start[R][sj][0]) + dDeg;
     for (let rr = 1; rr <= R; rr++) {
-      const baseSat = rr / R, o = m.offsets[rr][sj], s0 = start[rr][sj];
-      o[0] = s0[0] + dDh;
-      o[1] = (baseSat + s0[1]) * s - baseSat;
-      o[2] = s0[2];
+      this.setNodePolar(rr, sj, armAngle, (rr / R + start[rr][sj][1]) * s);
+      m.offsets[rr][sj][2] = start[rr][sj][2];
       this.autonomous.add(this.key(rr, sj));
     }
   }
