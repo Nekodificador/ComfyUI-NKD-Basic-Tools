@@ -37,12 +37,15 @@ def _input_colors():
 
 
 def main():
+    neutral = M.identity()
+    neutral["neutral"] = [0.08, -0.05]  # global cast (draggable centre node)
     meshes = {
         "identity": M.identity(),
         "hue+25": M.constant(dh=25.0),
         "sat+0.30": M.constant(ds=0.30),
         "luma-0.15": M.constant(dl=-0.15),
         "mixed": _mixed(),
+        "neutral": neutral,
     }
     inputs = _input_colors()
     out = {"size": SIZE, "eps": EPS, "inputs": inputs.tolist(), "meshes": []}

@@ -11,6 +11,9 @@ def identity(hue_segments=12, sat_rings=6):
         "hue_segments": int(hue_segments),
         "sat_rings": int(sat_rings),
         "offsets": np.zeros((sat_rings + 1, hue_segments, 3), dtype=np.float64),
+        # Global neutral cast: an OKLab (a, b) offset added to every pixel (the
+        # draggable centre node). Not scaled by sat, so it tints the neutral too.
+        "neutral": [0.0, 0.0],
     }
 
 
@@ -27,6 +30,7 @@ def to_dict(m):
         "hue_segments": m["hue_segments"],
         "sat_rings": m["sat_rings"],
         "offsets": np.asarray(m["offsets"]).tolist(),
+        "neutral": [float(x) for x in m.get("neutral", [0.0, 0.0])],
     }
 
 
@@ -34,7 +38,8 @@ def from_dict(d):
     off = np.asarray(d["offsets"], dtype=np.float64)
     return {"hue_segments": int(d["hue_segments"]),
             "sat_rings": int(d["sat_rings"]),
-            "offsets": off}
+            "offsets": off,
+            "neutral": [float(x) for x in d.get("neutral", [0.0, 0.0])]}
 
 
 def sample(m, hue_deg, sat_norm):

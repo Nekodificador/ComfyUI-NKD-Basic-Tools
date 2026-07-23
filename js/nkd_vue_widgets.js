@@ -8922,20 +8922,22 @@ function meshIdentity(hueSegments = 12, satRings = 6) {
     for (let s = 0; s < hueSegments; s++) ring.push([0, 0, 0]);
     offsets.push(ring);
   }
-  return { hue_segments: hueSegments | 0, sat_rings: satRings | 0, offsets };
+  return { hue_segments: hueSegments | 0, sat_rings: satRings | 0, offsets, neutral: [0, 0] };
 }
 function meshFromDict(d) {
   return {
     hue_segments: d.hue_segments | 0,
     sat_rings: d.sat_rings | 0,
-    offsets: d.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]))
+    offsets: d.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]])),
+    neutral: d.neutral ? [d.neutral[0], d.neutral[1]] : [0, 0]
   };
 }
 function meshToDict(m) {
   return {
     hue_segments: m.hue_segments,
     sat_rings: m.sat_rings,
-    offsets: m.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]))
+    offsets: m.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]])),
+    neutral: m.neutral ? [m.neutral[0], m.neutral[1]] : [0, 0]
   };
 }
 function meshSample(m, hueDeg, satNorm) {
@@ -8974,6 +8976,7 @@ function clamp(x, lo, hi) {
 function bakeLut(m, size = 33) {
   const out = new Float64Array(size * size * size * 3);
   const step = size > 1 ? 1 / (size - 1) : 0;
+  const na = m.neutral ? m.neutral[0] : 0, nb = m.neutral ? m.neutral[1] : 0;
   for (let ri = 0; ri < size; ri++) {
     const r = ri * step;
     for (let gi = 0; gi < size; gi++) {
@@ -8988,7 +8991,10 @@ function bakeLut(m, size = 33) {
         const sat2 = Math.max(sat + ds, 0);
         const C2 = sat2 * C_REF;
         const L2 = clamp(L + dl, 0, 1);
-        const rgb = oklabToSrgb(oklchToOklab([L2, C2, h2]));
+        const lab2 = oklchToOklab([L2, C2, h2]);
+        lab2[1] += na;
+        lab2[2] += nb;
+        const rgb = oklabToSrgb(lab2);
         const idx = ((ri * size + gi) * size + bi) * 3;
         out[idx] = clamp(rgb[0], 0, 1);
         out[idx + 1] = clamp(rgb[1], 0, 1);
@@ -9202,7 +9208,8 @@ class ColorWarpGrid {
       o[1] = 0;
       o[2] = 0;
       if (ri !== this.mesh.sat_rings) this.autonomous.delete(this.key(ri, sj));
-      if (ri !== 0) this.recomputeSpoke(sj);
+      if (ri === 0) this.mesh.neutral = [0, 0];
+      else this.recomputeSpoke(sj);
       this.draw();
       this.emit(true);
       e.preventDefault();
@@ -9288,6 +9295,12 @@ class ColorWarpGrid {
   // reference used by every drag path.
   nodePt(ri, sj) {
     const m = this.mesh;
+    if (ri === 0) {
+      const n = m.neutral ?? [0, 0];
+      const C = Math.hypot(n[0], n[1]);
+      const hue2 = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
+      return this.polar(hueToDisplay(hue2), Math.min(C / C_REF, 1));
+    }
     const S = m.hue_segments, R = m.sat_rings;
     const baseDisp = sj * 360 / S;
     const baseSat = ri / R;
@@ -9507,15 +9520,12 @@ class ColorWarpGrid {
   // only the grabbed node.
   dragNode(x, y) {
     const m = this.mesh;
-    const S = m.hue_segments;
     const { ri, sj } = this.drag;
     const [disp, sat] = this.toPolar(x, y);
     if (ri === 0) {
-      for (let ss = 0; ss < S; ss++) {
-        const o = m.offsets[0][ss];
-        o[0] = 0;
-        o[1] = sat;
-      }
+      const rad = displayToHue(disp) * Math.PI / 180;
+      const C = sat * C_REF;
+      m.neutral = [C * Math.cos(rad), C * Math.sin(rad)];
       return;
     }
     this.autonomous.add(this.key(ri, sj));
@@ -9548,6 +9558,7 @@ class ColorWarpGrid {
     const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
     for (let rr = 0; rr <= R; rr++)
       for (let ss = 0; ss < S; ss++) this.mesh.offsets[rr][ss] = [0, 0, 0];
+    this.mesh.neutral = [0, 0];
     this.initAutonomy();
     this.draw();
     this.emit(true);

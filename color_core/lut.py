@@ -28,7 +28,12 @@ def bake(mesh_dict, size=33):
     L2 = np.clip(L + dl, 0.0, 1.0)
 
     lch2 = np.stack([L2, C2, h2], axis=-1)
-    out = oklab.oklab_to_srgb(oklab.oklch_to_oklab(lch2))
+    lab2 = oklab.oklch_to_oklab(lch2)
+    na, nb = mesh_dict.get("neutral", (0.0, 0.0))
+    if na or nb:  # global neutral cast (draggable centre node)
+        lab2[..., 1] += na
+        lab2[..., 2] += nb
+    out = oklab.oklab_to_srgb(lab2)
     return np.clip(out, 0.0, 1.0)
 
 

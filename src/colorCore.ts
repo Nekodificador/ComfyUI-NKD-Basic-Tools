@@ -170,6 +170,7 @@ export interface Mesh {
   hue_segments: number;
   sat_rings: number;
   offsets: number[][][]; // [ring][seg][3]
+  neutral?: [number, number]; // global OKLab (a,b) cast (draggable centre node)
 }
 
 export function meshIdentity(hueSegments = 12, satRings = 6): Mesh {
@@ -179,7 +180,7 @@ export function meshIdentity(hueSegments = 12, satRings = 6): Mesh {
     for (let s = 0; s < hueSegments; s++) ring.push([0, 0, 0]);
     offsets.push(ring);
   }
-  return { hue_segments: hueSegments | 0, sat_rings: satRings | 0, offsets };
+  return { hue_segments: hueSegments | 0, sat_rings: satRings | 0, offsets, neutral: [0, 0] };
 }
 
 export function meshFromDict(d: any): Mesh {
@@ -187,6 +188,7 @@ export function meshFromDict(d: any): Mesh {
     hue_segments: d.hue_segments | 0,
     sat_rings: d.sat_rings | 0,
     offsets: d.offsets.map((ring: number[][]) => ring.map((c: number[]) => [c[0], c[1], c[2]])),
+    neutral: d.neutral ? [d.neutral[0], d.neutral[1]] : [0, 0],
   };
 }
 
@@ -195,6 +197,7 @@ export function meshToDict(m: Mesh): any {
     hue_segments: m.hue_segments,
     sat_rings: m.sat_rings,
     offsets: m.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]])),
+    neutral: m.neutral ? [m.neutral[0], m.neutral[1]] : [0, 0],
   };
 }
 
@@ -247,6 +250,7 @@ function clamp(x: number, lo: number, hi: number): number {
 export function bakeLut(m: Mesh, size = 33): Float64Array {
   const out = new Float64Array(size * size * size * 3);
   const step = size > 1 ? 1.0 / (size - 1) : 0.0;
+  const na = m.neutral ? m.neutral[0] : 0, nb = m.neutral ? m.neutral[1] : 0;
   for (let ri = 0; ri < size; ri++) {
     const r = ri * step;
     for (let gi = 0; gi < size; gi++) {
@@ -261,7 +265,9 @@ export function bakeLut(m: Mesh, size = 33): Float64Array {
         const sat2 = Math.max(sat + ds, 0.0);
         const C2 = sat2 * C_REF;
         const L2 = clamp(L + dl, 0.0, 1.0);
-        const rgb = oklabToSrgb(oklchToOklab([L2, C2, h2]));
+        const lab2 = oklchToOklab([L2, C2, h2]);
+        lab2[1] += na; lab2[2] += nb; // global neutral cast
+        const rgb = oklabToSrgb(lab2);
         const idx = ((ri * size + gi) * size + bi) * 3;
         out[idx] = clamp(rgb[0], 0.0, 1.0);
         out[idx + 1] = clamp(rgb[1], 0.0, 1.0);

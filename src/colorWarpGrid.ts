@@ -12,7 +12,7 @@
 // ring's sat). Alt+wheel nudges per-node luma. Double-click resets a node.
 // Edits are written back through `onEdit(json, commit)`.
 import {
-  Mesh, hslToSrgb, displayToHue, hueToDisplay, meshToDict, meshIdentity,
+  Mesh, hslToSrgb, displayToHue, hueToDisplay, meshToDict, meshIdentity, C_REF,
 } from "./colorCore";
 
 const GRID_LINE = "rgba(120,180,255,0.35)";
@@ -194,6 +194,12 @@ export class ColorWarpGrid {
   // reference used by every drag path.
   private nodePt(ri: number, sj: number): [number, number] {
     const m = this.mesh!;
+    if (ri === 0) { // centre = the global neutral cast, drawn at its (a,b) position
+      const n = m.neutral ?? [0, 0];
+      const C = Math.hypot(n[0], n[1]);
+      const hue = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
+      return this.polar(hueToDisplay(hue), Math.min(C / C_REF, 1));
+    }
     const S = m.hue_segments, R = m.sat_rings;
     const baseDisp = sj * 360 / S;
     const baseSat = ri / R;
@@ -507,13 +513,15 @@ export class ColorWarpGrid {
   // only the grabbed node.
   private dragNode(x: number, y: number) {
     const m = this.mesh!;
-    const S = m.hue_segments;
     const { ri, sj } = this.drag!;
     const [disp, sat] = this.toPolar(x, y);
 
-    // Center (ri=0) collapses to a point — apply its radius uniformly.
+    // Centre (ri=0) = global neutral cast: store an OKLab (a,b) toward the cursor
+    // so gray tints in any direction (not only straight up).
     if (ri === 0) {
-      for (let ss = 0; ss < S; ss++) { const o = m.offsets[0][ss]; o[0] = 0; o[1] = sat; }
+      const rad = displayToHue(disp) * Math.PI / 180;
+      const C = sat * C_REF;
+      m.neutral = [C * Math.cos(rad), C * Math.sin(rad)];
       return;
     }
 
@@ -556,7 +564,7 @@ export class ColorWarpGrid {
     // De-autonomise (back to dependent), except the rim which stays each arm's
     // anchor; then let the spoke recompute so the freed node follows again.
     if (ri !== this.mesh.sat_rings) this.autonomous.delete(this.key(ri, sj));
-    if (ri !== 0) this.recomputeSpoke(sj);
+    if (ri === 0) this.mesh.neutral = [0, 0]; else this.recomputeSpoke(sj);
     this.draw();
     this.emit(true);
     e.preventDefault();
@@ -581,6 +589,7 @@ export class ColorWarpGrid {
     const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
     for (let rr = 0; rr <= R; rr++)
       for (let ss = 0; ss < S; ss++) this.mesh.offsets[rr][ss] = [0, 0, 0];
+    this.mesh.neutral = [0, 0];
     this.initAutonomy();
     this.draw();
     this.emit(true);
