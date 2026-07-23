@@ -9538,10 +9538,9 @@ class ColorWarpGrid {
     this.setNodePolar(ri, sj, disp, sat);
     if (!this.pin) this.recomputeSpoke(sj);
   }
-  // Shift gesture = axis-locked nudge of ONLY the grabbed node: the axis locks to
-  // radial (saturation) or tangential (hue) — whichever the cursor first moved in
-  // — so you tweak one dimension at a time. Only that node becomes autonomous; no
-  // other node moves. (Group Shift over a bbox selection is a future addition.)
+  // Shift = a normal node drag (dependents follow exactly the same way) but LOCKED
+  // to one axis: radial → saturation, tangential → hue, chosen by the first move.
+  // You move only the grabbed node; its arm recomputes as usual.
   dragShift(x, y) {
     const m = this.mesh;
     const S = m.hue_segments, R = m.sat_rings;
@@ -9563,6 +9562,7 @@ class ColorWarpGrid {
     const [disp, sat] = this.toPolar(x, y);
     this.autonomous.add(this.key(ri, sj));
     this.setNodePolar(ri, sj, d.axis === "v" ? snapAngle : disp, d.axis === "h" ? snapSat : sat);
+    if (!this.pin) this.recomputeSpoke(sj);
   }
   // Reset all offsets to identity (keeps current density) (Phase 8).
   resetAll() {
