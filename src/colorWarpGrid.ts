@@ -29,6 +29,7 @@ const DEBUG_LABELS = true;
 const R_IDLE = 6;
 const R_HOVER = 7;
 const R_CENTER = 4.5;
+const R_DEP = 3;   // dependent (non-autonomous) node → small dot (3DLC-style)
 const HIT_PX = 14; // hit-test tolerance in CSS px
 
 // ponytail: interaction tuning knobs — the drag "feel" Neko will eyeball.
@@ -103,6 +104,11 @@ export class ColorWarpGrid {
   // Preview-hover indicator: [displayDeg, sat, cssColor] or null.
   private indicator: [number, number, string] | null = null;
 
+  // Autonomy: nodes the user has fixed ("ri,sj"). Rim nodes are autonomous by
+  // default (each arm's root). A dependent node follows its nearest autonomous
+  // ancestor outward; dragging a node makes it autonomous.
+  private autonomous = new Set<string>();
+
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
@@ -115,7 +121,7 @@ export class ColorWarpGrid {
     canvas.addEventListener("wheel", this.onWheel, { passive: false });
   }
 
-  setMesh(mesh: Mesh) { this.mesh = mesh; this.draw(); }
+  setMesh(mesh: Mesh) { this.mesh = mesh; this.initAutonomy(); this.draw(); }
   getMesh(): Mesh | null { return this.mesh; }
 
   setSource(src: HTMLCanvasElement) {
@@ -183,6 +189,53 @@ export class ColorWarpGrid {
     const warpedDisp = hueToDisplay(warpedHue);
     const warpedSat = clamp01(baseSat + off[1]);
     return this.polar(warpedDisp, warpedSat);
+  }
+
+  // --- autonomy / hierarchy ------------------------------------------------
+
+  private key(ri: number, sj: number): string { return ri + "," + sj; }
+
+  // A node's warped polar position [displayAngle, sat] (polar twin of nodePt).
+  private nodePolar(ri: number, sj: number): [number, number] {
+    const m = this.mesh!;
+    const S = m.hue_segments, R = m.sat_rings;
+    const baseSat = ri / R;
+    const off = m.offsets[ri][sj];
+    const warpedHue = displayToHue(sj * 360 / S) + off[0] * baseSat;
+    return [hueToDisplay(warpedHue), clamp01(baseSat + off[1])];
+  }
+
+  // Write the offset that places node (ri,sj) at a display angle + sat (keeps luma).
+  private setNodePolar(ri: number, sj: number, angle: number, sat: number) {
+    const m = this.mesh!;
+    const S = m.hue_segments, R = m.sat_rings;
+    const baseSat = ri / R;
+    const baseHue = displayToHue(sj * 360 / S);
+    const o = m.offsets[ri][sj];
+    o[0] = wrapDeg(displayToHue(angle) - baseHue) / baseSat;
+    o[1] = sat - baseSat;
+  }
+
+  // Default anchors: the rim node of every spoke (each arm's root).
+  private initAutonomy() {
+    this.autonomous.clear();
+    const m = this.mesh; if (!m) return;
+    for (let sj = 0; sj < m.hue_segments; sj++) this.autonomous.add(this.key(m.sat_rings, sj));
+  }
+
+  // Reposition one spoke's dependent nodes: each follows its nearest autonomous
+  // ancestor outward (toward the rim), on that ancestor's radial line with sat
+  // scaled from the centre. Autonomous nodes keep their explicit position.
+  private recomputeSpoke(sj: number) {
+    const m = this.mesh!, R = m.sat_rings;
+    for (let rr = 1; rr <= R; rr++) {
+      if (this.autonomous.has(this.key(rr, sj))) continue;
+      let a = -1;
+      for (let aa = rr + 1; aa <= R; aa++) if (this.autonomous.has(this.key(aa, sj))) { a = aa; break; }
+      if (a < 0) continue; // no ancestor above (rim is always an anchor, so rare)
+      const [angA, satA] = this.nodePolar(a, sj);
+      this.setNodePolar(rr, sj, angA, satA * rr / a);
+    }
   }
 
   // Nearest control node to a CSS-px point, within HIT_PX. Center (ri=0) counted
@@ -279,13 +332,14 @@ export class ColorWarpGrid {
     this.emit(true); // write back to node on drag end
   };
 
-  // Drag a node → the segment BELOW it (rings 1..ri on its spoke, itself + inner)
-  // swings to the cursor as a straight radial line; the outer rings and every
-  // other spoke stay put — each node governs only what's below it (3DLC/DaVinci
-  // hierarchy). Pin All isolates the grabbed node.
+  // Drag a node → it becomes AUTONOMOUS (fixed at the cursor); only its dependent
+  // descendants (the nodes below whose nearest autonomous ancestor outward is now
+  // this node) follow, on a straight radial line scaled from the centre. Outer
+  // rings, other autonomous nodes, and other spokes stay put (3DLC hierarchy).
+  // Pin All moves only the grabbed node.
   private dragNode(x: number, y: number) {
     const m = this.mesh!;
-    const S = m.hue_segments, R = m.sat_rings;
+    const S = m.hue_segments;
     const { ri, sj } = this.drag!;
     const [disp, sat] = this.toPolar(x, y);
 
@@ -295,24 +349,9 @@ export class ColorWarpGrid {
       return;
     }
 
-    const baseHue = displayToHue(sj * 360 / S);
-    const dTheta = wrapDeg(displayToHue(disp) - baseHue);
-
-    // Pin All: only the grabbed node moves.
-    if (this.pin) {
-      const o = m.offsets[ri][sj];
-      o[0] = dTheta * R / ri;      // warpedHue = baseHue + o[0]*(ri/R) = targetHue
-      o[1] = sat - ri / R;
-      return;
-    }
-
-    // Only rings 1..ri (the grabbed node + inner) swing to the cursor as a
-    // straight radial line; outer rings (ri+1..R) are left untouched.
-    for (let rr = 1; rr <= ri; rr++) {
-      const o = m.offsets[rr][sj];
-      o[0] = dTheta * R / rr;                     // warpedHue(rr) = targetHue (rigid)
-      o[1] = clamp01(sat * rr / ri) - rr / R;     // warpedSat scales through the cursor
-    }
+    this.autonomous.add(this.key(ri, sj)); // dragging fixes the node
+    this.setNodePolar(ri, sj, disp, sat);  // place it under the cursor
+    if (!this.pin) this.recomputeSpoke(sj); // dependents follow; Pin = only this node
   }
 
   // Shift gesture: horizontal rotates the grabbed sector's hue (dh on every ring
@@ -343,8 +382,13 @@ export class ColorWarpGrid {
     const [x, y] = this.localXY(e);
     const hit = this.hitTest(x, y);
     if (!hit) return;
-    const o = this.mesh.offsets[hit[0]][hit[1]];
+    const [ri, sj] = hit;
+    const o = this.mesh.offsets[ri][sj];
     o[0] = 0; o[1] = 0; o[2] = 0;
+    // De-autonomise (back to dependent), except the rim which stays each arm's
+    // anchor; then let the spoke recompute so the freed node follows again.
+    if (ri !== this.mesh.sat_rings) this.autonomous.delete(this.key(ri, sj));
+    if (ri !== 0) this.recomputeSpoke(sj);
     this.draw();
     this.emit(true);
     e.preventDefault();
@@ -369,6 +413,7 @@ export class ColorWarpGrid {
     const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
     for (let rr = 0; rr <= R; rr++)
       for (let ss = 0; ss < S; ss++) this.mesh.offsets[rr][ss] = [0, 0, 0];
+    this.initAutonomy();
     this.draw();
     this.emit(true);
   }
@@ -378,6 +423,7 @@ export class ColorWarpGrid {
   setDensity(hueSegments: number) {
     const rings = this.mesh?.sat_rings ?? 6;
     this.mesh = meshIdentity(hueSegments, rings);
+    this.initAutonomy();
     this.hover = null;
     this.draw();
     this.emit(true);
@@ -581,7 +627,8 @@ export class ColorWarpGrid {
     for (let ri = 1; ri <= R; ri++) {
       for (let sj = 0; sj < S; sj++) {
         const [x, y] = pt(ri, sj);
-        drawHandle(x, y, ri, sj, R_IDLE);
+        // Autonomous nodes read as full handles; dependents as small dots (3DLC).
+        drawHandle(x, y, ri, sj, this.autonomous.has(this.key(ri, sj)) ? R_IDLE : R_DEP);
       }
     }
     const [cx0, cy0] = pt(0, 0);
