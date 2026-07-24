@@ -4,7 +4,7 @@
 // to match the LUT layout in colorCore. If WebGL2 / 3D textures are unavailable
 // it falls back to a CPU applyRgb pass at reduced resolution (still correct,
 // just slower). Mesh changes rebake + re-upload the LUT, debounced with rAF.
-import { Mesh, bakeLut, applyRgb, srgbToHsl } from "./colorCore";
+import { Mesh, bakeLut, applyRgb, srgbToEngine } from "./colorCore";
 
 const LUT_SIZE = 33;
 
@@ -24,26 +24,25 @@ uniform sampler2D uImg;
 uniform highp sampler3D uLut;
 uniform float uN;
 uniform float uMask;    // 0 = off, 1 = affected-region mask
-uniform float uMaskHue; // target hue in turns [0,1)
-uniform float uMaskSat; // target HSL sat [0,1]
+uniform float uMaskHue; // target OKLCh hue in turns [0,1)
+uniform float uMaskSat; // target engine sat (C/C_REF) [0,1]
 out vec4 outColor;
 
-// HSL hue (turns) & sat of a color — matches the wheel/scatter convention so
-// the mask lines up with where the pixel sits on the grid.
-float hueTurns(vec3 c) {
-  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b), d = mx - mn;
-  float h = 0.0;
-  if (d > 1e-5) {
-    if (mx == c.r) h = mod((c.g - c.b) / d, 6.0);
-    else if (mx == c.g) h = (c.b - c.r) / d + 2.0;
-    else h = (c.r - c.g) / d + 4.0;
-  }
-  return mod(h / 6.0, 1.0);
-}
-float hslSat(vec3 c) {
-  float mx = max(max(c.r, c.g), c.b), mn = min(min(c.r, c.g), c.b);
-  float L = (mx + mn) * 0.5, d = mx - mn;
-  return d < 1e-5 ? 0.0 : d / (1.0 - abs(2.0 * L - 1.0) + 1e-6);
+// OKLab (a,b) of an sRGB color — ENGINE space, so the mask selects exactly the
+// pixels the mesh cell under the cursor warps. Mirrors colorCore srgbToOklab;
+// mat3 constants are column-major (transposed from the row-major JS tables).
+const mat3 M1 = mat3(
+  0.4122214708, 0.2119034982, 0.0883024619,
+  0.5363325363, 0.6806995451, 0.2817188376,
+  0.0514459929, 0.1073969566, 0.6299787005);
+const mat3 M2 = mat3(
+  0.2104542553, 1.9779984951, 0.0259040371,
+  0.7936177850, -2.4285922050, 0.7827717662,
+  -0.0040720468, 0.4505937099, -0.8086757660);
+vec2 oklabAB(vec3 c) {
+  vec3 lin = mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
+  vec3 lms = pow(max(M1 * lin, 0.0), vec3(1.0 / 3.0));
+  return (M2 * lms).yz;
 }
 
 void main() {
@@ -53,10 +52,13 @@ void main() {
   vec3 coord = (c * (uN - 1.0) + 0.5) / uN;
   vec3 graded = texture(uLut, coord).rgb;
   if (uMask > 0.5) {
-    // Weight the SOURCE pixel by how close its (hue,sat) is to the grid cursor
-    // cell; show that region in colour over a grayscale base.
-    float dh = abs(hueTurns(c) - uMaskHue); dh = min(dh, 1.0 - dh);
-    float w = smoothstep(0.11, 0.0, dh) * smoothstep(0.33, 0.0, abs(hslSat(c) - uMaskSat));
+    // Weight the SOURCE pixel by how close its engine (hue,sat) is to the grid
+    // cursor cell; show that region in colour over a grayscale base.
+    vec2 ab = oklabAB(c);
+    float sat = length(ab) / 0.35;              // C / C_REF
+    float hue = fract(atan(ab.y, ab.x) / 6.28318530718);
+    float dh = abs(hue - uMaskHue); dh = min(dh, 1.0 - dh);
+    float w = smoothstep(0.11, 0.0, dh) * smoothstep(0.33, 0.0, abs(sat - uMaskSat));
     float g = dot(graded, vec3(0.299, 0.587, 0.114));
     outColor = vec4(mix(vec3(g), graded, w), 1.0);
     return;
@@ -172,7 +174,7 @@ export class ColorWarpPreview {
     this.schedule();
   }
 
-  // Alt affected-region mask (Phase 7.2). hueDeg = target real hue; sat = HSL sat.
+  // Alt affected-region mask (Phase 7.2). hueDeg = engine OKLCh hue; sat = C/C_REF.
   setMask(hueDeg: number, sat: number) {
     const next = { hue: hueDeg, sat };
     if (this.mask && this.mask.hue === hueDeg && this.mask.sat === sat) return;
@@ -343,7 +345,7 @@ export class ColorWarpPreview {
       const src: [number, number, number] = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
       const rgb = applyRgb(lut, LUT_SIZE, src);
       if (this.mask) {
-        const [h, s] = srgbToHsl(src);
+        const [h, s] = srgbToEngine(src); // OKLCh hue + C/C_REF, same as shader
         let dh = Math.abs(h - maskHue); dh = Math.min(dh, 360 - dh) / 180; // 0..1 (turns*2)
         const wh = Math.max(0, 1 - dh / 0.22);
         const ws = Math.max(0, 1 - Math.abs(s - this.mask.sat) / 0.33);

@@ -4,9 +4,13 @@
 // guard). Left pane = RYB polar net, right pane = image / live LUT preview.
 // The node's `mesh` string widget is the single source of truth — parsed on
 // open, written back on change/close.
-import { Mesh, meshFromDict, meshIdentity, meshToDict, srgbToHsl, displayToHue, hueToDisplay } from "./colorCore";
-import { ColorWarpGrid } from "./colorWarpGrid";
+import {
+  Mesh, meshFromDict, meshIdentity, meshToDict, srgbToHsl, srgbToEngine,
+  WHEEL_MODES, WheelModeName, wheelColumnHues,
+} from "./colorCore";
+import { ColorWarpGrid, ColorWarpLumaStrip } from "./colorWarpGrid";
 import { ColorWarpPreview } from "./colorWarpPreview";
+import { ColorWarpScope3D } from "./colorWarpScope3D";
 
 export interface ColorWarpViewerOpts {
   image: HTMLImageElement | HTMLCanvasElement | null;
@@ -17,7 +21,9 @@ export interface ColorWarpViewerOpts {
 
 export interface ColorWarpViewerHandle {
   // Feed a resolved frame after open (e.g. the nkd-colorwarp-source push event).
-  setImage(src: CanvasImageSource, w: number, h: number): void;
+  // scatter16: optional 16-bit RGB companion for a quantization-free cloud.
+  setImage(src: CanvasImageSource, w: number, h: number,
+           scatter16?: { data: Uint16Array; width: number; height: number }): void;
   close(): void;
 }
 
@@ -30,9 +36,9 @@ const ACCENT = "#4ab4ff";
 const BORDER = "#3a3d46";
 const TEXT = "#c8d0e0";
 
-// TEMP debug (2026-07-23): force a 6-radius × 4-point grid so Neko can reference
-// exact nodes (A1–F4) over text. Flip to false to restore the saved density.
-const DEBUG_GRID = true;
+// TEMP debug (2026-07-23, off 2026-07-24): forced a 6×4 grid for node-naming
+// over text. Superseded by the Spokes/Rings density selects. Labels stay.
+const DEBUG_GRID = false;
 
 function meshJson(m: Mesh): string {
   return JSON.stringify(meshToDict(m));
@@ -58,8 +64,8 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
 
   let mesh: Mesh;
   try { mesh = meshFromDict(JSON.parse(opts.mesh)); }
-  catch { mesh = meshIdentity(); }
-  if (DEBUG_GRID) mesh = meshIdentity(6, 4); // TEMP 6×4 debug grid (A1–F4)
+  catch { mesh = meshIdentity(12, 6, wheelColumnHues(12)); }
+  if (DEBUG_GRID) mesh = meshIdentity(6, 4, wheelColumnHues(6));
 
   let sourceCanvas = toCanvas(opts.image);
 
@@ -77,16 +83,22 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   title.textContent = "😺 Color Warp";
   title.style.cssText = "font-weight:600;font-size:13px";
   const hint = document.createElement("span");
-  hint.textContent = "DEBUG 6×4 grid — nodes A1–F4 (A top, clockwise; 1 inner…4 rim) · drag · Pin = single node · dbl-click resets";
+  hint.textContent = "drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
   hint.style.cssText = "opacity:0.7;font-size:11px";
   const spacer = document.createElement("span");
   spacer.style.cssText = "flex:1 1 auto";
 
-  // Toolbar toggles (Smooth default on / Pin) + Reset all + density.
-  const smoothBtn = mkToggle("Smooth", true);
+  // Toolbar toggles (Pin) + Reset all + density + wheel mode + scope/luma/labels.
   const pinBtn = mkToggle("Pin", false);
   const resetBtn = mkBtn("Reset all", TEXT);
-  const densBtn = mkBtn("Segments: 12", TEXT);
+  // DaVinci-style grid density: spokes (radial arms) and rings, independently.
+  const spokesSel = mkSelect("Spokes", [4, 6, 8, 12, 16, 24, 32], mesh.hue_segments);
+  const ringsSel = mkSelect("Rings", [2, 3, 4, 6, 8, 10, 12, 16], mesh.sat_rings);
+  const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
+  const scopeBtn = mkToggle("3D", false);
+  const trailsBtn = mkToggle("Trails", false);
+  const lumaBtn = mkToggle("Luma", true);
+  const labelsBtn = mkToggle("Labels", false);
 
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
@@ -101,7 +113,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     `border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
   const barSpacer = document.createElement("span");
   barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, smoothBtn, pinBtn, resetBtn, densBtn, saveBtn);
+  bottomBar.append(barSpacer, wheelBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
 
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
@@ -111,13 +123,43 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   leftPane.style.borderRight = `1px solid ${BORDER}`;
   body.append(leftPane, rightPane);
 
+  // Left pane: wheel on top, Hue/Luma strip along the bottom (DaVinci-style).
+  const LUMA_H = 118;
+  // canvas is a replaced element: top+bottom alone won't stretch it — height
+  // must be explicit or it collapses to its intrinsic size (tiny wheel).
   const gridCanvas = document.createElement("canvas");
-  gridCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+  gridCanvas.style.cssText = `position:absolute;left:0;top:0;width:100%;height:calc(100% - ${LUMA_H}px)`;
   leftPane.appendChild(gridCanvas);
+  const lumaCanvas = document.createElement("canvas");
+  lumaCanvas.style.cssText =
+    `position:absolute;left:0;right:0;bottom:0;height:${LUMA_H}px;width:100%;` +
+    `border-top:1px solid ${BORDER}`;
+  leftPane.appendChild(lumaCanvas);
 
   const previewCanvas = document.createElement("canvas");
   previewCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
   rightPane.appendChild(previewCanvas);
+
+  // 3D vectorscope (3DLC-style): floating mini-window over the preview (like
+  // the hue readout), expandable to the full pane with the corner icon.
+  const SCOPE_MINI =
+    `position:absolute;left:10px;bottom:10px;width:300px;height:240px;` +
+    `border:1px solid ${BORDER};border-radius:6px;overflow:hidden;display:none;` +
+    `box-shadow:0 2px 10px rgba(0,0,0,0.5);z-index:5;background:#0d0f13`;
+  const SCOPE_FULL = "position:absolute;inset:0;overflow:hidden;display:none;z-index:5;background:#0d0f13";
+  const scopeBox = document.createElement("div");
+  scopeBox.style.cssText = SCOPE_MINI;
+  const scopeCanvas = document.createElement("canvas");
+  scopeCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
+  const scopeExpand = document.createElement("button");
+  scopeExpand.textContent = "⤢";
+  scopeExpand.title = "Expand / restore";
+  scopeExpand.style.cssText =
+    `position:absolute;top:6px;right:6px;z-index:2;background:rgba(20,22,28,0.85);` +
+    `border:1px solid ${BORDER};color:${TEXT};border-radius:4px;padding:2px 7px;` +
+    `cursor:pointer;font:12px Inter,system-ui,sans-serif;line-height:1.3`;
+  scopeBox.append(scopeCanvas, scopeExpand);
+  rightPane.appendChild(scopeBox);
 
   // Floating tooltip (hover/drag over a node) — nkd-curve-style.
   const tip = document.createElement("div");
@@ -142,12 +184,17 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
 
   // --- render engines: RYB grid (left) + WebGL LUT preview (right) ---------
   const grid = new ColorWarpGrid(gridCanvas);
+  const luma = new ColorWarpLumaStrip(lumaCanvas, grid);
   const preview = new ColorWarpPreview(previewCanvas);
+  const scope = new ColorWarpScope3D(scopeCanvas);
 
-  // Live edit from the grid → rebake preview + write back to the node.
+  // Live edit from the grid (or the luma strip, which routes through the grid)
+  // → rebake preview + write back to the node.
   grid.cb.onEdit = (json, commit) => {
     try { mesh = meshFromDict(JSON.parse(json)); } catch { /* keep */ }
     preview.setMesh(mesh);
+    scope.setMesh(mesh);
+    luma.refresh(); // dl can change from the wheel side too (Alt+wheel, resets)
     opts.onChange?.(json);
   };
   grid.cb.onHover = (info, cx, cy) => {
@@ -160,24 +207,73 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     tip.style.top = (cy + 14) + "px";
   };
   // Alt over the grid → preview affected-region mask at the cursor cell.
-  grid.cb.onGridCursor = (disp, sat, alt, inside) => {
-    if (alt && inside) preview.setMask(displayToHue(disp), sat);
+  // The grid already reports ENGINE coords (OKLCh hue + sat).
+  grid.cb.onGridCursor = (engineHue, sat, alt, inside) => {
+    if (alt && inside) preview.setMask(engineHue, sat);
     else preview.clearMask();
   };
 
   grid.setMesh(mesh);
   preview.setMesh(mesh);
-  if (sourceCanvas) { grid.setSource(sourceCanvas); preview.setSource(sourceCanvas); }
+  scope.setMesh(mesh);
+  if (sourceCanvas) {
+    grid.setSource(sourceCanvas);
+    preview.setSource(sourceCanvas);
+    scope.setSource(sourceCanvas, null);
+  }
 
   // Toolbar wiring.
-  smoothBtn.onclick = () => { grid.smooth = !grid.smooth; setToggle(smoothBtn, grid.smooth); };
   pinBtn.onclick = () => { grid.pin = !grid.pin; setToggle(pinBtn, grid.pin); };
   resetBtn.onclick = () => grid.resetAll();
-  densBtn.onclick = () => {
-    const cur = grid.getMesh()?.hue_segments ?? 12;
-    const next = cur === 12 ? 8 : 12;
-    grid.setDensity(next);
-    densBtn.textContent = `Segments: ${next}`;
+  spokesSel.sel.onchange = () => grid.setDensity(parseInt(spokesSel.sel.value), undefined);
+  ringsSel.sel.onchange = () => grid.setDensity(undefined, parseInt(ringsSel.sel.value));
+  // 3D scope: mini-window toggle + expand-to-pane icon.
+  let scopeOn = false;
+  let scopeFull = false;
+  function applyScopeLayout() {
+    scopeBox.style.cssText = scopeFull ? SCOPE_FULL : SCOPE_MINI;
+    scopeBox.style.display = scopeOn ? "block" : "none";
+    scopeExpand.textContent = scopeFull ? "⤡" : "⤢";
+    scope.setVisible(scopeOn);
+    if (scopeOn) scope.resize();
+  }
+  scopeBtn.onclick = () => {
+    scopeOn = !scopeOn;
+    setToggle(scopeBtn, scopeOn);
+    applyScopeLayout();
+  };
+  scopeExpand.onclick = () => {
+    scopeFull = !scopeFull;
+    applyScopeLayout();
+  };
+  trailsBtn.onclick = () => {
+    scope.trails = !scope.trails;
+    setToggle(trailsBtn, scope.trails);
+    scope.setTrails(scope.trails);
+  };
+  // Luma strip show/hide — the wheel reclaims the full pane height when off.
+  let lumaOn = true;
+  lumaBtn.onclick = () => {
+    lumaOn = !lumaOn;
+    setToggle(lumaBtn, lumaOn);
+    lumaCanvas.style.display = lumaOn ? "block" : "none";
+    gridCanvas.style.height = lumaOn ? `calc(100% - ${LUMA_H}px)` : "100%";
+    requestAnimationFrame(render);
+  };
+  // Node coordinate labels (A1…): only for discussing nodes over text.
+  labelsBtn.onclick = () => {
+    grid.labels = !grid.labels;
+    setToggle(labelsBtn, grid.labels);
+    grid.refresh();
+  };
+  // Wheel mode: cycles the display projection (RYB → RGB → OKLCh). The mesh is
+  // engine-space, so this only reprojects the view — data untouched.
+  wheelBtn.onclick = () => {
+    const order: WheelModeName[] = ["ryb", "rgb", "oklch"];
+    const next = order[(order.indexOf(grid.getWheelMode()) + 1) % order.length];
+    grid.setWheelMode(next);
+    wheelBtn.textContent = `Wheel: ${WHEEL_MODES[next].label}`;
+    luma.refresh(); // the strip's x-axis is the wheel projection
   };
 
   // Preview hover → HSL readout + grid indicator dot (Phase 7.1).
@@ -192,14 +288,17 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
       `<div style="margin-top:6px">S ${(s * 100).toFixed(0)}%  L ${(l * 100).toFixed(0)}%</div>` +
       `<div style="opacity:0.75;margin-top:2px">rgb ${R}, ${G}, ${B}</div>`;
     readout.style.display = "block";
-    grid.setIndicator(hueToDisplay(h), s, `rgb(${R},${G},${B})`);
+    // Indicator in ENGINE coords: the dot lands on the mesh cell that actually
+    // warps this pixel, whatever wheel mode is active.
+    const [engHue, engSat] = srgbToEngine(rgb);
+    grid.setIndicator(engHue, Math.min(engSat, 1), `rgb(${R},${G},${B})`);
   });
   previewCanvas.addEventListener("pointerleave", () => {
     readout.style.display = "none";
     grid.setIndicator(null);
   });
 
-  function render() { grid.resize(); preview.resize(); }
+  function render() { grid.resize(); luma.resize(); preview.resize(); scope.resize(); }
 
   const ro = new ResizeObserver(render);
   ro.observe(body);
@@ -213,7 +312,9 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     ro.disconnect();
     window.removeEventListener("keydown", onKey, true);
     grid.dispose();
+    luma.dispose();
     preview.dispose();
+    scope.dispose();
     host.remove();
     if (active && active.destroy === destroy) active = null;
   }
@@ -231,7 +332,6 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     }
     const k = e.key.toLowerCase();
     if (k === "r") { e.stopPropagation(); grid.resetAll(); }
-    else if (k === "s") { e.stopPropagation(); grid.smooth = !grid.smooth; setToggle(smoothBtn, grid.smooth); }
   };
   window.addEventListener("keydown", onKey, true);
   host.addEventListener("pointerdown", (e) => { if (e.target === host) closeWith(true); });
@@ -241,12 +341,15 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   active = { destroy };
 
   return {
-    setImage(src: CanvasImageSource, w: number, h: number) {
+    setImage(src: CanvasImageSource, w: number, h: number,
+             scatter16?: { data: Uint16Array; width: number; height: number }) {
       const c = toCanvas(src, w, h);
       if (!c) return;
       sourceCanvas = c;
       grid.setSource(c);
+      grid.setScatter16(scatter16 ?? null);
       preview.setSource(c);
+      scope.setSource(c, scatter16 ?? null);
       render();
     },
     close() { closeWith(false); },
@@ -261,6 +364,28 @@ function mkBtn(label: string, color: string): HTMLButtonElement {
     `padding:4px 12px;cursor:pointer;font:inherit`;
   if (color === ACCENT) { b.style.borderColor = ACCENT; b.style.fontWeight = "600"; }
   return b;
+}
+
+// Labeled <select> for the density controls. Ensures the current value is
+// always an option (e.g. a mesh saved at a density not in the preset list).
+function mkSelect(label: string, values: number[], current: number): { wrap: HTMLElement; sel: HTMLSelectElement } {
+  const wrap = document.createElement("label");
+  wrap.style.cssText = `display:flex;align-items:center;gap:6px;color:${TEXT};opacity:0.9;cursor:pointer`;
+  wrap.textContent = label;
+  const sel = document.createElement("select");
+  sel.style.cssText =
+    `background:#252830;border:1px solid ${BORDER};color:${TEXT};border-radius:4px;` +
+    `padding:3px 6px;font:inherit;cursor:pointer`;
+  const vals = values.includes(current) ? values : [...values, current].sort((a, b) => a - b);
+  for (const v of vals) {
+    const o = document.createElement("option");
+    o.value = String(v);
+    o.textContent = String(v);
+    if (v === current) o.selected = true;
+    sel.appendChild(o);
+  }
+  wrap.appendChild(sel);
+  return { wrap, sel };
 }
 
 function mkToggle(label: string, on: boolean): HTMLButtonElement {

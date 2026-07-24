@@ -812,7 +812,16 @@ comfyApp.registerExtension({
           const bytes = new Uint8Array(bin.length);
           for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
           const c = rgbBytesToCanvas(bytes, d.width, d.height);
-          activeColorWarp.handle.setImage(c, d.width, d.height);
+          // Optional 16-bit RGB companion (little-endian uint16) for the
+          // viewer's scatter cloud — quantization-free vectorscope.
+          let s16: { data: Uint16Array; width: number; height: number } | undefined;
+          if (d.scatter16 && d.s16_width && d.s16_height) {
+            const sbin = atob(d.scatter16);
+            const sbytes = new Uint8Array(sbin.length);
+            for (let i = 0; i < sbin.length; i++) sbytes[i] = sbin.charCodeAt(i);
+            s16 = { data: new Uint16Array(sbytes.buffer), width: d.s16_width, height: d.s16_height };
+          }
+          activeColorWarp.handle.setImage(c, d.width, d.height, s16);
         } catch { /* ignore malformed */ }
       };
       api.addEventListener("nkd-colorwarp-source", onSource);
