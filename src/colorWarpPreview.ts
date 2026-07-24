@@ -59,8 +59,10 @@ void main() {
     float hue = fract(atan(ab.y, ab.x) / 6.28318530718);
     float dh = abs(hue - uMaskHue); dh = min(dh, 1.0 - dh);
     float w = smoothstep(0.11, 0.0, dh) * smoothstep(0.33, 0.0, abs(sat - uMaskSat));
+    // Non-selected region: grayscale AND heavily dimmed — desaturation alone
+    // is unreadable under color blindness; the luminance drop carries the cue.
     float g = dot(graded, vec3(0.299, 0.587, 0.114));
-    outColor = vec4(mix(vec3(g), graded, w), 1.0);
+    outColor = vec4(mix(vec3(g * 0.22), graded, w), 1.0);
     return;
   }
   outColor = vec4(graded, 1.0);
@@ -350,10 +352,11 @@ export class ColorWarpPreview {
         const wh = Math.max(0, 1 - dh / 0.22);
         const ws = Math.max(0, 1 - Math.abs(s - this.mask.sat) / 0.33);
         const w = wh * ws;
-        const g = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
-        rgb[0] = g + (rgb[0] - g) * w;
-        rgb[1] = g + (rgb[1] - g) * w;
-        rgb[2] = g + (rgb[2] - g) * w;
+        // Grayscale + heavy dim outside the selection (colorblind-safe cue).
+        const dim = (rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114) * 0.22;
+        rgb[0] = dim + (rgb[0] - dim) * w;
+        rgb[1] = dim + (rgb[1] - dim) * w;
+        rgb[2] = dim + (rgb[2] - dim) * w;
       }
       px[k] = Math.round(rgb[0] * 255);
       px[k + 1] = Math.round(rgb[1] * 255);

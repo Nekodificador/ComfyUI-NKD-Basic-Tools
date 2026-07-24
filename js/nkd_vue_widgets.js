@@ -9140,10 +9140,6 @@ const R_CENTER = 4.5;
 const R_DEP = 3;
 const HIT_PX = 14;
 const MARQUEE_MIN = 4;
-const GIZMO_R = 4;
-const GIZMO_HIT = 10;
-const ROT_LEVER = 26;
-const ROT_HANDLE_R = 5;
 const SHIFT_ROT_PER_PX = 0.3;
 const SHIFT_SAT_PER_PX = 3e-3;
 const SHIFT_AXIS_MIN = 4;
@@ -9285,43 +9281,18 @@ class ColorWarpGrid {
         if (!hit) return;
         this.drag = { kind: "shift", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
       } else {
-        const box = this.selectionBox();
-        let handled = false;
-        if (box) {
-          const cxs = [box.x0, box.x1, box.x1, box.x0], cys = [box.y0, box.y0, box.y1, box.y1];
-          let corner = -1, bd = GIZMO_HIT * GIZMO_HIT;
-          for (let c = 0; c < 4; c++) {
-            const ax = x - cxs[c], ay = y - cys[c], dd = ax * ax + ay * ay;
-            if (dd < bd) {
-              bd = dd;
-              corner = c;
-            }
+        const hit = this.hitTest(x, y);
+        if (hit && this.selected.has(this.key(hit[0], hit[1]))) {
+          this.drag = { kind: "group", ri: hit[0], sj: hit[1], startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: this.selectionSnapshot() };
+        } else if (hit) {
+          if (this.selected.size) {
+            this.selected.clear();
+            this.draw();
           }
-          const rhx = box.cx, rhy = box.y0 - ROT_LEVER;
-          if (corner >= 0) {
-            this.drag = { kind: "scale", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId, corner, box, groupStart: this.selectionSnapshot() };
-            handled = true;
-          } else if ((x - rhx) * (x - rhx) + (y - rhy) * (y - rhy) < GIZMO_HIT * GIZMO_HIT) {
-            this.drag = { kind: "rotate", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId, box, startAng: Math.atan2(y - box.cy, x - box.cx), groupStart: this.selectionSnapshot() };
-            handled = true;
-          }
-        }
-        if (!handled) {
-          const hit = this.hitTest(x, y);
-          if (hit && this.selected.has(this.key(hit[0], hit[1]))) {
-            this.drag = { kind: "group", ri: hit[0], sj: hit[1], startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: this.selectionSnapshot() };
-          } else if (hit) {
-            if (this.selected.size) {
-              this.selected.clear();
-              this.draw();
-            }
-            this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
-          } else if (box && x >= box.x0 && x <= box.x1 && y >= box.y0 && y <= box.y1) {
-            this.drag = { kind: "group", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId, groupStart: this.selectionSnapshot() };
-          } else {
-            this.drag = { kind: "marquee", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId };
-            this.marquee = [x, y, x, y];
-          }
+          this.drag = { kind: "node", ri: hit[0], sj: hit[1], startX: x, startY: y, start: this.cloneOffsets(), pointerId: e.pointerId };
+        } else {
+          this.drag = { kind: "marquee", ri: 0, sj: 0, startX: x, startY: y, start: [], pointerId: e.pointerId };
+          this.marquee = [x, y, x, y];
         }
       }
       this.canvas.setPointerCapture(e.pointerId);
@@ -9339,8 +9310,6 @@ class ColorWarpGrid {
         }
         if (this.drag.kind === "node") this.dragNode(x, y);
         else if (this.drag.kind === "group") this.dragGroup(x, y);
-        else if (this.drag.kind === "scale") this.dragScale(x, y, e);
-        else if (this.drag.kind === "rotate") this.dragRotate(x, y);
         else this.dragShift(x, y);
         this.draw();
         this.emit(false);
@@ -9645,20 +9614,6 @@ class ColorWarpGrid {
   cloneOffsets() {
     return this.mesh.offsets.map((ring) => ring.map((c) => [c[0], c[1], c[2]]));
   }
-  // Screen-space bbox + centre of the current box-selection (≥2 nodes), or null.
-  selectionBox() {
-    if (this.selected.size < 2 || !this.mesh) return null;
-    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const k of this.selected) {
-      const [ri, sj] = k.split(",").map(Number);
-      const [px, py] = this.nodePt(ri, sj);
-      if (px < x0) x0 = px;
-      if (py < y0) y0 = py;
-      if (px > x1) x1 = px;
-      if (py > y1) y1 = py;
-    }
-    return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
-  }
   // The centre node's screen-space displacement from the canvas origin (the
   // vector by which the centre was dragged), used to stretch — not collapse — the web.
   centerDisp() {
@@ -9685,55 +9640,6 @@ class ColorWarpGrid {
     for (const g of d.groupStart) {
       if (g.ri === 0) continue;
       const [disp, sat] = this.toPolar(g.x + dx, g.y + dy);
-      this.autonomous.add(this.key(g.ri, g.sj));
-      this.setNodePolar(g.ri, g.sj, disp, sat);
-      spokes.add(g.sj);
-    }
-    for (const sj of spokes) this.recomputeSpoke(sj);
-  }
-  // Transform-box SCALE: drag a corner. Anchor = opposite corner, or the box
-  // centre with Alt; Shift keeps it proportional (uniform by distance ratio).
-  dragScale(x, y, e) {
-    const d = this.drag, b = d.box, corner = d.corner;
-    const cx = [b.x0, b.x1, b.x1, b.x0], cy = [b.y0, b.y0, b.y1, b.y1];
-    const p0x = cx[corner], p0y = cy[corner];
-    let ax, ay;
-    if (e.altKey) {
-      ax = b.cx;
-      ay = b.cy;
-    } else {
-      const opp = (corner + 2) % 4;
-      ax = cx[opp];
-      ay = cy[opp];
-    }
-    let sx = p0x - ax !== 0 ? (x - ax) / (p0x - ax) : 1;
-    let sy = p0y - ay !== 0 ? (y - ay) / (p0y - ay) : 1;
-    if (e.shiftKey) {
-      const s = Math.hypot(x - ax, y - ay) / (Math.hypot(p0x - ax, p0y - ay) || 1);
-      sx = s;
-      sy = s;
-    }
-    this.applyGroupXform((gx, gy) => [ax + (gx - ax) * sx, ay + (gy - ay) * sy]);
-  }
-  // Transform-box ROTATE: the top lever pivots the selection around the centre.
-  dragRotate(x, y) {
-    const d = this.drag, b = d.box;
-    const delta = Math.atan2(y - b.cy, x - b.cx) - d.startAng;
-    const cos = Math.cos(delta), sin = Math.sin(delta);
-    this.applyGroupXform((gx, gy) => {
-      const ox = gx - b.cx, oy = gy - b.cy;
-      return [b.cx + ox * cos - oy * sin, b.cy + ox * sin + oy * cos];
-    });
-  }
-  // Map every snapshot node's screen position through `f`, write it back as an
-  // autonomous node, and recompute the affected spokes. Shared by scale/rotate.
-  applyGroupXform(f) {
-    this.drag.xform = f;
-    const spokes = /* @__PURE__ */ new Set();
-    for (const g of this.drag.groupStart) {
-      if (g.ri === 0) continue;
-      const [nx, ny] = f(g.x, g.y);
-      const [disp, sat] = this.toPolar(nx, ny);
       this.autonomous.add(this.key(g.ri, g.sj));
       this.setNodePolar(g.ri, g.sj, disp, sat);
       spokes.add(g.sj);
@@ -9981,57 +9887,7 @@ class ColorWarpGrid {
     if (this.mesh) this.drawWeb(ctx, this.mesh);
     if (this.labels && this.mesh) this.drawLabels(ctx);
     this.drawIndicator(ctx);
-    this.drawGizmo(ctx);
     this.drawMarquee(ctx);
-  }
-  // Free-transform box around a box-selection: a dashed quad, corner scale dots,
-  // and a top lever with a rotate handle. While a scale/rotate drag is live, the
-  // box is drawn as the SNAPSHOT box mapped through the current transform — so it
-  // visibly rotates/scales with the lever (not a re-fitted axis-aligned bbox).
-  drawGizmo(ctx) {
-    var _a, _b, _c;
-    if (((_a = this.drag) == null ? void 0 : _a.kind) === "marquee") return;
-    const active2 = ((_b = this.drag) == null ? void 0 : _b.kind) === "scale" || ((_c = this.drag) == null ? void 0 : _c.kind) === "rotate" ? this.drag : null;
-    let corners;
-    if ((active2 == null ? void 0 : active2.box) && active2.xform) {
-      const b = active2.box, f = active2.xform;
-      corners = [[b.x0, b.y0], [b.x1, b.y0], [b.x1, b.y1], [b.x0, b.y1]].map(([px, py]) => f(px, py));
-    } else {
-      const box = this.selectionBox();
-      if (!box) return;
-      corners = [[box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1]];
-    }
-    const [TL, TR] = corners;
-    ctx.save();
-    ctx.strokeStyle = ACCENT$1;
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 3]);
-    ctx.beginPath();
-    ctx.moveTo(corners[0][0], corners[0][1]);
-    for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
-    ctx.closePath();
-    ctx.stroke();
-    ctx.setLineDash([]);
-    const midX = (TL[0] + TR[0]) / 2, midY = (TL[1] + TR[1]) / 2;
-    const ex = TR[0] - TL[0], ey = TR[1] - TL[1], len = Math.hypot(ex, ey) || 1;
-    const tipX = midX + ey / len * ROT_LEVER, tipY = midY + -ex / len * ROT_LEVER;
-    ctx.beginPath();
-    ctx.moveTo(midX, midY);
-    ctx.lineTo(tipX, tipY);
-    ctx.stroke();
-    ctx.fillStyle = "#fff";
-    ctx.lineWidth = 1.5;
-    for (const [hx, hy] of corners) {
-      ctx.beginPath();
-      ctx.arc(hx, hy, GIZMO_R, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, ROT_HANDLE_R, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
   }
   drawMarquee(ctx) {
     if (!this.marquee) return;
@@ -10503,8 +10359,10 @@ void main() {
     float hue = fract(atan(ab.y, ab.x) / 6.28318530718);
     float dh = abs(hue - uMaskHue); dh = min(dh, 1.0 - dh);
     float w = smoothstep(0.11, 0.0, dh) * smoothstep(0.33, 0.0, abs(sat - uMaskSat));
+    // Non-selected region: grayscale AND heavily dimmed — desaturation alone
+    // is unreadable under color blindness; the luminance drop carries the cue.
     float g = dot(graded, vec3(0.299, 0.587, 0.114));
-    outColor = vec4(mix(vec3(g), graded, w), 1.0);
+    outColor = vec4(mix(vec3(g * 0.22), graded, w), 1.0);
     return;
   }
   outColor = vec4(graded, 1.0);
@@ -10795,10 +10653,10 @@ class ColorWarpPreview {
         const wh = Math.max(0, 1 - dh2 / 0.22);
         const ws = Math.max(0, 1 - Math.abs(s - this.mask.sat) / 0.33);
         const w = wh * ws;
-        const g = rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114;
-        rgb[0] = g + (rgb[0] - g) * w;
-        rgb[1] = g + (rgb[1] - g) * w;
-        rgb[2] = g + (rgb[2] - g) * w;
+        const dim = (rgb[0] * 0.299 + rgb[1] * 0.587 + rgb[2] * 0.114) * 0.22;
+        rgb[0] = dim + (rgb[0] - dim) * w;
+        rgb[1] = dim + (rgb[1] - dim) * w;
+        rgb[2] = dim + (rgb[2] - dim) * w;
       }
       px[k] = Math.round(rgb[0] * 255);
       px[k + 1] = Math.round(rgb[1] * 255);
@@ -11290,7 +11148,7 @@ function openColorWarpViewer(opts) {
   const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
   const scopeBtn = mkToggle("3D", false);
   const trailsBtn = mkToggle("Trails", false);
-  const lumaBtn = mkToggle("Luma", true);
+  const lumaBtn = mkToggle("Luma", false);
   const labelsBtn = mkToggle("Labels", false);
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
@@ -11309,10 +11167,10 @@ function openColorWarpViewer(opts) {
   body.append(leftPane, rightPane);
   const LUMA_H = 118;
   const gridCanvas = document.createElement("canvas");
-  gridCanvas.style.cssText = `position:absolute;left:0;top:0;width:100%;height:calc(100% - ${LUMA_H}px)`;
+  gridCanvas.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%";
   leftPane.appendChild(gridCanvas);
   const lumaCanvas = document.createElement("canvas");
-  lumaCanvas.style.cssText = `position:absolute;left:0;right:0;bottom:0;height:${LUMA_H}px;width:100%;border-top:1px solid ${BORDER}`;
+  lumaCanvas.style.cssText = `position:absolute;left:0;right:0;bottom:0;height:${LUMA_H}px;width:100%;border-top:1px solid ${BORDER};display:none`;
   leftPane.appendChild(lumaCanvas);
   const previewCanvas = document.createElement("canvas");
   previewCanvas.style.cssText = "position:absolute;inset:0;width:100%;height:100%";
@@ -11404,7 +11262,7 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     setToggle(trailsBtn, scope.trails);
     scope.setTrails(scope.trails);
   };
-  let lumaOn = true;
+  let lumaOn = false;
   lumaBtn.onclick = () => {
     lumaOn = !lumaOn;
     setToggle(lumaBtn, lumaOn);
@@ -11530,6 +11388,13 @@ function mkSelect(label, values, current) {
     if (v === current) o.selected = true;
     sel.appendChild(o);
   }
+  sel.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    const i = sel.selectedIndex + (e.deltaY < 0 ? 1 : -1);
+    if (i < 0 || i >= sel.options.length) return;
+    sel.selectedIndex = i;
+    sel.dispatchEvent(new Event("change"));
+  }, { passive: false });
   wrap.appendChild(sel);
   return { wrap, sel };
 }

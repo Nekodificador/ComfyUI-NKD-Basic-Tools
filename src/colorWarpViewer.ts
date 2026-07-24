@@ -97,7 +97,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
   const scopeBtn = mkToggle("3D", false);
   const trailsBtn = mkToggle("Trails", false);
-  const lumaBtn = mkToggle("Luma", true);
+  const lumaBtn = mkToggle("Luma", false);
   const labelsBtn = mkToggle("Labels", false);
 
   const saveBtn = mkBtn("Save & close", ACCENT);
@@ -127,13 +127,14 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   const LUMA_H = 118;
   // canvas is a replaced element: top+bottom alone won't stretch it — height
   // must be explicit or it collapses to its intrinsic size (tiny wheel).
+  // Luma strip starts HIDDEN (toolbar toggle) — wheel owns the full height.
   const gridCanvas = document.createElement("canvas");
-  gridCanvas.style.cssText = `position:absolute;left:0;top:0;width:100%;height:calc(100% - ${LUMA_H}px)`;
+  gridCanvas.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%";
   leftPane.appendChild(gridCanvas);
   const lumaCanvas = document.createElement("canvas");
   lumaCanvas.style.cssText =
     `position:absolute;left:0;right:0;bottom:0;height:${LUMA_H}px;width:100%;` +
-    `border-top:1px solid ${BORDER}`;
+    `border-top:1px solid ${BORDER};display:none`;
   leftPane.appendChild(lumaCanvas);
 
   const previewCanvas = document.createElement("canvas");
@@ -252,7 +253,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     scope.setTrails(scope.trails);
   };
   // Luma strip show/hide — the wheel reclaims the full pane height when off.
-  let lumaOn = true;
+  let lumaOn = false;
   lumaBtn.onclick = () => {
     lumaOn = !lumaOn;
     setToggle(lumaBtn, lumaOn);
@@ -384,6 +385,14 @@ function mkSelect(label: string, values: number[], current: number): { wrap: HTM
     if (v === current) o.selected = true;
     sel.appendChild(o);
   }
+  // Mouse wheel over the dropdown steps through the values (up = higher).
+  sel.addEventListener("wheel", (e: WheelEvent) => {
+    e.preventDefault();
+    const i = sel.selectedIndex + (e.deltaY < 0 ? 1 : -1);
+    if (i < 0 || i >= sel.options.length) return;
+    sel.selectedIndex = i;
+    sel.dispatchEvent(new Event("change"));
+  }, { passive: false });
   wrap.appendChild(sel);
   return { wrap, sel };
 }
