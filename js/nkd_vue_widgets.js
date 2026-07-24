@@ -9298,42 +9298,49 @@ class ColorWarpGrid {
       this.canvas.setPointerCapture(e.pointerId);
       e.preventDefault();
     });
+    // Drag moves are COALESCED to one per animation frame: each applied move
+    // triggers scatter warp + preview rebake downstream, and pointermove fires at
+    // the mouse rate (125-1000 Hz) — driving the pipeline per event ran ~5 fps.
+    __publicField(this, "moveRaf", 0);
+    __publicField(this, "lastMoveEv", null);
     __publicField(this, "onMove", (e) => {
-      var _a, _b, _c, _d, _e, _f, _g, _h, _i, _j;
+      var _a, _b, _c, _d, _e, _f, _g, _h;
       if (!this.mesh || this.R < 2) return;
-      const [x, y] = this.localXY(e);
       if (this.drag) {
-        if (this.drag.kind === "marquee") {
-          this.marquee = [this.drag.startX, this.drag.startY, x, y];
-          this.draw();
-          return;
+        this.lastMoveEv = e;
+        if (!this.moveRaf) {
+          this.moveRaf = requestAnimationFrame(() => {
+            this.moveRaf = 0;
+            if (this.lastMoveEv) this.applyDragMove(this.lastMoveEv);
+          });
         }
-        if (this.drag.kind === "node") this.dragNode(x, y);
-        else if (this.drag.kind === "group") this.dragGroup(x, y);
-        else this.dragShift(x, y);
-        this.draw();
-        this.emit(false);
-        const { ri, sj } = this.drag;
-        const off = this.mesh.offsets[ri][sj];
-        (_b = (_a = this.cb).onHover) == null ? void 0 : _b.call(_a, { ri, sj, dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
         return;
       }
+      const [x, y] = this.localXY(e);
       const hit = this.hitTest(x, y);
-      const changed = (hit == null ? void 0 : hit[0]) !== ((_c = this.hover) == null ? void 0 : _c[0]) || (hit == null ? void 0 : hit[1]) !== ((_d = this.hover) == null ? void 0 : _d[1]);
+      const changed = (hit == null ? void 0 : hit[0]) !== ((_a = this.hover) == null ? void 0 : _a[0]) || (hit == null ? void 0 : hit[1]) !== ((_b = this.hover) == null ? void 0 : _b[1]);
       this.hover = hit;
       if (changed) this.draw();
       if (hit) {
         const off = this.mesh.offsets[hit[0]][hit[1]];
-        (_f = (_e = this.cb).onHover) == null ? void 0 : _f.call(_e, { ri: hit[0], sj: hit[1], dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
+        (_d = (_c = this.cb).onHover) == null ? void 0 : _d.call(_c, { ri: hit[0], sj: hit[1], dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
       } else {
-        (_h = (_g = this.cb).onHover) == null ? void 0 : _h.call(_g, null, e.clientX, e.clientY);
+        (_f = (_e = this.cb).onHover) == null ? void 0 : _f.call(_e, null, e.clientX, e.clientY);
       }
       const [disp, sat] = this.toPolar(x, y);
       const inside = Math.hypot(x - this.cx, y - this.cy) <= this.R;
-      (_j = (_i = this.cb).onGridCursor) == null ? void 0 : _j.call(_i, this.d2h(disp), sat, e.altKey, inside);
+      (_h = (_g = this.cb).onGridCursor) == null ? void 0 : _h.call(_g, this.d2h(disp), sat, e.altKey, inside);
     });
     __publicField(this, "onUp", (e) => {
       if (!this.drag) return;
+      if (this.moveRaf) {
+        cancelAnimationFrame(this.moveRaf);
+        this.moveRaf = 0;
+      }
+      if (this.lastMoveEv) {
+        this.applyDragMove(this.lastMoveEv);
+        this.lastMoveEv = null;
+      }
       try {
         this.canvas.releasePointerCapture(this.drag.pointerId);
       } catch {
@@ -9631,6 +9638,25 @@ class ColorWarpGrid {
   emit(commit) {
     var _a, _b;
     (_b = (_a = this.cb).onEdit) == null ? void 0 : _b.call(_a, JSON.stringify(meshToDict(this.mesh)), commit);
+  }
+  // Apply the latest coalesced drag move (one per frame).
+  applyDragMove(e) {
+    var _a, _b;
+    if (!this.drag || !this.mesh) return;
+    const [x, y] = this.localXY(e);
+    if (this.drag.kind === "marquee") {
+      this.marquee = [this.drag.startX, this.drag.startY, x, y];
+      this.draw();
+      return;
+    }
+    if (this.drag.kind === "node") this.dragNode(x, y);
+    else if (this.drag.kind === "group") this.dragGroup(x, y);
+    else this.dragShift(x, y);
+    this.draw();
+    this.emit(false);
+    const { ri, sj } = this.drag;
+    const off = this.mesh.offsets[ri][sj];
+    (_b = (_a = this.cb).onHover) == null ? void 0 : _b.call(_a, { ri, sj, dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
   }
   // Move every selected node by the same screen delta (box-select group drag).
   dragGroup(x, y) {
@@ -10309,6 +10335,7 @@ function mixLuma(hex, dl) {
   return `rgb(${r},${g},${b})`;
 }
 const LUT_SIZE = 33;
+const DRAFT_SIZE = 17;
 const VERT$1 = `#version 300 es
 in vec2 aPos;
 out vec2 vUv;
@@ -10389,7 +10416,11 @@ class ColorWarpPreview {
     __publicField(this, "lutDirty", true);
     __publicField(this, "raf", 0);
     // Baked LUT cache (Float64) — reused by GL upload, CPU render and readPixel.
+    // Baked LAZILY (in render/readPixel, once per rAF) — baking synchronously in
+    // setMesh ran 30-80ms per pointermove and dragged the UI to ~5fps.
     __publicField(this, "lutF", null);
+    __publicField(this, "lutSize", LUT_SIZE);
+    __publicField(this, "draft", false);
     // Cached source pixels (for the hover readout) + last draw geometry (device px).
     __publicField(this, "srcData", null);
     __publicField(this, "rect", { x: 0, y: 0, w: 0, h: 0, iw: 0, ih: 0 });
@@ -10460,11 +10491,20 @@ class ColorWarpPreview {
     this.lutTex = gl.createTexture();
     return true;
   }
-  setMesh(mesh) {
+  // draft=true → interactive-quality LUT (DRAFT_SIZE) while dragging; the
+  // commit call (draft=false) rebakes at full LUT_SIZE.
+  setMesh(mesh, draft = false) {
     this.mesh = mesh;
-    this.lutF = bakeLut(mesh, LUT_SIZE);
+    this.draft = draft;
+    this.lutF = null;
     this.lutDirty = true;
     this.schedule();
+  }
+  ensureLut() {
+    if (this.lutF || !this.mesh) return;
+    this.lutSize = this.draft ? DRAFT_SIZE : LUT_SIZE;
+    this.lutF = bakeLut(this.mesh, this.lutSize);
+    this.lutDirty = true;
   }
   setSource(src) {
     this.source = src;
@@ -10497,6 +10537,7 @@ class ColorWarpPreview {
   // Computed from cached source pixels + baked LUT so it's exact and independent
   // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
   readPixel(clientX, clientY) {
+    this.ensureLut();
     if (!this.srcData || !this.lutF) return null;
     const r = this.canvas.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return null;
@@ -10508,7 +10549,7 @@ class ColorWarpPreview {
     const sy = Math.min(ih - 1, Math.floor((dy - y) / h * ih));
     const k = (sy * iw + sx) * 4;
     const d = this.srcData.data;
-    return applyRgb(this.lutF, LUT_SIZE, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
+    return applyRgb(this.lutF, this.lutSize, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
   }
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
@@ -10554,8 +10595,9 @@ class ColorWarpPreview {
   uploadLut() {
     const gl = this.gl;
     if (!gl || !this.mesh) return;
-    const size = LUT_SIZE;
-    const lut = this.lutF || bakeLut(this.mesh, size);
+    this.ensureLut();
+    const size = this.lutSize;
+    const lut = this.lutF;
     const data = new Uint8Array(size * size * size * 4);
     for (let r = 0; r < size; r++) {
       for (let g = 0; g < size; g++) {
@@ -10612,7 +10654,7 @@ class ColorWarpPreview {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.uniform1i(this.uLut, 1);
-    gl.uniform1f(this.uN, LUT_SIZE);
+    gl.uniform1f(this.uN, this.lutSize);
     gl.uniform1f(this.uMask, this.mask ? 1 : 0);
     gl.uniform1f(this.uMaskHue, this.mask ? (this.mask.hue % 360 + 360) % 360 / 360 : 0);
     gl.uniform1f(this.uMaskSat, this.mask ? this.mask.sat : 0);
@@ -10629,7 +10671,8 @@ class ColorWarpPreview {
     ctx.fillStyle = "#111318";
     ctx.fillRect(0, 0, W, H);
     if (!this.source || !this.mesh) return;
-    const lut = this.lutF || bakeLut(this.mesh, LUT_SIZE);
+    this.ensureLut();
+    const lut = this.lutF;
     const iw = this.source.width, ih = this.source.height;
     const longest = Math.max(iw, ih);
     const scale = longest > 512 ? 512 / longest : 1;
@@ -10645,7 +10688,7 @@ class ColorWarpPreview {
     const maskHue = this.mask ? (this.mask.hue % 360 + 360) % 360 : 0;
     for (let k = 0; k < px.length; k += 4) {
       const src = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
-      const rgb = applyRgb(lut, LUT_SIZE, src);
+      const rgb = applyRgb(lut, this.lutSize, src);
       if (this.mask) {
         const [h, s] = srgbToEngine(src);
         let dh2 = Math.abs(h - maskHue);
@@ -11204,7 +11247,7 @@ function openColorWarpViewer(opts) {
       mesh = meshFromDict(JSON.parse(json));
     } catch {
     }
-    preview.setMesh(mesh);
+    preview.setMesh(mesh, !commit);
     scope.setMesh(mesh);
     luma.refresh();
     (_a = opts.onChange) == null ? void 0 : _a.call(opts, json);

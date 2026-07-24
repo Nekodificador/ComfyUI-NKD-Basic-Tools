@@ -495,27 +495,26 @@ export class ColorWarpGrid {
     e.preventDefault();
   };
 
+  // Drag moves are COALESCED to one per animation frame: each applied move
+  // triggers scatter warp + preview rebake downstream, and pointermove fires at
+  // the mouse rate (125-1000 Hz) — driving the pipeline per event ran ~5 fps.
+  private moveRaf = 0;
+  private lastMoveEv: PointerEvent | null = null;
+
   private onMove = (e: PointerEvent) => {
     if (!this.mesh || this.R < 2) return;
-    const [x, y] = this.localXY(e);
 
     if (this.drag) {
-      if (this.drag.kind === "marquee") {
-        this.marquee = [this.drag.startX, this.drag.startY, x, y];
-        this.draw();
-        return;
+      this.lastMoveEv = e;
+      if (!this.moveRaf) {
+        this.moveRaf = requestAnimationFrame(() => {
+          this.moveRaf = 0;
+          if (this.lastMoveEv) this.applyDragMove(this.lastMoveEv);
+        });
       }
-      if (this.drag.kind === "node") this.dragNode(x, y);
-      else if (this.drag.kind === "group") this.dragGroup(x, y);
-      else this.dragShift(x, y);
-      this.draw();
-      this.emit(false);
-      // Live tooltip on the dragged node.
-      const { ri, sj } = this.drag;
-      const off = this.mesh.offsets[ri][sj];
-      this.cb.onHover?.({ ri, sj, dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
       return;
     }
+    const [x, y] = this.localXY(e);
 
     // Hover: track nearest node for handle highlight + tooltip.
     const hit = this.hitTest(x, y);
@@ -535,8 +534,31 @@ export class ColorWarpGrid {
     this.cb.onGridCursor?.(this.d2h(disp), sat, e.altKey, inside);
   };
 
+  // Apply the latest coalesced drag move (one per frame).
+  private applyDragMove(e: PointerEvent) {
+    if (!this.drag || !this.mesh) return;
+    const [x, y] = this.localXY(e);
+    if (this.drag.kind === "marquee") {
+      this.marquee = [this.drag.startX, this.drag.startY, x, y];
+      this.draw();
+      return;
+    }
+    if (this.drag.kind === "node") this.dragNode(x, y);
+    else if (this.drag.kind === "group") this.dragGroup(x, y);
+    else this.dragShift(x, y);
+    this.draw();
+    this.emit(false);
+    // Live tooltip on the dragged node.
+    const { ri, sj } = this.drag;
+    const off = this.mesh.offsets[ri][sj];
+    this.cb.onHover?.({ ri, sj, dh: off[0], ds: off[1], dl: off[2] }, e.clientX, e.clientY);
+  }
+
   private onUp = (e: PointerEvent) => {
     if (!this.drag) return;
+    // Flush any coalesced move still pending so the final position lands.
+    if (this.moveRaf) { cancelAnimationFrame(this.moveRaf); this.moveRaf = 0; }
+    if (this.lastMoveEv) { this.applyDragMove(this.lastMoveEv); this.lastMoveEv = null; }
     try { this.canvas.releasePointerCapture(this.drag.pointerId); } catch { /* ignore */ }
     const wasMarquee = this.drag.kind === "marquee";
     this.drag = null;

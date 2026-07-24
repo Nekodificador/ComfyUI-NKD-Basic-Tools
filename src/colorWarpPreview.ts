@@ -7,6 +7,7 @@
 import { Mesh, bakeLut, applyRgb, srgbToEngine } from "./colorCore";
 
 const LUT_SIZE = 33;
+const DRAFT_SIZE = 17; // interactive-drag bake (~8x fewer voxels); full on commit
 
 const VERT = `#version 300 es
 in vec2 aPos;
@@ -87,7 +88,11 @@ export class ColorWarpPreview {
   private raf = 0;
 
   // Baked LUT cache (Float64) — reused by GL upload, CPU render and readPixel.
+  // Baked LAZILY (in render/readPixel, once per rAF) — baking synchronously in
+  // setMesh ran 30-80ms per pointermove and dragged the UI to ~5fps.
   private lutF: Float64Array | null = null;
+  private lutSize = LUT_SIZE;
+  private draft = false;
   // Cached source pixels (for the hover readout) + last draw geometry (device px).
   private srcData: ImageData | null = null;
   private rect = { x: 0, y: 0, w: 0, h: 0, iw: 0, ih: 0 };
@@ -155,11 +160,21 @@ export class ColorWarpPreview {
     return true;
   }
 
-  setMesh(mesh: Mesh) {
+  // draft=true → interactive-quality LUT (DRAFT_SIZE) while dragging; the
+  // commit call (draft=false) rebakes at full LUT_SIZE.
+  setMesh(mesh: Mesh, draft = false) {
     this.mesh = mesh;
-    this.lutF = bakeLut(mesh, LUT_SIZE); // one bake, shared by GL/CPU/readPixel
+    this.draft = draft;
+    this.lutF = null; // baked lazily (ensureLut) — coalesces to one bake/frame
     this.lutDirty = true;
     this.schedule();
+  }
+
+  private ensureLut() {
+    if (this.lutF || !this.mesh) return;
+    this.lutSize = this.draft ? DRAFT_SIZE : LUT_SIZE;
+    this.lutF = bakeLut(this.mesh, this.lutSize);
+    this.lutDirty = true;
   }
 
   setSource(src: HTMLCanvasElement) {
@@ -193,6 +208,7 @@ export class ColorWarpPreview {
   // Computed from cached source pixels + baked LUT so it's exact and independent
   // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
   readPixel(clientX: number, clientY: number): [number, number, number] | null {
+    this.ensureLut();
     if (!this.srcData || !this.lutF) return null;
     const r = this.canvas.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return null;
@@ -204,7 +220,7 @@ export class ColorWarpPreview {
     const sy = Math.min(ih - 1, Math.floor((dy - y) / h * ih));
     const k = (sy * iw + sx) * 4;
     const d = this.srcData.data;
-    return applyRgb(this.lutF, LUT_SIZE, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
+    return applyRgb(this.lutF, this.lutSize, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
   }
 
   resize() {
@@ -255,8 +271,9 @@ export class ColorWarpPreview {
   private uploadLut() {
     const gl = this.gl;
     if (!gl || !this.mesh) return;
-    const size = LUT_SIZE;
-    const lut = this.lutF || bakeLut(this.mesh, size); // idx ((r*size+g)*size+b)*3
+    this.ensureLut();
+    const size = this.lutSize;
+    const lut = this.lutF!; // idx ((r*size+g)*size+b)*3
     // Repack so the texel at (x,y,z)=(r,g,b) — data order x fastest — holds
     // lut[r,g,b]. dst index = (r + g*size + b*size*size)*4.
     const data = new Uint8Array(size * size * size * 4);
@@ -311,7 +328,7 @@ export class ColorWarpPreview {
     gl.activeTexture(gl.TEXTURE1);
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.uniform1i(this.uLut, 1);
-    gl.uniform1f(this.uN, LUT_SIZE);
+    gl.uniform1f(this.uN, this.lutSize);
     gl.uniform1f(this.uMask, this.mask ? 1 : 0);
     gl.uniform1f(this.uMaskHue, this.mask ? ((this.mask.hue % 360 + 360) % 360) / 360 : 0);
     gl.uniform1f(this.uMaskSat, this.mask ? this.mask.sat : 0);
@@ -330,7 +347,8 @@ export class ColorWarpPreview {
     ctx.fillRect(0, 0, W, H);
     if (!this.source || !this.mesh) return;
 
-    const lut = this.lutF || bakeLut(this.mesh, LUT_SIZE);
+    this.ensureLut();
+    const lut = this.lutF!;
     const iw = this.source.width, ih = this.source.height;
     const longest = Math.max(iw, ih);
     const scale = longest > 512 ? 512 / longest : 1;
@@ -345,7 +363,7 @@ export class ColorWarpPreview {
     const maskHue = this.mask ? (this.mask.hue % 360 + 360) % 360 : 0;
     for (let k = 0; k < px.length; k += 4) {
       const src: [number, number, number] = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
-      const rgb = applyRgb(lut, LUT_SIZE, src);
+      const rgb = applyRgb(lut, this.lutSize, src);
       if (this.mask) {
         const [h, s] = srgbToEngine(src); // OKLCh hue + C/C_REF, same as shader
         let dh = Math.abs(h - maskHue); dh = Math.min(dh, 360 - dh) / 180; // 0..1 (turns*2)

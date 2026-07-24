@@ -193,7 +193,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   // → rebake preview + write back to the node.
   grid.cb.onEdit = (json, commit) => {
     try { mesh = meshFromDict(JSON.parse(json)); } catch { /* keep */ }
-    preview.setMesh(mesh);
+    preview.setMesh(mesh, !commit); // draft-quality LUT while dragging
     scope.setMesh(mesh);
     luma.refresh(); // dl can change from the wheel side too (Alt+wheel, resets)
     opts.onChange?.(json);
