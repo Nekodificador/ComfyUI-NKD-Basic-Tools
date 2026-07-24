@@ -204,6 +204,85 @@ export class ColorWarpGrid {
     return this.h2dTab[Math.round(h * 2)];
   }
 
+  // --- remote editing from the image preview (3DLC-style) -------------------
+  // The viewer grabs the node governing the SOURCE color under the cursor and
+  // replays pointer deltas here. Shift / selection / luma behave like local
+  // drags because the same drag machinery runs underneath.
+
+  // Node governing a SOURCE engine position: nearest ring (≥1) + nearest column.
+  nodeForEngine(hueDeg: number, sat: number): [number, number] | null {
+    const m = this.mesh;
+    if (!m) return null;
+    const R = m.sat_rings;
+    const ri = Math.min(Math.max(Math.round(clamp01(sat) * R), 1), R);
+    const hues = meshColumnHues(m);
+    let best = 0, bestD = Infinity;
+    for (let s = 0; s < m.hue_segments; s++) {
+      const d = Math.abs(wrapDeg(hueDeg - hues[s]));
+      if (d < bestD) { bestD = d; best = s; }
+    }
+    return [ri, best];
+  }
+
+  private remoteRaf = 0;
+  private remoteDx = 0;
+  private remoteDy = 0;
+
+  beginRemoteDrag(ri: number, sj: number, shift: boolean) {
+    const [px, py] = this.nodePt(ri, sj); // anchor = the node's own position
+    const kind = shift ? "shift" as const
+      : this.selected.has(this.key(ri, sj)) ? "group" as const : "node" as const;
+    this.drag = {
+      kind, ri, sj, startX: px, startY: py,
+      start: this.cloneOffsets(), pointerId: -1,
+      groupStart: kind === "group" ? this.selectionSnapshot() : undefined,
+    };
+    this.remoteDx = 0; this.remoteDy = 0;
+    this.draw(); // highlight the grabbed node immediately
+  }
+
+  moveRemoteDrag(dx: number, dy: number) {
+    this.remoteDx = dx; this.remoteDy = dy;
+    if (this.remoteRaf) return; // coalesce to one apply per frame
+    this.remoteRaf = requestAnimationFrame(() => {
+      this.remoteRaf = 0;
+      this.applyRemote(false);
+    });
+  }
+
+  endRemoteDrag() {
+    if (this.remoteRaf) { cancelAnimationFrame(this.remoteRaf); this.remoteRaf = 0; }
+    this.applyRemote(true);
+    this.drag = null;
+    this.draw();
+  }
+
+  private applyRemote(commit: boolean) {
+    const d = this.drag;
+    if (!d || !this.mesh) return;
+    const x = d.startX + this.remoteDx, y = d.startY + this.remoteDy;
+    if (d.kind === "node") this.dragNode(x, y);
+    else if (d.kind === "group") this.dragGroup(x, y);
+    else this.dragShift(x, y);
+    this.draw();
+    this.emit(commit);
+  }
+
+  // Luma nudge (wheel): applies to the whole selection when the node is in one.
+  nudgeLuma(ri: number, sj: number, deltaY: number) {
+    if (!this.mesh) return;
+    const targets: [number, number][] = this.selected.has(this.key(ri, sj))
+      ? [...this.selected].map((k) => k.split(",").map(Number) as [number, number])
+      : [[ri, sj]];
+    for (const [rr, ss] of targets) {
+      if (rr === 0) continue;
+      const o = this.mesh.offsets[rr][ss];
+      o[2] = Math.min(Math.max(o[2] - deltaY * LUMA_PER_WHEEL, -1), 1);
+    }
+    this.draw();
+    this.emit(true);
+  }
+
   // Minimal API for external editors sharing this mesh (the Hue/Luma strip
   // mutates the same Mesh object, then notifies through here).
   notifyExternalEdit(commit: boolean) { this.draw(); this.emit(commit); }
@@ -693,16 +772,7 @@ export class ColorWarpGrid {
     const hit = this.hitTest(x, y);
     if (!hit) return;
     e.preventDefault();
-    const targets: [number, number][] = this.selected.has(this.key(hit[0], hit[1]))
-      ? [...this.selected].map((k) => k.split(",").map(Number) as [number, number])
-      : [hit];
-    for (const [rr, ss] of targets) {
-      if (rr === 0) continue;
-      const o = this.mesh.offsets[rr][ss];
-      o[2] = Math.min(Math.max(o[2] - e.deltaY * LUMA_PER_WHEEL, -1), 1);
-    }
-    this.draw();
-    this.emit(true);
+    this.nudgeLuma(hit[0], hit[1], e.deltaY);
   };
 
   // Reset all offsets to identity (keeps current density) (Phase 8).

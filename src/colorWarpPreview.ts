@@ -204,12 +204,9 @@ export class ColorWarpPreview {
     this.schedule();
   }
 
-  // Read the GRADED colour under a client point (for the hover HSL readout).
-  // Computed from cached source pixels + baked LUT so it's exact and independent
-  // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
-  readPixel(clientX: number, clientY: number): [number, number, number] | null {
-    this.ensureLut();
-    if (!this.srcData || !this.lutF) return null;
+  // Index into cached source pixels for a client point, or null outside image.
+  private srcIndexAt(clientX: number, clientY: number): number | null {
+    if (!this.srcData) return null;
     const r = this.canvas.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return null;
     const dx = (clientX - r.left) * (this.canvas.width / r.width);
@@ -218,9 +215,27 @@ export class ColorWarpPreview {
     if (w < 1 || h < 1 || dx < x || dy < y || dx >= x + w || dy >= y + h) return null;
     const sx = Math.min(iw - 1, Math.floor((dx - x) / w * iw));
     const sy = Math.min(ih - 1, Math.floor((dy - y) / h * ih));
-    const k = (sy * iw + sx) * 4;
-    const d = this.srcData.data;
+    return (sy * iw + sx) * 4;
+  }
+
+  // Read the GRADED colour under a client point (for the hover HSL readout).
+  // Computed from cached source pixels + baked LUT so it's exact and independent
+  // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
+  readPixel(clientX: number, clientY: number): [number, number, number] | null {
+    this.ensureLut();
+    const k = this.srcIndexAt(clientX, clientY);
+    if (k == null || !this.lutF) return null;
+    const d = this.srcData!.data;
     return applyRgb(this.lutF, this.lutSize, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
+  }
+
+  // Read the SOURCE colour under a client point (ungraded) — determines which
+  // mesh cell governs the pixel, for remote editing from the image.
+  readSourcePixel(clientX: number, clientY: number): [number, number, number] | null {
+    const k = this.srcIndexAt(clientX, clientY);
+    if (k == null) return null;
+    const d = this.srcData!.data;
+    return [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255];
   }
 
   resize() {

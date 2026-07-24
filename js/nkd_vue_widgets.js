@@ -9247,6 +9247,9 @@ class ColorWarpGrid {
     __publicField(this, "anchors", WHEEL_MODES.ryb.anchors);
     // Cached h2d table (0.5° steps) for per-point hot paths (scatter/indicator).
     __publicField(this, "h2dTab", null);
+    __publicField(this, "remoteRaf", 0);
+    __publicField(this, "remoteDx", 0);
+    __publicField(this, "remoteDy", 0);
     // Geometry in CSS px, recomputed on resize.
     __publicField(this, "cx", 0);
     __publicField(this, "cy", 0);
@@ -9386,14 +9389,7 @@ class ColorWarpGrid {
       const hit = this.hitTest(x, y);
       if (!hit) return;
       e.preventDefault();
-      const targets = this.selected.has(this.key(hit[0], hit[1])) ? [...this.selected].map((k) => k.split(",").map(Number)) : [hit];
-      for (const [rr, ss] of targets) {
-        if (rr === 0) continue;
-        const o = this.mesh.offsets[rr][ss];
-        o[2] = Math.min(Math.max(o[2] - e.deltaY * LUMA_PER_WHEEL, -1), 1);
-      }
-      this.draw();
-      this.emit(true);
+      this.nudgeLuma(hit[0], hit[1], e.deltaY);
     });
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
@@ -9419,6 +9415,84 @@ class ColorWarpGrid {
     }
     const h = (hueDeg % 360 + 360) % 360;
     return this.h2dTab[Math.round(h * 2)];
+  }
+  // --- remote editing from the image preview (3DLC-style) -------------------
+  // The viewer grabs the node governing the SOURCE color under the cursor and
+  // replays pointer deltas here. Shift / selection / luma behave like local
+  // drags because the same drag machinery runs underneath.
+  // Node governing a SOURCE engine position: nearest ring (≥1) + nearest column.
+  nodeForEngine(hueDeg, sat) {
+    const m = this.mesh;
+    if (!m) return null;
+    const R = m.sat_rings;
+    const ri = Math.min(Math.max(Math.round(clamp01$1(sat) * R), 1), R);
+    const hues = meshColumnHues(m);
+    let best = 0, bestD = Infinity;
+    for (let s = 0; s < m.hue_segments; s++) {
+      const d = Math.abs(wrapDeg(hueDeg - hues[s]));
+      if (d < bestD) {
+        bestD = d;
+        best = s;
+      }
+    }
+    return [ri, best];
+  }
+  beginRemoteDrag(ri, sj, shift) {
+    const [px, py] = this.nodePt(ri, sj);
+    const kind = shift ? "shift" : this.selected.has(this.key(ri, sj)) ? "group" : "node";
+    this.drag = {
+      kind,
+      ri,
+      sj,
+      startX: px,
+      startY: py,
+      start: this.cloneOffsets(),
+      pointerId: -1,
+      groupStart: kind === "group" ? this.selectionSnapshot() : void 0
+    };
+    this.remoteDx = 0;
+    this.remoteDy = 0;
+    this.draw();
+  }
+  moveRemoteDrag(dx, dy) {
+    this.remoteDx = dx;
+    this.remoteDy = dy;
+    if (this.remoteRaf) return;
+    this.remoteRaf = requestAnimationFrame(() => {
+      this.remoteRaf = 0;
+      this.applyRemote(false);
+    });
+  }
+  endRemoteDrag() {
+    if (this.remoteRaf) {
+      cancelAnimationFrame(this.remoteRaf);
+      this.remoteRaf = 0;
+    }
+    this.applyRemote(true);
+    this.drag = null;
+    this.draw();
+  }
+  applyRemote(commit) {
+    const d = this.drag;
+    if (!d || !this.mesh) return;
+    const x = d.startX + this.remoteDx, y = d.startY + this.remoteDy;
+    if (d.kind === "node") this.dragNode(x, y);
+    else if (d.kind === "group") this.dragGroup(x, y);
+    else this.dragShift(x, y);
+    this.draw();
+    this.emit(commit);
+  }
+  // Luma nudge (wheel): applies to the whole selection when the node is in one.
+  nudgeLuma(ri, sj, deltaY) {
+    if (!this.mesh) return;
+    const targets = this.selected.has(this.key(ri, sj)) ? [...this.selected].map((k) => k.split(",").map(Number)) : [[ri, sj]];
+    for (const [rr, ss] of targets) {
+      if (rr === 0) continue;
+      const o = this.mesh.offsets[rr][ss];
+      o[2] = Math.min(Math.max(o[2] - deltaY * LUMA_PER_WHEEL, -1), 1);
+    }
+    this.draw();
+    this.emit(true);
   }
   // Minimal API for external editors sharing this mesh (the Hue/Luma strip
   // mutates the same Mesh object, then notifies through here).
@@ -10533,12 +10607,9 @@ class ColorWarpPreview {
     this.mask = null;
     this.schedule();
   }
-  // Read the GRADED colour under a client point (for the hover HSL readout).
-  // Computed from cached source pixels + baked LUT so it's exact and independent
-  // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
-  readPixel(clientX, clientY) {
-    this.ensureLut();
-    if (!this.srcData || !this.lutF) return null;
+  // Index into cached source pixels for a client point, or null outside image.
+  srcIndexAt(clientX, clientY) {
+    if (!this.srcData) return null;
     const r = this.canvas.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) return null;
     const dx = (clientX - r.left) * (this.canvas.width / r.width);
@@ -10547,9 +10618,25 @@ class ColorWarpPreview {
     if (w < 1 || h < 1 || dx < x || dy < y || dx >= x + w || dy >= y + h) return null;
     const sx = Math.min(iw - 1, Math.floor((dx - x) / w * iw));
     const sy = Math.min(ih - 1, Math.floor((dy - y) / h * ih));
-    const k = (sy * iw + sx) * 4;
+    return (sy * iw + sx) * 4;
+  }
+  // Read the GRADED colour under a client point (for the hover HSL readout).
+  // Computed from cached source pixels + baked LUT so it's exact and independent
+  // of GL readback quirks. Returns [r,g,b] in 0..1, or null if outside the image.
+  readPixel(clientX, clientY) {
+    this.ensureLut();
+    const k = this.srcIndexAt(clientX, clientY);
+    if (k == null || !this.lutF) return null;
     const d = this.srcData.data;
     return applyRgb(this.lutF, this.lutSize, [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255]);
+  }
+  // Read the SOURCE colour under a client point (ungraded) — determines which
+  // mesh cell governs the pixel, for remote editing from the image.
+  readSourcePixel(clientX, clientY) {
+    const k = this.srcIndexAt(clientX, clientY);
+    if (k == null) return null;
+    const d = this.srcData.data;
+    return [d[k] / 255, d[k + 1] / 255, d[k + 2] / 255];
   }
   resize() {
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
@@ -11343,6 +11430,43 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     readout.style.display = "none";
     grid.setIndicator(null);
   });
+  previewCanvas.style.cursor = "crosshair";
+  let remoteDrag = null;
+  const nodeUnderCursor = (e) => {
+    const src = preview.readSourcePixel(e.clientX, e.clientY);
+    if (!src) return null;
+    const [h, s] = srgbToEngine(src);
+    return grid.nodeForEngine(h, Math.min(s, 1));
+  };
+  previewCanvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const node = nodeUnderCursor(e);
+    if (!node) return;
+    grid.beginRemoteDrag(node[0], node[1], e.shiftKey);
+    remoteDrag = { startX: e.clientX, startY: e.clientY };
+    previewCanvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  previewCanvas.addEventListener("pointermove", (e) => {
+    if (remoteDrag) grid.moveRemoteDrag(e.clientX - remoteDrag.startX, e.clientY - remoteDrag.startY);
+  });
+  const endRemote = (e) => {
+    if (!remoteDrag) return;
+    remoteDrag = null;
+    try {
+      previewCanvas.releasePointerCapture(e.pointerId);
+    } catch {
+    }
+    grid.endRemoteDrag();
+  };
+  previewCanvas.addEventListener("pointerup", endRemote);
+  previewCanvas.addEventListener("pointercancel", endRemote);
+  previewCanvas.addEventListener("wheel", (e) => {
+    if (!e.altKey) return;
+    e.preventDefault();
+    const node = nodeUnderCursor(e);
+    if (node) grid.nudgeLuma(node[0], node[1], e.deltaY);
+  }, { passive: false });
   function render() {
     grid.resize();
     luma.resize();

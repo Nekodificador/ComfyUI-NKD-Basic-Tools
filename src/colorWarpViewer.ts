@@ -299,6 +299,46 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     grid.setIndicator(null);
   });
 
+  // 3DLC-style REMOTE editing: click-drag on the IMAGE grabs the grid node
+  // governing the SOURCE color under the cursor and replays the pointer deltas
+  // 1:1 on the disc. Shift = axis-locked hue/sat gesture; Alt+wheel = luma;
+  // a node inside a box-selection moves/adjusts the whole pack — same rules
+  // as on the grid, because the same drag machinery runs underneath.
+  previewCanvas.style.cursor = "crosshair";
+  let remoteDrag: { startX: number; startY: number } | null = null;
+  const nodeUnderCursor = (e: MouseEvent): [number, number] | null => {
+    const src = preview.readSourcePixel(e.clientX, e.clientY);
+    if (!src) return null;
+    const [h, s] = srgbToEngine(src);
+    return grid.nodeForEngine(h, Math.min(s, 1));
+  };
+  previewCanvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const node = nodeUnderCursor(e);
+    if (!node) return;
+    grid.beginRemoteDrag(node[0], node[1], e.shiftKey);
+    remoteDrag = { startX: e.clientX, startY: e.clientY };
+    previewCanvas.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  });
+  previewCanvas.addEventListener("pointermove", (e) => {
+    if (remoteDrag) grid.moveRemoteDrag(e.clientX - remoteDrag.startX, e.clientY - remoteDrag.startY);
+  });
+  const endRemote = (e: PointerEvent) => {
+    if (!remoteDrag) return;
+    remoteDrag = null;
+    try { previewCanvas.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    grid.endRemoteDrag();
+  };
+  previewCanvas.addEventListener("pointerup", endRemote);
+  previewCanvas.addEventListener("pointercancel", endRemote);
+  previewCanvas.addEventListener("wheel", (e) => {
+    if (!e.altKey) return;
+    e.preventDefault();
+    const node = nodeUnderCursor(e);
+    if (node) grid.nudgeLuma(node[0], node[1], e.deltaY);
+  }, { passive: false });
+
   function render() { grid.resize(); luma.resize(); preview.resize(); scope.resize(); }
 
   const ro = new ResizeObserver(render);
