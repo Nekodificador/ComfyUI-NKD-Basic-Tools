@@ -4,12 +4,15 @@ import os
 import numpy as np
 
 try:
-    from .color_core import mesh as _mesh, lut as _lut, cube as _cube  # ComfyUI (package)
+    from .color_core import mesh as _mesh, lut as _lut, cube as _cube, ryb as _ryb  # ComfyUI (package)
 except ImportError:
-    from color_core import mesh as _mesh, lut as _lut, cube as _cube   # standalone tests (sys.path)
+    from color_core import mesh as _mesh, lut as _lut, cube as _cube, ryb as _ryb   # standalone tests (sys.path)
 
 _LUT_SIZE = 33
-_IDENTITY = json.dumps(_mesh.to_dict(_mesh.identity()))
+# Default mesh: columns anchored on the RYB wheel layout (engine OKLCh hues of
+# 12 display-uniform spokes), so nodes sit exactly on the cells they edit.
+_HUES = np.unwrap(_ryb.display_to_hue(np.arange(12) * 30.0), period=360.0)
+_IDENTITY = json.dumps(_mesh.to_dict(_mesh.identity(hues=_HUES)))
 
 
 def apply_mesh_to_batch(img, mesh_json, size=_LUT_SIZE):
@@ -75,7 +78,16 @@ def _push_source(unique_id, np_img):
     try:
         from server import PromptServer
         import base64
-        frame = np.clip(np_img[0], 0.0, 1.0)  # first frame, HWC
+        frame = np.clip(np_img[0], 0.0, 1.0)  # first frame, HWC (float)
+        # 16-bit companion (<=256 longest side, little-endian) for the viewer's
+        # scatter cloud: reconstructed from this instead of the 8-bit preview,
+        # so strong warps don't magnify quantization into streaks. The uint8
+        # frame below stays for the on-screen preview (displays are 8-bit).
+        sh, sw = frame.shape[:2]
+        s_step = max(int(np.ceil(max(sh, sw) / 256)), 1)
+        s16 = frame[::s_step, ::s_step]
+        s16_h, s16_w = s16.shape[:2]
+        s16_buf = (s16 * 65535.0 + 0.5).astype("<u2").tobytes()
         h, w = frame.shape[:2]
         longest = max(h, w)
         if longest > 1024:
@@ -87,6 +99,8 @@ def _push_source(unique_id, np_img):
             "node": str(unique_id),
             "width": w, "height": h,
             "data": base64.b64encode(buf).decode("ascii"),
+            "s16_width": s16_w, "s16_height": s16_h,
+            "scatter16": base64.b64encode(s16_buf).decode("ascii"),
         })
     except Exception:
         pass

@@ -36,11 +36,15 @@ def srgb_to_oklab(rgb):
     return lms_ @ _M2.T
 
 
-def oklab_to_srgb(lab):
+def oklab_to_linear(lab):
+    """OKLab -> linear sRGB (no gamma, no clamp). May leave [0,1] out of gamut."""
     lms_ = np.asarray(lab, dtype=np.float64) @ _M2_INV.T
     lms = lms_ ** 3
-    lin = lms @ _M1_INV.T
-    return linear_to_srgb(lin)
+    return lms @ _M1_INV.T
+
+
+def oklab_to_srgb(lab):
+    return linear_to_srgb(oklab_to_linear(lab))
 
 
 def oklab_to_oklch(lab):

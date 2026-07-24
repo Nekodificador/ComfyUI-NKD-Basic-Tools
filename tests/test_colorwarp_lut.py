@@ -24,6 +24,12 @@ def demo():
     # output stays in gamut
     assert L2.min() >= 0.0 and L2.max() <= 1.0
 
+    # absolute-rotation dh: a global +90deg hue mesh leaves pure grays fixed
+    # (rotating zero chroma is a no-op — the centre-safety of the new scheme)
+    Lh = lut.bake(mesh.constant(dh=90.0), size=33)
+    grays = np.stack([np.linspace(0.0, 1.0, 9)] * 3, axis=-1)
+    assert np.abs(lut.apply(Lh, grays) - grays).max() < 5e-3
+
     print("lut OK")
 
 

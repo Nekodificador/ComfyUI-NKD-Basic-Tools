@@ -1,15 +1,41 @@
 """Bake a mesh into a 3D LUT and apply it (numpy only, trilinear).
 
 C_REF normalizes OKLCh chroma to the grid's 0..1 saturation radius. It is a
-calibration constant (~max sRGB OKLCh chroma). Gamut handling in v1 is a plain
-clamp to [0,1] after conversion.
-# ponytail: trilinear + hard clamp is the validated baseline; tetrahedral interp
-# and chroma-preserving soft-clip are a later quality pass, not needed to prove the motor.
+calibration constant (~max sRGB OKLCh chroma). Out-of-gamut results are mapped
+back by compressing chroma toward the gray axis at constant L and hue (binary
+search for the gamut boundary) — per-channel RGB clamping would drift hue/L.
+# ponytail: trilinear interp is the validated baseline; tetrahedral is a later
+# quality pass. Gamut clip is hard (to the boundary); soft knee is a refinement.
 """
 import numpy as np
 from . import oklab, mesh as _mesh
 
 C_REF = 0.35
+_GAMUT_EPS = 1e-9
+_GAMUT_ITERS = 22  # binary-search steps; keep in sync with colorCore.ts
+
+
+def _compress_to_gamut(lab):
+    """Scale (a,b) of out-of-gamut OKLab colors to the sRGB boundary, keeping
+    L and hue. Requires L already in [0,1] (gray axis is always in gamut)."""
+    lin = oklab.oklab_to_linear(lab)
+    oog = np.any((lin < -_GAMUT_EPS) | (lin > 1 + _GAMUT_EPS), axis=-1)
+    if not np.any(oog):
+        return lab
+    L = lab[..., 0][oog]
+    a = lab[..., 1][oog]
+    b = lab[..., 2][oog]
+    lo = np.zeros_like(L)
+    hi = np.ones_like(L)
+    for _ in range(_GAMUT_ITERS):
+        mid = 0.5 * (lo + hi)
+        t = oklab.oklab_to_linear(np.stack([L, a * mid, b * mid], axis=-1))
+        ok = np.all((t >= -_GAMUT_EPS) & (t <= 1 + _GAMUT_EPS), axis=-1)
+        lo = np.where(ok, mid, lo)
+        hi = np.where(ok, hi, mid)
+    lab[..., 1][oog] = a * lo
+    lab[..., 2][oog] = b * lo
+    return lab
 
 
 def bake(mesh_dict, size=33):
@@ -33,6 +59,7 @@ def bake(mesh_dict, size=33):
     if na or nb:  # global neutral cast (draggable centre node)
         lab2[..., 1] += na
         lab2[..., 2] += nb
+    lab2 = _compress_to_gamut(lab2)
     out = oklab.oklab_to_srgb(lab2)
     return np.clip(out, 0.0, 1.0)
 

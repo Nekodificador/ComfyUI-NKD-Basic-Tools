@@ -1,22 +1,41 @@
-"""Adjustable RYB hue-angle remap (numpy only).
+"""Wheel-mode hue remap: display angle <-> engine OKLCh hue (numpy only).
 
-display angle (painter's RYB wheel) <-> engine hue angle (HSL/OKLCh).
-Both are degrees in [0, 360). Defined by a monotonic anchor table so the
-mapping is bijective and wrap-continuous. The table is the calibration knob.
+A wheel mode is a monotonic anchor table (display_deg, oklch_hue_deg) — the
+projection between what the viewer shows and the engine's OKLCh hue. The mesh
+is ALWAYS stored in engine space; switching wheel modes never touches the data.
+Hue columns are measured OKLCh hues of the anchor sRGB colors (see
+tests/test_colorwarp_ryb.py). Display column must be strictly increasing and
+span 0..360; hue column strictly increasing with hue[-1] == hue[0] + 360
+(wrap-continuous — it need not start at 0).
 """
 import numpy as np
 
-# (display_deg, hue_deg). Must be strictly increasing in both columns and
-# span 0..360 with matching endpoints. RYB primaries R/Y/B evenly at 0/120/240.
-DEFAULT_ANCHORS = [
-    (0.0,   0.0),    # red
-    (60.0,  30.0),   # orange
-    (120.0, 60.0),   # yellow
-    (180.0, 120.0),  # green
-    (240.0, 240.0),  # blue
-    (300.0, 290.0),  # violet
-    (360.0, 360.0),  # red (wrap)
+# Painter's RYB wheel: R/O/Y/G/B/V evenly spaced on display.
+RYB_ANCHORS = [
+    (0.0,   29.2339),   # red
+    (60.0,  52.7757),   # orange
+    (120.0, 109.7692),  # yellow
+    (180.0, 142.4953),  # green
+    (240.0, 264.0520),  # blue
+    (300.0, 293.7740),  # violet
+    (360.0, 389.2339),  # red (wrap)
 ]
+
+# Classic RGB/HSL wheel: R/Y/G/C/B/M evenly spaced on display.
+RGB_ANCHORS = [
+    (0.0,   29.2339),   # red
+    (60.0,  109.7692),  # yellow
+    (120.0, 142.4953),  # green
+    (180.0, 194.7689),  # cyan
+    (240.0, 264.0520),  # blue
+    (300.0, 328.3634),  # magenta
+    (360.0, 389.2339),  # red (wrap)
+]
+
+# Native OKLCh wheel: display angle IS the engine hue.
+OKLCH_ANCHORS = [(0.0, 0.0), (360.0, 360.0)]
+
+DEFAULT_ANCHORS = RYB_ANCHORS
 
 
 def _cols(anchors):
@@ -31,4 +50,6 @@ def display_to_hue(display, anchors=None):
 
 def hue_to_display(hue, anchors=None):
     xs, ys = _cols(anchors)
-    return np.interp(np.asarray(hue, dtype=np.float64) % 360.0, ys, xs) % 360.0
+    # Shift hue into the table's wrap window [ys[0], ys[0] + 360).
+    h = (np.asarray(hue, dtype=np.float64) - ys[0]) % 360.0 + ys[0]
+    return np.interp(h, ys, xs) % 360.0

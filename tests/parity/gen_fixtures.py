@@ -26,6 +26,19 @@ def _mixed():
     return m
 
 
+def _ryb_columns():
+    """Non-uniform column hues (RYB wheel layout) + a wave of offsets."""
+    from color_core import ryb
+    hues = np.unwrap(ryb.display_to_hue(np.arange(12) * 30.0), period=360.0)
+    m = M.identity(hue_segments=12, sat_rings=6, hues=hues)
+    off = m["offsets"]
+    for r in range(7):
+        for s in range(12):
+            off[r, s, 0] = 12.0 * np.cos(2 * np.pi * s / 12)
+            off[r, s, 1] = 0.15 * (r / 6.0) * np.sin(2 * np.pi * s / 12)
+    return m
+
+
 def _input_colors():
     colors = []
     n = 6
@@ -39,6 +52,9 @@ def _input_colors():
 def main():
     neutral = M.identity()
     neutral["neutral"] = [0.08, -0.05]  # global cast (draggable centre node)
+    wrapmix = M.identity(hue_segments=12, sat_rings=6)
+    wrapmix["offsets"][:, 7, 0] = -175.0  # same target, opposite wrap picks
+    wrapmix["offsets"][:, 8, 0] = +155.0  # (exercises circular dh interp)
     meshes = {
         "identity": M.identity(),
         "hue+25": M.constant(dh=25.0),
@@ -46,6 +62,8 @@ def main():
         "luma-0.15": M.constant(dl=-0.15),
         "mixed": _mixed(),
         "neutral": neutral,
+        "hues-ryb": _ryb_columns(),
+        "wrap-mix": wrapmix,
     }
     inputs = _input_colors()
     out = {"size": SIZE, "eps": EPS, "inputs": inputs.tolist(), "meshes": []}
