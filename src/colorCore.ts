@@ -327,6 +327,133 @@ export function meshSample(m: Mesh, hueDeg: number, satNorm: number): Vec3 {
   return [dh, ds, dl];
 }
 
+// --- skin locus (3D scope reference; no parity surface) ---------------------
+
+// Measured from Neko's "Skin Check.3dl" (3D LUT Creator, 64³). A skin-check LUT
+// darkens everything except skin, so the locus is the set of nodes it leaves
+// alone — 2853 of them, 1.29% of the cube.
+//
+// The finding that shapes this: the wedge does NOT twist. Hue stays 26°..58°
+// at every lightness (fit: 2.1°/L, correlation 0.029) — skin looking redder in
+// shadow is just where one face lands INSIDE a static wedge, not the wedge
+// moving. What is genuinely 3D is the chroma ceiling: skin cannot be saturated
+// when it is dark (C 0.058 at L 0.33 → 0.128 at L 0.78, then the gamut pulls it
+// back). That cone is what the 3D scope shows and the 2D disc cannot.
+//
+// SNAPSHOT of one authored LUT, not a law — and Neko intends to re-author it.
+// Regenerate with: python tools/extract_skin_locus.py "<path to .3dl>"
+export const SKIN_LOCUS = {
+  hueLo: 26.3,
+  hueHi: 58.2,
+  // [OKLab L, max chroma] — linearly interpolated, clamped outside the range.
+  envelope: [
+    [0.325, 0.0579], [0.375, 0.0654], [0.425, 0.0710], [0.475, 0.0796],
+    [0.525, 0.0894], [0.575, 0.0988], [0.625, 0.1055], [0.675, 0.1135],
+    [0.725, 0.1235], [0.775, 0.1275], [0.825, 0.1146],
+  ] as [number, number][],
+};
+
+// Chroma ceiling of the skin locus at a given lightness. Outside the measured
+// band there is no data, so it returns 0 rather than extrapolating a cone into
+// blacks and whites where the LUT never claimed skin exists.
+export function skinChromaAt(L: number): number {
+  const e = SKIN_LOCUS.envelope;
+  if (L < e[0][0] || L > e[e.length - 1][0]) return 0;
+  for (let i = 1; i < e.length; i++) {
+    if (L <= e[i][0]) {
+      const t = (L - e[i - 1][0]) / (e[i][0] - e[i - 1][0]);
+      return e[i - 1][1] + t * (e[i][1] - e[i - 1][1]);
+    }
+  }
+  return e[e.length - 1][1];
+}
+
+// --- source sampling helpers (scope cloud; no parity surface) ---------------
+
+// Deterministic ±0.5 LSB dither: reconstructs the continuous colour the source
+// quantized. A strong warp — or the wheel's own magnification — stretches colour
+// space locally and blows the quantization gaps up into visible streaks;
+// dithering fills them (same reason 3DLC's scope looks smooth). Hashed by sample
+// index, so it's stable frame to frame instead of crawling.
+export function dither(seed: number): number {
+  let v = (seed ^ 0x9e3779b9) >>> 0;
+  v = Math.imul(v ^ (v >>> 15), 0x85ebca6b) >>> 0;
+  v = Math.imul(v ^ (v >>> 13), 0xc2b2ae35) >>> 0;
+  return ((v ^ (v >>> 16)) >>> 0) / 4294967296 - 0.5;
+}
+
+// Spacing of the value lattice a uint16 buffer actually sits on: gcd of every
+// sample. 8-bit source → 257, 10-bit → 64, true 16-bit → 1 (bails on the first
+// odd value, so the full-precision case costs nothing). 0 = the buffer is flat.
+// 16 bits of CONTAINER is not 16 bits of DATA — the scatter push is built from
+// the float tensor, so an 8-bit image arrives on a 256-level lattice.
+export function latticeStep(data: Uint16Array): number {
+  let g = 0;
+  for (let i = 0; i < data.length; i++) {
+    let a = g, b = data[i];
+    while (b) { const t = a % b; a = b; b = t; } // gcd
+    g = a;
+    if (g === 1) return 1;
+  }
+  return g;
+}
+
+// --- radial display projection (NOT engine math — no parity surface) --------
+
+// The angle has per-mode projections (WHEEL_MODES: RYB/RGB/OKLCh); this is the
+// RADIAL twin. The mesh always lives in engine sat = C/C_REF, exactly as the
+// hue always lives in engine OKLCh degrees — a mode only changes where that
+// coordinate is DRAWN, never what the LUT bakes.
+//
+// Why it's needed: C_REF is the chroma of the most vivid sRGB primaries at
+// their own best lightness, so real footage lives in the inner fifth — lit skin
+// C≈0.08 → sat 0.23, a dark blue shadow C≈0.026 → sat 0.07. A linear radius
+// packs ~90% of an image's pixels into ~6% of the disc AREA (area ∝ r²): the
+// cloud reads as one central blob, and a truly neutral shadow sits 2 px from a
+// tinted one. Spreading the core turns a colour cast into a DISTANCE.
+export type RadialModeName = "linear" | "neutral" | "sqrt";
+
+export interface RadialMode {
+  label: string;
+  toRadius(sat: number): number; // engine sat → display radius (1 = rim)
+  toSat(r: number): number;      // exact inverse
+}
+
+// "neutral" knee: the band below KNEE_SAT (where neutrals and subtle casts
+// live) is magnified onto KNEE_R of the radius; everything above is linearly
+// compressed into what's left. ponytail: two knobs for Neko to eyeball.
+const KNEE_SAT = 0.12;
+const KNEE_R = 0.45;
+const OUT_SLOPE = (1 - KNEE_R) / (1 - KNEE_SAT);
+
+// Every mode is monotonic and defined past 1, so callers can place labels just
+// outside the rim; negative sat is meaningless → 0.
+export const RADIAL_MODES: Record<RadialModeName, RadialMode> = {
+  // Metric-honest: screen distance ∝ perceptual chroma. Everything crushed in.
+  linear: {
+    label: "Linear",
+    toRadius: (s) => (s <= 0 ? 0 : s),
+    toSat: (r) => (r <= 0 ? 0 : r),
+  },
+  // Magnifying glass on the neutral band. Locally LINEAR on both sides of the
+  // knee, so within the band a cast twice as strong is still drawn twice as far
+  // out — and the gain is bounded (×3.75), unlike sqrt, which blows near-zero
+  // shadow noise into a fat ball.
+  neutral: {
+    label: "Neutrals",
+    toRadius: (s) => (s <= 0 ? 0 : s <= KNEE_SAT ? s * (KNEE_R / KNEE_SAT)
+                                                 : KNEE_R + (s - KNEE_SAT) * OUT_SLOPE),
+    toSat: (r) => (r <= 0 ? 0 : r <= KNEE_R ? r * (KNEE_SAT / KNEE_R)
+                                            : KNEE_SAT + (r - KNEE_R) / OUT_SLOPE),
+  },
+  // Continuous spread, no knee to reason about; gain → ∞ at the centre.
+  sqrt: {
+    label: "Sqrt",
+    toRadius: (s) => (s <= 0 ? 0 : Math.sqrt(s)),
+    toSat: (r) => (r <= 0 ? 0 : r * r),
+  },
+};
+
 // --- lut ---
 
 export const C_REF = 0.35;

@@ -6,7 +6,7 @@
 // open, written back on change/close.
 import {
   Mesh, meshFromDict, meshIdentity, meshToDict, srgbToHsl, srgbToEngine,
-  WHEEL_MODES, WheelModeName, wheelColumnHues,
+  WHEEL_MODES, WheelModeName, wheelColumnHues, RADIAL_MODES, RadialModeName,
 } from "./colorCore";
 import { ColorWarpGrid, ColorWarpLumaStrip } from "./colorWarpGrid";
 import { ColorWarpPreview } from "./colorWarpPreview";
@@ -95,6 +95,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   const spokesSel = mkSelect("Spokes", [4, 6, 8, 12, 16, 24, 32], mesh.hue_segments);
   const ringsSel = mkSelect("Rings", [2, 3, 4, 6, 8, 10, 12, 16], mesh.sat_rings);
   const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
+  const radialBtn = mkBtn(`Radial: ${RADIAL_MODES.neutral.label}`, TEXT);
   const scopeBtn = mkToggle("3D", false);
   const trailsBtn = mkToggle("Trails", false);
   const lumaBtn = mkToggle("Luma", false);
@@ -113,7 +114,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     `border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
   const barSpacer = document.createElement("span");
   barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, wheelBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
+  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
 
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
@@ -275,6 +276,16 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     grid.setWheelMode(next);
     wheelBtn.textContent = `Wheel: ${WHEEL_MODES[next].label}`;
     luma.refresh(); // the strip's x-axis is the wheel projection
+  };
+  // Radial mode: the same idea on the RADIUS. Neutrals (default) magnifies the
+  // low-chroma core where footage actually lives; Linear is the metric-honest
+  // disc; Sqrt spreads continuously. Wheel + 3D floor must move together.
+  radialBtn.onclick = () => {
+    const order: RadialModeName[] = ["neutral", "linear", "sqrt"];
+    const next = order[(order.indexOf(grid.getRadialMode()) + 1) % order.length];
+    grid.setRadialMode(next);
+    scope.setRadialMode(next);
+    radialBtn.textContent = `Radial: ${RADIAL_MODES[next].label}`;
   };
 
   // Preview hover → HSL readout + grid indicator dot (Phase 7.1).

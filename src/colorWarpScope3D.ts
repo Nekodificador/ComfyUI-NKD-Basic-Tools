@@ -7,7 +7,9 @@
 // Orbit: drag rotates, wheel zooms. Additive blending for the scope-glow look.
 // ponytail: warp+color run on CPU per edit (~15-20ms for 20k pts, rAF-debounced);
 // move to a GPU transform if it ever limits drag rates.
-import { Mesh, meshSample, oklabToSrgb, srgbToOklab, C_REF } from "./colorCore";
+import { Mesh, meshSample, oklabToSrgb, srgbToOklab, C_REF,
+         RADIAL_MODES, RadialModeName, RadialMode,
+         SKIN_LOCUS, skinChromaAt } from "./colorCore";
 
 const RAD = Math.PI / 180;
 
@@ -94,7 +96,8 @@ export class ColorWarpScope3D {
   private ptsBuf: WebGLBuffer | null = null;
   private trailBuf: WebGLBuffer | null = null;
   private refBuf: WebGLBuffer | null = null;
-  private nPts = 0; private nTrail = 0; private nRef = 0;
+  private skinBuf: WebGLBuffer | null = null;
+  private nPts = 0; private nTrail = 0; private nRef = 0; private nSkin = 0;
   // ≥2 supersamples the mini window so the cloud stays crisp at small sizes.
   private dpr = Math.max(window.devicePixelRatio || 1, 2);
 
@@ -155,7 +158,9 @@ export class ColorWarpScope3D {
     this.ptsBuf = gl.createBuffer();
     this.trailBuf = gl.createBuffer();
     this.refBuf = gl.createBuffer();
+    this.skinBuf = gl.createBuffer();
     this.buildRef(gl);
+    this.buildSkin(gl);
     return true;
   }
 
@@ -183,6 +188,48 @@ export class ColorWarpScope3D {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.refBuf);
     gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
     this.nRef = arr.length / 6;
+  }
+
+  // Skin locus cage: the hue wedge of SKIN_LOCUS swept up the L axis, with its
+  // radius following the measured chroma ceiling — a cone that pinches shut in
+  // the shadows, which is the part the 2D disc cannot show. Wireframe rather
+  // than a translucent solid: the scope draws additively with depth testing off
+  // (a solid would just wash out whatever is behind it), and lines reuse the
+  // existing pipeline with no new shader.
+  // Rebuilt with the cage because it depends on the radial mode, same as the cloud.
+  private buildSkin(gl: WebGL2RenderingContext) {
+    const v: number[] = [];
+    const C = [0.95, 0.62, 0.42]; // warm, reads as "skin" without competing with the dots
+    const { hueLo, hueHi, envelope } = SKIN_LOCUS;
+    const L0 = envelope[0][0], L1 = envelope[envelope.length - 1][0];
+    const ARC = 12, RUNGS = 9;
+    // A point on the cage: hue t∈[0,1] across the wedge, at lightness L.
+    const pt = (t: number, L: number): [number, number, number] => {
+      const h = (hueLo + (hueHi - hueLo) * t) * RAD;
+      const sat = skinChromaAt(L) / C_REF;
+      const r = this.radial.toRadius(sat); // same projection as the cloud
+      return [r * Math.cos(h), L, r * Math.sin(h)];
+    };
+    const seg = (a: [number, number, number], b: [number, number, number]) =>
+      v.push(a[0], a[1], a[2], ...C, b[0], b[1], b[2], ...C);
+
+    for (let k = 0; k < RUNGS; k++) { // horizontal arcs up the cone
+      const L = L0 + (L1 - L0) * (k / (RUNGS - 1));
+      for (let i = 0; i < ARC; i++) seg(pt(i / ARC, L), pt((i + 1) / ARC, L));
+    }
+    for (const t of [0, 1]) {         // the two vertical edges of the wedge
+      for (let k = 0; k < RUNGS - 1; k++) {
+        const La = L0 + (L1 - L0) * (k / (RUNGS - 1));
+        const Lb = L0 + (L1 - L0) * ((k + 1) / (RUNGS - 1));
+        seg(pt(t, La), pt(t, Lb));
+      }
+      seg([0, L0, 0], pt(t, L0));     // close the wedge onto the neutral axis
+      seg([0, L1, 0], pt(t, L1));
+    }
+    const arr = new Float32Array(v);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.skinBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+    this.nSkin = arr.length / 6;
   }
 
   // --- data ------------------------------------------------------------------
@@ -233,6 +280,15 @@ export class ColorWarpScope3D {
   }
 
   setMesh(m: Mesh) { this.mesh = m; this.dirty = true; this.schedule(); }
+  // Same radial projection as the 2D wheel — the floor plane IS the wheel seen
+  // from above, so if they disagree the two views stop being the same picture.
+  setRadialMode(name: RadialModeName) {
+    this.radial = RADIAL_MODES[name];
+    if (this.gl) this.buildSkin(this.gl); // the cone is drawn in projected radius too
+    this.dirty = true;
+    this.schedule();
+  }
+  private radial: RadialMode = RADIAL_MODES.neutral;
   setTrails(t: boolean) { this.trails = t; this.schedule(); }
 
   setVisible(v: boolean) {
@@ -303,6 +359,13 @@ export class ColorWarpScope3D {
     this.raf = requestAnimationFrame(() => { this.raf = 0; this.draw(); });
   }
 
+  // Radius gain for an OKLab (a,b): displayRadius / sat, so scaling the vector
+  // by it lands the point where the 2D wheel draws that same colour.
+  private floorGain(a: number, b: number): number {
+    const sat = Math.hypot(a, b) / C_REF;
+    return sat > 1e-9 ? this.radial.toRadius(sat) / sat : 1;
+  }
+
   // Warp the source cloud through the ENGINE (meshSample + neutral, same math
   // as the LUT bake sans gamut clip) and upload point/trail vertex buffers.
   private rebuild(gl: WebGL2RenderingContext) {
@@ -330,12 +393,17 @@ export class ColorWarpScope3D {
       }
       const rgb = oklabToSrgb([L2, a2, b2]);
       const r = clamp01(rgb[0]), g = clamp01(rgb[1]), bl = clamp01(rgb[2]);
-      const px = a2 / C_REF, py = L2, pz = b2 / C_REF;
+      // Floor position = (a,b)/C_REF rescaled by the radial mode: the vector's
+      // length IS engine sat, so one gain factor moves it to its display radius
+      // (direction — the hue — is untouched).
+      const dg = this.floorGain(a2, b2);
+      const px = a2 / C_REF * dg, py = L2, pz = b2 / C_REF * dg;
       const o = i * 6;
       pts[o] = px; pts[o + 1] = py; pts[o + 2] = pz;
       pts[o + 3] = r; pts[o + 4] = g; pts[o + 5] = bl;
       const t = i * 12;
-      trl[t] = lab[i * 3 + 1] / C_REF; trl[t + 1] = L; trl[t + 2] = lab[i * 3 + 2] / C_REF;
+      const sg = this.floorGain(lab[i * 3 + 1], lab[i * 3 + 2]);
+      trl[t] = lab[i * 3 + 1] / C_REF * sg; trl[t + 1] = L; trl[t + 2] = lab[i * 3 + 2] / C_REF * sg;
       trl[t + 3] = srcCol[i * 3] * 0.45; trl[t + 4] = srcCol[i * 3 + 1] * 0.45; trl[t + 5] = srcCol[i * 3 + 2] * 0.45;
       trl[t + 6] = px; trl[t + 7] = py; trl[t + 8] = pz;
       trl[t + 9] = r; trl[t + 10] = g; trl[t + 11] = bl;
@@ -388,6 +456,12 @@ export class ColorWarpScope3D {
     gl.uniform1f(this.uAlpha, 0.4);
     this.bindAttribs(gl, this.refBuf);
     gl.drawArrays(gl.LINES, 0, this.nRef);
+
+    if (this.nSkin) { // skin locus cone, brighter than the neutral cage
+      gl.uniform1f(this.uAlpha, 0.55);
+      this.bindAttribs(gl, this.skinBuf);
+      gl.drawArrays(gl.LINES, 0, this.nSkin);
+    }
 
     if (this.trails && this.nTrail) {
       gl.uniform1f(this.uAlpha, 0.16);

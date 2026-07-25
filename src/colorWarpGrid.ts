@@ -21,6 +21,7 @@ import {
   Mesh, displayToHue, hueToDisplay, meshToDict, meshIdentity, C_REF,
   oklabToLinear, linearToSrgb, srgbToEngine, WHEEL_MODES, WheelModeName,
   meshColumnHues, wheelColumnHues, meshSample, hslToSrgb,
+  RADIAL_MODES, RadialModeName, dither, latticeStep, srgbToHsl,
 } from "./colorCore";
 
 const GRID_LINE = "rgba(120,180,255,0.35)";
@@ -28,11 +29,71 @@ const WEB_LINE = "rgba(120,180,255,0.55)";
 const ACCENT = "#4ab4ff";
 const RAD = Math.PI / 180;
 
-// Skin-tone reference ray (vectorscope-style): defined as HSL hue 25° (the
-// readout's convention), converted to the engine OKLCh hue so it lands on real
-// skin colors under ANY wheel mode.
-const SKIN_ENGINE_HUE = srgbToEngine(hslToSrgb([25, 1, 0.5]))[0];
+// Skin-tone reference (vectorscope-style): a LINE at HSL 20° with a wedge over
+// HSL 15°..25°, the readout's convention. Skin is never one hue — shadows run
+// red, highlights run yellow — and no colorimetric constant fixes the edges, so
+// the span is a convention like the vectorscope line itself.
+// ponytail: knobs to eyeball, not a law.
+const SKIN_HSL_LO = 15;
+const SKIN_HSL_LINE = 20;
+const SKIN_HSL_HI = 25;
 const SKIN_LINE = "rgba(255,190,150,0.6)";
+const SKIN_FAN = "rgba(255,190,150,0.10)";
+
+// An HSL hue does NOT map to one engine hue: OKLCh hue and HSL hue both shift
+// with lightness/chroma, and they shift differently, so the answer depends on
+// WHICH colour you ask about. Converting a fully-saturated probe puts the marks
+// where the wheel reads right at the rim and ~5° off through the middle of the
+// disc — which is where the wedge is actually read. So instead: solve for the
+// engine hue whose PAINTED wheel colour reads as the wanted HSL hue, at the
+// radius the eye uses. Edges stay straight (a fixed engine range = a fixed set
+// of mesh columns, which is the point of drawing it); only the calibration
+// moves. Exact at SKIN_CALIB_SAT, within ~2° over most of the disc, ~5° at the
+// extreme rim.
+const SKIN_CALIB_SAT = 0.5;
+
+// Mirrors buildWheel's per-sample recipe (L blended toward the hue's cusp,
+// chroma compressed to the sRGB boundary), then reads the HSL hue back.
+// ponytail: 6 duplicated lines rather than refactoring the wheel's hot loop —
+// if that recipe changes, this has to follow.
+function wheelHslHue(engHue: number, sat: number): number {
+  const rad = engHue * RAD, ca = Math.cos(rad), sb = Math.sin(rad);
+  const L = WHEEL_L + (cuspL(engHue) - WHEEL_L) * sat;
+  let C = sat * C_REF * WHEEL_CHROMA;
+  if (!linInGamut(oklabToLinear([L, C * ca, C * sb]))) {
+    let lo = 0, hi = C;
+    for (let it = 0; it < 24; it++) {
+      const mid = (lo + hi) / 2;
+      if (linInGamut(oklabToLinear([L, mid * ca, mid * sb]))) lo = mid; else hi = mid;
+    }
+    C = lo;
+  }
+  const lin = oklabToLinear([L, C * ca, C * sb]);
+  return srgbToHsl([linearToSrgb(clamp01(lin[0])), linearToSrgb(clamp01(lin[1])), linearToSrgb(clamp01(lin[2]))])[0];
+}
+
+// Engine hue that PAINTS as `hslHue` at the calibration radius. Bisection over
+// the warm quadrant, where wheelHslHue is monotonic.
+function engineHueForWheelHsl(hslHue: number): number {
+  let lo = 0, hi = 110;
+  for (let it = 0; it < 40; it++) {
+    const mid = (lo + hi) / 2;
+    if (wheelHslHue(mid, SKIN_CALIB_SAT) < hslHue) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+// Memoized: the solver walks the (lazily built) cusp table, so it must not run
+// at module load.
+let skinHuesTab: { lo: number; line: number; hi: number } | null = null;
+function skinHues(): { lo: number; line: number; hi: number } {
+  if (!skinHuesTab) skinHuesTab = {
+    lo: engineHueForWheelHsl(SKIN_HSL_LO),
+    line: engineHueForWheelHsl(SKIN_HSL_LINE),
+    hi: engineHueForWheelHsl(SKIN_HSL_HI),
+  };
+  return skinHuesTab;
+}
 
 // Node coordinate labels (A1…): toolbar-toggled via `labels` — used when
 // discussing exact nodes over text, off by default for daily work.
@@ -192,6 +253,11 @@ export class ColorWarpGrid {
   // Cached h2d table (0.5° steps) for per-point hot paths (scatter/indicator).
   private h2dTab: Float32Array | null = null;
 
+  // Active radial mode: the sat↔radius twin of the above. Same contract — the
+  // mesh stays in engine sat, only the drawing/hit-testing radius changes.
+  private radialName: RadialModeName = "neutral";
+  private radial = RADIAL_MODES.neutral;
+
   private d2h(displayDeg: number): number { return displayToHue(displayDeg, this.anchors); }
   private h2d(hueDeg: number): number { return hueToDisplay(hueDeg, this.anchors); }
   private h2dFast(hueDeg: number): number {
@@ -296,6 +362,24 @@ export class ColorWarpGrid {
     this.anchors = WHEEL_MODES[name].anchors;
     this.h2dTab = null;
     this.wheelKey = ""; // repaint the background wheel in the new projection
+    // Columns are ENGINE hues anchored to the wheel the mesh was born on, so
+    // another mode draws them bunched up — truthful (that's where they really
+    // act) but useless as a starting grid. On an UNTOUCHED mesh there is
+    // nothing to be truthful about, so re-anchor to the new wheel and get an
+    // even web back. An edited mesh keeps its columns: re-anchoring would move
+    // every offset to a different hue, i.e. silently change the LUT.
+    if (this.mesh && isIdentityMesh(this.mesh)) {
+      this.mesh.hues = wheelColumnHues(this.mesh.hue_segments, this.anchors);
+      this.initAutonomy();
+    }
+    this.draw();
+  }
+
+  getRadialMode(): RadialModeName { return this.radialName; }
+  setRadialMode(name: RadialModeName) {
+    this.radialName = name;
+    this.radial = RADIAL_MODES[name];
+    this.wheelKey = ""; // the wheel's radius ramp changed too
     this.draw();
   }
 
@@ -347,7 +431,14 @@ export class ColorWarpGrid {
     canvas.addEventListener("wheel", this.onWheel, { passive: false });
   }
 
-  setMesh(mesh: Mesh) { this.mesh = mesh; this.initAutonomy(); this.draw(); }
+  setMesh(mesh: Mesh) {
+    this.mesh = mesh;
+    // Same rule as setWheelMode: a saved-but-untouched mesh carries the columns
+    // of whatever wheel it was born on, which would open bunched on this one.
+    if (isIdentityMesh(mesh)) mesh.hues = wheelColumnHues(mesh.hue_segments, this.anchors);
+    this.initAutonomy();
+    this.draw();
+  }
   getMesh(): Mesh | null { return this.mesh; }
 
   setSource(src: HTMLCanvasElement) {
@@ -396,17 +487,19 @@ export class ColorWarpGrid {
 
   // --- geometry ------------------------------------------------------------
 
-  // display angle + normalized sat → CSS-px screen point.
+  // display angle + ENGINE sat → CSS-px screen point. The radius goes through
+  // the active radial mode: every node, dot, ring and indicator inherits the
+  // projection from here, so the mesh keeps living in absolute chroma.
   private polar(displayDeg: number, sat: number): [number, number] {
     const a = angleRad(displayDeg);
-    const r = sat * this.R;
+    const r = this.radial.toRadius(sat) * this.R;
     return [this.cx + r * Math.cos(a), this.cy + r * Math.sin(a)];
   }
 
-  // Inverse: CSS-px screen point → [displayDeg, sat] (sat clamped to [0,1]).
+  // Inverse: CSS-px screen point → [displayDeg, engine sat] (clamped to [0,1]).
   private toPolar(x: number, y: number): [number, number] {
     const dx = x - this.cx, dy = y - this.cy;
-    const sat = clamp01(Math.hypot(dx, dy) / (this.R || 1));
+    const sat = this.radial.toSat(clamp01(Math.hypot(dx, dy) / (this.R || 1)));
     let disp = Math.atan2(dy, dx) / RAD + 90;
     disp = ((disp % 360) + 360) % 360;
     return [disp, sat];
@@ -733,7 +826,11 @@ export class ColorWarpGrid {
       const snapAngle = this.h2d(hues[ss] + start[rr][ss][0]);
       const snapSat = clamp01(baseSat + start[rr][ss][1]);
       const angle = d.axis === "h" ? snapAngle + dx * SHIFT_ROT_PER_PX : snapAngle; // pivot hue
-      const sat = d.axis === "v" ? clamp01(snapSat - dy * SHIFT_SAT_PER_PX) : snapSat; // in/out
+      // in/out: stepped in DISPLAY radius, so a Shift drag covers the same
+      // ground as a free drag of the same length whatever the radial mode is.
+      const sat = d.axis === "v"
+        ? clamp01(this.radial.toSat(clamp01(this.radial.toRadius(snapSat) - dy * SHIFT_SAT_PER_PX)))
+        : snapSat;
       this.autonomous.add(this.key(rr, ss));
       this.setNodePolar(rr, ss, angle, sat);
       spokes.add(ss);
@@ -812,7 +909,7 @@ export class ColorWarpGrid {
   // is independent of canvas resolution.
   private buildWheel() {
     const dw = this.canvas.width, dh = this.canvas.height;
-    const key = `${dw}x${dh}:${this.modeName}`;
+    const key = `${dw}x${dh}:${this.modeName}:${this.radialName}`;
     if (this.wheel && this.wheelKey === key) return;
 
     const NA = 720, NR = 48;
@@ -822,7 +919,10 @@ export class ColorWarpGrid {
       const rad = hue * RAD, ca = Math.cos(rad), sb = Math.sin(rad);
       const Lc = cuspL(hue);
       for (let r = 0; r <= NR; r++) {
-        const sat = r / NR;
+        // Table rows are uniform in DISPLAY radius (that's how the pixel loop
+        // below samples it), so the sat they carry comes back through the
+        // projection — the painted wheel and the nodes agree on where sat lands.
+        const sat = this.radial.toSat(r / NR);
         const L = WHEEL_L + (Lc - WHEEL_L) * sat;
         const C = sat * C_REF * WHEEL_CHROMA;
         let lin = oklabToLinear([L, C * ca, C * sb]);
@@ -881,15 +981,28 @@ export class ColorWarpGrid {
   // pixel; the wheel projection is applied at draw time (h2dFast).
   private buildScatter() {
     if (this.scatter) return;
-    if (this.scatter16) { // 16-bit path: continuous, no dither required
+    if (this.scatter16) {
+      // 16 bits of CONTAINER is not 16 bits of DATA: the push is built straight
+      // from the float tensor, so an 8-bit source arrives sitting on a 256-level
+      // lattice (v/255 → uint16 = v*257). latticeStep finds the real spacing, and
+      // anything coarser than 1 gets the same ±0.5 LSB dither as the 8-bit path —
+      // otherwise the wheel's magnification (RYB stretches the oranges 2.5×, the
+      // neutral knee another 3.75×) blows those gaps up into visible combs.
       const { data, width: sw, height: sh } = this.scatter16;
+      const q = latticeStep(data);
       const step = Math.max(1, Math.round(Math.sqrt((sw * sh) / 20000)));
       const out = new Float32Array(Math.ceil(sw / step) * Math.ceil(sh / step) * 2);
       let n = 0;
       for (let y = 0; y < sh; y += step) {
         for (let x = 0; x < sw; x += step) {
           const k = (y * sw + x) * 3;
-          const [h, s] = srgbToEngine([data[k] / 65535, data[k + 1] / 65535, data[k + 2] / 65535]);
+          const [h, s] = q > 1
+            ? srgbToEngine([
+                clamp01((data[k] + dither(k) * q) / 65535),
+                clamp01((data[k + 1] + dither(k + 1) * q) / 65535),
+                clamp01((data[k + 2] + dither(k + 2) * q) / 65535),
+              ])
+            : srgbToEngine([data[k] / 65535, data[k + 1] / 65535, data[k + 2] / 65535]);
           out[n++] = h;
           out[n++] = clamp01(s);
         }
@@ -912,25 +1025,15 @@ export class ColorWarpGrid {
     // Cap ≈20k points: the live warp (meshSample per dot per frame) must stay
     // cheap enough to drag at interactive rates; density on screen barely changes.
     const step = Math.max(1, Math.round(Math.sqrt((sw * sh) / 20000)));
-    // Deterministic ±0.5 LSB dither: reconstruct the continuous color the 8-bit
-    // source quantized. A strong warp STRETCHES color space locally and blows
-    // the quantization gaps up into visible streaks; dithering fills them (same
-    // reason 3DLC's scope looks smooth). Hash by pixel index → stable frames.
-    const dith = (seed: number): number => {
-      let v = (seed ^ 0x9e3779b9) >>> 0;
-      v = Math.imul(v ^ (v >>> 15), 0x85ebca6b) >>> 0;
-      v = Math.imul(v ^ (v >>> 13), 0xc2b2ae35) >>> 0;
-      return ((v ^ (v >>> 16)) >>> 0) / 4294967296 - 0.5;
-    };
     const out = new Float32Array(Math.ceil(sw / step) * Math.ceil(sh / step) * 2);
     let n = 0;
     for (let y = 0; y < sh; y += step) {
       for (let x = 0; x < sw; x += step) {
         const k = (y * sw + x) * 4;
         const [h, s] = srgbToEngine([
-          clamp01((px[k] + dith(k)) / 255),
-          clamp01((px[k + 1] + dith(k + 1)) / 255),
-          clamp01((px[k + 2] + dith(k + 2)) / 255),
+          clamp01((px[k] + dither(k)) / 255),
+          clamp01((px[k + 1] + dither(k + 1)) / 255),
+          clamp01((px[k + 2] + dither(k + 2)) / 255),
         ]);
         out[n++] = h;
         out[n++] = clamp01(s);
@@ -1059,7 +1162,7 @@ export class ColorWarpGrid {
     ctx.strokeStyle = GRID_LINE;
     ctx.lineWidth = 1;
     for (let i = 1; i <= R; i++) {
-      const rad = (i / R) * this.R;
+      const rad = this.radial.toRadius(i / R) * this.R;
       ctx.beginPath();
       ctx.arc(this.cx, this.cy, rad, 0, Math.PI * 2);
       ctx.stroke();
@@ -1072,8 +1175,27 @@ export class ColorWarpGrid {
       ctx.stroke();
     }
 
-    // Skin-tone reference ray (dashed) + rim label.
-    const [sx, sy] = this.polar(this.h2d(SKIN_ENGINE_HUE), 1);
+    // Skin-tone reference: a WEDGE over the hue span skin actually occupies,
+    // with the conventional line still drawn down its middle. Swept per engine
+    // degree rather than as a flat triangle, because the wheel mode bends the
+    // angle on the way out — the wedge is wide in RYB (2.55× round the oranges)
+    // and narrow in RGB, which is the honest picture of where those hues sit.
+    ctx.save();
+    ctx.fillStyle = SKIN_FAN;
+    ctx.beginPath();
+    ctx.moveTo(this.cx, this.cy);
+    const skin = skinHues();
+    const FAN_STEPS = 16; // fixed count → both edges land exactly on the bounds
+    for (let i = 0; i <= FAN_STEPS; i++) {
+      const h = skin.lo + (skin.hi - skin.lo) * (i / FAN_STEPS);
+      const [fx, fy] = this.polar(this.h2d(h), 1);
+      ctx.lineTo(fx, fy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    const [sx, sy] = this.polar(this.h2d(skin.line), 1);
     ctx.save();
     ctx.strokeStyle = SKIN_LINE;
     ctx.setLineDash([5, 4]);
@@ -1085,7 +1207,8 @@ export class ColorWarpGrid {
     ctx.fillStyle = SKIN_LINE;
     ctx.font = "600 10px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
-    const [lx, ly] = this.polar(this.h2d(SKIN_ENGINE_HUE), 1.045);
+    // toSat so the label still sits at 1.045 × R on screen, just past the rim.
+    const [lx, ly] = this.polar(this.h2d(skin.line), this.radial.toSat(1.045));
     ctx.fillText("skin", lx, ly);
     ctx.restore();
   }

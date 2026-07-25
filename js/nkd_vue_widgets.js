@@ -8843,50 +8843,6 @@ function srgbToHsl(rgb) {
   h = mod(h * 60, 360);
   return [h, S, L];
 }
-function hslToSrgb(hsl) {
-  const h = mod(hsl[0], 360);
-  const s = hsl[1];
-  const L = hsl[2];
-  const c = (1 - Math.abs(2 * L - 1)) * s;
-  const x = c * (1 - Math.abs(mod(h / 60, 2) - 1));
-  const m = L - c / 2;
-  const z = 0;
-  const seg = mod(Math.trunc(h / 60), 6);
-  let rp, gp, bp;
-  switch (seg) {
-    case 0:
-      rp = c;
-      gp = x;
-      bp = z;
-      break;
-    case 1:
-      rp = x;
-      gp = c;
-      bp = z;
-      break;
-    case 2:
-      rp = z;
-      gp = c;
-      bp = x;
-      break;
-    case 3:
-      rp = z;
-      gp = x;
-      bp = c;
-      break;
-    case 4:
-      rp = x;
-      gp = z;
-      bp = c;
-      break;
-    default:
-      rp = c;
-      gp = z;
-      bp = x;
-      break;
-  }
-  return [rp + m, gp + m, bp + m];
-}
 const RYB_ANCHORS = [
   [0, 29.2339],
   // red
@@ -9050,6 +9006,81 @@ function meshSample(m, hueDeg, satNorm) {
   const dl = (off[ri][sj][2] * (1 - st) + off[ri][sj1][2] * st) * (1 - rt) + (off[ri + 1][sj][2] * (1 - st) + off[ri + 1][sj1][2] * st) * rt;
   return [dh, ds, dl];
 }
+const SKIN_LOCUS = {
+  hueLo: 26.3,
+  hueHi: 58.2,
+  // [OKLab L, max chroma] — linearly interpolated, clamped outside the range.
+  envelope: [
+    [0.325, 0.0579],
+    [0.375, 0.0654],
+    [0.425, 0.071],
+    [0.475, 0.0796],
+    [0.525, 0.0894],
+    [0.575, 0.0988],
+    [0.625, 0.1055],
+    [0.675, 0.1135],
+    [0.725, 0.1235],
+    [0.775, 0.1275],
+    [0.825, 0.1146]
+  ]
+};
+function skinChromaAt(L) {
+  const e = SKIN_LOCUS.envelope;
+  if (L < e[0][0] || L > e[e.length - 1][0]) return 0;
+  for (let i = 1; i < e.length; i++) {
+    if (L <= e[i][0]) {
+      const t = (L - e[i - 1][0]) / (e[i][0] - e[i - 1][0]);
+      return e[i - 1][1] + t * (e[i][1] - e[i - 1][1]);
+    }
+  }
+  return e[e.length - 1][1];
+}
+function dither(seed) {
+  let v = (seed ^ 2654435769) >>> 0;
+  v = Math.imul(v ^ v >>> 15, 2246822507) >>> 0;
+  v = Math.imul(v ^ v >>> 13, 3266489909) >>> 0;
+  return ((v ^ v >>> 16) >>> 0) / 4294967296 - 0.5;
+}
+function latticeStep(data) {
+  let g = 0;
+  for (let i = 0; i < data.length; i++) {
+    let a = g, b = data[i];
+    while (b) {
+      const t = a % b;
+      a = b;
+      b = t;
+    }
+    g = a;
+    if (g === 1) return 1;
+  }
+  return g;
+}
+const KNEE_SAT = 0.12;
+const KNEE_R = 0.45;
+const OUT_SLOPE = (1 - KNEE_R) / (1 - KNEE_SAT);
+const RADIAL_MODES = {
+  // Metric-honest: screen distance ∝ perceptual chroma. Everything crushed in.
+  linear: {
+    label: "Linear",
+    toRadius: (s) => s <= 0 ? 0 : s,
+    toSat: (r) => r <= 0 ? 0 : r
+  },
+  // Magnifying glass on the neutral band. Locally LINEAR on both sides of the
+  // knee, so within the band a cast twice as strong is still drawn twice as far
+  // out — and the gain is bounded (×3.75), unlike sqrt, which blows near-zero
+  // shadow noise into a fat ball.
+  neutral: {
+    label: "Neutrals",
+    toRadius: (s) => s <= 0 ? 0 : s <= KNEE_SAT ? s * (KNEE_R / KNEE_SAT) : KNEE_R + (s - KNEE_SAT) * OUT_SLOPE,
+    toSat: (r) => r <= 0 ? 0 : r <= KNEE_R ? r * (KNEE_SAT / KNEE_R) : KNEE_SAT + (r - KNEE_R) / OUT_SLOPE
+  },
+  // Continuous spread, no knee to reason about; gain → ∞ at the centre.
+  sqrt: {
+    label: "Sqrt",
+    toRadius: (s) => s <= 0 ? 0 : Math.sqrt(s),
+    toSat: (r) => r <= 0 ? 0 : r * r
+  }
+};
 const C_REF = 0.35;
 function clamp(x, lo, hi) {
   return x < lo ? lo : x > hi ? hi : x;
@@ -9132,8 +9163,46 @@ const GRID_LINE = "rgba(120,180,255,0.35)";
 const WEB_LINE = "rgba(120,180,255,0.55)";
 const ACCENT$1 = "#4ab4ff";
 const RAD$1 = Math.PI / 180;
-const SKIN_ENGINE_HUE = srgbToEngine(hslToSrgb([25, 1, 0.5]))[0];
+const SKIN_HSL_LO = 15;
+const SKIN_HSL_LINE = 20;
+const SKIN_HSL_HI = 25;
 const SKIN_LINE = "rgba(255,190,150,0.6)";
+const SKIN_FAN = "rgba(255,190,150,0.10)";
+const SKIN_CALIB_SAT = 0.5;
+function wheelHslHue(engHue, sat) {
+  const rad = engHue * RAD$1, ca = Math.cos(rad), sb = Math.sin(rad);
+  const L = WHEEL_L + (cuspL(engHue) - WHEEL_L) * sat;
+  let C = sat * C_REF * WHEEL_CHROMA;
+  if (!linInGamut(oklabToLinear([L, C * ca, C * sb]))) {
+    let lo = 0, hi = C;
+    for (let it = 0; it < 24; it++) {
+      const mid = (lo + hi) / 2;
+      if (linInGamut(oklabToLinear([L, mid * ca, mid * sb]))) lo = mid;
+      else hi = mid;
+    }
+    C = lo;
+  }
+  const lin = oklabToLinear([L, C * ca, C * sb]);
+  return srgbToHsl([linearToSrgb(clamp01$1(lin[0])), linearToSrgb(clamp01$1(lin[1])), linearToSrgb(clamp01$1(lin[2]))])[0];
+}
+function engineHueForWheelHsl(hslHue) {
+  let lo = 0, hi = 110;
+  for (let it = 0; it < 40; it++) {
+    const mid = (lo + hi) / 2;
+    if (wheelHslHue(mid, SKIN_CALIB_SAT) < hslHue) lo = mid;
+    else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+let skinHuesTab = null;
+function skinHues() {
+  if (!skinHuesTab) skinHuesTab = {
+    lo: engineHueForWheelHsl(SKIN_HSL_LO),
+    line: engineHueForWheelHsl(SKIN_HSL_LINE),
+    hi: engineHueForWheelHsl(SKIN_HSL_HI)
+  };
+  return skinHuesTab;
+}
 const R_IDLE = 6;
 const R_HOVER = 7;
 const R_CENTER = 4.5;
@@ -9247,6 +9316,10 @@ class ColorWarpGrid {
     __publicField(this, "anchors", WHEEL_MODES.ryb.anchors);
     // Cached h2d table (0.5° steps) for per-point hot paths (scatter/indicator).
     __publicField(this, "h2dTab", null);
+    // Active radial mode: the sat↔radius twin of the above. Same contract — the
+    // mesh stays in engine sat, only the drawing/hit-testing radius changes.
+    __publicField(this, "radialName", "neutral");
+    __publicField(this, "radial", RADIAL_MODES.neutral);
     __publicField(this, "remoteRaf", 0);
     __publicField(this, "remoteDx", 0);
     __publicField(this, "remoteDy", 0);
@@ -9517,10 +9590,24 @@ class ColorWarpGrid {
     this.anchors = WHEEL_MODES[name].anchors;
     this.h2dTab = null;
     this.wheelKey = "";
+    if (this.mesh && isIdentityMesh(this.mesh)) {
+      this.mesh.hues = wheelColumnHues(this.mesh.hue_segments, this.anchors);
+      this.initAutonomy();
+    }
+    this.draw();
+  }
+  getRadialMode() {
+    return this.radialName;
+  }
+  setRadialMode(name) {
+    this.radialName = name;
+    this.radial = RADIAL_MODES[name];
+    this.wheelKey = "";
     this.draw();
   }
   setMesh(mesh) {
     this.mesh = mesh;
+    if (isIdentityMesh(mesh)) mesh.hues = wheelColumnHues(mesh.hue_segments, this.anchors);
     this.initAutonomy();
     this.draw();
   }
@@ -9568,16 +9655,18 @@ class ColorWarpGrid {
     c.removeEventListener("wheel", this.onWheel);
   }
   // --- geometry ------------------------------------------------------------
-  // display angle + normalized sat → CSS-px screen point.
+  // display angle + ENGINE sat → CSS-px screen point. The radius goes through
+  // the active radial mode: every node, dot, ring and indicator inherits the
+  // projection from here, so the mesh keeps living in absolute chroma.
   polar(displayDeg, sat) {
     const a = angleRad(displayDeg);
-    const r = sat * this.R;
+    const r = this.radial.toRadius(sat) * this.R;
     return [this.cx + r * Math.cos(a), this.cy + r * Math.sin(a)];
   }
-  // Inverse: CSS-px screen point → [displayDeg, sat] (sat clamped to [0,1]).
+  // Inverse: CSS-px screen point → [displayDeg, engine sat] (clamped to [0,1]).
   toPolar(x, y) {
     const dx = x - this.cx, dy = y - this.cy;
-    const sat = clamp01$1(Math.hypot(dx, dy) / (this.R || 1));
+    const sat = this.radial.toSat(clamp01$1(Math.hypot(dx, dy) / (this.R || 1)));
     let disp = Math.atan2(dy, dx) / RAD$1 + 90;
     disp = (disp % 360 + 360) % 360;
     return [disp, sat];
@@ -9810,7 +9899,7 @@ class ColorWarpGrid {
       const snapAngle = this.h2d(hues[ss] + start[rr][ss][0]);
       const snapSat = clamp01$1(baseSat + start[rr][ss][1]);
       const angle = d.axis === "h" ? snapAngle + dx * SHIFT_ROT_PER_PX : snapAngle;
-      const sat = d.axis === "v" ? clamp01$1(snapSat - dy * SHIFT_SAT_PER_PX) : snapSat;
+      const sat = d.axis === "v" ? clamp01$1(this.radial.toSat(clamp01$1(this.radial.toRadius(snapSat) - dy * SHIFT_SAT_PER_PX))) : snapSat;
       this.autonomous.add(this.key(rr, ss));
       this.setNodePolar(rr, ss, angle, sat);
       spokes.add(ss);
@@ -9852,7 +9941,7 @@ class ColorWarpGrid {
   // is independent of canvas resolution.
   buildWheel() {
     const dw = this.canvas.width, dh = this.canvas.height;
-    const key = `${dw}x${dh}:${this.modeName}`;
+    const key = `${dw}x${dh}:${this.modeName}:${this.radialName}`;
     if (this.wheel && this.wheelKey === key) return;
     const NA = 720, NR = 48;
     const tab = new Uint8Array(NA * (NR + 1) * 3);
@@ -9861,7 +9950,7 @@ class ColorWarpGrid {
       const rad = hue * RAD$1, ca = Math.cos(rad), sb = Math.sin(rad);
       const Lc = cuspL(hue);
       for (let r = 0; r <= NR; r++) {
-        const sat = r / NR;
+        const sat = this.radial.toSat(r / NR);
         const L = WHEEL_L + (Lc - WHEEL_L) * sat;
         const C = sat * C_REF * WHEEL_CHROMA;
         let lin = oklabToLinear([L, C * ca, C * sb]);
@@ -9922,13 +10011,18 @@ class ColorWarpGrid {
     if (this.scatter) return;
     if (this.scatter16) {
       const { data, width: sw2, height: sh2 } = this.scatter16;
+      const q = latticeStep(data);
       const step2 = Math.max(1, Math.round(Math.sqrt(sw2 * sh2 / 2e4)));
       const out2 = new Float32Array(Math.ceil(sw2 / step2) * Math.ceil(sh2 / step2) * 2);
       let n2 = 0;
       for (let y = 0; y < sh2; y += step2) {
         for (let x = 0; x < sw2; x += step2) {
           const k = (y * sw2 + x) * 3;
-          const [h, s] = srgbToEngine([data[k] / 65535, data[k + 1] / 65535, data[k + 2] / 65535]);
+          const [h, s] = q > 1 ? srgbToEngine([
+            clamp01$1((data[k] + dither(k) * q) / 65535),
+            clamp01$1((data[k + 1] + dither(k + 1) * q) / 65535),
+            clamp01$1((data[k + 2] + dither(k + 2) * q) / 65535)
+          ]) : srgbToEngine([data[k] / 65535, data[k + 1] / 65535, data[k + 2] / 65535]);
           out2[n2++] = h;
           out2[n2++] = clamp01$1(s);
         }
@@ -9950,21 +10044,15 @@ class ColorWarpGrid {
     tctx.drawImage(this.source, 0, 0, sw, sh);
     const px = tctx.getImageData(0, 0, sw, sh).data;
     const step = Math.max(1, Math.round(Math.sqrt(sw * sh / 2e4)));
-    const dith = (seed) => {
-      let v = (seed ^ 2654435769) >>> 0;
-      v = Math.imul(v ^ v >>> 15, 2246822507) >>> 0;
-      v = Math.imul(v ^ v >>> 13, 3266489909) >>> 0;
-      return ((v ^ v >>> 16) >>> 0) / 4294967296 - 0.5;
-    };
     const out = new Float32Array(Math.ceil(sw / step) * Math.ceil(sh / step) * 2);
     let n = 0;
     for (let y = 0; y < sh; y += step) {
       for (let x = 0; x < sw; x += step) {
         const k = (y * sw + x) * 4;
         const [h, s] = srgbToEngine([
-          clamp01$1((px[k] + dith(k)) / 255),
-          clamp01$1((px[k + 1] + dith(k + 1)) / 255),
-          clamp01$1((px[k + 2] + dith(k + 2)) / 255)
+          clamp01$1((px[k] + dither(k)) / 255),
+          clamp01$1((px[k + 1] + dither(k + 1)) / 255),
+          clamp01$1((px[k + 2] + dither(k + 2)) / 255)
         ]);
         out[n++] = h;
         out[n++] = clamp01$1(s);
@@ -10078,7 +10166,7 @@ class ColorWarpGrid {
     ctx.strokeStyle = GRID_LINE;
     ctx.lineWidth = 1;
     for (let i = 1; i <= R; i++) {
-      const rad = i / R * this.R;
+      const rad = this.radial.toRadius(i / R) * this.R;
       ctx.beginPath();
       ctx.arc(this.cx, this.cy, rad, 0, Math.PI * 2);
       ctx.stroke();
@@ -10090,7 +10178,21 @@ class ColorWarpGrid {
       ctx.lineTo(x, y);
       ctx.stroke();
     }
-    const [sx, sy] = this.polar(this.h2d(SKIN_ENGINE_HUE), 1);
+    ctx.save();
+    ctx.fillStyle = SKIN_FAN;
+    ctx.beginPath();
+    ctx.moveTo(this.cx, this.cy);
+    const skin = skinHues();
+    const FAN_STEPS = 16;
+    for (let i = 0; i <= FAN_STEPS; i++) {
+      const h = skin.lo + (skin.hi - skin.lo) * (i / FAN_STEPS);
+      const [fx, fy] = this.polar(this.h2d(h), 1);
+      ctx.lineTo(fx, fy);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+    const [sx, sy] = this.polar(this.h2d(skin.line), 1);
     ctx.save();
     ctx.strokeStyle = SKIN_LINE;
     ctx.setLineDash([5, 4]);
@@ -10102,7 +10204,7 @@ class ColorWarpGrid {
     ctx.fillStyle = SKIN_LINE;
     ctx.font = "600 10px Inter, system-ui, sans-serif";
     ctx.textAlign = "center";
-    const [lx, ly] = this.polar(this.h2d(SKIN_ENGINE_HUE), 1.045);
+    const [lx, ly] = this.polar(this.h2d(skin.line), this.radial.toSat(1.045));
     ctx.fillText("skin", lx, ly);
     ctx.restore();
   }
@@ -10893,9 +10995,11 @@ class ColorWarpScope3D {
     __publicField(this, "ptsBuf", null);
     __publicField(this, "trailBuf", null);
     __publicField(this, "refBuf", null);
+    __publicField(this, "skinBuf", null);
     __publicField(this, "nPts", 0);
     __publicField(this, "nTrail", 0);
     __publicField(this, "nRef", 0);
+    __publicField(this, "nSkin", 0);
     // ≥2 supersamples the mini window so the cloud stays crisp at small sizes.
     __publicField(this, "dpr", Math.max(window.devicePixelRatio || 1, 2));
     __publicField(this, "mesh", null);
@@ -10914,6 +11018,7 @@ class ColorWarpScope3D {
     __publicField(this, "orbiting", null);
     __publicField(this, "lastX", 0);
     __publicField(this, "lastY", 0);
+    __publicField(this, "radial", RADIAL_MODES.neutral);
     // --- orbit -------------------------------------------------------------------
     __publicField(this, "onDown", (e) => {
       this.orbiting = e.pointerId;
@@ -10984,7 +11089,9 @@ class ColorWarpScope3D {
     this.ptsBuf = gl.createBuffer();
     this.trailBuf = gl.createBuffer();
     this.refBuf = gl.createBuffer();
+    this.skinBuf = gl.createBuffer();
     this.buildRef(gl);
+    this.buildSkin(gl);
     return true;
   }
   // Reference cage: unit chroma circle at L=0.5, faint circles at L=0/1, the
@@ -11011,6 +11118,44 @@ class ColorWarpScope3D {
     gl.bindBuffer(gl.ARRAY_BUFFER, this.refBuf);
     gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
     this.nRef = arr.length / 6;
+  }
+  // Skin locus cage: the hue wedge of SKIN_LOCUS swept up the L axis, with its
+  // radius following the measured chroma ceiling — a cone that pinches shut in
+  // the shadows, which is the part the 2D disc cannot show. Wireframe rather
+  // than a translucent solid: the scope draws additively with depth testing off
+  // (a solid would just wash out whatever is behind it), and lines reuse the
+  // existing pipeline with no new shader.
+  // Rebuilt with the cage because it depends on the radial mode, same as the cloud.
+  buildSkin(gl) {
+    const v = [];
+    const C = [0.95, 0.62, 0.42];
+    const { hueLo, hueHi, envelope } = SKIN_LOCUS;
+    const L0 = envelope[0][0], L1 = envelope[envelope.length - 1][0];
+    const ARC = 12, RUNGS = 9;
+    const pt = (t, L) => {
+      const h = (hueLo + (hueHi - hueLo) * t) * RAD;
+      const sat = skinChromaAt(L) / C_REF;
+      const r = this.radial.toRadius(sat);
+      return [r * Math.cos(h), L, r * Math.sin(h)];
+    };
+    const seg = (a, b) => v.push(a[0], a[1], a[2], ...C, b[0], b[1], b[2], ...C);
+    for (let k = 0; k < RUNGS; k++) {
+      const L = L0 + (L1 - L0) * (k / (RUNGS - 1));
+      for (let i = 0; i < ARC; i++) seg(pt(i / ARC, L), pt((i + 1) / ARC, L));
+    }
+    for (const t of [0, 1]) {
+      for (let k = 0; k < RUNGS - 1; k++) {
+        const La = L0 + (L1 - L0) * (k / (RUNGS - 1));
+        const Lb = L0 + (L1 - L0) * ((k + 1) / (RUNGS - 1));
+        seg(pt(t, La), pt(t, Lb));
+      }
+      seg([0, L0, 0], pt(t, L0));
+      seg([0, L1, 0], pt(t, L1));
+    }
+    const arr = new Float32Array(v);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.skinBuf);
+    gl.bufferData(gl.ARRAY_BUFFER, arr, gl.STATIC_DRAW);
+    this.nSkin = arr.length / 6;
   }
   // --- data ------------------------------------------------------------------
   // Build the source cloud from the 16-bit push (preferred) or a canvas.
@@ -11070,6 +11215,14 @@ class ColorWarpScope3D {
     this.dirty = true;
     this.schedule();
   }
+  // Same radial projection as the 2D wheel — the floor plane IS the wheel seen
+  // from above, so if they disagree the two views stop being the same picture.
+  setRadialMode(name) {
+    this.radial = RADIAL_MODES[name];
+    if (this.gl) this.buildSkin(this.gl);
+    this.dirty = true;
+    this.schedule();
+  }
   setTrails(t) {
     this.trails = t;
     this.schedule();
@@ -11113,6 +11266,12 @@ class ColorWarpScope3D {
       this.draw();
     });
   }
+  // Radius gain for an OKLab (a,b): displayRadius / sat, so scaling the vector
+  // by it lands the point where the 2D wheel draws that same colour.
+  floorGain(a, b) {
+    const sat = Math.hypot(a, b) / C_REF;
+    return sat > 1e-9 ? this.radial.toRadius(sat) / sat : 1;
+  }
   // Warp the source cloud through the ENGINE (meshSample + neutral, same math
   // as the LUT bake sans gamut clip) and upload point/trail vertex buffers.
   rebuild(gl) {
@@ -11145,7 +11304,8 @@ class ColorWarpScope3D {
       }
       const rgb = oklabToSrgb([L2, a2, b2]);
       const r = clamp01(rgb[0]), g = clamp01(rgb[1]), bl = clamp01(rgb[2]);
-      const px = a2 / C_REF, py = L2, pz = b2 / C_REF;
+      const dg = this.floorGain(a2, b2);
+      const px = a2 / C_REF * dg, py = L2, pz = b2 / C_REF * dg;
       const o = i * 6;
       pts[o] = px;
       pts[o + 1] = py;
@@ -11154,9 +11314,10 @@ class ColorWarpScope3D {
       pts[o + 4] = g;
       pts[o + 5] = bl;
       const t = i * 12;
-      trl[t] = lab[i * 3 + 1] / C_REF;
+      const sg = this.floorGain(lab[i * 3 + 1], lab[i * 3 + 2]);
+      trl[t] = lab[i * 3 + 1] / C_REF * sg;
       trl[t + 1] = L;
-      trl[t + 2] = lab[i * 3 + 2] / C_REF;
+      trl[t + 2] = lab[i * 3 + 2] / C_REF * sg;
       trl[t + 3] = srcCol[i * 3] * 0.45;
       trl[t + 4] = srcCol[i * 3 + 1] * 0.45;
       trl[t + 5] = srcCol[i * 3 + 2] * 0.45;
@@ -11210,6 +11371,11 @@ class ColorWarpScope3D {
     gl.uniform1f(this.uAlpha, 0.4);
     this.bindAttribs(gl, this.refBuf);
     gl.drawArrays(gl.LINES, 0, this.nRef);
+    if (this.nSkin) {
+      gl.uniform1f(this.uAlpha, 0.55);
+      this.bindAttribs(gl, this.skinBuf);
+      gl.drawArrays(gl.LINES, 0, this.nSkin);
+    }
     if (this.trails && this.nTrail) {
       gl.uniform1f(this.uAlpha, 0.16);
       this.bindAttribs(gl, this.trailBuf);
@@ -11276,6 +11442,7 @@ function openColorWarpViewer(opts) {
   const spokesSel = mkSelect("Spokes", [4, 6, 8, 12, 16, 24, 32], mesh.hue_segments);
   const ringsSel = mkSelect("Rings", [2, 3, 4, 6, 8, 10, 12, 16], mesh.sat_rings);
   const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
+  const radialBtn = mkBtn(`Radial: ${RADIAL_MODES.neutral.label}`, TEXT);
   const scopeBtn = mkToggle("3D", false);
   const trailsBtn = mkToggle("Trails", false);
   const lumaBtn = mkToggle("Luma", false);
@@ -11288,7 +11455,7 @@ function openColorWarpViewer(opts) {
   bottomBar.style.cssText = `display:flex;align-items:center;gap:12px;padding:8px 14px;background:${BAR_BG};border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
   const barSpacer = document.createElement("span");
   barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, wheelBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
+  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
   const leftPane = mkPane();
@@ -11411,6 +11578,13 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     grid.setWheelMode(next);
     wheelBtn.textContent = `Wheel: ${WHEEL_MODES[next].label}`;
     luma.refresh();
+  };
+  radialBtn.onclick = () => {
+    const order = ["neutral", "linear", "sqrt"];
+    const next = order[(order.indexOf(grid.getRadialMode()) + 1) % order.length];
+    grid.setRadialMode(next);
+    scope.setRadialMode(next);
+    radialBtn.textContent = `Radial: ${RADIAL_MODES[next].label}`;
   };
   previewCanvas.addEventListener("pointermove", (e) => {
     const rgb = preview.readPixel(e.clientX, e.clientY);
