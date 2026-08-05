@@ -69,6 +69,27 @@ const RULES = {
       refreshNode(node);
     },
   },
+  // Block coverage is meaningless until there are blocks. Feather is NOT hidden
+  // alongside it: a small feather on a blockified mask is what keeps the block
+  // edges from showing as a staircase on composite.
+  NKDMaskOps: {
+    watch: ["blockify"],
+    apply(node) {
+      const w = (n) => node.widgets?.find((x) => x.name === n);
+      const size = w("blockify");
+      const cover = w("blockify_threshold");
+      if (!size || !cover) return;
+      // A connected VAE both turns Blockify on and supplies the grid, so the
+      // number stops meaning anything — hiding it is only safe *because* the
+      // connection is the switch.
+      const fromVae = node.inputs?.find((i) => i.name === "vae")?.link != null;
+      if (fromVae) hideWidget(size);
+      else showWidget(size);
+      if (fromVae || size.value > 0) showWidget(cover);
+      else hideWidget(cover);
+      refreshNode(node);
+    },
+  },
   // edge_threshold only matters for the edge-preserving methods.
   NKDFrequencySeparate: {
     watch: ["method"],
@@ -106,6 +127,14 @@ app.registerExtension({
       const r = origCreated?.apply(this, arguments);
       for (const name of rule.watch) wrapCb(this, name, rule.apply);
       requestAnimationFrame(() => rule.apply(this));
+      // Rules that read an input's link need this: plugging a cable is not a
+      // widget edit, so no callback fires and the node would keep the stale layout.
+      const origConnections = this.onConnectionsChange;
+      this.onConnectionsChange = function () {
+        const r2 = origConnections?.apply(this, arguments);
+        rule.apply(this);
+        return r2;
+      };
       const origConfigure = this.onConfigure;
       // Saved workflows restore widget values after creation — re-apply there.
       this.onConfigure = function () {

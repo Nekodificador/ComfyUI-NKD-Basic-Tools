@@ -6,6 +6,11 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+try:  # package import in ComfyUI; the bare one is for `python tests/…`
+    from .mask_core import process as _mask_process
+except ImportError:
+    from mask_core import process as _mask_process
+
 
 # ---------------------------------------------------------------------------
 # Text splitting
@@ -407,43 +412,8 @@ def _mask_grow(mask: torch.Tensor, expand: int, blur: int) -> torch.Tensor:
         mask = mask.unsqueeze(0)
     if expand <= 0 and blur <= 0:
         return mask.float()
-
-    # ComfyUI hands masks over on CPU; morphology + separable blur at native
-    # resolution there takes seconds on large images. Hop to the GPU for the
-    # heavy passes and return on the original device.
-    orig_device = mask.device
-    work_device = orig_device
-    if orig_device.type == "cpu" and torch.cuda.is_available():
-        work_device = torch.device("cuda")
-
-    m = mask.to(work_device).unsqueeze(1).float()
-
-    if expand > 0:
-        # Chunked max-pool dilation: ~log(expand) passes instead of `expand`
-        # iterations of a 3×3 kernel. Square structuring element either way.
-        remaining = expand
-        for k in (32, 8, 2, 1):
-            while remaining >= k:
-                m = F.pad(m, (k, k, k, k), mode="replicate")
-                m = F.max_pool2d(m, kernel_size=2 * k + 1, stride=1, padding=0)
-                remaining -= k
-        m = m.clamp(0.0, 1.0)
-
-    if blur > 0:
-        # Box blur ×3 passes per axis approximates a gaussian, separable and fast.
-        k = blur | 1
-        pad = k // 2
-        box = torch.ones(1, 1, 1, k, device=m.device, dtype=m.dtype) / k
-        for _ in range(3):
-            m = F.pad(m, (pad, pad, 0, 0), mode="replicate")
-            m = F.conv2d(m, box, padding=0)
-        box_v = box.transpose(2, 3)
-        for _ in range(3):
-            m = F.pad(m, (0, 0, pad, pad), mode="replicate")
-            m = F.conv2d(m, box_v, padding=0)
-        m = m.clamp(0.0, 1.0)
-
-    return m.squeeze(1).to(orig_device)
+    # One implementation of mask morphology for the whole pack: see mask_core.
+    return _mask_process(mask.float(), expand_px=expand, feather_px=blur)
 
 
 def _separate_regions(mask: torch.Tensor, min_area_frac: float, max_regions: int,
@@ -490,15 +460,7 @@ def _separate_regions(mask: torch.Tensor, min_area_frac: float, max_regions: int
 def _mask_fill_holes(mask: torch.Tensor) -> torch.Tensor:
     """Fill fully-enclosed holes in the mask (regions of 0 not connected to the
     border). Soft edge values are preserved — only the holes are set to 1."""
-    from scipy.ndimage import binary_fill_holes  # ships with ComfyUI core
-    if mask.dim() == 2:
-        mask = mask.unsqueeze(0)
-    binary = (mask > 0.5).cpu().numpy()
-    out = mask.clone()
-    for i in range(binary.shape[0]):
-        filled = torch.from_numpy(binary_fill_holes(binary[i])).to(mask.device)
-        out[i] = torch.maximum(out[i], filled.to(out.dtype))
-    return out
+    return _mask_process(mask, fill=True)
 
 
 # ---------------------------------------------------------------------------

@@ -90,6 +90,44 @@ original ─▶ 😺NKD Frequency Separate ─┬─ high_frequency ─▶ 😺N
   (`r8 → r2 @ 31%`), so it never lies about the frequency you're getting.
 - Optional `mask` output confines the detail to a region (e.g. skin only).
 
+### 😺NKD Mask Ops
+
+**Use it to** get a mask ready to use in one node instead of six — and to stop
+mask cleanup from being the slow part of a video workflow. The whole batch goes
+to the GPU once and comes back processed: a full pipeline on 81 frames of 1080p
+runs in about a third of a second, and expanding a mask is ~50× faster than the
+node you're probably using for it.
+
+```
+Mask ──▶ 😺NKD Mask Ops ──▶ mask / mask_inverted
+```
+
+Everything is in one place, and anything left at 0 is skipped:
+
+- **Levels** (`Black Point` / `White Point`) — cut the faint halo a segmentation
+  model leaves behind, or set both to the same value for a hard threshold.
+- **Remove Specks** — drops blobs thinner than the given width. What survives
+  keeps its **exact** outline, so fingers, hair and thin details aren't shaved
+  off the way a normal cleanup pass shaves them.
+- **Fill Holes** / **Close Gaps** — solid shapes, bridged cracks.
+- **Expand / Contract** and **Feather** — one signed value and one softness.
+- **Blockify** — snaps the mask to a grid of squares, so it survives the trip
+  into latent space with no bleeding into neighbouring blocks. **Connect your
+  `vae` and it configures itself**: the grid comes from that VAE, and on a video
+  VAE the mask is also quantized along time, to the exact frames it collapses
+  into one latent (uneven last group included — it's read from the VAE, not
+  assumed). Without a VAE, set the size yourself. `Block Coverage` at 0 keeps
+  each block's average as a gray value, for a pixelated look instead.
+- **Expand In Time** — video: each frame also covers what the mask covered a few
+  frames before and after, so a segmentation that lags the motion still covers
+  it.
+- **Smooth In Time** — video: averages across neighbouring frames so the mask
+  edge stops flickering.
+
+Steps run in a fixed order — clean, stabilize, shape, soften — so a feathered
+edge is never re-hardened by a later step. The node previews the result in
+itself, subsampled for long clips.
+
 ---
 
 ## Color & gradients
