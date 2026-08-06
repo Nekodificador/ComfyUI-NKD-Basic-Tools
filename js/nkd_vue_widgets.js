@@ -12457,6 +12457,7 @@ app.registerExtension({
   }
 });
 let activeColorWarp = null;
+const colorWarpFrames = /* @__PURE__ */ new Map();
 function rgbBytesToCanvas(bytes, w, h) {
   const c = document.createElement("canvas");
   c.width = w;
@@ -12491,6 +12492,7 @@ app.registerExtension({
       const node = this;
       const btn = this.addWidget("button", "🎨 Open Color Warper", null, () => {
         const img = findSourceImg(node, "image");
+        const cached = colorWarpFrames.get(String(node.id));
         const handle = openColorWarpViewer({
           image: img,
           mesh: (meshW == null ? void 0 : meshW.value) || "",
@@ -12505,12 +12507,12 @@ app.registerExtension({
           }
         });
         activeColorWarp = { nodeId: String(node.id), handle };
+        if (!img && cached) handle.setImage(cached.canvas, cached.w, cached.h, cached.s16);
       });
       btn.serialize = false;
       const onSource = (e) => {
         const d = e == null ? void 0 : e.detail;
-        if (!d || !activeColorWarp || activeColorWarp.nodeId !== String(node.id)) return;
-        if (String(d.node) !== String(node.id)) return;
+        if (!d || String(d.node) !== String(node.id)) return;
         try {
           const bin = atob(d.data);
           const bytes = new Uint8Array(bin.length);
@@ -12523,7 +12525,10 @@ app.registerExtension({
             for (let i = 0; i < sbin.length; i++) sbytes[i] = sbin.charCodeAt(i);
             s16 = { data: new Uint16Array(sbytes.buffer), width: d.s16_width, height: d.s16_height };
           }
-          activeColorWarp.handle.setImage(c, d.width, d.height, s16);
+          colorWarpFrames.set(String(node.id), { canvas: c, w: d.width, h: d.height, s16 });
+          if ((activeColorWarp == null ? void 0 : activeColorWarp.nodeId) === String(node.id)) {
+            activeColorWarp.handle.setImage(c, d.width, d.height, s16);
+          }
         } catch {
         }
       };

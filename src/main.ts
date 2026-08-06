@@ -747,6 +747,18 @@ comfyApp.registerExtension({
 // `nkd-colorwarp-source` push as a fallback for sources behind resizes/subgraphs.
 let activeColorWarp: { nodeId: string; handle: ColorWarpViewerHandle } | null = null;
 
+// Last frame the backend resolved for each node, kept whether or not the editor
+// is open. findSourceImg only finds a thumbnail on nodes that draw one (Load
+// Image does; VAE Decode and most generators do not), and a generated image
+// simply does not exist until the graph runs — which nobody does with the
+// editor already open. Caching the push means opening the editor after a run
+// shows that run's frame.
+type CachedFrame = {
+  canvas: HTMLCanvasElement; w: number; h: number;
+  s16?: { data: Uint16Array; width: number; height: number };
+};
+const colorWarpFrames = new Map<string, CachedFrame>();
+
 // Build a canvas from the pushed RGB (uint8, 3 bytes/px) frame.
 function rgbBytesToCanvas(bytes: Uint8Array, w: number, h: number): HTMLCanvasElement {
   const c = document.createElement("canvas");
@@ -783,7 +795,11 @@ comfyApp.registerExtension({
 
       const node = this;
       const btn = this.addWidget("button", "🎨 Open Color Warper", null, () => {
+        // Live upstream thumbnail first (it tracks edits with no run — e.g.
+        // picking a new file in Load Image), then the last frame the backend
+        // pushed, which is all a generated image can offer.
         const img = findSourceImg(node, "image");
+        const cached = colorWarpFrames.get(String(node.id));
         const handle = openColorWarpViewer({
           image: img,
           mesh: meshW?.value || "",
@@ -798,6 +814,9 @@ comfyApp.registerExtension({
           },
         });
         activeColorWarp = { nodeId: String(node.id), handle };
+        // setImage rather than passing it as `image`: it carries the 16-bit
+        // companion the scatter cloud wants.
+        if (!img && cached) handle.setImage(cached.canvas, cached.w, cached.h, cached.s16);
       });
       btn.serialize = false;
 
@@ -805,8 +824,7 @@ comfyApp.registerExtension({
       // resize/subgraph). Payload: {node,width,height,data} — RGB uint8 base64.
       const onSource = (e: any) => {
         const d = e?.detail;
-        if (!d || !activeColorWarp || activeColorWarp.nodeId !== String(node.id)) return;
-        if (String(d.node) !== String(node.id)) return;
+        if (!d || String(d.node) !== String(node.id)) return;
         try {
           const bin = atob(d.data);
           const bytes = new Uint8Array(bin.length);
@@ -821,7 +839,10 @@ comfyApp.registerExtension({
             for (let i = 0; i < sbin.length; i++) sbytes[i] = sbin.charCodeAt(i);
             s16 = { data: new Uint16Array(sbytes.buffer), width: d.s16_width, height: d.s16_height };
           }
-          activeColorWarp.handle.setImage(c, d.width, d.height, s16);
+          colorWarpFrames.set(String(node.id), { canvas: c, w: d.width, h: d.height, s16 });
+          if (activeColorWarp?.nodeId === String(node.id)) {
+            activeColorWarp.handle.setImage(c, d.width, d.height, s16);
+          }
         } catch { /* ignore malformed */ }
       };
       api.addEventListener("nkd-colorwarp-source", onSource);
