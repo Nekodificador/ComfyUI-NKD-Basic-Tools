@@ -38,7 +38,7 @@ class NKDMaskOps(io.ComfyNode):
         return io.Schema(
             node_id="NKDMaskOps",
             display_name="😺NKD Mask Ops",
-            category="😺NKD Nodes/Basic",
+            category="😺NKD Nodes/Masking",
             description=(
                 "All the mask preprocessing in one node, on the GPU, over the "
                 "whole batch at once: levels, speck removal, hole filling, gap "

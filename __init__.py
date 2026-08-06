@@ -12,6 +12,7 @@ from .nkd_noise import NKDNoise
 from .nkd_frequency import NKDFrequencySeparate, NKDFrequencyCombine
 from .nkd_color_warp import NKDColorWarp
 from .nkd_mask_ops import NKDMaskOps
+from .nkd_mask_painter import NKDMaskPainter
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
@@ -34,6 +35,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDFrequencyCombine,
             NKDColorWarp,
             NKDMaskOps,
+            NKDMaskPainter,
         ]
 
 
@@ -55,6 +57,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDFrequencyCombine": NKDFrequencyCombine,
     "NKDColorWarp": NKDColorWarp,
     "NKDMaskOps": NKDMaskOps,
+    "NKDMaskPainter": NKDMaskPainter,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -70,6 +73,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDFrequencyCombine": "😺NKD Frequency Combine",
     "NKDColorWarp": "😺NKD Color Warp",
     "NKDMaskOps": "😺NKD Mask Ops",
+    "NKDMaskPainter": "😺NKD Mask Painter",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
