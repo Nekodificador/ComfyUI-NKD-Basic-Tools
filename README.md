@@ -132,6 +132,40 @@ itself, subsampled for long clips.
 
 ## Color & gradients
 
+### 😺NKD Color Warp
+
+**Use it to** grade by grabbing the colors themselves. Open the editor from the
+node and you get a color wheel with a web of handles over it: drag the one
+sitting on your skin tones and the skin moves, drag the rim of the blue spoke
+and every blue in the shot follows. The neighbours give way smoothly, so you
+push one color without tearing a hole next to it.
+
+- **Your image is on the wheel.** Run the node once and the editor scatters the
+  frame's own pixels across it, so you can see where your image actually lives
+  before touching anything — and the preview updates live as you drag, full
+  frame, not a thumbnail.
+- **Hold `Alt`** and the image shows you exactly which pixels a handle owns.
+  No guessing about what a move is going to hit.
+- **`Pin`** moves a single handle on its own; without it the whole spoke follows.
+  Double-click resets a handle, `Reset all` starts over.
+- **Drag the centre** for a global cast, and the whole web stretches with it.
+- **Three wheels** — `RYB` puts complementaries opposite each other the way a
+  painter expects, `RGB` matches what other tools show, `OKLCh` is the raw
+  perceptual layout. Same edit underneath; pick the one you think in.
+- **Three radial scales** — `Neutrals` magnifies the near-grey band so you can
+  actually grab a subtle cast, `Linear` keeps distance honest, `Sqrt` spreads
+  everything.
+- Add or remove spokes and rings for finer control, and turn on the `3D` scope,
+  the `Luma` strip or `Trails` when you want to see what the grade is doing.
+
+Hue shifts don't drag brightness along with them, and colors pushed past what
+the screen can show are brought back in gracefully instead of clipping to a flat
+patch.
+
+Turn on `save_lut` and the grade is also written to the output folder as a
+`.cube` you can load in Resolve, Premiere or anywhere else. The whole grade is a
+single lookup, so a 200-frame batch is graded identically frame to frame.
+
 ### 😺NKD Gradient Map / 😺NKD Gradient Generate
 
 Both share one **color-ramp editor**: click the bar to add a stop, click a stop
