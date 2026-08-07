@@ -151,6 +151,9 @@ https://github.com/user-attachments/assets/fea39b77-1e47-4006-ba7f-51197db0f106
   re-applies the upstream mask on the next run without losing what you painted —
   the one you want when `Clear` would be too blunt.
 - **One mask per node**: drop several on the same image for independent masks.
+- **This is the node for stacking masks.** Anything with a `MASK` output feeds
+  it — 😺NKD Vector Mask included — and the set operations composite them while
+  the result stays paintable. See [Vector Mask or Mask Painter?](#vector-mask-or-mask-painter)
 
 > Moved here from 😺NKD Preview Tools, which is now about viewing. Same node,
 > same saved workflows, same painted masks — nothing to redo.
@@ -188,6 +191,21 @@ graph.
   untouched image.
 - Survives a resolution change: coordinates are relative, and the editor warns
   you if the aspect ratio no longer matches what you drew on.
+
+#### Vector Mask or Mask Painter?
+
+They're two ways at the same job, and they're better together than apart — this
+node's `MASK` output plugs straight into Mask Painter's `mask` input.
+
+Reach for **Vector Mask** when the mask is a *shape*: an outline you want exact,
+and still editable next week, because what's saved is the control points rather
+than pixels.
+
+Reach for **Mask Painter** when you're **combining masks and want to keep
+editing**. That's what its `mask_input_mode` is for: send it a vector mask, a
+segmenter's output, 😺NKD Mask Ops — `Add`, `Subtract` and `Intersect`
+composite them together, and you carry on painting on the result by hand. Chain
+several and each stage stays editable.
 
 ---
 
