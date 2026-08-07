@@ -160,6 +160,8 @@ https://github.com/user-attachments/assets/fea39b77-1e47-4006-ba7f-51197db0f106
 
 ### 😺NKD Vector Mask
 
+<img width="1853" height="1199" alt="image" src="https://github.com/user-attachments/assets/aea95716-85a8-4402-abf8-e10e78cedfb6" />
+
 **Use it to** draw a mask by hand with a pen tool, the way you would roto a shape
 in Nuke — and keep it editable forever, because what gets saved is the control
 points, not pixels. Click **Draw mask shapes** and the editor opens over the
