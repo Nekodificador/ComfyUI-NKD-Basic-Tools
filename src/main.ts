@@ -11,6 +11,8 @@ import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
 import NoisePreviewWidget from "./NoisePreviewWidget.vue";
 import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
 import { openColorWarpViewer, ColorWarpViewerHandle } from "./colorWarpViewer";
+import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
+import type { EditorMode } from "./splineEditor";
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -861,3 +863,172 @@ comfyApp.registerExtension({
     };
   },
 });
+
+// ---------------------------------------------------------------------------
+// 😺NKD Vector Mask / Path Blur / Field Blur — the spline editor nodes.
+//
+// All three are the same wiring: a hidden STRING widget holding the geometry, a
+// button that opens the shared overlay, and a backdrop frame that arrives one
+// of two ways. The upstream thumbnail is instant and tracks edits with no run,
+// but only Load Image has one — a VAE Decode has no thumbnail until the graph
+// runs, so the node also pushes its resolved input frame over the websocket and
+// that frame is cached per node id. Opening the editor after a run therefore
+// still shows that run.
+// ---------------------------------------------------------------------------
+
+const splineFrames = new Map<string, { canvas: HTMLCanvasElement; w: number; h: number }>();
+let openSpline: { nodeId: string; handle: SplineOverlayHandle } | null = null;
+
+api.addEventListener("nkd-source", (e: any) => {
+  const d = e?.detail;
+  if (!d?.data) return;
+  try {
+    const bin = atob(d.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const canvas = rgbBytesToCanvas(bytes, d.width, d.height);
+    const id = String(d.node);
+    splineFrames.set(id, { canvas, w: d.width, h: d.height });
+    if (openSpline?.nodeId === id) openSpline.handle.setImage(canvas, d.width, d.height);
+  } catch { /* ignore malformed */ }
+});
+
+/**
+ * Run one node and its upstream dependencies, nothing else.
+ *
+ * `app.queuePrompt` has no "just this node" form, so the serialised graph is
+ * intercepted for a single call and trimmed to the node plus whatever feeds it.
+ * The same trick as `js/mask_painter.js`, which cannot be imported from here —
+ * it is a hand-written vanilla extension outside the Vite bundle, and wiring a
+ * runtime import across that boundary is more fragile than the duplication.
+ */
+function collectUpstream(nodeId: string, output: any, into: any): void {
+  if (into[nodeId] || !output[nodeId]) return;
+  into[nodeId] = output[nodeId];
+  for (const value of Object.values(output[nodeId].inputs ?? {})) {
+    if (Array.isArray(value)) collectUpstream(String(value[0]), output, into);
+  }
+}
+
+async function queueNode(node: any): Promise<void> {
+  // The original method, not a bound copy, so it can be restored and still
+  // called with the right receiver.
+  const origQueue = (api as any).queuePrompt;
+  try {
+    (api as any).queuePrompt = async function (index: number, prompt: any) {
+      (api as any).queuePrompt = origQueue;          // one call only
+      if (prompt?.output) {
+        const filtered = {};
+        collectUpstream(String(node.id), prompt.output, filtered);
+        prompt = { ...prompt, output: filtered };
+      }
+      return origQueue.call(api, index, prompt);
+    };
+    await comfyApp.queuePrompt(0, 1);
+  } catch (err) {
+    (api as any).queuePrompt = origQueue;
+    console.error("[NKD Basic Tools] queue failed:", err);
+    (comfyApp as any).extensionManager?.toast?.add?.({
+      severity: "error", summary: "Queue Failed", detail: String(err), life: 6000,
+    });
+  }
+}
+
+/** The node settings the backend preview needs, read fresh so it tracks edits. */
+function widgetValues(node: any, names: string[]): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const n of names) {
+    const w = node.widgets?.find((x: any) => x.name === n);
+    if (w) out[n] = w.value;
+  }
+  return out;
+}
+
+function registerSplineNode(nodeName: string, widgetName: string, mode: EditorMode,
+                            title: string, buttonLabel: string,
+                            preview?: { kind: "field" | "path"; params: string[] }) {
+  comfyApp.registerExtension({
+    name: `NKD.BasicTools.${nodeName}`,
+    async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+      if (nodeData.name !== nodeName) return;
+      // "Refresh node definitions" re-runs this hook on the SAME prototype;
+      // without the guard the onNodeCreated wraps stack and every node ends up
+      // with duplicated, permanently-mounted widgets.
+      if (nodeType.prototype[`__nkd_${nodeName}`]) return;
+      nodeType.prototype[`__nkd_${nodeName}`] = true;
+
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function () {
+        const result = origCreated?.apply(this, arguments);
+        const node = this;
+
+        const dataW = this.widgets?.find((w: any) => w.name === widgetName);
+        if (dataW) {
+          dataW.type = "hidden";
+          dataW.hidden = true;
+          if (dataW.options) dataW.options.hidden = true;
+          dataW.computedHeight = 0;
+          dataW.computeSize = () => [0, -4];
+        }
+
+        const btn = this.addWidget("button", buttonLabel, null, () => {
+          if (openSpline) openSpline.handle.close();
+          const img = findSourceImg(node, "image");
+          const cached = splineFrames.get(String(node.id));
+          const src = img
+            ? { el: img as CanvasImageSource, w: img.naturalWidth, h: img.naturalHeight }
+            : cached
+              ? { el: cached.canvas as CanvasImageSource, w: cached.w, h: cached.h }
+              : { el: null, w: 1024, h: 1024 };
+
+          const handle = openSplineOverlay({
+            mode, title,
+            image: src.el, imageW: src.w, imageH: src.h,
+            json: dataW?.value || "",
+            nodeId: String(node.id),
+            previewKind: preview?.kind,
+            previewKey: widgetName as "pins" | "paths",
+            previewParams: preview ? () => widgetValues(node, preview.params) : undefined,
+            onChange: (json: string) => {
+              if (dataW) dataW.value = json;
+              node.setDirtyCanvas(true, true);
+            },
+            onClose: (json: string, save: boolean) => {
+              if (json && dataW) dataW.value = json;
+              node.setDirtyCanvas(true, true);
+              if (openSpline?.handle === handle) openSpline = null;
+              // Save & close runs the node, so the in-node preview shows what
+              // was just drawn instead of the previous run. Dismissing does not.
+              if (save) void queueNode(node);
+            },
+          });
+          openSpline = { nodeId: String(node.id), handle };
+        });
+        btn.serialize = false;
+
+        const origRemoved = this.onRemoved;
+        this.onRemoved = function () {
+          if (openSpline?.nodeId === String(node.id)) {
+            openSpline.handle.close();
+            openSpline = null;
+          }
+          splineFrames.delete(String(node.id));
+          origRemoved?.apply(this, arguments);
+        };
+
+        return result;
+      };
+    },
+  });
+}
+
+registerSplineNode("NKDVectorMask", "shapes", "shape",
+                   "😺 Vector Mask", "Draw mask shapes");
+registerSplineNode("NKDPathBlur", "paths", "path",
+                   "😺 Path Blur", "Draw motion strokes",
+                   { kind: "path", params: ["strength", "spread"] });
+registerSplineNode("NKDFieldBlur", "pins", "pin",
+                   "😺 Field Blur", "Place blur pins",
+                   { kind: "field", params: ["max_blur"] });
+
+console.log("[NKD Basic Tools] spline editors loaded (vector mask · path blur · field blur)");

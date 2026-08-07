@@ -5,7 +5,8 @@
   "description": "NKD Basic Tools – ComfyUI transversal utility nodes",
   "scripts": {
     "build": "vite build",
-    "dev": "vite build --watch"
+    "dev": "vite build --watch",
+    "test:ts": "esbuild tests/spline_eval_check.ts --bundle --format=esm --platform=node --outfile=node_modules/.cache/nkd_spline_check.mjs --log-level=warning && node node_modules/.cache/nkd_spline_check.mjs"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.0",

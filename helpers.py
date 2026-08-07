@@ -947,3 +947,84 @@ def _post_blend(orig: torch.Tensor, composite: torch.Tensor, mask: torch.Tensor,
         out[i, :, :, :3] = torch.from_numpy(np.ascontiguousarray(res)).to(
             device=composite.device, dtype=composite.dtype)
     return out
+
+
+# ---------------------------------------------------------------------------
+# Sending a backdrop frame to an in-browser editor
+# ---------------------------------------------------------------------------
+
+# Last frame pushed per node, kept so the editors' preview route has something
+# to work on without the graph running again. uint8 RGB, so a 1024² frame is 3 MB;
+# the cap is generous but bounded because a big graph can hold many editors.
+_SOURCE_CACHE: "dict[str, tuple[int, int, bytes]]" = {}
+_SOURCE_CACHE_MAX = 8
+
+
+def cached_source(unique_id):
+    """(height, width, RGB uint8 bytes) of the last frame pushed for this node."""
+    return _SOURCE_CACHE.get(str(unique_id))
+
+
+def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 1024) -> None:
+    """Push the first frame of `image` to the frontend as raw base64 RGB.
+
+    The editors that draw over an image need a backdrop, and walking the graph
+    for an upstream thumbnail only works when the source is a Load Image — a
+    VAE Decode has no thumbnail until it runs. So the node that *has* the pixels
+    sends them, keyed by node id, and the frontend caches the frame so opening
+    the editor after a run still shows that run.
+
+    Raw RGB bytes rather than a PNG: no encoder on the way out, no decoder on
+    the way in, and the frontend already has width/height to lay them out.
+    Never raises — a missing backdrop must not fail a render.
+    """
+    if unique_id is None:
+        return
+    try:
+        import base64
+        from server import PromptServer
+
+        frame = image[0] if hasattr(image, "shape") and len(image.shape) == 4 else image
+        if hasattr(frame, "detach"):
+            frame = frame.detach().cpu().numpy()
+        frame = np.clip(np.asarray(frame, dtype=np.float32), 0.0, 1.0)[:, :, :3]
+
+        longest = max(frame.shape[:2])
+        if longest > max_side:
+            step = int(np.ceil(longest / max_side))
+            frame = frame[::step, ::step]
+        h, w = frame.shape[:2]
+        buf = (frame * 255.0 + 0.5).astype(np.uint8).tobytes()
+
+        if len(_SOURCE_CACHE) >= _SOURCE_CACHE_MAX:
+            _SOURCE_CACHE.pop(next(iter(_SOURCE_CACHE)))
+        _SOURCE_CACHE[str(unique_id)] = (h, w, buf)
+
+        PromptServer.instance.send_sync(event, {
+            "node": str(unique_id),
+            "width": w, "height": h,
+            "data": base64.b64encode(buf).decode("ascii"),
+        })
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# In-node previews
+# ---------------------------------------------------------------------------
+
+_PREVIEW_FRAMES = 8
+
+
+def preview_frames(x: torch.Tensor, count: int = _PREVIEW_FRAMES) -> torch.Tensor:
+    """Evenly spaced frames of a batch, at full resolution.
+
+    A long clip only previews a handful of frames, because writing 81 PNGs to
+    temp on every run is the cost actually worth avoiding. Resolution is *not*:
+    downscaling throws away the mask edge and the blur falloff, which is the
+    only thing anyone is looking at the preview to judge.
+    """
+    if x.shape[0] <= count:
+        return x
+    idx = torch.linspace(0, x.shape[0] - 1, count).round().long()
+    return x[idx]

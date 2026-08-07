@@ -6807,7 +6807,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     const BAR_Y = PAD2.top;
     const BAR_H = CH - PAD2.top - PAD2.bottom;
     const BAR_MID = BAR_Y + BAR_H / 2;
-    const C = {
+    const C2 = {
       bg: "#111318",
       gridBorder: "rgba(255,255,255,0.16)",
       ptStroke: "rgba(0,0,0,0.65)",
@@ -6881,7 +6881,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     function redraw() {
       if (!ctx) return;
       ctx.clearRect(0, 0, CW, CH);
-      ctx.fillStyle = C.bg;
+      ctx.fillStyle = C2.bg;
       ctx.fillRect(0, 0, CW, CH);
       const grad = ctx.createLinearGradient(PAD2.left, 0, PAD2.left + IW, 0);
       const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
@@ -6889,7 +6889,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       ctx.fillStyle = grad;
       roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.fill();
-      ctx.strokeStyle = C.gridBorder;
+      ctx.strokeStyle = C2.gridBorder;
       ctx.lineWidth = 0.75;
       roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
       ctx.stroke();
@@ -6902,7 +6902,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
         if (isActive) {
           ctx.beginPath();
           ctx.arc(x, BAR_MID, r + 3.5, 0, Math.PI * 2);
-          ctx.strokeStyle = C.active;
+          ctx.strokeStyle = C2.active;
           ctx.lineWidth = 1.5;
           ctx.stroke();
         }
@@ -6916,7 +6916,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
         ctx.fill();
         ctx.restore();
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = C.ptStroke;
+        ctx.strokeStyle = C2.ptStroke;
         ctx.stroke();
       }
       const tip = dragging ? activeStop : hoverStop;
@@ -6933,13 +6933,13 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       let tx = x - w / 2;
       tx = Math.max(2, Math.min(CW - w - 2, tx));
       const ty = BAR_MID - 5 - h - 6;
-      ctx.fillStyle = C.tooltipBg;
-      ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : C.tooltipBorder;
+      ctx.fillStyle = C2.tooltipBg;
+      ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : C2.tooltipBorder;
       ctx.lineWidth = 1;
       roundRectPath(tx, ty, w, h, 4);
       ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = C.tooltipText;
+      ctx.fillStyle = C2.tooltipText;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(label, tx + w / 2, ty + h / 2 + 0.5);
@@ -7622,16 +7622,16 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       ctx.strokeRect(-r, -r, r * 2, r * 2);
       ctx.restore();
     }
-    function drawTooltip(at, text) {
+    function drawTooltip(at2, text) {
       if (!ctx) return;
       ctx.font = "10px monospace";
       const textW = ctx.measureText(text).width;
       const padX = 6, h = 16;
       const w = textW + padX * 2;
-      let tx = at[0] - w / 2;
+      let tx = at2[0] - w / 2;
       tx = Math.max(2, Math.min(BOX_W - w - 2, tx));
-      let ty = at[1] - 12 - h;
-      if (ty < 2) ty = at[1] + 12;
+      let ty = at2[1] - 12 - h;
+      if (ty < 2) ty = at2[1] + 12;
       ctx.fillStyle = "rgba(15,18,26,0.88)";
       ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : "rgba(74,180,255,0.5)";
       ctx.lineWidth = 1;
@@ -8814,14 +8814,14 @@ function mod(a, n) {
 }
 function oklabToOklch(lab) {
   const [L, a, b] = lab;
-  const C = Math.hypot(a, b);
+  const C2 = Math.hypot(a, b);
   const h = mod(Math.atan2(b, a) * DEG, 360);
-  return [L, C, h];
+  return [L, C2, h];
 }
 function oklchToOklab(lch) {
-  const [L, C, h] = lch;
+  const [L, C2, h] = lch;
   const r = h * RAD$2;
-  return [L, C * Math.cos(r), C * Math.sin(r)];
+  return [L, C2 * Math.cos(r), C2 * Math.sin(r)];
 }
 function srgbToHsl(rgb) {
   const [r, g, b] = rgb;
@@ -8906,8 +8906,8 @@ function hueToDisplay(hueDeg, anchors = DEFAULT_ANCHORS) {
   return mod(interp(h, ys, xs), 360);
 }
 function srgbToEngine(rgb) {
-  const [, C, h] = oklabToOklch(srgbToOklab(rgb));
-  return [h, C / C_REF];
+  const [, C2, h] = oklabToOklch(srgbToOklab(rgb));
+  return [h, C2 / C_REF];
 }
 function meshColumnHues(m) {
   if (m.hues && m.hues.length === m.hue_segments) return m.hues;
@@ -9112,14 +9112,14 @@ function bakeLut(m, size = 33) {
       for (let bi = 0; bi < size; bi++) {
         const b = bi * step;
         const lab = srgbToOklab([r, g, b]);
-        const [L, C, h] = oklabToOklch(lab);
-        const sat = C / C_REF;
+        const [L, C2, h] = oklabToOklch(lab);
+        const sat = C2 / C_REF;
         const [dh, ds, dl] = meshSample(m, h, sat);
         const h2 = mod(h + dh, 360);
         const sat2 = Math.max(sat + ds, 0);
-        const C2 = sat2 * C_REF;
+        const C22 = sat2 * C_REF;
         const L2 = clamp(L + dl, 0, 1);
-        const lab2 = oklchToOklab([L2, C2, h2]);
+        const lab2 = oklchToOklab([L2, C22, h2]);
         lab2[1] += na;
         lab2[2] += nb;
         const rgb = oklabToSrgb(compressToGamut(lab2));
@@ -9146,13 +9146,13 @@ function applyRgb(lut, size, rgb) {
   const fr = pr - r0;
   const fg = pg - g0;
   const fb = pb - b0;
-  const at = (dr, dg, db, c) => lut[(((r0 + dr) * N + (g0 + dg)) * N + (b0 + db)) * 3 + c];
+  const at2 = (dr, dg, db, c) => lut[(((r0 + dr) * N + (g0 + dg)) * N + (b0 + db)) * 3 + c];
   const res = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
-    const c00 = at(0, 0, 0, c) * (1 - fr) + at(1, 0, 0, c) * fr;
-    const c01 = at(0, 0, 1, c) * (1 - fr) + at(1, 0, 1, c) * fr;
-    const c10 = at(0, 1, 0, c) * (1 - fr) + at(1, 1, 0, c) * fr;
-    const c11 = at(0, 1, 1, c) * (1 - fr) + at(1, 1, 1, c) * fr;
+    const c00 = at2(0, 0, 0, c) * (1 - fr) + at2(1, 0, 0, c) * fr;
+    const c01 = at2(0, 0, 1, c) * (1 - fr) + at2(1, 0, 1, c) * fr;
+    const c10 = at2(0, 1, 0, c) * (1 - fr) + at2(1, 1, 0, c) * fr;
+    const c11 = at2(0, 1, 1, c) * (1 - fr) + at2(1, 1, 1, c) * fr;
     const c0 = c00 * (1 - fg) + c10 * fg;
     const c1 = c01 * (1 - fg) + c11 * fg;
     res[c] = c0 * (1 - fb) + c1 * fb;
@@ -9172,18 +9172,18 @@ const SKIN_CALIB_SAT = 0.5;
 function wheelHslHue(engHue, sat) {
   const rad = engHue * RAD$1, ca = Math.cos(rad), sb = Math.sin(rad);
   const L = WHEEL_L + (cuspL(engHue) - WHEEL_L) * sat;
-  let C = sat * C_REF * WHEEL_CHROMA;
-  if (!linInGamut(oklabToLinear([L, C * ca, C * sb]))) {
-    let lo = 0, hi = C;
+  let C2 = sat * C_REF * WHEEL_CHROMA;
+  if (!linInGamut(oklabToLinear([L, C2 * ca, C2 * sb]))) {
+    let lo = 0, hi = C2;
     for (let it = 0; it < 24; it++) {
       const mid = (lo + hi) / 2;
       if (linInGamut(oklabToLinear([L, mid * ca, mid * sb]))) lo = mid;
       else hi = mid;
     }
-    C = lo;
+    C2 = lo;
   }
-  const lin = oklabToLinear([L, C * ca, C * sb]);
-  return srgbToHsl([linearToSrgb(clamp01$1(lin[0])), linearToSrgb(clamp01$1(lin[1])), linearToSrgb(clamp01$1(lin[2]))])[0];
+  const lin = oklabToLinear([L, C2 * ca, C2 * sb]);
+  return srgbToHsl([linearToSrgb(clamp01$2(lin[0])), linearToSrgb(clamp01$2(lin[1])), linearToSrgb(clamp01$2(lin[2]))])[0];
 }
 function engineHueForWheelHsl(hslHue) {
   let lo = 0, hi = 110;
@@ -9216,7 +9216,7 @@ const LUMA_PER_WHEEL = 15e-4;
 function angleRad(displayDeg) {
   return (displayDeg - 90) * RAD$1;
 }
-function clamp01$1(x) {
+function clamp01$2(x) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 function wrapDeg(d) {
@@ -9498,7 +9498,7 @@ class ColorWarpGrid {
     const m = this.mesh;
     if (!m) return null;
     const R = m.sat_rings;
-    const ri = Math.min(Math.max(Math.round(clamp01$1(sat) * R), 1), R);
+    const ri = Math.min(Math.max(Math.round(clamp01$2(sat) * R), 1), R);
     const hues = meshColumnHues(m);
     let best = 0, bestD = Infinity;
     for (let s = 0; s < m.hue_segments; s++) {
@@ -9666,7 +9666,7 @@ class ColorWarpGrid {
   // Inverse: CSS-px screen point → [displayDeg, engine sat] (clamped to [0,1]).
   toPolar(x, y) {
     const dx = x - this.cx, dy = y - this.cy;
-    const sat = this.radial.toSat(clamp01$1(Math.hypot(dx, dy) / (this.R || 1)));
+    const sat = this.radial.toSat(clamp01$2(Math.hypot(dx, dy) / (this.R || 1)));
     let disp = Math.atan2(dy, dx) / RAD$1 + 90;
     disp = (disp % 360 + 360) % 360;
     return [disp, sat];
@@ -9678,16 +9678,16 @@ class ColorWarpGrid {
     const m = this.mesh;
     if (ri === 0) {
       const n = m.neutral ?? [0, 0];
-      const C = Math.hypot(n[0], n[1]);
+      const C2 = Math.hypot(n[0], n[1]);
       const hue = (Math.atan2(n[1], n[0]) * 180 / Math.PI + 360) % 360;
-      return this.polar(this.h2d(hue), Math.min(C / C_REF, 1));
+      return this.polar(this.h2d(hue), Math.min(C2 / C_REF, 1));
     }
     const R = m.sat_rings;
     const baseSat = ri / R;
     const off = m.offsets[ri][sj];
     const warpedHue = meshColumnHues(m)[sj] + off[0];
     const warpedDisp = this.h2d(warpedHue);
-    const warpedSat = clamp01$1(baseSat + off[1]);
+    const warpedSat = clamp01$2(baseSat + off[1]);
     return this.polar(warpedDisp, warpedSat);
   }
   // --- autonomy / hierarchy ------------------------------------------------
@@ -9701,7 +9701,7 @@ class ColorWarpGrid {
     const baseSat = ri / R;
     const off = m.offsets[ri][sj];
     const warpedHue = meshColumnHues(m)[sj] + off[0];
-    return [this.h2d(warpedHue), clamp01$1(baseSat + off[1])];
+    return [this.h2d(warpedHue), clamp01$2(baseSat + off[1])];
   }
   // Write the offset that places node (ri,sj) at a display angle + sat (keeps luma).
   setNodePolar(ri, sj, angle, sat) {
@@ -9868,8 +9868,8 @@ class ColorWarpGrid {
     const [disp, sat] = this.toPolar(x, y);
     if (ri === 0) {
       const rad = this.d2h(disp) * Math.PI / 180;
-      const C = sat * C_REF;
-      m.neutral = [C * Math.cos(rad), C * Math.sin(rad)];
+      const C2 = sat * C_REF;
+      m.neutral = [C2 * Math.cos(rad), C2 * Math.sin(rad)];
       for (let s = 0; s < m.hue_segments; s++) this.recomputeSpoke(s);
       return;
     }
@@ -9897,9 +9897,9 @@ class ColorWarpGrid {
       if (rr === 0) continue;
       const baseSat = rr / R;
       const snapAngle = this.h2d(hues[ss] + start[rr][ss][0]);
-      const snapSat = clamp01$1(baseSat + start[rr][ss][1]);
+      const snapSat = clamp01$2(baseSat + start[rr][ss][1]);
       const angle = d.axis === "h" ? snapAngle + dx * SHIFT_ROT_PER_PX : snapAngle;
-      const sat = d.axis === "v" ? clamp01$1(this.radial.toSat(clamp01$1(this.radial.toRadius(snapSat) - dy * SHIFT_SAT_PER_PX))) : snapSat;
+      const sat = d.axis === "v" ? clamp01$2(this.radial.toSat(clamp01$2(this.radial.toRadius(snapSat) - dy * SHIFT_SAT_PER_PX))) : snapSat;
       this.autonomous.add(this.key(rr, ss));
       this.setNodePolar(rr, ss, angle, sat);
       spokes.add(ss);
@@ -9952,17 +9952,17 @@ class ColorWarpGrid {
       for (let r = 0; r <= NR; r++) {
         const sat = this.radial.toSat(r / NR);
         const L = WHEEL_L + (Lc - WHEEL_L) * sat;
-        const C = sat * C_REF * WHEEL_CHROMA;
-        let lin = oklabToLinear([L, C * ca, C * sb]);
+        const C2 = sat * C_REF * WHEEL_CHROMA;
+        let lin = oklabToLinear([L, C2 * ca, C2 * sb]);
         if (!linInGamut(lin)) {
-          let lo = 0, hi = C;
+          let lo = 0, hi = C2;
           for (let it = 0; it < 12; it++) {
             const mid = (lo + hi) / 2;
             if (linInGamut(oklabToLinear([L, mid * ca, mid * sb]))) lo = mid;
             else hi = mid;
           }
           lin = oklabToLinear([L, lo * ca, lo * sb]);
-          const t = Math.min(1, (C - lo) / (0.35 * C_REF));
+          const t = Math.min(1, (C2 - lo) / (0.35 * C_REF));
           const fade = 1 - WHEEL_OOG_FADE * t * t;
           lin = [lin[0] * fade, lin[1] * fade, lin[2] * fade];
         }
@@ -10019,12 +10019,12 @@ class ColorWarpGrid {
         for (let x = 0; x < sw2; x += step2) {
           const k = (y * sw2 + x) * 3;
           const [h, s] = q > 1 ? srgbToEngine([
-            clamp01$1((data[k] + dither(k) * q) / 65535),
-            clamp01$1((data[k + 1] + dither(k + 1) * q) / 65535),
-            clamp01$1((data[k + 2] + dither(k + 2) * q) / 65535)
+            clamp01$2((data[k] + dither(k) * q) / 65535),
+            clamp01$2((data[k + 1] + dither(k + 1) * q) / 65535),
+            clamp01$2((data[k + 2] + dither(k + 2) * q) / 65535)
           ]) : srgbToEngine([data[k] / 65535, data[k + 1] / 65535, data[k + 2] / 65535]);
           out2[n2++] = h;
-          out2[n2++] = clamp01$1(s);
+          out2[n2++] = clamp01$2(s);
         }
       }
       this.scatter = out2.subarray(0, n2);
@@ -10050,12 +10050,12 @@ class ColorWarpGrid {
       for (let x = 0; x < sw; x += step) {
         const k = (y * sw + x) * 4;
         const [h, s] = srgbToEngine([
-          clamp01$1((px[k] + dither(k)) / 255),
-          clamp01$1((px[k + 1] + dither(k + 1)) / 255),
-          clamp01$1((px[k + 2] + dither(k + 2)) / 255)
+          clamp01$2((px[k] + dither(k)) / 255),
+          clamp01$2((px[k + 1] + dither(k + 1)) / 255),
+          clamp01$2((px[k + 2] + dither(k + 2)) / 255)
         ]);
         out[n++] = h;
-        out[n++] = clamp01$1(s);
+        out[n++] = clamp01$2(s);
       }
     }
     this.scatter = out.subarray(0, n);
@@ -10144,15 +10144,15 @@ class ColorWarpGrid {
   warpPoint(m, h, sat) {
     const [dh, ds] = meshSample(m, h, sat);
     let hue = h + dh;
-    let s2 = clamp01$1(sat + ds);
+    let s2 = clamp01$2(sat + ds);
     const n = m.neutral;
     if (n && (n[0] || n[1])) {
-      const C = s2 * C_REF;
+      const C2 = s2 * C_REF;
       const rad = hue * RAD$1;
-      const a = C * Math.cos(rad) + n[0];
-      const b = C * Math.sin(rad) + n[1];
+      const a = C2 * Math.cos(rad) + n[0];
+      const b = C2 * Math.sin(rad) + n[1];
       hue = Math.atan2(b, a) / RAD$1;
-      s2 = clamp01$1(Math.hypot(a, b) / C_REF);
+      s2 = clamp01$2(Math.hypot(a, b) / C_REF);
     }
     return [hue, s2];
   }
@@ -10929,7 +10929,7 @@ void main() {
   }
   outColor = vec4(vCol, uAlpha * w);
 }`;
-function clamp01(x) {
+function clamp01$1(x) {
   return x < 0 ? 0 : x > 1 ? 1 : x;
 }
 function matPerspective(fovy, aspect, near, far) {
@@ -11098,21 +11098,21 @@ class ColorWarpScope3D {
   // neutral axis, and 4 corner posts — enough to read orientation in orbit.
   buildRef(gl) {
     const v = [];
-    const C = [0.35, 0.45, 0.55];
+    const C2 = [0.35, 0.45, 0.55];
     const circle = (y) => {
       const N = 72;
       for (let i = 0; i < N; i++) {
         const a0 = i / N * Math.PI * 2, a1 = (i + 1) / N * Math.PI * 2;
-        v.push(Math.cos(a0), y, Math.sin(a0), ...C, Math.cos(a1), y, Math.sin(a1), ...C);
+        v.push(Math.cos(a0), y, Math.sin(a0), ...C2, Math.cos(a1), y, Math.sin(a1), ...C2);
       }
     };
     circle(0.5);
     circle(0);
     circle(1);
-    v.push(0, 0, 0, ...C, 0, 1, 0, ...C);
+    v.push(0, 0, 0, ...C2, 0, 1, 0, ...C2);
     for (let i = 0; i < 4; i++) {
       const a = i / 4 * Math.PI * 2 + Math.PI / 4;
-      v.push(Math.cos(a), 0, Math.sin(a), ...C, Math.cos(a), 1, Math.sin(a), ...C);
+      v.push(Math.cos(a), 0, Math.sin(a), ...C2, Math.cos(a), 1, Math.sin(a), ...C2);
     }
     const arr = new Float32Array(v);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.refBuf);
@@ -11128,7 +11128,7 @@ class ColorWarpScope3D {
   // Rebuilt with the cage because it depends on the radial mode, same as the cloud.
   buildSkin(gl) {
     const v = [];
-    const C = [0.95, 0.62, 0.42];
+    const C2 = [0.95, 0.62, 0.42];
     const { hueLo, hueHi, envelope } = SKIN_LOCUS;
     const L0 = envelope[0][0], L1 = envelope[envelope.length - 1][0];
     const ARC = 12, RUNGS = 9;
@@ -11138,7 +11138,7 @@ class ColorWarpScope3D {
       const r = this.radial.toRadius(sat);
       return [r * Math.cos(h), L, r * Math.sin(h)];
     };
-    const seg = (a, b) => v.push(a[0], a[1], a[2], ...C, b[0], b[1], b[2], ...C);
+    const seg = (a, b) => v.push(a[0], a[1], a[2], ...C2, b[0], b[1], b[2], ...C2);
     for (let k = 0; k < RUNGS; k++) {
       const L = L0 + (L1 - L0) * (k / (RUNGS - 1));
       for (let i = 0; i < ARC; i++) seg(pt(i / ARC, L), pt((i + 1) / ARC, L));
@@ -11292,18 +11292,18 @@ class ColorWarpScope3D {
       const L = lab[i * 3], a = lab[i * 3 + 1], b = lab[i * 3 + 2];
       let L2 = L, a2 = a, b2 = b;
       if (m) {
-        const C = Math.hypot(a, b);
+        const C2 = Math.hypot(a, b);
         const h = (Math.atan2(b, a) / RAD % 360 + 360) % 360;
-        const sat = C / C_REF;
+        const sat = C2 / C_REF;
         const [dh, ds, dl] = meshSample(m, h, sat);
-        const C2 = Math.max(sat + ds, 0) * C_REF;
+        const C22 = Math.max(sat + ds, 0) * C_REF;
         const h2 = (h + dh) * RAD;
-        a2 = C2 * Math.cos(h2) + na;
-        b2 = C2 * Math.sin(h2) + nb;
-        L2 = clamp01(L + dl);
+        a2 = C22 * Math.cos(h2) + na;
+        b2 = C22 * Math.sin(h2) + nb;
+        L2 = clamp01$1(L + dl);
       }
       const rgb = oklabToSrgb([L2, a2, b2]);
-      const r = clamp01(rgb[0]), g = clamp01(rgb[1]), bl = clamp01(rgb[2]);
+      const r = clamp01$1(rgb[0]), g = clamp01$1(rgb[1]), bl = clamp01$1(rgb[2]);
       const dg = this.floorGain(a2, b2);
       const px = a2 / C_REF * dg, py = L2, pz = b2 / C_REF * dg;
       const o = i * 6;
@@ -11755,6 +11755,1566 @@ function mkPane() {
   const p2 = document.createElement("div");
   p2.style.cssText = `position:relative;flex:1 1 0;min-width:0;overflow:hidden;background:${PANEL}`;
   return p2;
+}
+const STYLE_ID = "nkd-modal-styles";
+const CSS = `
+.nkd-modal-overlay {
+  position: fixed; inset: 0; z-index: 100000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.8); backdrop-filter: blur(3px);
+  font: 12px system-ui, sans-serif; color: #c8d0e0;
+}
+/* Framed panel, never edge-to-edge: the graph staying visible around the border
+   is what keeps the editor feeling like part of the workflow. */
+.nkd-modal-panel {
+  display: flex; flex-direction: column;
+  background: #111318; color: #c8d0e0;
+  border: 1px solid #3a3d46; border-radius: 10px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+  overflow: hidden;
+}
+.nkd-modal-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: #1a1c22;
+  border-bottom: 1px solid rgba(255,255,255,0.07); font-weight: 500;
+}
+.nkd-modal-hint { color: rgba(255,255,255,0.40); font-size: 11px; font-weight: 400; }
+.nkd-modal-spacer { flex: 1 1 auto; }
+.nkd-modal-x {
+  background: transparent; border: none; color: #c8d0e0;
+  font-size: 16px; cursor: pointer; padding: 2px 8px; border-radius: 4px;
+}
+.nkd-modal-x:hover { background: rgba(255,77,77,0.25); color: #ff6b6b; }
+.nkd-modal-body { position: relative; flex: 1 1 auto; min-height: 0; background: #0b0d12; display: flex; }
+.nkd-modal-body > canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.nkd-modal-foot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 14px; background: #1a1c22;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.nkd-modal-foot-left, .nkd-modal-foot-right { display: flex; align-items: center; gap: 12px; }
+
+/* Shared controls. Vue templates use these class names directly instead of
+   re-declaring the same rules in <style scoped>. */
+.nkd-modal-btn {
+  background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
+  color: #c8d0e0; padding: 4px 10px; font-size: 12px; cursor: pointer;
+}
+.nkd-modal-btn:hover { border-color: #4ab4ff; }
+.nkd-modal-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.nkd-modal-btn.on { border-color: #4ab4ff; color: #4ab4ff; background: rgba(74,180,255,0.12); }
+.nkd-modal-btn.primary { border-color: #4ab4ff; color: #4ab4ff; font-weight: 500; padding: 5px 14px; }
+.nkd-modal-btn.primary:hover { background: rgba(74,180,255,0.15); }
+.nkd-modal-lbl { color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
+.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; }
+.nkd-modal-sel {
+  background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
+  color: #c8d0e0; padding: 3px 8px; font-size: 12px; cursor: pointer;
+}
+.nkd-modal-status { color: #4ab4ff; font-variant-numeric: tabular-nums; }
+.nkd-modal-status.bad { color: #ff6b6b; }
+`;
+function ensureNkdModalStyles() {
+  if (document.getElementById(STYLE_ID)) return;
+  const el = document.createElement("style");
+  el.id = STYLE_ID;
+  el.textContent = CSS;
+  document.head.appendChild(el);
+}
+function div(cls) {
+  const d = document.createElement("div");
+  d.className = cls;
+  return d;
+}
+function openNkdModal(opts) {
+  ensureNkdModalStyles();
+  const overlay = div("nkd-modal-overlay");
+  const panel = div("nkd-modal-panel");
+  panel.style.width = opts.width ?? "92vw";
+  panel.style.height = opts.height ?? "92vh";
+  panel.style.maxWidth = opts.maxWidth ?? "1800px";
+  const head = div("nkd-modal-head");
+  const titleEl = document.createElement("span");
+  titleEl.textContent = opts.title;
+  const hintEl = document.createElement("span");
+  hintEl.className = "nkd-modal-hint";
+  hintEl.textContent = opts.hint ?? "";
+  const xBtn = document.createElement("button");
+  xBtn.className = "nkd-modal-x";
+  xBtn.textContent = "✕";
+  xBtn.title = "Close (Esc)";
+  head.append(titleEl, hintEl, div("nkd-modal-spacer"), xBtn);
+  const body = div("nkd-modal-body");
+  const footer = div("nkd-modal-foot");
+  const footerLeft = div("nkd-modal-foot-left");
+  const footerRight = div("nkd-modal-foot-right");
+  footer.append(footerLeft, div("nkd-modal-spacer"), footerRight);
+  panel.append(head, body, footer);
+  overlay.append(panel);
+  document.body.appendChild(overlay);
+  let closed = false;
+  function close(reason = "dismiss") {
+    var _a;
+    if (closed) return;
+    closed = true;
+    window.removeEventListener("keydown", onKey, true);
+    overlay.remove();
+    (_a = opts.onClose) == null ? void 0 : _a.call(opts, reason);
+  }
+  function onKey(e) {
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    e.preventDefault();
+    close("dismiss");
+  }
+  xBtn.onclick = () => close("dismiss");
+  if (opts.closeOnEsc !== false) window.addEventListener("keydown", onKey, true);
+  if (opts.closeOnBackdrop !== false) {
+    overlay.addEventListener("pointerdown", (e) => {
+      if (e.target === overlay) close("dismiss");
+    });
+  }
+  return {
+    overlay,
+    panel,
+    head,
+    body,
+    footer,
+    footerLeft,
+    footerRight,
+    setTitle: (t) => {
+      titleEl.textContent = t;
+    },
+    setHint: (h) => {
+      hintEl.textContent = h;
+    },
+    addPrimary(label, onClick) {
+      const b = nkdButton(label, () => {
+        onClick == null ? void 0 : onClick();
+        close("save");
+      });
+      b.classList.add("primary");
+      footerRight.appendChild(b);
+      return b;
+    },
+    close
+  };
+}
+function nkdButton(label, onClick, title) {
+  const b = document.createElement("button");
+  b.className = "nkd-modal-btn";
+  b.textContent = label;
+  if (title) b.title = title;
+  b.onclick = onClick;
+  return b;
+}
+function nkdToggle(label, initial, onChange, title) {
+  let on = initial;
+  const b = nkdButton(label, () => {
+    on = !on;
+    b.classList.toggle("on", on);
+    onChange(on);
+  }, title);
+  b.classList.toggle("on", on);
+  return b;
+}
+function nkdSlider(label, cfg, onInput, title) {
+  const wrap = document.createElement("label");
+  wrap.className = "nkd-modal-lbl";
+  if (title) wrap.title = title;
+  const rng = document.createElement("input");
+  rng.type = "range";
+  rng.className = "nkd-modal-rng";
+  rng.min = String(cfg.min);
+  rng.max = String(cfg.max);
+  rng.step = String(cfg.step);
+  rng.value = String(cfg.value);
+  rng.oninput = () => onInput(parseFloat(rng.value));
+  wrap.append(document.createTextNode(label), rng);
+  return wrap;
+}
+const FLATTEN_TOL = 1 / 24576;
+const MIN_W$1 = 1;
+const MAX_W = 10;
+const MIN_SPLITS = 3;
+const MAX_DEPTH = 14;
+const clampW = (v) => Math.max(MIN_W$1, Math.min(MAX_W, Number.isFinite(v) ? v : MIN_W$1));
+function segDist(p2, a, b) {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const len2 = dx * dx + dy * dy;
+  if (len2 < 1e-24) return Math.hypot(p2[0] - a[0], p2[1] - a[1]);
+  let t = ((p2[0] - a[0]) * dx + (p2[1] - a[1]) * dy) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(p2[0] - (a[0] + t * dx), p2[1] - (a[1] + t * dy));
+}
+function adaptive(f, t0, t1, p0, p1, tol, out, depth) {
+  const tm = (t0 + t1) / 2;
+  const pm = f(tm);
+  if (depth >= MIN_SPLITS && (segDist(pm, p0, p1) <= tol || depth >= MAX_DEPTH)) {
+    out.push(p1);
+    return;
+  }
+  adaptive(f, t0, tm, p0, pm, tol, out, depth + 1);
+  adaptive(f, tm, t1, pm, p1, tol, out, depth + 1);
+}
+const at = (pts, i, closed) => {
+  const n = pts.length;
+  if (closed) return pts[(i % n + n) % n];
+  return pts[Math.max(0, Math.min(n - 1, i))];
+};
+function controlPoints(pts, i, closed) {
+  const p1 = at(pts, i, closed);
+  const p2 = at(pts, i + 1, closed);
+  const p0 = at(pts, i - 1, closed);
+  const p3 = at(pts, i + 2, closed);
+  const c1 = p1.corner ? [p1.x, p1.y] : p1.h ? [p1.x + p1.h[2], p1.y + p1.h[3]] : [p1.x + (p2.x - p0.x) / 6, p1.y + (p2.y - p0.y) / 6];
+  const c2 = p2.corner ? [p2.x, p2.y] : p2.h ? [p2.x + p2.h[0], p2.y + p2.h[1]] : [p2.x - (p3.x - p1.x) / 6, p2.y - (p3.y - p1.y) / 6];
+  return [c1, c2];
+}
+function bezierSegments(pts, closed) {
+  const segs = [];
+  const last = closed ? pts.length : pts.length - 1;
+  for (let i = 0; i < last; i++) {
+    const [c1, c2] = controlPoints(pts, i, closed);
+    const a = at(pts, i, closed);
+    const b = at(pts, i + 1, closed);
+    segs.push([[a.x, a.y], c1, c2, [b.x, b.y]]);
+  }
+  return segs;
+}
+const cubic = (p0, c1, c2, p3) => (t) => {
+  const u = 1 - t;
+  const a = u * u * u, b = 3 * u * u * t, c = 3 * u * t * t, d = t * t * t;
+  return [
+    a * p0[0] + b * c1[0] + c * c2[0] + d * p3[0],
+    a * p0[1] + b * c1[1] + c * c2[1] + d * p3[1]
+  ];
+};
+const NURBS_DEGREE = 3;
+function clampedKnots(nPts, degree) {
+  const order = degree + 1;
+  if (nPts <= degree) return new Array(nPts + order).fill(0);
+  const knots = [];
+  for (let i = 0; i < order; i++) knots.push(0);
+  const interior = nPts - degree;
+  for (let i = 1; i < interior; i++) knots.push(i / interior);
+  for (let i = 0; i < order; i++) knots.push(1);
+  return knots;
+}
+function uniformKnots(nPts, degree) {
+  const knots = [];
+  for (let i = 0; i < nPts + degree + 1; i++) knots.push(i);
+  return knots;
+}
+function nurbsBasis(knots, nPts, degree, u) {
+  u = Math.max(knots[degree], Math.min(knots[nPts], u));
+  if (u >= knots[nPts]) u = knots[nPts] - 1e-10;
+  const len = knots.length - 1;
+  let N = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) {
+    if (knots[i] <= u && u < knots[i + 1]) N[i] = 1;
+  }
+  for (let p2 = 1; p2 <= degree; p2++) {
+    const next = new Array(len).fill(0);
+    for (let i = 0; i < len - p2; i++) {
+      const d1 = knots[i + p2] - knots[i];
+      const d2 = knots[i + p2 + 1] - knots[i + 1];
+      const c1 = d1 > 0 ? (u - knots[i]) / d1 * N[i] : 0;
+      const c2 = d2 > 0 ? (knots[i + p2 + 1] - u) / d2 * N[i + 1] : 0;
+      next[i] = c1 + c2;
+    }
+    N = next;
+  }
+  return N.slice(0, nPts);
+}
+function nurbsEvaluate(P, weights, knots, degree, u) {
+  const N = nurbsBasis(knots, P.length, degree, u);
+  let wx = 0, wy = 0, sum = 0;
+  for (let i = 0; i < P.length; i++) {
+    const nw = N[i] * weights[i];
+    wx += nw * P[i][0];
+    wy += nw * P[i][1];
+    sum += nw;
+  }
+  return sum === 0 ? P[0] : [wx / sum, wy / sum];
+}
+function bsplineSetup(pts, closed) {
+  const n = pts.length;
+  if (n < 3) return null;
+  const expanded = [];
+  const src = [];
+  pts.forEach((p2, i) => {
+    for (let k = 0; k < (p2.corner ? NURBS_DEGREE : 1); k++) {
+      expanded.push(p2);
+      src.push(i);
+    }
+  });
+  const degree = Math.min(NURBS_DEGREE, closed ? expanded.length : expanded.length - 1);
+  if (degree < 1) return null;
+  const ctrl = closed ? expanded.concat(expanded.slice(0, degree)) : expanded;
+  const srcOf = closed ? src.concat(src.slice(0, degree)) : src;
+  return {
+    P: ctrl.map((p2) => [p2.x, p2.y]),
+    weights: ctrl.map((p2) => clampW(p2.w)),
+    knots: closed ? uniformKnots(ctrl.length, degree) : clampedKnots(ctrl.length, degree),
+    degree,
+    srcOf
+  };
+}
+function greville(b) {
+  const out = [];
+  for (let j = 0; j < b.P.length; j++) {
+    let s = 0;
+    for (let k = 1; k <= b.degree; k++) s += b.knots[j + k];
+    out.push(s / b.degree);
+  }
+  return out;
+}
+function bsplinePolyline(pts, closed, tol) {
+  const b = bsplineSetup(pts, closed);
+  if (!b) return pts.map((p2) => [p2.x, p2.y]);
+  const { P, weights, knots, degree } = b;
+  const out = [];
+  const ev = (u) => nurbsEvaluate(P, weights, knots, degree, u);
+  for (let i = degree; i < P.length; i++) {
+    const u0 = knots[i], u1 = knots[i + 1];
+    if (!(u1 > u0)) continue;
+    const a = ev(u0);
+    if (!out.length) out.push(a);
+    adaptive(ev, u0, u1, a, ev(u1), tol, out, 0);
+  }
+  return out;
+}
+function simplify(pts, tol) {
+  if (pts.length < 3) return pts;
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  const stack2 = [[0, pts.length - 1]];
+  while (stack2.length) {
+    const [lo, hi] = stack2.pop();
+    if (hi - lo < 2) continue;
+    let best = -1, bestD = tol;
+    for (let i = lo + 1; i < hi; i++) {
+      const d = segDist(pts[i], pts[lo], pts[hi]);
+      if (d > bestD) {
+        bestD = d;
+        best = i;
+      }
+    }
+    if (best < 0) continue;
+    keep[best] = 1;
+    stack2.push([lo, best], [best, hi]);
+  }
+  return pts.filter((_, i) => keep[i]);
+}
+function dropCollinearWrapped(pts, tol) {
+  const n = pts.length;
+  if (n < 4) return pts;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const prev = out.length ? out[out.length - 1] : pts[n - 1];
+    if (segDist(pts[i], prev, pts[(i + 1) % n]) > tol) out.push(pts[i]);
+  }
+  return out.length >= 3 ? out : pts;
+}
+function insertionIndex(pts, type, closed, target, tol, aspect = 1) {
+  if (pts.length < 2) return null;
+  const sx = (p2) => [p2[0] * aspect, p2[1]];
+  const t = sx(target);
+  const scan = (ev2, u0, u1, steps) => {
+    let bd = Infinity, bu = u0, bp = ev2(u0);
+    let prev = ev2(u0), prevU = u0;
+    for (let i = 1; i <= steps; i++) {
+      const u = u0 + (u1 - u0) * i / steps;
+      const cur = ev2(u);
+      const a = sx(prev), b2 = sx(cur);
+      const dx = b2[0] - a[0], dy = b2[1] - a[1];
+      const l2 = dx * dx + dy * dy;
+      const s = l2 < 1e-18 ? 0 : Math.max(0, Math.min(1, ((t[0] - a[0]) * dx + (t[1] - a[1]) * dy) / l2));
+      const d = Math.hypot(t[0] - (a[0] + s * dx), t[1] - (a[1] + s * dy));
+      if (d < bd) {
+        bd = d;
+        bu = prevU + (u - prevU) * s;
+        bp = [prev[0] + (cur[0] - prev[0]) * s, prev[1] + (cur[1] - prev[1]) * s];
+      }
+      prev = cur;
+      prevU = u;
+    }
+    return { d: bd, u: bu, p: bp };
+  };
+  if (type !== "bspline") {
+    const segs = bezierSegments(pts, closed);
+    let best2 = { d: Infinity, i: -1, p: [0, 0] };
+    segs.forEach(([p0, c1, c2, p3], i) => {
+      const got = scan(cubic(p0, c1, c2, p3), 0, 1, 48);
+      if (got.d < best2.d) best2 = { d: got.d, i, p: got.p };
+    });
+    if (best2.i < 0 || best2.d > tol) return null;
+    return { at: Math.max(1, best2.i + 1), point: best2.p };
+  }
+  const b = bsplineSetup(pts, closed);
+  if (!b) return null;
+  const { P, weights, knots, degree, srcOf } = b;
+  const ev = (u) => nurbsEvaluate(P, weights, knots, degree, u);
+  let best = { d: Infinity, u: 0, p: [0, 0] };
+  for (let i = degree; i < P.length; i++) {
+    if (!(knots[i + 1] > knots[i])) continue;
+    const got = scan(ev, knots[i], knots[i + 1], 32);
+    if (got.d < best.d) best = got;
+  }
+  if (best.d > tol) return null;
+  const grev = greville(b);
+  let j = grev.findIndex((g) => g > best.u);
+  if (j < 1) j = 1;
+  const n = pts.length;
+  const at2 = Math.max(1, Math.min(n, srcOf[j - 1] + 1));
+  return { at: at2, point: best.p };
+}
+function flatten(pts, type, closed, tol = FLATTEN_TOL) {
+  if (pts.length < 2) return pts.map((p2) => [p2.x, p2.y]);
+  let out;
+  if (type === "bspline") {
+    out = bsplinePolyline(pts, closed, tol);
+  } else {
+    out = [[pts[0].x, pts[0].y]];
+    for (const [p0, c1, c2, p3] of bezierSegments(pts, closed)) {
+      adaptive(cubic(p0, c1, c2, p3), 0, 1, p0, p3, tol, out, 0);
+    }
+  }
+  out = simplify(out, tol);
+  if (closed && out.length > 1) {
+    const a = out[0], b = out[out.length - 1];
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < tol) out.pop();
+    out = dropCollinearWrapped(out, tol);
+  }
+  return out;
+}
+const RING = { inner: 16, maxWidth: 18, tol: 5 };
+const SCRUB_PX = 90;
+const FINE = 0.1;
+function hitRing(px, py, cx, cy) {
+  const d = Math.hypot(px - cx, py - cy);
+  return d >= RING.inner - RING.tol && d <= RING.inner + RING.maxWidth + RING.tol;
+}
+function hitDot(px, py, cx, cy, r = 9) {
+  return Math.hypot(px - cx, py - cy) <= r;
+}
+function drawRing(ctx, cx, cy, value, color, selected) {
+  const v = Math.max(0, Math.min(1, value));
+  const w = 2 + v * (RING.maxWidth - 2);
+  ctx.save();
+  ctx.strokeStyle = "rgba(255,255,255,0.10)";
+  ctx.lineWidth = RING.maxWidth;
+  ctx.beginPath();
+  ctx.arc(cx, cy, RING.inner + RING.maxWidth / 2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = w;
+  ctx.beginPath();
+  ctx.arc(cx, cy, RING.inner + w / 2, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = selected ? "#ff6b6b" : color;
+  ctx.strokeStyle = "rgba(0,0,0,0.65)";
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  if (selected) {
+    ctx.fillStyle = "#c8d0e0";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(v.toFixed(2), cx, cy - RING.inner - RING.maxWidth - 6);
+  }
+  ctx.restore();
+}
+function startScrub(startY, get, set) {
+  let prev = startY;
+  return (y, fine) => {
+    const delta = (prev - y) / SCRUB_PX * (fine ? FINE : 1);
+    prev = y;
+    set(Math.max(0, Math.min(1, get() + delta)));
+  };
+}
+const C = {
+  bg: "#0b0d12",
+  add: "#4ab4ff",
+  sub: "#ff6b6b",
+  path: "#4ab4ff",
+  idle: "rgba(255,255,255,0.45)",
+  pt: "#4ab4ff",
+  ptHover: "#ffd166",
+  ptActive: "#ff6b6b",
+  handle: "rgba(255,209,102,0.85)",
+  ptStroke: "rgba(0,0,0,0.65)",
+  hull: "rgba(255,255,255,0.28)"
+};
+const HIT = 10;
+const PT_R = { idle: 4.5, hover: 6, active: 7 };
+const HANDLE_HIT = 7;
+const UNDO_DEPTH = 30;
+const MIN_PTS = { shape: 3, path: 2 };
+class SplineEditor {
+  constructor(opts) {
+    __publicField(this, "canvas");
+    __publicField(this, "ctx");
+    __publicField(this, "ro");
+    __publicField(this, "mode");
+    __publicField(this, "onEdit");
+    __publicField(this, "onState");
+    __publicField(this, "image", null);
+    __publicField(this, "imgW", 1);
+    __publicField(this, "imgH", 1);
+    __publicField(this, "shapes", []);
+    __publicField(this, "pins", []);
+    /** Index of the shape being drawn into / edited. -1 for none. */
+    __publicField(this, "active", -1);
+    __publicField(this, "selPt", -1);
+    __publicField(this, "hover", null);
+    /** Defaults the toolbar writes and new shapes inherit. */
+    __publicField(this, "newType", "bezier");
+    __publicField(this, "newOp", "add");
+    __publicField(this, "showFill", true);
+    __publicField(this, "view", "result");
+    /** Backend-rendered result for the blur modes; null until one arrives. */
+    __publicField(this, "preview", null);
+    /** Offscreen matte for shape mode, rebuilt on every edit — cheap and exact. */
+    __publicField(this, "matte", null);
+    __publicField(this, "zoom", 1);
+    __publicField(this, "panX", 0);
+    __publicField(this, "panY", 0);
+    __publicField(this, "fit", 1);
+    __publicField(this, "drag", null);
+    __publicField(this, "undo", []);
+    __publicField(this, "onDown", (e) => {
+      const [px, py] = this.eventPos(e);
+      this.canvas.setPointerCapture(e.pointerId);
+      if (e.button === 1 || e.altKey) {
+        this.drag = { kind: "pan", x: px - this.panX, y: py - this.panY };
+        return;
+      }
+      if (e.button !== 0) return;
+      if (this.mode === "pin") return this.downPin(e, px, py);
+      const hit = this.pick(px, py);
+      if (hit && hit.handle < 0 && hit.i === 0 && hit.s === this.active) {
+        const s2 = this.shapes[hit.s];
+        if (this.mode === "shape" && !s2.closed && s2.pts.length >= MIN_PTS.shape) {
+          this.snapshot();
+          s2.closed = true;
+          this.finishShape();
+          return;
+        }
+      }
+      if (hit && hit.handle >= 0) {
+        this.snapshot();
+        this.drag = { kind: "handle", s: hit.s, i: hit.i, side: hit.handle };
+        return;
+      }
+      if (hit) {
+        if (e.shiftKey) {
+          this.snapshot();
+          const s2 = this.shapes[hit.s];
+          s2.pts.splice(hit.i, 1);
+          if (s2.pts.length === 0) {
+            this.shapes.splice(hit.s, 1);
+            this.active = -1;
+          }
+          this.selPt = -1;
+          this.commit();
+          return;
+        }
+        this.active = hit.s;
+        this.selPt = hit.i;
+        this.snapshot();
+        const p2 = this.shapes[hit.s].pts[hit.i];
+        const [nx2, ny2] = this.toNorm(px, py);
+        this.drag = { kind: "pt", s: hit.s, i: hit.i, dx: p2.x - nx2, dy: p2.y - ny2 };
+        this.emit(true);
+        return;
+      }
+      const ins = this.pickCurve(px, py);
+      if (ins) {
+        this.snapshot();
+        const s2 = this.shapes[ins.s];
+        s2.pts.splice(ins.at, 0, {
+          x: ins.x,
+          y: ins.y,
+          h: null,
+          corner: false
+        });
+        this.active = ins.s;
+        this.selPt = ins.at;
+        const [cnx, cny] = this.toNorm(px, py);
+        this.drag = { kind: "pt", s: ins.s, i: ins.at, dx: ins.x - cnx, dy: ins.y - cny };
+        this.emit(true);
+        return;
+      }
+      this.snapshot();
+      if (this.active < 0 || this.shapes[this.active].closed) {
+        if (this.active >= 0) this.finishShape();
+        this.shapes.push(this.newShape());
+        this.active = this.shapes.length - 1;
+      }
+      const [nx, ny] = this.toNorm(px, py);
+      const s = this.shapes[this.active];
+      s.pts.push({ x: clamp01(nx), y: clamp01(ny), h: null, corner: false });
+      this.selPt = s.pts.length - 1;
+      this.drag = { kind: "pt", s: this.active, i: this.selPt, dx: 0, dy: 0 };
+      this.emit(true);
+    });
+    __publicField(this, "onMove", (e) => {
+      const [px, py] = this.eventPos(e);
+      const d = this.drag;
+      if (!d) {
+        const hit = this.mode === "pin" ? null : this.pick(px, py);
+        const changed = JSON.stringify(hit) !== JSON.stringify(this.hover);
+        this.hover = hit;
+        this.canvas.style.cursor = hit ? "pointer" : "crosshair";
+        if (changed) this.draw();
+        return;
+      }
+      if (d.kind === "pan") {
+        this.panX = px - d.x;
+        this.panY = py - d.y;
+        this.draw();
+        return;
+      }
+      if (d.kind === "scrub") {
+        d.apply(py, e.shiftKey);
+        this.emit(false);
+        return;
+      }
+      const [nx, ny] = this.toNorm(px, py);
+      if (d.kind === "pin") {
+        const p2 = this.pins[d.i];
+        p2.x = clamp01(nx + d.dx);
+        p2.y = clamp01(ny + d.dy);
+        this.emit(false);
+        return;
+      }
+      const s = this.shapes[d.s];
+      if (!s) return;
+      if (d.kind === "pt") {
+        const p2 = s.pts[d.i];
+        p2.x = clamp01(nx + d.dx);
+        p2.y = clamp01(ny + d.dy);
+      } else {
+        const p2 = s.pts[d.i];
+        this.ensureHandles(s, d.i);
+        const hx = nx - p2.x;
+        const hy = ny - p2.y;
+        p2.h[d.side] = hx;
+        p2.h[d.side + 1] = hy;
+        if (!e.altKey) {
+          const other = d.side === 0 ? 2 : 0;
+          p2.h[other] = -hx;
+          p2.h[other + 1] = -hy;
+        }
+      }
+      this.emit(false);
+    });
+    __publicField(this, "onUp", (e) => {
+      if (!this.drag) return;
+      const wasEdit = this.drag.kind !== "pan";
+      this.drag = null;
+      try {
+        this.canvas.releasePointerCapture(e.pointerId);
+      } catch {
+      }
+      if (wasEdit) this.commit();
+    });
+    __publicField(this, "onDblClick", (e) => {
+      if (this.mode === "pin") return;
+      const [px, py] = this.eventPos(e);
+      const hit = this.pick(px, py);
+      if (!hit && this.active >= 0) {
+        const s = this.shapes[this.active];
+        const n = s.pts.length;
+        if (n >= 2) {
+          const [ax, ay] = this.toScreen(s.pts[n - 1].x, s.pts[n - 1].y);
+          const [bx, by] = this.toScreen(s.pts[n - 2].x, s.pts[n - 2].y);
+          if (Math.hypot(ax - bx, ay - by) < HIT) s.pts.pop();
+        }
+        if (this.mode === "shape" && s.pts.length >= MIN_PTS.shape) s.closed = true;
+        this.finishShape();
+        return;
+      }
+      if (!hit || hit.handle >= 0) return;
+      this.snapshot();
+      const p2 = this.shapes[hit.s].pts[hit.i];
+      p2.corner = !p2.corner;
+      if (p2.corner) p2.h = null;
+      this.commit();
+    });
+    __publicField(this, "onWheel", (e) => {
+      e.preventDefault();
+      const [px, py] = this.eventPos(e);
+      const [nx, ny] = this.toNorm(px, py);
+      this.zoom = Math.max(0.2, Math.min(24, this.zoom * (e.deltaY < 0 ? 1.12 : 1 / 1.12)));
+      this.panX = px - nx * this.viewW;
+      this.panY = py - ny * this.viewH;
+      this.draw();
+    });
+    __publicField(this, "onKey", (e) => {
+      if (!this.canvas.isConnected) return;
+      const meta = e.ctrlKey || e.metaKey;
+      if (meta && e.key.toLowerCase() === "z") {
+        const prev = this.undo.pop();
+        if (prev != null) {
+          e.preventDefault();
+          e.stopPropagation();
+          const keep = this.undo;
+          this.deserialise(prev);
+          this.undo = keep;
+          this.emit(true);
+        }
+        return;
+      }
+      if (e.key === "Enter") {
+        e.stopPropagation();
+        this.finishShape();
+        return;
+      }
+      if (e.key === "Delete" || e.key === "Backspace") {
+        e.stopPropagation();
+        this.deleteActive();
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        this.fitView();
+      }
+    });
+    this.mode = opts.mode;
+    if (opts.mode === "shape") this.newType = "bspline";
+    this.onEdit = opts.onEdit;
+    this.onState = opts.onState;
+    this.canvas = document.createElement("canvas");
+    this.canvas.style.cssText = "display:block;width:100%;height:100%;touch-action:none;cursor:crosshair";
+    this.ctx = this.canvas.getContext("2d");
+    this.canvas.addEventListener("pointerdown", this.onDown);
+    this.canvas.addEventListener("pointermove", this.onMove);
+    this.canvas.addEventListener("pointerup", this.onUp);
+    this.canvas.addEventListener("pointercancel", this.onUp);
+    this.canvas.addEventListener("dblclick", this.onDblClick);
+    this.canvas.addEventListener("wheel", this.onWheel, { passive: false });
+    this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    window.addEventListener("keydown", this.onKey, true);
+    this.ro = new ResizeObserver(() => this.resize());
+    this.ro.observe(this.canvas);
+  }
+  destroy() {
+    this.ro.disconnect();
+    window.removeEventListener("keydown", this.onKey, true);
+  }
+  /* ── View ──────────────────────────────────────────────────────────────── */
+  setImage(img, w, h) {
+    this.image = img;
+    this.imgW = Math.max(1, w);
+    this.imgH = Math.max(1, h);
+    this.preview = null;
+    if (this.mode === "shape") this.buildMatte();
+    this.fitView();
+  }
+  get aspect() {
+    return this.imgW / this.imgH;
+  }
+  /** The backdrop as a base64 PNG, for the backend preview to work on when it
+   *  has no cached frame of its own. Null if there is nothing to send. */
+  sourceFrame(maxSide = 640) {
+    if (!this.image) return null;
+    const scale = Math.min(1, maxSide / Math.max(this.imgW, this.imgH));
+    const c = document.createElement("canvas");
+    c.width = Math.max(1, Math.round(this.imgW * scale));
+    c.height = Math.max(1, Math.round(this.imgH * scale));
+    try {
+      c.getContext("2d").drawImage(this.image, 0, 0, c.width, c.height);
+      return c.toDataURL("image/png");
+    } catch {
+      return null;
+    }
+  }
+  fitView() {
+    const { width: cw, height: ch } = this.logicalSize();
+    this.fit = Math.min(cw / this.imgW, ch / this.imgH) * 0.96;
+    this.zoom = 1;
+    this.panX = (cw - this.imgW * this.fit) / 2;
+    this.panY = (ch - this.imgH * this.fit) / 2;
+    this.draw();
+  }
+  logicalSize() {
+    const r = this.canvas.getBoundingClientRect();
+    return { width: Math.max(1, r.width), height: Math.max(1, r.height) };
+  }
+  resize() {
+    const { width, height } = this.logicalSize();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = Math.round(width * dpr);
+    const h = Math.round(height * dpr);
+    if (this.canvas.width !== w || this.canvas.height !== h) {
+      this.canvas.width = w;
+      this.canvas.height = h;
+      this.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (this.fit === 1) this.fitView();
+    }
+    this.draw();
+  }
+  get viewW() {
+    return this.imgW * this.fit * this.zoom;
+  }
+  get viewH() {
+    return this.imgH * this.fit * this.zoom;
+  }
+  /** Flattening tolerance for *drawing*: a third of a screen pixel at the
+   *  current zoom. Serialization uses the fixed fine tolerance instead — the
+   *  mask must not get coarser just because the editor happened to be zoomed
+   *  out when it was saved. */
+  get drawTol() {
+    return Math.max(1e-7, 0.33 / Math.max(1, this.viewW));
+  }
+  toScreen(nx, ny) {
+    return [this.panX + nx * this.viewW, this.panY + ny * this.viewH];
+  }
+  toNorm(sx, sy) {
+    return [(sx - this.panX) / this.viewW, (sy - this.panY) / this.viewH];
+  }
+  eventPos(e) {
+    const r = this.canvas.getBoundingClientRect();
+    return [e.clientX - r.left, e.clientY - r.top];
+  }
+  /* ── Model ─────────────────────────────────────────────────────────────── */
+  snapshot() {
+    this.undo.push(this.serialise());
+    if (this.undo.length > UNDO_DEPTH) this.undo.shift();
+  }
+  newShape() {
+    return {
+      type: this.newType,
+      op: this.newOp,
+      // Born open even in mask mode: a shape closes when you click its first
+      // point or double-click empty space, so what you see while drawing is the
+      // stroke you have actually laid down.
+      closed: false,
+      feather: 0,
+      speed: 1,
+      pts: []
+    };
+  }
+  /**
+   * The handle offsets a point actually has — its own, or the automatic
+   * Catmull-Rom tangent the curve is being drawn with.
+   *
+   * Without this the handles are invisible until they exist, and they only come
+   * to exist by dragging one: you cannot grab what is not drawn. Resolving the
+   * implicit tangent means the handles are always there to see and to grab, and
+   * touching one just freezes the value that was already in effect.
+   */
+  handlesOf(s, i) {
+    const p2 = s.pts[i];
+    if (p2.corner) return null;
+    if (p2.h) return p2.h;
+    if (s.pts.length < 2) return null;
+    const segs = bezierSegments(s.pts, s.closed);
+    const n = s.pts.length;
+    const outSeg = segs[i];
+    const inSeg = segs[(i - 1 + n) % n];
+    const ox = outSeg ? outSeg[1][0] - p2.x : 0;
+    const oy = outSeg ? outSeg[1][1] - p2.y : 0;
+    const ix = inSeg && (s.closed || i > 0) ? inSeg[2][0] - p2.x : -ox;
+    const iy = inSeg && (s.closed || i > 0) ? inSeg[2][1] - p2.y : -oy;
+    return [ix, iy, ox, oy];
+  }
+  /** Freeze the implicit tangent so it can be edited. */
+  ensureHandles(s, i) {
+    const p2 = s.pts[i];
+    if (!p2.h) p2.h = this.handlesOf(s, i) ?? [0, 0, 0, 0];
+  }
+  deleteActive() {
+    if (this.mode === "pin") {
+      if (this.selPt < 0) return;
+      this.snapshot();
+      this.pins.splice(this.selPt, 1);
+      this.selPt = -1;
+    } else {
+      if (this.active < 0) return;
+      this.snapshot();
+      this.shapes.splice(this.active, 1);
+      this.active = Math.min(this.active, this.shapes.length - 1);
+      this.selPt = -1;
+    }
+    this.commit();
+  }
+  clearAll() {
+    this.snapshot();
+    this.shapes = [];
+    this.pins = [];
+    this.active = -1;
+    this.selPt = -1;
+    this.commit();
+  }
+  /** Finish the shape being drawn, so the next click starts a new one. */
+  finishShape() {
+    if (this.active < 0) return;
+    const s = this.shapes[this.active];
+    const need = this.mode === "shape" ? MIN_PTS.shape : MIN_PTS.path;
+    if (s.pts.length < need) {
+      this.shapes.splice(this.active, 1);
+    } else if (this.mode === "shape") {
+      s.closed = true;
+    }
+    this.active = -1;
+    this.selPt = -1;
+    this.commit();
+  }
+  setActiveProp(key, value) {
+    if (this.active < 0) return;
+    this.snapshot();
+    this.shapes[this.active][key] = value;
+    this.commit();
+  }
+  get activeShape() {
+    return this.active >= 0 ? this.shapes[this.active] ?? null : null;
+  }
+  /* ── Serialization ─────────────────────────────────────────────────────── */
+  serialise() {
+    const aspect = Number(this.aspect.toFixed(6));
+    if (this.mode === "pin") {
+      return JSON.stringify({
+        v: 1,
+        t: 0,
+        aspect,
+        pins: this.pins.map((p2) => ({
+          x: round(p2.x),
+          y: round(p2.y),
+          blur: round(p2.blur)
+        }))
+      });
+    }
+    const key = this.mode === "shape" ? "shapes" : "paths";
+    const items = this.shapes.filter((s) => s.pts.length >= (this.mode === "shape" ? MIN_PTS.shape : MIN_PTS.path)).map((s) => {
+      const closed = this.mode === "shape" ? true : s.closed;
+      const base = {
+        type: s.type,
+        closed,
+        pts: s.pts.map((p2) => ({
+          x: round(p2.x),
+          y: round(p2.y),
+          ...p2.h ? { h: p2.h.map(round) } : {},
+          ...p2.corner ? { corner: true } : {}
+        })),
+        poly: flatten(s.pts, s.type, closed).map((q) => [round(q[0]), round(q[1])])
+      };
+      if (this.mode === "shape") {
+        base.op = s.op;
+        base.feather = Math.round(s.feather);
+      } else {
+        base.speed = round(s.speed);
+      }
+      return base;
+    });
+    return JSON.stringify({ v: 1, t: 0, aspect, [key]: items });
+  }
+  deserialise(json) {
+    var _a;
+    let data;
+    try {
+      data = JSON.parse(json || "{}");
+    } catch {
+      return;
+    }
+    this.active = -1;
+    this.selPt = -1;
+    if (this.mode === "pin") {
+      const raw = Array.isArray(data == null ? void 0 : data.pins) ? data.pins : [];
+      this.pins = raw.map((p2) => ({
+        x: clamp01(num(p2 == null ? void 0 : p2.x, 0.5)),
+        y: clamp01(num(p2 == null ? void 0 : p2.y, 0.5)),
+        blur: clamp01(num(p2 == null ? void 0 : p2.blur, 0.5))
+      }));
+    } else {
+      const raw = Array.isArray(data == null ? void 0 : data.shapes) ? data.shapes : Array.isArray(data == null ? void 0 : data.paths) ? data.paths : [];
+      this.shapes = raw.map((s) => ({
+        type: (s == null ? void 0 : s.type) === "bspline" || (s == null ? void 0 : s.type) === "xspline" ? "bspline" : "bezier",
+        op: (s == null ? void 0 : s.op) === "sub" ? "sub" : "add",
+        closed: (s == null ? void 0 : s.closed) ?? this.mode === "shape",
+        feather: Math.max(0, Math.round(num(s == null ? void 0 : s.feather, 0))),
+        speed: Math.max(0, num(s == null ? void 0 : s.speed, 1)),
+        pts: (Array.isArray(s == null ? void 0 : s.pts) ? s.pts : []).map((p2) => ({
+          x: num(p2 == null ? void 0 : p2.x, 0),
+          y: num(p2 == null ? void 0 : p2.y, 0),
+          h: Array.isArray(p2 == null ? void 0 : p2.h) && p2.h.length === 4 ? p2.h.map((v) => num(v, 0)) : null,
+          corner: !!(p2 == null ? void 0 : p2.corner),
+          w: Math.max(MIN_W$1, Math.min(MAX_W, num(p2 == null ? void 0 : p2.w, MIN_W$1)))
+        }))
+      })).filter((s) => s.pts.length > 0);
+    }
+    this.draw();
+    (_a = this.onState) == null ? void 0 : _a.call(this);
+  }
+  emit(commit) {
+    var _a;
+    if (this.mode === "shape" && this.view !== "source") this.buildMatte();
+    this.onEdit(this.serialise(), commit);
+    this.draw();
+    if (commit) (_a = this.onState) == null ? void 0 : _a.call(this);
+  }
+  /** Rebuild whatever this mode uses as a backdrop and repaint. */
+  refreshView() {
+    if (this.mode === "shape") this.buildMatte();
+    this.draw();
+  }
+  commit() {
+    this.emit(true);
+  }
+  /* ── Input ─────────────────────────────────────────────────────────────── */
+  pick(px, py) {
+    if (this.mode !== "pin" && this.active >= 0 && this.selPt >= 0) {
+      const s = this.shapes[this.active];
+      const p2 = s == null ? void 0 : s.pts[this.selPt];
+      const h = p2 && s.type === "bezier" ? this.handlesOf(s, this.selPt) : null;
+      if (h) {
+        for (const side of [0, 2]) {
+          const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
+          if (Math.hypot(px - hx, py - hy) <= HANDLE_HIT) {
+            return { s: this.active, i: this.selPt, handle: side };
+          }
+        }
+      }
+    }
+    const order = this.shapes.map((_, i) => i).sort((a, b) => (b === this.active ? 1 : 0) - (a === this.active ? 1 : 0));
+    for (const si of order) {
+      const s = this.shapes[si];
+      for (let i = 0; i < s.pts.length; i++) {
+        const [sx, sy] = this.toScreen(s.pts[i].x, s.pts[i].y);
+        if (Math.hypot(px - sx, py - sy) <= HIT) return { s: si, i, handle: -1 };
+      }
+    }
+    return null;
+  }
+  /** Which finished shape's curve is under the cursor, and where a point goes. */
+  pickCurve(px, py) {
+    const [nx, ny] = this.toNorm(px, py);
+    const aspect = this.viewW / Math.max(1, this.viewH);
+    const tol = HIT / Math.max(1, this.viewH);
+    for (let si = this.shapes.length - 1; si >= 0; si--) {
+      const s = this.shapes[si];
+      if (s.pts.length < 2) continue;
+      const got = insertionIndex(s.pts, s.type, s.closed, [nx, ny], tol, aspect);
+      if (!got) continue;
+      if (si === this.active && !s.closed && got.at >= s.pts.length) continue;
+      return { s: si, at: got.at, x: got.point[0], y: got.point[1] };
+    }
+    return null;
+  }
+  downPin(e, px, py) {
+    for (let i = this.pins.length - 1; i >= 0; i--) {
+      const [cx, cy] = this.toScreen(this.pins[i].x, this.pins[i].y);
+      if (hitDot(px, py, cx, cy)) {
+        if (e.shiftKey) {
+          this.snapshot();
+          this.pins.splice(i, 1);
+          this.selPt = -1;
+          this.commit();
+          return;
+        }
+        this.selPt = i;
+        this.snapshot();
+        const [nx2, ny2] = this.toNorm(px, py);
+        this.drag = { kind: "pin", i, dx: this.pins[i].x - nx2, dy: this.pins[i].y - ny2 };
+        this.emit(true);
+        return;
+      }
+      if (hitRing(px, py, cx, cy)) {
+        this.selPt = i;
+        this.snapshot();
+        const pin = this.pins[i];
+        this.drag = {
+          kind: "scrub",
+          apply: startScrub(py, () => pin.blur, (v) => {
+            pin.blur = v;
+          })
+        };
+        this.emit(true);
+        return;
+      }
+    }
+    this.snapshot();
+    const [nx, ny] = this.toNorm(px, py);
+    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0.5 });
+    this.selPt = this.pins.length - 1;
+    this.drag = { kind: "pin", i: this.selPt, dx: 0, dy: 0 };
+    this.emit(true);
+  }
+  /* ── Matte ─────────────────────────────────────────────────────────────── */
+  /**
+   * Composite the shapes into a real matte, offscreen, at image resolution.
+   *
+   * Deliberately mirrors `blur_core.rasterize` rather than approximating it:
+   * `add` is `lighten` (a max) and `sub` draws the *inverted* coverage with
+   * `darken` (a min against 1 - coverage). Per-shape feather is a canvas blur
+   * filter applied before compositing, same order as the backend — which is what
+   * makes a soft cut-out look right instead of merely dark.
+   *
+   * Cheap enough to redo on every mouse move, which is why this one preview is
+   * genuinely live while the blurs need a round trip.
+   */
+  buildMatte() {
+    if (this.mode !== "shape") return;
+    const w = Math.min(1024, Math.max(16, Math.round(this.imgW)));
+    const h = Math.max(16, Math.round(w * this.imgH / this.imgW));
+    if (!this.matte) this.matte = document.createElement("canvas");
+    const acc = this.matte;
+    if (acc.width !== w || acc.height !== h) {
+      acc.width = w;
+      acc.height = h;
+    }
+    const a = acc.getContext("2d");
+    a.setTransform(1, 0, 0, 1, 0, 0);
+    a.globalCompositeOperation = "source-over";
+    a.fillStyle = "#000";
+    a.fillRect(0, 0, w, h);
+    const tmp = document.createElement("canvas");
+    tmp.width = w;
+    tmp.height = h;
+    const t = tmp.getContext("2d");
+    const scale = w / Math.max(1, this.imgW);
+    for (const s of this.shapes) {
+      if (s.pts.length < 3 || !s.closed) continue;
+      const poly = flatten(s.pts, s.type, s.closed, this.drawTol);
+      if (poly.length < 3) continue;
+      const sub = s.op === "sub";
+      t.setTransform(1, 0, 0, 1, 0, 0);
+      t.filter = "none";
+      t.globalCompositeOperation = "source-over";
+      t.fillStyle = sub ? "#fff" : "#000";
+      t.fillRect(0, 0, w, h);
+      if (s.feather > 0) t.filter = `blur(${(s.feather * scale).toFixed(2)}px)`;
+      t.fillStyle = sub ? "#000" : "#fff";
+      t.beginPath();
+      t.moveTo(poly[0][0] * w, poly[0][1] * h);
+      for (let i = 1; i < poly.length; i++) t.lineTo(poly[i][0] * w, poly[i][1] * h);
+      t.closePath();
+      t.fill();
+      a.globalCompositeOperation = sub ? "darken" : "lighten";
+      a.drawImage(tmp, 0, 0);
+    }
+    a.globalCompositeOperation = "source-over";
+  }
+  /* ── Drawing ───────────────────────────────────────────────────────────── */
+  drawBackdrop() {
+    const ctx = this.ctx;
+    const box = [this.panX, this.panY, this.viewW, this.viewH];
+    if (this.mode === "shape") {
+      if (this.view === "matte" && this.matte) {
+        ctx.drawImage(this.matte, ...box);
+        return;
+      }
+      if (this.image) ctx.drawImage(this.image, ...box);
+      if (this.view === "source" || !this.matte) return;
+      ctx.globalCompositeOperation = "multiply";
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(this.matte, ...box);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+      return;
+    }
+    const src = this.view === "result" && this.preview ? this.preview : this.image;
+    if (src) ctx.drawImage(src, ...box);
+  }
+  draw() {
+    const ctx = this.ctx;
+    const { width, height } = this.logicalSize();
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, width, height);
+    ctx.imageSmoothingEnabled = this.zoom < 4;
+    this.drawBackdrop();
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(this.panX, this.panY, this.viewW, this.viewH);
+    if (this.mode === "pin") return this.drawPins();
+    this.shapes.forEach((s, si) => this.drawShape(s, si));
+  }
+  tracePath(ctx, s) {
+    ctx.beginPath();
+    if (s.type === "bezier") {
+      const segs = bezierSegments(s.pts, s.closed);
+      if (!segs.length) return;
+      const [x0, y0] = this.toScreen(segs[0][0][0], segs[0][0][1]);
+      ctx.moveTo(x0, y0);
+      for (const [, c1, c2, p3] of segs) {
+        const a = this.toScreen(c1[0], c1[1]);
+        const b = this.toScreen(c2[0], c2[1]);
+        const c = this.toScreen(p3[0], p3[1]);
+        ctx.bezierCurveTo(a[0], a[1], b[0], b[1], c[0], c[1]);
+      }
+    } else {
+      const poly = flatten(s.pts, s.type, s.closed, this.drawTol);
+      if (!poly.length) return;
+      const [x0, y0] = this.toScreen(poly[0][0], poly[0][1]);
+      ctx.moveTo(x0, y0);
+      for (let i = 1; i < poly.length; i++) {
+        const [x, y] = this.toScreen(poly[i][0], poly[i][1]);
+        ctx.lineTo(x, y);
+      }
+    }
+    if (s.closed) ctx.closePath();
+  }
+  drawShape(s, si) {
+    const ctx = this.ctx;
+    const isActive = si === this.active;
+    const color = this.mode === "shape" ? s.op === "sub" ? C.sub : C.add : C.path;
+    if (s.pts.length >= 2) {
+      this.tracePath(ctx, s);
+      if (s.closed && this.showFill && s.pts.length >= 3) {
+        ctx.fillStyle = s.op === "sub" ? "rgba(255,107,107,0.20)" : "rgba(74,180,255,0.20)";
+        ctx.fill();
+      }
+      ctx.strokeStyle = isActive ? color : C.idle;
+      ctx.lineWidth = isActive ? 2 : 1.4;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+      if (!s.closed) this.drawArrow(s, color);
+    }
+    if (s.type === "bspline" && s.pts.length >= 2) {
+      ctx.save();
+      ctx.setLineDash([3, 4]);
+      ctx.strokeStyle = isActive ? C.hull : "rgba(255,255,255,0.12)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const [x0, y0] = this.toScreen(s.pts[0].x, s.pts[0].y);
+      ctx.moveTo(x0, y0);
+      for (let i = 1; i < s.pts.length; i++) {
+        const [x, y] = this.toScreen(s.pts[i].x, s.pts[i].y);
+        ctx.lineTo(x, y);
+      }
+      if (s.closed) ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (isActive && this.selPt >= 0 && s.type === "bezier") {
+      const p2 = s.pts[this.selPt];
+      const h = p2 ? this.handlesOf(s, this.selPt) : null;
+      if (p2 && h) {
+        const [cx, cy] = this.toScreen(p2.x, p2.y);
+        ctx.strokeStyle = C.handle;
+        ctx.fillStyle = C.handle;
+        ctx.lineWidth = 1;
+        for (const side of [0, 2]) {
+          const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(hx, hy, 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+    s.pts.forEach((p2, i) => {
+      var _a, _b;
+      const [x, y] = this.toScreen(p2.x, p2.y);
+      const hovered = ((_a = this.hover) == null ? void 0 : _a.s) === si && ((_b = this.hover) == null ? void 0 : _b.i) === i && this.hover.handle < 0;
+      const selected = isActive && i === this.selPt;
+      const r = selected ? PT_R.active : hovered ? PT_R.hover : PT_R.idle;
+      ctx.save();
+      ctx.shadowColor = "rgba(0,0,0,0.55)";
+      ctx.shadowBlur = 5;
+      ctx.shadowOffsetY = 1;
+      ctx.beginPath();
+      if (p2.corner) {
+        ctx.rect(x - r, y - r, r * 2, r * 2);
+      } else {
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = selected ? C.ptActive : hovered ? C.ptHover : isActive ? C.pt : C.idle;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetY = 0;
+      ctx.strokeStyle = C.ptStroke;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+  /** Direction marker on an open stroke — which way the blur travels. */
+  drawArrow(s, color) {
+    const poly = flatten(s.pts, s.type, s.closed);
+    if (poly.length < 2) return;
+    const a = this.toScreen(poly[poly.length - 2][0], poly[poly.length - 2][1]);
+    const b = this.toScreen(poly[poly.length - 1][0], poly[poly.length - 1][1]);
+    const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.translate(b[0], b[1]);
+    ctx.rotate(ang);
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-11, 5);
+    ctx.lineTo(-11, -5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+  drawPins() {
+    this.pins.forEach((p2, i) => {
+      const [x, y] = this.toScreen(p2.x, p2.y);
+      drawRing(this.ctx, x, y, p2.blur, C.add, i === this.selPt);
+    });
+  }
+}
+const round = (v) => Math.round(v * 1e5) / 1e5;
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+const num = (v, d) => Number.isFinite(Number(v)) ? Number(v) : d;
+const HINTS = {
+  shape: "click to add points · click the first point or double-click empty space to close · click on the curve to insert a point · double-click a point for a corner · shift-click to delete · alt-drag pans · wheel zooms",
+  path: "click to draw a stroke in the direction of movement · Enter finishes it · click on the stroke to insert a point · alt-drag pans · wheel zooms",
+  pin: "click to drop a pin · drag the ring to set its blur (shift for fine) · shift-click to delete · alt-drag pans · wheel zooms"
+};
+function openSplineOverlay(opts) {
+  let refreshBar = () => {
+  };
+  let note = "";
+  const editor = new SplineEditor({
+    mode: opts.mode,
+    onEdit: (json, commit) => {
+      opts.onChange(json);
+      if (commit) requestPreview(json);
+    },
+    onState: () => refreshBar()
+  });
+  let token = 0;
+  let timer;
+  let shut = false;
+  const post = (json, frame) => {
+    var _a;
+    return api.fetchApi("/nkd/spline/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        node: opts.nodeId,
+        kind: opts.previewKind,
+        params: {
+          ...((_a = opts.previewParams) == null ? void 0 : _a.call(opts)) ?? {},
+          [opts.previewKey]: json,
+          ...frame ? { frame } : {}
+        }
+      })
+    });
+  };
+  function requestPreview(json) {
+    if (shut || !opts.previewKind || !opts.previewKey || opts.nodeId == null) return;
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      var _a;
+      const mine = ++token;
+      note = "rendering…";
+      refreshBar();
+      try {
+        let res = await post(json);
+        if (mine !== token) return;
+        if (res.status === 204) {
+          const frame = editor.sourceFrame();
+          if (!frame) {
+            note = "run the graph once to preview";
+            return;
+          }
+          res = await post(json, frame);
+          if (mine !== token) return;
+        }
+        const err = res.headers.get("X-NKD-Error");
+        if (err) {
+          note = `preview failed: ${err}`;
+          return;
+        }
+        if (!res.ok) {
+          note = res.status === 404 ? "preview route missing — restart ComfyUI" : `preview failed (HTTP ${res.status})`;
+          return;
+        }
+        const bitmap = await createImageBitmap(await res.blob());
+        if (mine !== token) {
+          (_a = bitmap.close) == null ? void 0 : _a.call(bitmap);
+          return;
+        }
+        editor.preview = bitmap;
+        note = "";
+        editor.draw();
+      } catch (e) {
+        if (mine === token) note = `preview failed: ${(e == null ? void 0 : e.message) ?? e}`;
+      } finally {
+        if (mine === token) refreshBar();
+      }
+    }, 160);
+  }
+  const modal = openNkdModal({
+    title: opts.title,
+    hint: HINTS[opts.mode],
+    onClose: (reason) => {
+      editor.finishShape();
+      const json = editor.serialise();
+      editor.destroy();
+      opts.onClose(json, reason === "save");
+    }
+  });
+  modal.body.appendChild(editor.canvas);
+  editor.deserialise(opts.json);
+  editor.setImage(opts.image, opts.imageW, opts.imageH);
+  const savedAspect = readAspect(opts.json);
+  const status = document.createElement("span");
+  status.className = "nkd-modal-status";
+  modal.footerLeft.appendChild(status);
+  const right = modal.footerRight;
+  if (opts.mode !== "pin") {
+    const setType = (t) => {
+      editor.newType = t;
+      if (editor.activeShape) editor.setActiveProp("type", t);
+      refreshBar();
+    };
+    const bezier = nkdButton(
+      "Bezier",
+      () => setType("bezier"),
+      "Points sit on the curve, with pen handles. Best for tracing an exact outline."
+    );
+    const bspline = nkdButton(
+      "B-spline",
+      () => setType("bspline"),
+      "Smooth with far fewer points and no handles to wrangle — the roto standard. The points steer the curve rather than sitting on it, so it can never overshoot, however close together you put them. Double-click a point for a hard corner."
+    );
+    right.append(bezier, bspline);
+    if (opts.mode === "shape") {
+      const setOp = (o) => {
+        editor.newOp = o;
+        if (editor.activeShape) editor.setActiveProp("op", o);
+        refreshBar();
+      };
+      const add = nkdButton("Add", () => setOp("add"), "This shape adds to the mask.");
+      const sub = nkdButton(
+        "Subtract",
+        () => setOp("sub"),
+        "This shape cuts out of the shapes before it — the way to make a hole."
+      );
+      right.append(add, sub);
+      const feather = nkdSlider(
+        "Feather",
+        { min: 0, max: 128, step: 1, value: 0 },
+        (v) => editor.setActiveProp("feather", v),
+        "Soften this shape's edge, before it is combined with the others."
+      );
+      right.appendChild(feather);
+      const fill = nkdToggle(
+        "Fill",
+        true,
+        (on) => {
+          editor.showFill = on;
+          editor.draw();
+        },
+        "Tint the inside of each shape, so you can tell them apart."
+      );
+      right.appendChild(fill);
+      refreshBar = () => {
+        const s = editor.activeShape;
+        bezier.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bezier");
+        bspline.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bspline");
+        add.classList.toggle("on", ((s == null ? void 0 : s.op) ?? editor.newOp) === "add");
+        sub.classList.toggle("on", ((s == null ? void 0 : s.op) ?? editor.newOp) === "sub");
+        const rng = feather.querySelector("input");
+        rng.disabled = !s;
+        if (s) rng.value = String(s.feather);
+        setStatus(`${editor.shapes.length} shape${editor.shapes.length === 1 ? "" : "s"}`);
+      };
+    } else {
+      const speed = nkdSlider(
+        "Speed",
+        { min: 0, max: 2, step: 0.05, value: 1 },
+        (v) => editor.setActiveProp("speed", v),
+        "How fast this stroke moves, relative to the others. The node's Strength sets what full speed means in pixels."
+      );
+      right.appendChild(speed);
+      refreshBar = () => {
+        const s = editor.activeShape;
+        bezier.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bezier");
+        bspline.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bspline");
+        const rng = speed.querySelector("input");
+        rng.disabled = !s;
+        if (s) rng.value = String(s.speed);
+        setStatus(`${editor.shapes.length} stroke${editor.shapes.length === 1 ? "" : "s"}`);
+      };
+    }
+    right.appendChild(nkdButton(
+      "Finish",
+      () => editor.finishShape(),
+      "Stop adding to this one; the next click starts a new one. (Enter)"
+    ));
+    right.appendChild(nkdButton(
+      "Delete",
+      () => editor.deleteActive(),
+      "Delete the selected shape. (Del)"
+    ));
+  } else {
+    refreshBar = () => setStatus(`${editor.pins.length} pin${editor.pins.length === 1 ? "" : "s"}`);
+  }
+  const VIEWS = opts.mode === "shape" ? ["result", "matte", "source"] : ["result", "source"];
+  const VIEW_LABEL = {
+    result: opts.mode === "shape" ? "View: masked" : "View: result",
+    matte: "View: matte",
+    source: "View: original"
+  };
+  const viewBtn = nkdButton("", () => {
+    editor.view = VIEWS[(VIEWS.indexOf(editor.view) + 1) % VIEWS.length];
+    editor.refreshView();
+    refreshBar();
+  }, opts.mode === "shape" ? "Cycle the backdrop: the image with everything outside the mask dimmed, the mask on its own, or the untouched image. (V)" : "Show the rendered result or the untouched image. (V)");
+  right.appendChild(viewBtn);
+  right.appendChild(nkdButton("Clear", () => editor.clearAll(), "Remove everything."));
+  right.appendChild(nkdButton("Fit", () => editor.fitView(), "Reset the view. (F)"));
+  window.addEventListener("keydown", onViewKey, true);
+  function onViewKey(e) {
+    if (e.key !== "v" && e.key !== "V") return;
+    if (!editor.canvas.isConnected) return;
+    viewBtn.click();
+  }
+  function setStatus(text) {
+    viewBtn.textContent = VIEW_LABEL[editor.view];
+    viewBtn.classList.toggle("on", editor.view !== "source");
+    const mismatch = savedAspect != null && Math.abs(savedAspect - editor.aspect) > 0.01;
+    const warn = mismatch ? ` — drawn at a different aspect ratio (${savedAspect.toFixed(2)} vs ${editor.aspect.toFixed(2)}); shapes are stretched` : "";
+    status.textContent = text + warn + (note ? ` — ${note}` : "");
+    status.classList.toggle("bad", mismatch || note.startsWith("preview failed"));
+  }
+  modal.addPrimary("Save & close");
+  refreshBar();
+  requestAnimationFrame(() => {
+    editor.fitView();
+    editor.refreshView();
+    requestPreview(editor.serialise());
+  });
+  const origClose = modal.close;
+  modal.close = (reason) => {
+    window.removeEventListener("keydown", onViewKey, true);
+    shut = true;
+    clearTimeout(timer);
+    token++;
+    origClose(reason);
+  };
+  return {
+    setImage(img, w, h) {
+      editor.setImage(img, w, h);
+      requestPreview(editor.serialise());
+      refreshBar();
+    },
+    close: () => modal.close("dismiss")
+  };
+}
+function readAspect(json) {
+  var _a;
+  try {
+    const a = Number((_a = JSON.parse(json || "{}")) == null ? void 0 : _a.aspect);
+    return Number.isFinite(a) && a > 0 ? a : null;
+  } catch {
+    return null;
+  }
 }
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -12380,7 +13940,7 @@ app.registerExtension({
     const origCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function() {
       const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
-      const num = (name, def2) => {
+      const num2 = (name, def2) => {
         var _a, _b;
         return Number(((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === name)) == null ? void 0 : _b.value) ?? def2);
       };
@@ -12389,18 +13949,18 @@ app.registerExtension({
         return {
           width: resolveDim(this, "width", 1024),
           height: resolveDim(this, "height", 1024),
-          scale: num("scale", 6),
-          detail: num("detail", 4),
-          roughness: num("roughness", 0.5),
-          lacunarity: num("lacunarity", 2),
-          distortion: num("distortion", 0),
-          contrast: num("contrast", 1),
-          brightness: num("brightness", 0),
-          evolution: num("evolution", 0),
+          scale: num2("scale", 6),
+          detail: num2("detail", 4),
+          roughness: num2("roughness", 0.5),
+          lacunarity: num2("lacunarity", 2),
+          distortion: num2("distortion", 0),
+          contrast: num2("contrast", 1),
+          brightness: num2("brightness", 0),
+          evolution: num2("evolution", 0),
           loop: !!((_b = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "loop")) == null ? void 0 : _b.value),
-          offset_x: num("offset_x", 0),
-          offset_y: num("offset_y", 0),
-          seed: num("seed", 0)
+          offset_x: num2("offset_x", 0),
+          offset_y: num2("offset_y", 0),
+          seed: num2("seed", 0)
         };
       };
       const container = document.createElement("div");
@@ -12546,6 +14106,151 @@ app.registerExtension({
     };
   }
 });
+const splineFrames = /* @__PURE__ */ new Map();
+let openSpline = null;
+api.addEventListener("nkd-source", (e) => {
+  const d = e == null ? void 0 : e.detail;
+  if (!(d == null ? void 0 : d.data)) return;
+  try {
+    const bin = atob(d.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const canvas = rgbBytesToCanvas(bytes, d.width, d.height);
+    const id = String(d.node);
+    splineFrames.set(id, { canvas, w: d.width, h: d.height });
+    if ((openSpline == null ? void 0 : openSpline.nodeId) === id) openSpline.handle.setImage(canvas, d.width, d.height);
+  } catch {
+  }
+});
+function collectUpstream(nodeId, output, into) {
+  if (into[nodeId] || !output[nodeId]) return;
+  into[nodeId] = output[nodeId];
+  for (const value of Object.values(output[nodeId].inputs ?? {})) {
+    if (Array.isArray(value)) collectUpstream(String(value[0]), output, into);
+  }
+}
+async function queueNode(node) {
+  var _a, _b, _c;
+  const origQueue = api.queuePrompt;
+  try {
+    api.queuePrompt = async function(index, prompt) {
+      api.queuePrompt = origQueue;
+      if (prompt == null ? void 0 : prompt.output) {
+        const filtered = {};
+        collectUpstream(String(node.id), prompt.output, filtered);
+        prompt = { ...prompt, output: filtered };
+      }
+      return origQueue.call(api, index, prompt);
+    };
+    await app.queuePrompt(0, 1);
+  } catch (err) {
+    api.queuePrompt = origQueue;
+    console.error("[NKD Basic Tools] queue failed:", err);
+    (_c = (_b = (_a = app.extensionManager) == null ? void 0 : _a.toast) == null ? void 0 : _b.add) == null ? void 0 : _c.call(_b, {
+      severity: "error",
+      summary: "Queue Failed",
+      detail: String(err),
+      life: 6e3
+    });
+  }
+}
+function widgetValues(node, names) {
+  var _a;
+  const out = {};
+  for (const n of names) {
+    const w = (_a = node.widgets) == null ? void 0 : _a.find((x) => x.name === n);
+    if (w) out[n] = w.value;
+  }
+  return out;
+}
+function registerSplineNode(nodeName, widgetName, mode, title, buttonLabel, preview) {
+  app.registerExtension({
+    name: `NKD.BasicTools.${nodeName}`,
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== nodeName) return;
+      if (nodeType.prototype[`__nkd_${nodeName}`]) return;
+      nodeType.prototype[`__nkd_${nodeName}`] = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        var _a;
+        const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        const node = this;
+        const dataW = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === widgetName);
+        if (dataW) {
+          dataW.type = "hidden";
+          dataW.hidden = true;
+          if (dataW.options) dataW.options.hidden = true;
+          dataW.computedHeight = 0;
+          dataW.computeSize = () => [0, -4];
+        }
+        const btn = this.addWidget("button", buttonLabel, null, () => {
+          if (openSpline) openSpline.handle.close();
+          const img = findSourceImg(node, "image");
+          const cached = splineFrames.get(String(node.id));
+          const src = img ? { el: img, w: img.naturalWidth, h: img.naturalHeight } : cached ? { el: cached.canvas, w: cached.w, h: cached.h } : { el: null, w: 1024, h: 1024 };
+          const handle = openSplineOverlay({
+            mode,
+            title,
+            image: src.el,
+            imageW: src.w,
+            imageH: src.h,
+            json: (dataW == null ? void 0 : dataW.value) || "",
+            nodeId: String(node.id),
+            previewKind: preview == null ? void 0 : preview.kind,
+            previewKey: widgetName,
+            previewParams: preview ? () => widgetValues(node, preview.params) : void 0,
+            onChange: (json) => {
+              if (dataW) dataW.value = json;
+              node.setDirtyCanvas(true, true);
+            },
+            onClose: (json, save) => {
+              if (json && dataW) dataW.value = json;
+              node.setDirtyCanvas(true, true);
+              if ((openSpline == null ? void 0 : openSpline.handle) === handle) openSpline = null;
+              if (save) void queueNode(node);
+            }
+          });
+          openSpline = { nodeId: String(node.id), handle };
+        });
+        btn.serialize = false;
+        const origRemoved = this.onRemoved;
+        this.onRemoved = function() {
+          if ((openSpline == null ? void 0 : openSpline.nodeId) === String(node.id)) {
+            openSpline.handle.close();
+            openSpline = null;
+          }
+          splineFrames.delete(String(node.id));
+          origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+        };
+        return result;
+      };
+    }
+  });
+}
+registerSplineNode(
+  "NKDVectorMask",
+  "shapes",
+  "shape",
+  "😺 Vector Mask",
+  "Draw mask shapes"
+);
+registerSplineNode(
+  "NKDPathBlur",
+  "paths",
+  "path",
+  "😺 Path Blur",
+  "Draw motion strokes",
+  { kind: "path", params: ["strength", "spread"] }
+);
+registerSplineNode(
+  "NKDFieldBlur",
+  "pins",
+  "pin",
+  "😺 Field Blur",
+  "Place blur pins",
+  { kind: "field", params: ["max_blur"] }
+);
+console.log("[NKD Basic Tools] spline editors loaded (vector mask · path blur · field blur)");
 (function() {
   "use strict";
   try {

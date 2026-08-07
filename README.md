@@ -154,6 +154,76 @@ https://github.com/user-attachments/assets/fea39b77-1e47-4006-ba7f-51197db0f106
 > Moved here from 😺NKD Preview Tools, which is now about viewing. Same node,
 > same saved workflows, same painted masks — nothing to redo.
 
+### 😺NKD Vector Mask
+
+**Use it to** draw a mask by hand with a pen tool, the way you would roto a shape
+in Nuke — and keep it editable forever, because what gets saved is the control
+points, not pixels. Click **Draw mask shapes** and the editor opens over the
+graph.
+
+- **Two curve types, mixable in the same mask.** **Bezier** puts the point *on*
+  the curve with pen handles — what you want tracing an exact outline.
+  **B-spline** is the same rational cubic B-spline (NURBS) as the 😺NKD Sigmas
+  Curve editor, pinned to it by a parity test, and drawn the same way — points
+  joined by a dashed control polygon so you can see which one steers what.
+  Smooth with far fewer points and no handles to wrangle: the points steer the
+  curve rather than sitting on it, which is exactly why it can never overshoot
+  however close together you put them.
+- **Shapes are open while you draw them.** Click the first point again, or
+  double-click empty space, to close. Until then it's a stroke, not a region.
+- **Click on a finished curve to insert a point** between the two it falls
+  between, then drag it into place. On a B-spline the new point lands on the
+  control polygon rather than under the cursor — that's the position that leaves
+  the rest of the shape where it was.
+- **Double-click a point for a hard corner**, double-click again to make it
+  smooth. On a Bezier both handles retract; on a B-spline it repeats the control
+  point, which is the only way to get a true corner — no amount of tension gives
+  you one.
+- **Subtract shapes cut holes** in the shapes before them, each with its own
+  feather — so a soft cut-out is one shape rather than a second node.
+- **Live preview**: the editor composites the real matte as you drag — subtract
+  shapes actually cutting, feather actually soft. `V` cycles between the image
+  with everything outside the mask dimmed, the mask on its own, and the
+  untouched image.
+- Survives a resolution change: coordinates are relative, and the editor warns
+  you if the aspect ratio no longer matches what you drew on.
+
+---
+
+## Blur
+
+> Both blur editors preview the **real** result, not an approximation: the
+> geometry goes to the backend and comes back rendered by the same code the
+> graph runs, so what you tune is what you get. It refreshes when you finish a
+> drag rather than during one. `V` toggles between the result and the original.
+> The node has to have run once for there to be a frame to preview.
+
+### 😺NKD Path Blur
+
+**Use it to** add directional motion blur that *curves*, instead of the single
+straight angle a normal motion blur gives you. Draw strokes showing which way
+things move; the direction between them is blended into a smooth field, and each
+stroke carries its own speed.
+
+- Areas far from every stroke stay sharp — **Spread** sets how far the influence
+  reaches.
+- **No occlusion information exists**, so at the end of a stroke the background
+  will smear over whatever is in front of it. That is what the `mask` input is
+  for: where it's white the original is kept.
+- Very high **Strength** ghosts rather than blurs — the sampling is capped, and
+  past that point you see discrete steps instead of a smear.
+
+### 😺NKD Field Blur
+
+**Use it to** fake a shallow depth of field without a depth map. Drop pins, drag
+the ring around each one to set how much blur it wants, and everything in between
+is interpolated. One pin blurs evenly, two give you a gradient.
+
+- **Max Blur** sets what a fully-turned-up pin means in pixels; the pins
+  themselves are relative. Hold shift while dragging a ring for fine adjustment.
+- It's a variable gaussian, not bokeh — no iris shape and no highlight bloom.
+- Optional `mask` input protects a subject from the blur.
+
 ---
 
 ## Color & gradients

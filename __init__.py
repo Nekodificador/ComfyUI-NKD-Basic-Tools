@@ -13,6 +13,10 @@ from .nkd_frequency import NKDFrequencySeparate, NKDFrequencyCombine
 from .nkd_color_warp import NKDColorWarp
 from .nkd_mask_ops import NKDMaskOps
 from .nkd_mask_painter import NKDMaskPainter
+from .nkd_vector_mask import NKDVectorMask
+from .nkd_field_blur import NKDFieldBlur
+from .nkd_path_blur import NKDPathBlur
+from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
@@ -36,6 +40,9 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDColorWarp,
             NKDMaskOps,
             NKDMaskPainter,
+            NKDVectorMask,
+            NKDFieldBlur,
+            NKDPathBlur,
         ]
 
 
@@ -58,6 +65,9 @@ NODE_CLASS_MAPPINGS = {
     "NKDColorWarp": NKDColorWarp,
     "NKDMaskOps": NKDMaskOps,
     "NKDMaskPainter": NKDMaskPainter,
+    "NKDVectorMask": NKDVectorMask,
+    "NKDFieldBlur": NKDFieldBlur,
+    "NKDPathBlur": NKDPathBlur,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -74,6 +84,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDColorWarp": "😺NKD Color Warp",
     "NKDMaskOps": "😺NKD Mask Ops",
     "NKDMaskPainter": "😺NKD Mask Painter",
+    "NKDVectorMask": "😺NKD Vector Mask",
+    "NKDFieldBlur": "😺NKD Field Blur",
+    "NKDPathBlur": "😺NKD Path Blur",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]
