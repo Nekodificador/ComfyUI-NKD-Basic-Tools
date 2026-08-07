@@ -33,7 +33,10 @@ class NKDVectorMask(io.ComfyNode):
                 "per shape, and mixable. Double-click a point for a hard corner. "
                 "Shapes marked Subtract cut holes out of the ones before them, "
                 "each with its own feather, so a soft cut-out is one shape rather "
-                "than a second node. The shapes live in the workflow as control "
+                "than a second node. Ctrl-drag a point to pull out a feather clone "
+                "and place it where the edge should have faded to nothing, so one "
+                "part of the outline blends away while the rest stays crisp. "
+                "The shapes live in the workflow as control "
                 "points, so they stay editable and survive a resolution change."
             ),
             is_output_node=True,

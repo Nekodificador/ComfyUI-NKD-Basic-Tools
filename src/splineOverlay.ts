@@ -39,12 +39,18 @@ export type SplineOverlayHandle = {
 const HINTS: Record<EditorMode, string> = {
   shape: "click to add points · click the first point or double-click empty space to close · " +
          "click on the curve to insert a point · " +
-         "double-click a point for a corner · shift-click to delete · alt-drag pans · wheel zooms",
+         "double-click a point for a corner · ctrl-drag a point to pull out a feather clone, " +
+         "then drag the clone to say how far the edge fades (shift-click it to remove) · " +
+         "shift-drag empty space to box-select · shift-click to delete · " +
+         "click away from a finished shape to deselect it · " +
+         "H hides the curves · alt-drag pans · wheel zooms",
   path: "click to draw a stroke in the direction of movement · Enter finishes it · " +
-        "click on the stroke to insert a point · " +
+        "click on the stroke to insert a point · ctrl-drag a point for its own speed · " +
+        "shift-drag empty space to box-select · H hides the curves · " +
         "alt-drag pans · wheel zooms",
   pin: "click to drop a pin · drag the ring to set its blur (shift for fine) · " +
-       "shift-click to delete · alt-drag pans · wheel zooms",
+       "ctrl-drag a pin to widen its reach · shift-drag empty space to box-select · " +
+       "shift-click to delete · H hides the pins · alt-drag pans · wheel zooms",
 };
 
 export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle {
@@ -54,9 +60,9 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
 
   const editor = new SplineEditor({
     mode: opts.mode,
-    onEdit: (json, commit) => {
+    onEdit: (json) => {
       opts.onChange(json);
-      if (commit) requestPreview(json);
+      requestPreview(json);
     },
     onState: () => refreshBar(),
   });
@@ -145,6 +151,7 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
   const settings = opts.previewParams?.() ?? {};
   if (Number.isFinite(Number(settings.max_blur))) editor.maxBlur = Number(settings.max_blur);
   if (Number.isFinite(Number(settings.falloff))) editor.falloff = Number(settings.falloff);
+  if (Number.isFinite(Number(settings.strength))) editor.strength = Number(settings.strength);
   editor.setImage(opts.image, opts.imageW, opts.imageH);
 
   // Normalized coordinates survive a resize, but a change of aspect silently
@@ -184,28 +191,41 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
         "This shape cuts out of the shapes before it — the way to make a hole.");
       right.append(add, sub);
 
-      const feather = nkdSlider("Feather", { min: 0, max: 128, step: 1, value: 0 },
+      const feather = nkdSlider("Feather",
+        { min: 0, max: 128, step: 0.5, value: 0, width: 220, fine: 0.05,
+          format: (v) => `${v.toFixed(2)} px` },
         (v) => editor.setActiveProp("feather", v),
-        "Soften this shape's edge, before it is combined with the others.");
+        "Soften this shape's edge evenly, before it is combined with the others. " +
+        "Hold Shift while dragging for fine control — the radius is continuous, " +
+        "so a fraction of a pixel is a real difference and not a rounding.");
       right.appendChild(feather);
 
       const fill = nkdToggle("Fill", true, (on) => { editor.showFill = on; editor.draw(); },
         "Tint the inside of each shape, so you can tell them apart.");
       right.appendChild(fill);
 
+      const noFeather = nkdButton("Clear feather", () => editor.clearFeather(),
+        "Remove every feather clone and put all the edges back to hard. With " +
+        "points box-selected it only clears those.");
+      right.appendChild(noFeather);
+
       refreshBar = () => {
+        const soft = editor.featherCount;
+        noFeather.textContent = soft ? `Clear feather (${soft})` : "Clear feather";
+        (noFeather as HTMLButtonElement).disabled = soft === 0;
         const s = editor.activeShape;
         bezier.classList.toggle("on", (s?.type ?? editor.newType) === "bezier");
         bspline.classList.toggle("on", (s?.type ?? editor.newType) === "bspline");
         add.classList.toggle("on", (s?.op ?? editor.newOp) === "add");
         sub.classList.toggle("on", (s?.op ?? editor.newOp) === "sub");
-        const rng = feather.querySelector("input") as HTMLInputElement;
-        rng.disabled = !s;
-        if (s) rng.value = String(s.feather);
+        feather.setDisabled(!s);
+        if (s) feather.sync(s.feather);
         setStatus(`${editor.shapes.length} shape${editor.shapes.length === 1 ? "" : "s"}`);
       };
     } else {
-      const speed = nkdSlider("Speed", { min: 0, max: 2, step: 0.05, value: 1 },
+      const speed = nkdSlider("Speed",
+        { min: 0, max: 2, step: 0.05, value: 1, width: 180,
+          format: (v) => `x${v.toFixed(2)}` },
         (v) => editor.setActiveProp("speed", v),
         "How fast this stroke moves, relative to the others. The node's Strength " +
         "sets what full speed means in pixels.");
@@ -215,9 +235,8 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
         const s = editor.activeShape;
         bezier.classList.toggle("on", (s?.type ?? editor.newType) === "bezier");
         bspline.classList.toggle("on", (s?.type ?? editor.newType) === "bspline");
-        const rng = speed.querySelector("input") as HTMLInputElement;
-        rng.disabled = !s;
-        if (s) rng.value = String(s.speed);
+        speed.setDisabled(!s);
+        if (s) speed.sync(s.speed);
         setStatus(`${editor.shapes.length} stroke${editor.shapes.length === 1 ? "" : "s"}`);
       };
     }
@@ -240,18 +259,22 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
       requestPreview(editor.serialise());
       refreshBar();
     };
-    const maxBlur = nkdSlider("Max Blur", { min: 0, max: 512, step: 1, value: editor.maxBlur },
+    const maxBlur = nkdSlider("Max Blur",
+      { min: 0, max: 512, step: 1, value: editor.maxBlur, width: 180,
+        format: (v) => `${Math.round(v)} px` },
       (v) => setNumber("max_blur", v),
       "What a pin turned all the way up means, in pixels.");
-    const falloff = nkdSlider("Falloff", { min: 0.5, max: 8, step: 0.1, value: editor.falloff },
+    const falloff = nkdSlider("Falloff",
+      { min: 0.5, max: 8, step: 0.1, value: editor.falloff, width: 140,
+        format: (v) => v.toFixed(2) },
       (v) => setNumber("falloff", v),
       "How tightly each pin holds its own area. Raise it to stop a sharp pin " +
       "from being dragged blurry by the ones around it.");
     right.append(maxBlur, falloff);
 
     refreshBar = () => {
-      (maxBlur.querySelector("input") as HTMLInputElement).value = String(editor.maxBlur);
-      (falloff.querySelector("input") as HTMLInputElement).value = String(editor.falloff);
+      maxBlur.sync(editor.maxBlur);
+      falloff.sync(editor.falloff);
       const n = editor.pins.length;
       setStatus(n
         ? `${n} pin${n === 1 ? "" : "s"} · up to ${Math.round(editor.maxBlur)} px`
@@ -286,25 +309,36 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
       : "Show the rendered result or the untouched image. (V)");
   right.appendChild(viewBtn);
 
+  const curvesBtn = nkdToggle("Curves", true, (on) => {
+    editor.showCurves = on;
+    editor.draw();
+  }, "Show or hide the vectors. Hidden, you get the backdrop with nothing drawn "
+   + "over it — the only way to judge an edge that has a control point sitting on "
+   + "it. Editing still works while they are hidden. (H)");
+  right.appendChild(curvesBtn);
+
   right.appendChild(nkdButton("Clear", () => editor.clearAll(), "Remove everything."));
   right.appendChild(nkdButton("Fit", () => editor.fitView(), "Reset the view. (F)"));
 
   window.addEventListener("keydown", onViewKey, true);
   function onViewKey(e: KeyboardEvent): void {
-    if (e.key !== "v" && e.key !== "V") return;
     if (!editor.canvas.isConnected) return;
-    viewBtn.click();
+    if (e.key === "h" || e.key === "H") { curvesBtn.click(); return; }
+    if (e.key === "v" || e.key === "V") viewBtn.click();
   }
 
   function setStatus(text: string): void {
     viewBtn.textContent = VIEW_LABEL[editor.view];
     viewBtn.classList.toggle("on", editor.view !== "source");
+    const picked = editor.selectionSize
+      ? ` · ${editor.selectionSize} point${editor.selectionSize === 1 ? "" : "s"} selected`
+      : "";
     const mismatch = savedAspect != null && Math.abs(savedAspect - editor.aspect) > 0.01;
     const warn = mismatch
       ? ` — drawn at a different aspect ratio (${savedAspect!.toFixed(2)} vs ` +
         `${editor.aspect.toFixed(2)}); shapes are stretched`
       : "";
-    status.textContent = text + warn + (note ? ` — ${note}` : "");
+    status.textContent = text + picked + warn + (note ? ` — ${note}` : "");
     status.classList.toggle("bad", mismatch || note.startsWith("preview failed"));
   }
 

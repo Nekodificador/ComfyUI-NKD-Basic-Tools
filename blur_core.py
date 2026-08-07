@@ -46,6 +46,20 @@ _SUPERSAMPLE_CUTOFF = 4 << 20
 _PYRAMID = (64, 16, 4, 1)
 _LEVEL_FALLOFF = 1e-2
 
+# Per-point feather is drawn as a stack of nested outlines (see `_fill_coverage`).
+# One ring per pixel of feather, so the gradient never has two levels sharing a
+# pixel and there is nothing to band; the ceiling is where a very soft edge stops
+# paying for more. Nested rings cost one polygon fill each and no buffer, so 64
+# of them run in about the time one did — the count is chosen for how it looks,
+# not for what it costs. Mirrored in `splineEditor.rampRings`.
+_RAMP_PX_PER_RING = 1
+_RAMP_MIN_RINGS, _RAMP_MAX_RINGS = 2, 64
+
+# A pin's reach is stored as a radius; the weighting wants it relative to the
+# neutral one, so a field of default pins matches what it rendered before pins
+# had a reach at all. Mirrored in `splineEditor.DEFAULT_INFLUENCE`.
+NEUTRAL_REACH = 0.25
+
 
 # ---------------------------------------------------------------------------
 # Rasterizing polylines
@@ -67,10 +81,97 @@ def parse_items(payload: str, key: str) -> list:
     return items if isinstance(items, list) else []
 
 
-def poly_to_px(poly, width: int, height: int, scale: int = 1) -> np.ndarray:
-    """Normalized 0..1 polyline → (K, 2) float pixel coords. y is down."""
+def poly_to_px(poly, width: int, height: int) -> np.ndarray:
+    """Normalized 0..1 polyline → (K, 2) float pixel coords. y is down.
+
+    Output pixels, never supersampled ones: per-point feather is a distance in
+    output pixels, so the offsetting has to happen in that space and the
+    supersample factor is applied last, at the fill.
+    """
     a = np.asarray(poly, dtype=np.float64).reshape(-1, 2)
-    return a * np.array([width * scale, height * scale], dtype=np.float64)
+    return a * np.array([width, height], dtype=np.float64)
+
+
+def ramp_rings(max_px: float) -> int:
+    """How many nested outlines a feather that wide needs. Twin of `rampRings`."""
+    return int(max(_RAMP_MIN_RINGS,
+                   min(_RAMP_MAX_RINGS, round(float(max_px) / _RAMP_PX_PER_RING))))
+
+
+def ramp_offsets(rings: int) -> np.ndarray:
+    """Where to place the nested outlines. Twin of `rampOffsets` in splineEval.ts.
+
+    Evenly spaced rings give a coverage of 1 - q: correct, and ugly. That profile
+    has a corner in its slope at both ends, so the eye reads a hard line where
+    the softness starts and another where it stops — the softening shows up
+    precisely as an edge, which is the one thing it exists to remove.
+
+    Coverage is the fraction of rings outside a point, so the profile is decided
+    by where the rings go: place them at the inverse of the profile wanted.
+    smoothstep⁻¹ has a closed form, so a smooth falloff costs nothing over a
+    straight one.
+    """
+    x = (np.arange(rings, dtype=np.float64) + 0.5) / rings
+    return 0.5 - np.sin(np.arcsin(1.0 - 2.0 * x) / 3.0)
+
+
+def _area(poly: np.ndarray) -> float:
+    """Unsigned shoelace area — only used to tell the two ends of a ring stack apart."""
+    nxt = np.roll(poly, -1, axis=0)
+    return abs(float(np.sum(poly[:, 0] * nxt[:, 1] - nxt[:, 0] * poly[:, 1]))) / 2.0
+
+
+def _fill_coverage(rings, width: int, height: int, ss: int) -> torch.Tensor:
+    """Mean coverage of a stack of nested polygons, rasterized `ss`× and boxed down.
+
+    One ring is a plain antialiased fill. Several are a gradient: a pixel inside
+    j of them has coverage j/K, and `ramp_offsets` chose where they sit so that
+    works out to a smoothstep across the band.
+
+    The rings are nested — each one is the outline pushed further along the same
+    offsets — so the smallest ring containing a pixel already determines its
+    count, and painting them largest-first with an increasing level writes the
+    whole gradient in a single buffer. No per-ring image, no accumulation, no
+    rounding, and a soft edge costs one polygon fill per ring instead of a fill
+    plus a full-resolution resize.
+
+    Which end is largest depends on where the clones were dragged: outward for
+    the usual soft edge, inward if they were pulled inside the shape, which
+    softens inward instead. Sweeping from whichever end encloses more area
+    covers both without the caller having to care.
+    """
+    from PIL import Image, ImageDraw  # ships with ComfyUI core
+
+    k = len(rings)
+    im = Image.new("L", (width * ss, height * ss), 0)
+    draw = ImageDraw.Draw(im)
+    order = range(k - 1, -1, -1) if _area(rings[-1]) >= _area(rings[0]) else range(k)
+    for level, j in enumerate(order, start=1):
+        draw.polygon([tuple(p) for p in rings[j] * ss], fill=level)
+    # The box downsample and the /K in one pass, in float32 rather than through
+    # a uint8 resize — the levels are what the gradient is made of.
+    cov = np.asarray(im).reshape(height, ss, width, ss).sum(axis=(1, 3), dtype=np.float32)
+    return torch.from_numpy(cov).div_(float(ss * ss * k))
+
+
+def _shape_rings(shape, poly_px: np.ndarray) -> list:
+    """The shape's outline, plus the softened rings its per-point feather asks for.
+
+    `fo` is the per-vertex feather offset in output pixels — a vector, because
+    the editor's feather is a clone of the point placed by hand rather than a
+    width pushed out along the normal. The editor resolves it from the control
+    points onto every vertex of the polyline, so all that happens here is adding
+    it: no normals, no winding, no miter, and no geometry written in two
+    languages that could drift apart.
+    """
+    fo = shape.get("fo")
+    if not fo or len(fo) != len(poly_px):
+        return [poly_px]
+    delta = np.asarray(fo, dtype=np.float64).reshape(-1, 2)
+    reach = float(np.hypot(delta[:, 0], delta[:, 1]).max())
+    if reach <= 0.0:
+        return [poly_px]
+    return [poly_px + delta * t for t in ramp_offsets(ramp_rings(reach))]
 
 
 def rasterize(shapes, width: int, height: int) -> torch.Tensor:
@@ -81,12 +182,13 @@ def rasterize(shapes, width: int, height: int) -> torch.Tensor:
     winding rule, which is both better to work with and avoids depending on how
     PIL's scanline fill treats a self-intersecting polygon.
 
-    Feather is per shape and applied *before* compositing, which is the whole
-    point of `sub`: a soft cut-out is impossible if softening only happens once
-    at the end.
+    Feather comes in two forms and both are per shape, applied *before*
+    compositing — which is the whole point of `sub`: a soft cut-out is impossible
+    if softening only happens once at the end. `feather` softens the whole edge
+    evenly; `fo` carries a per-vertex offset to a hand-placed clone of the
+    outline, so the softness can differ at every point and in any direction —
+    which is what lets one side of a shape blend away while the other stays crisp.
     """
-    from PIL import Image, ImageDraw  # ships with ComfyUI core
-
     acc = torch.zeros(height, width, dtype=torch.float32)
     ss = _SUPERSAMPLE if width * height <= _SUPERSAMPLE_CUTOFF else _SUPERSAMPLE_LARGE
 
@@ -94,14 +196,10 @@ def rasterize(shapes, width: int, height: int) -> torch.Tensor:
         poly = shape.get("poly") or []
         if len(poly) < 3:
             continue  # a polygon needs area; PIL raises on fewer than 3 points
-        pts = poly_to_px(poly, width, height, ss)
-        im = Image.new("L", (width * ss, height * ss), 0)
-        ImageDraw.Draw(im).polygon([tuple(p) for p in pts], fill=255)
-        cov = torch.from_numpy(
-            np.array(im.resize((width, height), Image.BOX), dtype=np.uint8)
-        ).float().div_(255.0)
+        pts = poly_to_px(poly, width, height)
+        cov = _fill_coverage(_shape_rings(shape, pts), width, height, ss)
 
-        feather = int(shape.get("feather") or 0)
+        feather = float(shape.get("feather") or 0.0)
         if feather > 0:
             cov = mask_core.blur(cov[None, None], feather)[0, 0]
 
@@ -147,13 +245,18 @@ def splat_field(xy: torch.Tensor, vals: torch.Tensor, height: int, width: int) -
 
 
 def idw_field(pins: torch.Tensor, vals: torch.Tensor, height: int, width: int,
-              power: float = 2.0) -> torch.Tensor:
+              power: float = 2.0, reach: torch.Tensor | None = None) -> torch.Tensor:
     """Inverse-distance weighting of a few scattered values over a grid.
 
     `pins` is (P, 2) normalized 0..1, `vals` is (P,). Closed form, no
     triangulation, no boundary to extrapolate past — with P in the tens this is
     one broadcast of P distances per pixel and it degenerates correctly at
     P == 1 (a constant field).
+
+    `reach` is an optional (P,) radius per pin, dividing its own distances. A
+    wider pin holds ground the ones around it would otherwise take — which is
+    how a single sharp pin can keep a whole subject in focus instead of being
+    dragged blurry by its neighbours. All at `NEUTRAL_REACH` is the plain form.
     """
     dev = pins.device
     gy, gx = torch.meshgrid(
@@ -161,8 +264,10 @@ def idw_field(pins: torch.Tensor, vals: torch.Tensor, height: int, width: int,
         torch.linspace(0.0, 1.0, width, device=dev),
         indexing="ij",
     )
-    d2 = (gx[..., None] - pins[:, 0]) ** 2 + (gy[..., None] - pins[:, 1]) ** 2 + 1e-9
-    w = d2.pow(-power / 2.0)
+    d2 = (gx[..., None] - pins[:, 0]) ** 2 + (gy[..., None] - pins[:, 1]) ** 2
+    if reach is not None:
+        d2 = d2 / (reach / NEUTRAL_REACH).clamp(min=1e-4) ** 2
+    w = (d2 + 1e-9).pow(-power / 2.0)
     return (w * vals).sum(-1) / w.sum(-1)
 
 
@@ -224,6 +329,11 @@ def path_samples(paths, width: int, height: int):
     Resampled to about one sample per pixel of arc length, which is what makes
     the splatted weight a density `flow_field`'s confidence term can calibrate
     against without a tuned constant.
+
+    A stroke's `speed` is its overall intensity; `sv` is an optional per-vertex
+    multiplier on top, resolved by the editor from the per-control-point values
+    and carried along the polyline. That is what lets one stroke describe
+    something that accelerates, instead of needing a stroke per speed.
     """
     pos, val = [], []
     for p in paths:
@@ -233,6 +343,9 @@ def path_samples(paths, width: int, height: int):
         speed = abs(float(p.get("speed", 1.0)))
         if speed <= 0.0:
             continue
+        sv = p.get("sv")
+        sv = (np.maximum(0.0, np.asarray(sv, dtype=np.float64))
+              if sv and len(sv) == len(poly) else np.ones(len(poly)))
         pts = poly * np.array([width, height], dtype=np.float64)
         seg = np.hypot(*np.diff(pts, axis=0).T)
         total = float(seg.sum())
@@ -243,8 +356,9 @@ def path_samples(paths, width: int, height: int):
         xy = np.stack([np.interp(t, cum, pts[:, 0]), np.interp(t, cum, pts[:, 1])], axis=1)
         d = np.gradient(xy, axis=0)
         d /= (np.hypot(d[:, 0], d[:, 1]) + 1e-9)[:, None]
+        spd = (speed * np.interp(t, cum, sv))[:, None]
         pos.append(xy)
-        val.append(np.concatenate([d * speed, np.full((len(xy), 1), speed)], axis=1))
+        val.append(np.concatenate([d * spd, spd], axis=1))
     if not pos:
         return None, None
     return np.concatenate(pos), np.concatenate(val)

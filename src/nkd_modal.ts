@@ -16,8 +16,24 @@
  * `body` and <Teleport> their controls into `footerLeft` / `footerRight`.
  *
  * Reusable across packs: this file has no imports at all, so copying it into any
- * other ComfyUI-NKD-* pack works as-is. It is also emitted standalone to
- * web/js/nkd_modal.js so hand-written extensions can import it at runtime.
+ * other ComfyUI-NKD-* pack works as-is.
+ *
+ * ── THIS COPY IS THE CANONICAL ONE ────────────────────────────────────────
+ * The same file is vendored by hand into other packs — today ComfyUI-NKD-VFX-Tools
+ * (`src/nkd_modal.ts`, which additionally emits `web/js/nkd_modal.js` as its own
+ * Vite entry so hand-written extensions can import it at runtime; this pack has
+ * no such entry and no `web/` at all).
+ *
+ * Nothing enforces that those copies stay in step — "do not fork it" is a comment,
+ * not a build step — so: **change it here, then copy outward and rebuild the
+ * consumer.** If you find yourself editing it anywhere else, you are creating the
+ * divergence this note exists to prevent. Everything added here must stay
+ * dependency-free and backwards compatible, because a copy lands in a pack whose
+ * callers you are not looking at.
+ *
+ * Consumers today: this pack's spline editors (Vector Mask / Path Blur / Field
+ * Blur) and, in VFX Tools, fSpy Camera, Lens Distort, Preview 3D and Perspective
+ * Dewarp.
  */
 
 export type NkdModalCloseReason = "save" | "dismiss";
@@ -108,7 +124,11 @@ const CSS = `
 .nkd-modal-btn.primary { border-color: #4ab4ff; color: #4ab4ff; font-weight: 500; padding: 5px 14px; }
 .nkd-modal-btn.primary:hover { background: rgba(74,180,255,0.15); }
 .nkd-modal-lbl { color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
-.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; }
+.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; touch-action: none; }
+.nkd-modal-num {
+  color: #c8d0e0; font-variant-numeric: tabular-nums;
+  min-width: 52px; text-align: right;
+}
 .nkd-modal-sel {
   background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
   color: #c8d0e0; padding: 3px 8px; font-size: 12px; cursor: pointer;
@@ -229,19 +249,131 @@ export function nkdToggle(label: string, initial: boolean,
   return b;
 }
 
-export function nkdSlider(label: string,
-                          cfg: { min: number; max: number; step: number; value: number },
-                          onInput: (v: number) => void, title?: string): HTMLLabelElement {
-  const wrap = document.createElement("label");
+/** Gain while Shift is held. The NKD pack-wide fine-adjust, same as the arc
+ *  gizmo's vertical scrub. */
+const FINE_GAIN = 0.1;
+
+export type NkdSliderCfg = {
+  min: number; max: number; step: number; value: number;
+  /** Track width in px. The default is deliberately small; give a slider that
+   *  has to be aimed precisely a wide one. */
+  width?: number;
+  /** Quantum while Shift is held. Defaults to a tenth of `step`. */
+  fine?: number;
+  /** Render the value beside the track. Give it units — a bare number next to a
+   *  slider called "Feather" does not say pixels, and pixels is the question. */
+  format?: (v: number) => string;
+};
+
+export type NkdSlider = HTMLLabelElement & {
+  /** Set the value from outside without firing `onInput`. */
+  sync(v: number): void;
+  /** Grey the control out — no value to edit. */
+  setDisabled(off: boolean): void;
+};
+
+/**
+ * A range input whose *drag* is ours, not the browser's.
+ *
+ * The native drag maps the pointer straight onto the track, so precision is
+ * whatever the track's width buys you and no more: on a 0..128 range in 80 px,
+ * one pixel of mouse is one and a half units and there are values you simply
+ * cannot select. Driving it by pointer *delta* instead means Shift can scale the
+ * gain, and because the value accumulates rather than being re-derived from the
+ * cursor, taking Shift on or off mid-drag changes the sensitivity without the
+ * value jumping.
+ *
+ * The element stays a real `<input type=range>` — same look, same keyboard — and
+ * carries `step="any"` so it will not snap away the fine values underneath us.
+ */
+export function nkdSlider(label: string, cfg: NkdSliderCfg,
+                          onInput: (v: number) => void, title?: string): NkdSlider {
+  const wrap = document.createElement("label") as NkdSlider;
   wrap.className = "nkd-modal-lbl";
   if (title) wrap.title = title;
+
   const rng = document.createElement("input");
   rng.type = "range";
   rng.className = "nkd-modal-rng";
   rng.min = String(cfg.min); rng.max = String(cfg.max);
-  rng.step = String(cfg.step); rng.value = String(cfg.value);
-  rng.oninput = () => onInput(parseFloat(rng.value));
+  rng.step = "any";                            // we quantize; the browser must not
+  rng.value = String(cfg.value);
+  if (cfg.width) rng.style.width = `${cfg.width}px`;
+
+  const out = cfg.format ? document.createElement("span") : null;
+  if (out) out.className = "nkd-modal-num";
+
+  const fine = cfg.fine ?? cfg.step / 10;
+  const clamp = (v: number) => Math.max(cfg.min, Math.min(cfg.max, v));
+  const quantize = (v: number, soft: boolean) => {
+    const q = soft ? fine : cfg.step;
+    // Rounded twice: once to the quantum, once to kill the float dust that
+    // leaves 0.30000000000000004 in a readout.
+    return Math.round(Math.round(clamp(v) / q) * q * 1e6) / 1e6;
+  };
+  const show = (v: number) => { if (out) out.textContent = cfg.format!(v); };
+  const apply = (v: number, soft: boolean) => {
+    const q = quantize(v, soft);
+    rng.value = String(q);
+    show(q);
+    onInput(q);
+  };
+
+  rng.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || rng.disabled) return;
+    e.preventDefault();                        // ours now, not the browser's
+    rng.focus();
+    rng.setPointerCapture(e.pointerId);
+    const rect = rng.getBoundingClientRect();
+    const span = cfg.max - cfg.min;
+    const width = Math.max(1, rect.width);
+    // Shift means "adjust what is already there", so it must not jump to the
+    // cursor first. Without Shift, clicking the track jumps, as it always did.
+    let v = e.shiftKey
+      ? parseFloat(rng.value)
+      : clamp(cfg.min + ((e.clientX - rect.left) / width) * span);
+    apply(v, e.shiftKey);
+
+    let prevX = e.clientX;
+    const move = (ev: PointerEvent) => {
+      v = clamp(v + ((ev.clientX - prevX) / width) * span * (ev.shiftKey ? FINE_GAIN : 1));
+      prevX = ev.clientX;
+      apply(v, ev.shiftKey);
+    };
+    const up = (ev: PointerEvent) => {
+      rng.removeEventListener("pointermove", move);
+      rng.removeEventListener("pointerup", up);
+      rng.removeEventListener("pointercancel", up);
+      try { rng.releasePointerCapture(ev.pointerId); } catch { /* already gone */ }
+    };
+    rng.addEventListener("pointermove", move);
+    rng.addEventListener("pointerup", up);
+    rng.addEventListener("pointercancel", up);
+  });
+
+  // step="any" would otherwise leave the arrow keys moving by a hundredth of the
+  // range, which is neither the coarse step nor the fine one.
+  rng.addEventListener("keydown", (e) => {
+    const dir = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1
+      : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const q = e.shiftKey ? fine : cfg.step;
+    apply(parseFloat(rng.value) + dir * q, e.shiftKey);
+  });
+
   wrap.append(document.createTextNode(label), rng);
+  if (out) wrap.appendChild(out);
+  show(cfg.value);
+
+  wrap.sync = (v: number) => {
+    rng.value = String(v);
+    show(v);
+  };
+  wrap.setDisabled = (off: boolean) => {
+    rng.disabled = off;
+    wrap.style.opacity = off ? "0.45" : "";
+  };
   return wrap;
 }
 

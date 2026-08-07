@@ -9208,7 +9208,7 @@ const R_HOVER = 7;
 const R_CENTER = 4.5;
 const R_DEP = 3;
 const HIT_PX = 14;
-const MARQUEE_MIN = 4;
+const MARQUEE_MIN$1 = 4;
 const SHIFT_ROT_PER_PX = 0.3;
 const SHIFT_SAT_PER_PX = 3e-3;
 const SHIFT_AXIS_MIN = 4;
@@ -9843,7 +9843,7 @@ class ColorWarpGrid {
     const x0 = Math.min(m[0], m[2]), x1 = Math.max(m[0], m[2]);
     const y0 = Math.min(m[1], m[3]), y1 = Math.max(m[1], m[3]);
     this.selected.clear();
-    if (x1 - x0 < MARQUEE_MIN && y1 - y0 < MARQUEE_MIN) return;
+    if (x1 - x0 < MARQUEE_MIN$1 && y1 - y0 < MARQUEE_MIN$1) return;
     const R = this.mesh.sat_rings, S = this.mesh.hue_segments;
     for (let ri = 1; ri <= R; ri++)
       for (let sj = 0; sj < S; sj++) {
@@ -11806,7 +11806,11 @@ const CSS = `
 .nkd-modal-btn.primary { border-color: #4ab4ff; color: #4ab4ff; font-weight: 500; padding: 5px 14px; }
 .nkd-modal-btn.primary:hover { background: rgba(74,180,255,0.15); }
 .nkd-modal-lbl { color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
-.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; }
+.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; touch-action: none; }
+.nkd-modal-num {
+  color: #c8d0e0; font-variant-numeric: tabular-nums;
+  min-width: 52px; text-align: right;
+}
 .nkd-modal-sel {
   background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
   color: #c8d0e0; padding: 3px 8px; font-size: 12px; cursor: pointer;
@@ -11918,6 +11922,7 @@ function nkdToggle(label, initial, onChange, title) {
   b.classList.toggle("on", on);
   return b;
 }
+const FINE_GAIN = 0.1;
 function nkdSlider(label, cfg, onInput, title) {
   const wrap = document.createElement("label");
   wrap.className = "nkd-modal-lbl";
@@ -11927,10 +11932,73 @@ function nkdSlider(label, cfg, onInput, title) {
   rng.className = "nkd-modal-rng";
   rng.min = String(cfg.min);
   rng.max = String(cfg.max);
-  rng.step = String(cfg.step);
+  rng.step = "any";
   rng.value = String(cfg.value);
-  rng.oninput = () => onInput(parseFloat(rng.value));
+  if (cfg.width) rng.style.width = `${cfg.width}px`;
+  const out = cfg.format ? document.createElement("span") : null;
+  if (out) out.className = "nkd-modal-num";
+  const fine = cfg.fine ?? cfg.step / 10;
+  const clamp2 = (v) => Math.max(cfg.min, Math.min(cfg.max, v));
+  const quantize = (v, soft) => {
+    const q = soft ? fine : cfg.step;
+    return Math.round(Math.round(clamp2(v) / q) * q * 1e6) / 1e6;
+  };
+  const show = (v) => {
+    if (out) out.textContent = cfg.format(v);
+  };
+  const apply2 = (v, soft) => {
+    const q = quantize(v, soft);
+    rng.value = String(q);
+    show(q);
+    onInput(q);
+  };
+  rng.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || rng.disabled) return;
+    e.preventDefault();
+    rng.focus();
+    rng.setPointerCapture(e.pointerId);
+    const rect = rng.getBoundingClientRect();
+    const span = cfg.max - cfg.min;
+    const width = Math.max(1, rect.width);
+    let v = e.shiftKey ? parseFloat(rng.value) : clamp2(cfg.min + (e.clientX - rect.left) / width * span);
+    apply2(v, e.shiftKey);
+    let prevX = e.clientX;
+    const move = (ev) => {
+      v = clamp2(v + (ev.clientX - prevX) / width * span * (ev.shiftKey ? FINE_GAIN : 1));
+      prevX = ev.clientX;
+      apply2(v, ev.shiftKey);
+    };
+    const up = (ev) => {
+      rng.removeEventListener("pointermove", move);
+      rng.removeEventListener("pointerup", up);
+      rng.removeEventListener("pointercancel", up);
+      try {
+        rng.releasePointerCapture(ev.pointerId);
+      } catch {
+      }
+    };
+    rng.addEventListener("pointermove", move);
+    rng.addEventListener("pointerup", up);
+    rng.addEventListener("pointercancel", up);
+  });
+  rng.addEventListener("keydown", (e) => {
+    const dir = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const q = e.shiftKey ? fine : cfg.step;
+    apply2(parseFloat(rng.value) + dir * q, e.shiftKey);
+  });
   wrap.append(document.createTextNode(label), rng);
+  if (out) wrap.appendChild(out);
+  show(cfg.value);
+  wrap.sync = (v) => {
+    rng.value = String(v);
+    show(v);
+  };
+  wrap.setDisabled = (off) => {
+    rng.disabled = off;
+    wrap.style.opacity = off ? "0.45" : "";
+  };
   return wrap;
 }
 const FLATTEN_TOL = 1 / 24576;
@@ -11938,6 +12006,7 @@ const MIN_W$1 = 1;
 const MAX_W = 10;
 const MIN_SPLITS = 3;
 const MAX_DEPTH = 14;
+const OFFSET_MAX_DEPTH = 7;
 const clampW = (v) => Math.max(MIN_W$1, Math.min(MAX_W, Number.isFinite(v) ? v : MIN_W$1));
 function segDist(p2, a, b) {
   const dx = b[0] - a[0], dy = b[1] - a[1];
@@ -11947,15 +12016,16 @@ function segDist(p2, a, b) {
   t = Math.max(0, Math.min(1, t));
   return Math.hypot(p2[0] - (a[0] + t * dx), p2[1] - (a[1] + t * dy));
 }
-function adaptive(f, t0, t1, p0, p1, tol, out, depth) {
+function adaptive(f, t0, t1, p0, p1, tol, out, us, depth) {
   const tm = (t0 + t1) / 2;
   const pm = f(tm);
   if (depth >= MIN_SPLITS && (segDist(pm, p0, p1) <= tol || depth >= MAX_DEPTH)) {
     out.push(p1);
+    us.push(t1);
     return;
   }
-  adaptive(f, t0, tm, p0, pm, tol, out, depth + 1);
-  adaptive(f, tm, t1, pm, p1, tol, out, depth + 1);
+  adaptive(f, t0, tm, p0, pm, tol, out, us, depth + 1);
+  adaptive(f, tm, t1, pm, p1, tol, out, us, depth + 1);
 }
 const at = (pts, i, closed) => {
   const n = pts.length;
@@ -12070,9 +12140,12 @@ function greville(b) {
   }
   return out;
 }
-function bsplinePolyline(pts, closed, tol) {
+function bsplinePolyline(pts, closed, tol, us) {
   const b = bsplineSetup(pts, closed);
-  if (!b) return pts.map((p2) => [p2.x, p2.y]);
+  if (!b) return pts.map((p2, i) => {
+    us.push(i);
+    return [p2.x, p2.y];
+  });
   const { P, weights, knots, degree } = b;
   const out = [];
   const ev = (u) => nurbsEvaluate(P, weights, knots, degree, u);
@@ -12080,12 +12153,15 @@ function bsplinePolyline(pts, closed, tol) {
     const u0 = knots[i], u1 = knots[i + 1];
     if (!(u1 > u0)) continue;
     const a = ev(u0);
-    if (!out.length) out.push(a);
-    adaptive(ev, u0, u1, a, ev(u1), tol, out, 0);
+    if (!out.length) {
+      out.push(a);
+      us.push(u0);
+    }
+    adaptive(ev, u0, u1, a, ev(u1), tol, out, us, 0);
   }
   return out;
 }
-function simplify(pts, tol) {
+function simplify(pts, us, tol) {
   if (pts.length < 3) return pts;
   const keep = new Uint8Array(pts.length);
   keep[0] = keep[pts.length - 1] = 1;
@@ -12105,17 +12181,28 @@ function simplify(pts, tol) {
     keep[best] = 1;
     stack2.push([lo, best], [best, hi]);
   }
-  return pts.filter((_, i) => keep[i]);
+  const kept = pts.filter((_, i) => keep[i]);
+  const keptU = us.filter((_, i) => keep[i]);
+  us.length = 0;
+  us.push(...keptU);
+  return kept;
 }
-function dropCollinearWrapped(pts, tol) {
+function dropCollinearWrapped(pts, us, tol) {
   const n = pts.length;
   if (n < 4) return pts;
   const out = [];
+  const outU = [];
   for (let i = 0; i < n; i++) {
     const prev = out.length ? out[out.length - 1] : pts[n - 1];
-    if (segDist(pts[i], prev, pts[(i + 1) % n]) > tol) out.push(pts[i]);
+    if (segDist(pts[i], prev, pts[(i + 1) % n]) > tol) {
+      out.push(pts[i]);
+      outU.push(us[i]);
+    }
   }
-  return out.length >= 3 ? out : pts;
+  if (out.length < 3) return pts;
+  us.length = 0;
+  us.push(...outU);
+  return out;
 }
 function insertionIndex(pts, type, closed, target, tol, aspect = 1) {
   if (pts.length < 2) return null;
@@ -12171,21 +12258,142 @@ function insertionIndex(pts, type, closed, target, tol, aspect = 1) {
   return { at: at2, point: best.p };
 }
 function flatten(pts, type, closed, tol = FLATTEN_TOL) {
-  if (pts.length < 2) return pts.map((p2) => [p2.x, p2.y]);
+  return flattenP(pts, type, closed, tol).poly;
+}
+function flattenP(pts, type, closed, tol = FLATTEN_TOL) {
+  const us = [];
+  if (pts.length < 2) {
+    return { poly: pts.map((p2, i) => {
+      us.push(i);
+      return [p2.x, p2.y];
+    }), us };
+  }
   let out;
   if (type === "bspline") {
-    out = bsplinePolyline(pts, closed, tol);
+    out = bsplinePolyline(pts, closed, tol, us);
   } else {
     out = [[pts[0].x, pts[0].y]];
+    us.push(0);
+    let seg = 0;
     for (const [p0, c1, c2, p3] of bezierSegments(pts, closed)) {
-      adaptive(cubic(p0, c1, c2, p3), 0, 1, p0, p3, tol, out, 0);
+      const local = [];
+      adaptive(cubic(p0, c1, c2, p3), 0, 1, p0, p3, tol, out, local, 0);
+      for (const t of local) us.push(seg + t);
+      seg++;
     }
   }
-  out = simplify(out, tol);
+  out = simplify(out, us, tol);
   if (closed && out.length > 1) {
     const a = out[0], b = out[out.length - 1];
-    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < tol) out.pop();
-    out = dropCollinearWrapped(out, tol);
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < tol) {
+      out.pop();
+      us.pop();
+    }
+    out = dropCollinearWrapped(out, us, tol);
+  }
+  return { poly: out, us };
+}
+function attrEvaluator(pts, type, closed, attr) {
+  if (type === "bspline") {
+    const b = bsplineSetup(pts, closed);
+    if (!b) {
+      const v2 = attr(pts[0]);
+      return () => v2;
+    }
+    const V = b.srcOf.map((i) => [attr(pts[i]), 0]);
+    return (u) => nurbsEvaluate(V, b.weights, b.knots, b.degree, u)[0];
+  }
+  const n = pts.length;
+  const v = (i) => attr(at(pts, i, closed));
+  const last = closed ? n : n - 1;
+  return (u) => {
+    const i = Math.max(0, Math.min(last - 1, Math.floor(u)));
+    const t = Math.max(0, Math.min(1, u - i));
+    const p1 = at(pts, i, closed), p2 = at(pts, i + 1, closed);
+    const a = v(i), d = v(i + 1);
+    const c1 = p1.corner ? a : a + (v(i + 1) - v(i - 1)) / 6;
+    const c2 = p2.corner ? d : d - (v(i + 2) - v(i)) / 6;
+    const w = 1 - t;
+    return w * w * w * a + 3 * w * w * t * c1 + 3 * w * t * t * c2 + t * t * t * d;
+  };
+}
+function sampleAttr(pts, type, closed, us, attr) {
+  if (!pts.length) return us.map(() => 0);
+  return us.map(attrEvaluator(pts, type, closed, attr));
+}
+function pointEvaluator(pts, type, closed) {
+  if (type === "bspline") {
+    const b = bsplineSetup(pts, closed);
+    if (!b) return () => [pts[0].x, pts[0].y];
+    return (u) => nurbsEvaluate(b.P, b.weights, b.knots, b.degree, u);
+  }
+  const segs = bezierSegments(pts, closed);
+  const last = segs.length;
+  return (u) => {
+    const i = Math.max(0, Math.min(last - 1, Math.floor(u)));
+    const t = Math.max(0, Math.min(1, u - i));
+    const [p0, c1, c2, p3] = segs[i];
+    return cubic(p0, c1, c2, p3)(t);
+  };
+}
+function period(pts, type, closed) {
+  if (!closed) return 0;
+  if (type !== "bspline") return pts.length;
+  const b = bsplineSetup(pts, closed);
+  return b ? b.knots[b.P.length] - b.knots[b.degree] : 0;
+}
+function flattenFeathered(pts, type, closed, tol, offX, offY) {
+  const base = flattenP(pts, type, closed, tol);
+  const fx = attrEvaluator(pts, type, closed, offX);
+  const fy = attrEvaluator(pts, type, closed, offY);
+  if (base.poly.length < 2) {
+    return { ...base, off: base.us.map((u) => [fx(u), fy(u)]) };
+  }
+  const pt = pointEvaluator(pts, type, closed);
+  const us = [];
+  const poly = [];
+  const off = [];
+  const push = (u, p2, o) => {
+    us.push(u);
+    poly.push(p2);
+    off.push(o);
+  };
+  const outer = (p2, o) => [p2[0] + o[0], p2[1] + o[1]];
+  const bisect = (u0, u1, p0, o0, p1, o1, depth) => {
+    if (depth >= OFFSET_MAX_DEPTH) return;
+    const um = (u0 + u1) / 2;
+    const pm = pt(um);
+    const om = [fx(um), fy(um)];
+    if (segDist(outer(pm, om), outer(p0, o0), outer(p1, o1)) <= tol) return;
+    bisect(u0, um, p0, o0, pm, om, depth + 1);
+    push(um, pm, om);
+    bisect(um, u1, pm, om, p1, o1, depth + 1);
+  };
+  let pu = base.us[0];
+  let pp = base.poly[0];
+  let po = [fx(pu), fy(pu)];
+  push(pu, pp, po);
+  for (let i = 1; i < base.us.length; i++) {
+    const u = base.us[i], p2 = base.poly[i];
+    const o = [fx(u), fy(u)];
+    bisect(pu, u, pp, po, p2, o, 0);
+    push(u, p2, o);
+    pu = u;
+    pp = p2;
+    po = o;
+  }
+  const span = period(pts, type, closed);
+  if (span > 0) {
+    const u1 = base.us[0] + span;
+    bisect(pu, u1, pp, po, base.poly[0], off[0], 0);
+  }
+  return { poly, us, off };
+}
+function rampOffsets(rings) {
+  const out = [];
+  for (let j = 0; j < rings; j++) {
+    const x = (j + 0.5) / rings;
+    out.push(0.5 - Math.sin(Math.asin(1 - 2 * x) / 3));
   }
   return out;
 }
@@ -12257,7 +12465,7 @@ void main() {
 const FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D uImg;
-uniform vec3 uPins[${MAX_PINS}];   // x, y, blur (0..1)
+uniform vec4 uPins[${MAX_PINS}];   // x, y, blur (0..1), reach scale
 uniform int uCount;
 uniform float uMaxBlur;            // pixels at texture resolution
 uniform float uPower;              // IDW falloff
@@ -12269,10 +12477,12 @@ out vec4 frag;
 void main() {
   // Inverse-distance weighting, the same form the backend solves. Distances are
   // in normalized units on both sides, so a non-square image skews identically.
+  // A pin's reach divides its distance, so widening one lets it hold ground the
+  // pins around it would otherwise take — including a reach of zero blur.
   float num = 0.0, den = 0.0;
   for (int i = 0; i < ${MAX_PINS}; i++) {
     if (i >= uCount) break;
-    vec2 d = vUv - uPins[i].xy;
+    vec2 d = (vUv - uPins[i].xy) / max(uPins[i].w, 1e-4);
     float w = pow(dot(d, d) + 1e-9, -uPower * 0.5);
     num += w * uPins[i].z;
     den += w;
@@ -12297,6 +12507,7 @@ void main() {
   c += textureLod(uImg, vUv + vec2(0.0, -o) * uTexel, lod).rgb;
   frag = vec4(c / 6.0, 1.0);
 }`;
+const NEUTRAL_REACH = 0.25;
 class FieldPreview {
   constructor() {
     __publicField(this, "canvas");
@@ -12376,18 +12587,19 @@ class FieldPreview {
     const gl = this.gl;
     if (!gl || !this.ready || !this.prog) return false;
     const n = Math.min(pins.length, MAX_PINS);
-    const flat = new Float32Array(MAX_PINS * 3);
+    const flat = new Float32Array(MAX_PINS * 4);
     for (let i = 0; i < n; i++) {
-      flat[i * 3] = pins[i].x;
-      flat[i * 3 + 1] = pins[i].y;
-      flat[i * 3 + 2] = pins[i].blur;
+      flat[i * 4] = pins[i].x;
+      flat[i * 4 + 1] = pins[i].y;
+      flat[i * 4 + 2] = pins[i].blur;
+      flat[i * 4 + 3] = Math.max(0.01, pins[i].r ?? NEUTRAL_REACH) / NEUTRAL_REACH;
     }
     gl.useProgram(this.prog);
     gl.viewport(0, 0, this.canvas.width, this.canvas.height);
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.uniform1i(this.loc.uImg, 0);
-    gl.uniform3fv(this.loc.uPins, flat);
+    gl.uniform4fv(this.loc.uPins, flat);
     gl.uniform1i(this.loc.uCount, n);
     gl.uniform1f(this.loc.uMaxBlur, maxBlur);
     gl.uniform1f(this.loc.uPower, falloff);
@@ -12407,6 +12619,7 @@ class FieldPreview {
     this.ready = false;
   }
 }
+const DEFAULT_INFLUENCE = 0.25;
 const C = {
   bg: "#0b0d12",
   add: "#4ab4ff",
@@ -12418,13 +12631,28 @@ const C = {
   ptActive: "#ff6b6b",
   handle: "rgba(255,209,102,0.85)",
   ptStroke: "rgba(0,0,0,0.65)",
-  hull: "rgba(255,255,255,0.28)"
+  hull: "rgba(255,255,255,0.28)",
+  // The Fusion convention: the softness guide is a second, green, dashed
+  // outline, so it never reads as another shape you might have drawn.
+  soft: "#7bd94f",
+  softDim: "rgba(123,217,79,0.45)",
+  marquee: "#4ab4ff"
 };
 const HIT = 10;
 const PT_R = { idle: 4.5, hover: 6, active: 7 };
 const HANDLE_HIT = 7;
+const CLONE_HIT = 8;
 const UNDO_DEPTH = 30;
 const MIN_PTS = { shape: 3, path: 2 };
+const MARQUEE_MIN = 4;
+const RAMP_PX_PER_RING = 1;
+const RAMP_RINGS = { min: 2, max: 64 };
+const MATTE_MAX_PX = 35e5;
+const DRAG_RINGS = 8;
+const rampRings = (maxPx) => Math.max(
+  RAMP_RINGS.min,
+  Math.min(RAMP_RINGS.max, Math.round(maxPx / RAMP_PX_PER_RING))
+);
 class SplineEditor {
   constructor(opts) {
     __publicField(this, "canvas");
@@ -12441,11 +12669,19 @@ class SplineEditor {
     /** Index of the shape being drawn into / edited. -1 for none. */
     __publicField(this, "active", -1);
     __publicField(this, "selPt", -1);
+    /** Box selection, as "shape,point" keys ("pin,i" in pin mode). Moves, deletes
+     *  and Ctrl-drags apply to the whole set. Same model as the Color Warp grid. */
+    __publicField(this, "sel", /* @__PURE__ */ new Set());
     __publicField(this, "hover", null);
+    __publicField(this, "hoverClone", null);
     /** Defaults the toolbar writes and new shapes inherit. */
     __publicField(this, "newType", "bezier");
     __publicField(this, "newOp", "add");
     __publicField(this, "showFill", true);
+    /** Draw the vectors at all. Off leaves the backdrop — the matte, the blurred
+     *  result — with nothing on top of it, which is the only way to judge an edge
+     *  that has a control point sitting on it. Editing still works while hidden. */
+    __publicField(this, "showCurves", true);
     __publicField(this, "view", "result");
     /** Backend-rendered result for the blur modes; null until one arrives. */
     __publicField(this, "preview", null);
@@ -12453,10 +12689,21 @@ class SplineEditor {
      *  live shader can match what the graph will do. */
     __publicField(this, "maxBlur", 48);
     __publicField(this, "falloff", 2);
+    /** Path Blur's Strength, so a per-point speed can be drawn as the distance
+     *  that pixel will actually travel rather than as a bare multiplier. */
+    __publicField(this, "strength", 24);
     /** GPU guide for pin mode. Drives the canvas between backend results. */
     __publicField(this, "live", null);
-    /** Offscreen matte for shape mode, rebuilt on every edit — cheap and exact. */
+    /** Offscreen matte for shape mode, at screen resolution. `matteKey` is what it
+     *  was built from, so it is rebuilt only when that actually changes. */
     __publicField(this, "matte", null);
+    __publicField(this, "scratch", null);
+    __publicField(this, "matteKey", "");
+    /** Bumped whenever any geometry changes, which is what invalidates the cached
+     *  flattening below. Every mutation goes through `emit`, so one counter there
+     *  covers all of them. */
+    __publicField(this, "geomRev", 0);
+    __publicField(this, "geomCache", /* @__PURE__ */ new WeakMap());
     __publicField(this, "zoom", 1);
     __publicField(this, "panX", 0);
     __publicField(this, "panY", 0);
@@ -12464,6 +12711,7 @@ class SplineEditor {
     __publicField(this, "drag", null);
     __publicField(this, "undo", []);
     __publicField(this, "onDown", (e) => {
+      var _a, _b;
       const [px, py] = this.eventPos(e);
       this.canvas.setPointerCapture(e.pointerId);
       if (e.button === 1 || e.altKey) {
@@ -12473,6 +12721,34 @@ class SplineEditor {
       if (e.button !== 0) return;
       if (this.mode === "pin") return this.downPin(e, px, py);
       const hit = this.pick(px, py);
+      if (hit && hit.handle < 0 && (e.ctrlKey || e.metaKey)) {
+        this.active = hit.s;
+        this.selPt = hit.i;
+        this.snapshot();
+        this.drag = { kind: "radius", s: hit.s, i: hit.i };
+        this.emit(true);
+        return;
+      }
+      if (!hit) {
+        const clone = this.pickClone(px, py);
+        if (clone) {
+          this.active = clone.s;
+          this.snapshot();
+          if (e.shiftKey) {
+            this.shapes[clone.s].pts[clone.i].fo = null;
+            this.commit();
+            return;
+          }
+          this.drag = { kind: "radius", s: clone.s, i: clone.i };
+          this.emit(true);
+          return;
+        }
+      }
+      if (!hit && e.shiftKey) {
+        this.drag = { kind: "marquee", x0: px, y0: py, x1: px, y1: py };
+        this.draw();
+        return;
+      }
       if (hit && hit.handle < 0 && hit.i === 0 && hit.s === this.active) {
         const s2 = this.shapes[hit.s];
         if (this.mode === "shape" && !s2.closed && s2.pts.length >= MIN_PTS.shape) {
@@ -12500,12 +12776,21 @@ class SplineEditor {
           this.commit();
           return;
         }
+        const inSel = this.sel.has(SplineEditor.key(hit.s, hit.i));
+        if (!inSel && this.sel.size) this.sel.clear();
         this.active = hit.s;
         this.selPt = hit.i;
         this.snapshot();
         const p2 = this.shapes[hit.s].pts[hit.i];
         const [nx2, ny2] = this.toNorm(px, py);
-        this.drag = { kind: "pt", s: hit.s, i: hit.i, dx: p2.x - nx2, dy: p2.y - ny2 };
+        this.drag = {
+          kind: "pt",
+          s: hit.s,
+          i: hit.i,
+          dx: p2.x - nx2,
+          dy: p2.y - ny2,
+          group: inSel ? this.targets(hit.s, hit.i) : void 0
+        };
         this.emit(true);
         return;
       }
@@ -12526,9 +12811,17 @@ class SplineEditor {
         this.emit(true);
         return;
       }
+      if (this.active >= 0 && ((_a = this.shapes[this.active]) == null ? void 0 : _a.closed)) {
+        this.sel.clear();
+        this.active = -1;
+        this.selPt = -1;
+        this.draw();
+        (_b = this.onState) == null ? void 0 : _b.call(this);
+        return;
+      }
+      this.sel.clear();
       this.snapshot();
-      if (this.active < 0 || this.shapes[this.active].closed) {
-        if (this.active >= 0) this.finishShape();
+      if (this.active < 0) {
         this.shapes.push(this.newShape());
         this.active = this.shapes.length - 1;
       }
@@ -12540,13 +12833,16 @@ class SplineEditor {
       this.emit(true);
     });
     __publicField(this, "onMove", (e) => {
+      var _a;
       const [px, py] = this.eventPos(e);
       const d = this.drag;
       if (!d) {
         const hit = this.mode === "pin" ? null : this.pick(px, py);
-        const changed = JSON.stringify(hit) !== JSON.stringify(this.hover);
+        const clone = hit ? null : this.pickClone(px, py);
+        const changed = JSON.stringify(hit) !== JSON.stringify(this.hover) || JSON.stringify(clone) !== JSON.stringify(this.hoverClone);
         this.hover = hit;
-        this.canvas.style.cursor = hit ? "pointer" : "crosshair";
+        this.hoverClone = clone;
+        this.canvas.style.cursor = hit || clone ? "pointer" : "crosshair";
         if (changed) this.draw();
         return;
       }
@@ -12561,11 +12857,28 @@ class SplineEditor {
         this.emit(false);
         return;
       }
+      if (d.kind === "marquee") {
+        d.x1 = px;
+        d.y1 = py;
+        this.draw();
+        return;
+      }
       const [nx, ny] = this.toNorm(px, py);
+      if (d.kind === "radius") return this.dragRadius(d.s, d.i, nx, ny);
       if (d.kind === "pin") {
         const p2 = this.pins[d.i];
-        p2.x = clamp01(nx + d.dx);
-        p2.y = clamp01(ny + d.dy);
+        const nxc = clamp01(nx + d.dx);
+        const nyc = clamp01(ny + d.dy);
+        if (d.group) {
+          const dx = nxc - p2.x, dy = nyc - p2.y;
+          for (const [, j] of d.group) {
+            if (j === d.i) continue;
+            this.pins[j].x = clamp01(this.pins[j].x + dx);
+            this.pins[j].y = clamp01(this.pins[j].y + dy);
+          }
+        }
+        p2.x = nxc;
+        p2.y = nyc;
         this.emit(false);
         return;
       }
@@ -12573,8 +12886,20 @@ class SplineEditor {
       if (!s) return;
       if (d.kind === "pt") {
         const p2 = s.pts[d.i];
-        p2.x = clamp01(nx + d.dx);
-        p2.y = clamp01(ny + d.dy);
+        const nxc = clamp01(nx + d.dx);
+        const nyc = clamp01(ny + d.dy);
+        if (d.group) {
+          const dx = nxc - p2.x, dy = nyc - p2.y;
+          for (const [gs, gi] of d.group) {
+            if (gs === d.s && gi === d.i) continue;
+            const q = (_a = this.shapes[gs]) == null ? void 0 : _a.pts[gi];
+            if (!q) continue;
+            q.x = clamp01(q.x + dx);
+            q.y = clamp01(q.y + dy);
+          }
+        }
+        p2.x = nxc;
+        p2.y = nyc;
       } else {
         const p2 = s.pts[d.i];
         this.ensureHandles(s, d.i);
@@ -12591,14 +12916,21 @@ class SplineEditor {
       this.emit(false);
     });
     __publicField(this, "onUp", (e) => {
+      var _a;
       if (!this.drag) return;
-      const wasEdit = this.drag.kind !== "pan";
+      const d = this.drag;
       this.drag = null;
       try {
         this.canvas.releasePointerCapture(e.pointerId);
       } catch {
       }
-      if (wasEdit) this.commit();
+      if (d.kind === "marquee") {
+        this.finishMarquee(d);
+        this.draw();
+        (_a = this.onState) == null ? void 0 : _a.call(this);
+        return;
+      }
+      if (d.kind !== "pan") this.commit();
     });
     __publicField(this, "onDblClick", (e) => {
       if (this.mode === "pin") return;
@@ -12633,6 +12965,7 @@ class SplineEditor {
       this.draw();
     });
     __publicField(this, "onKey", (e) => {
+      var _a;
       if (!this.canvas.isConnected) return;
       const meta = e.ctrlKey || e.metaKey;
       if (meta && e.key.toLowerCase() === "z") {
@@ -12645,6 +12978,14 @@ class SplineEditor {
           this.undo = keep;
           this.emit(true);
         }
+        return;
+      }
+      if (e.key === "Escape" && this.sel.size) {
+        e.preventDefault();
+        e.stopPropagation();
+        this.sel.clear();
+        this.draw();
+        (_a = this.onState) == null ? void 0 : _a.call(this);
         return;
       }
       if (e.key === "Enter") {
@@ -12690,7 +13031,8 @@ class SplineEditor {
     this.imgW = Math.max(1, w);
     this.imgH = Math.max(1, h);
     this.preview = null;
-    if (this.mode === "shape") this.buildMatte();
+    this.geomRev++;
+    this.matteKey = "";
     if (this.mode === "pin" && img) {
       if (!this.live) this.live = new FieldPreview();
       this.live.setImage(img, this.imgW, this.imgH);
@@ -12815,7 +13157,44 @@ class SplineEditor {
     const p2 = s.pts[i];
     if (!p2.h) p2.h = this.handlesOf(s, i) ?? [0, 0, 0, 0];
   }
+  static key(s, i) {
+    return `${s},${i}`;
+  }
+  /** The points a gesture on (s, i) acts on: the box selection if it is part of
+   *  one, otherwise just itself. */
+  targets(s, i) {
+    if (!this.sel.has(SplineEditor.key(s, i))) return [[s, i]];
+    return [...this.sel].map((k) => k.split(",").map(Number));
+  }
+  /** Distance from a point to the cursor, in image pixels. Normalized units are
+   *  anisotropic on a non-square frame; a feather radius must not be. */
+  distPx(nx, ny, px, py) {
+    return Math.hypot((nx - px) * this.imgW, (ny - py) * this.imgH);
+  }
   deleteActive() {
+    var _a;
+    if (this.sel.size) {
+      this.snapshot();
+      const byShape = /* @__PURE__ */ new Map();
+      for (const k of this.sel) {
+        const [s, i] = k.split(",").map(Number);
+        (byShape.get(s) ?? byShape.set(s, []).get(s)).push(i);
+      }
+      for (const [s, idx] of byShape) {
+        idx.sort((a, b) => b - a);
+        const list = this.mode === "pin" ? this.pins : (_a = this.shapes[s]) == null ? void 0 : _a.pts;
+        if (!list) continue;
+        for (const i of idx) list.splice(i, 1);
+      }
+      if (this.mode !== "pin") {
+        this.shapes = this.shapes.filter((s) => s.pts.length > 0);
+        this.active = Math.min(this.active, this.shapes.length - 1);
+      }
+      this.sel.clear();
+      this.selPt = -1;
+      this.commit();
+      return;
+    }
     if (this.mode === "pin") {
       if (this.selPt < 0) return;
       this.snapshot();
@@ -12830,12 +13209,37 @@ class SplineEditor {
     }
     this.commit();
   }
+  /** Take every feather clone away, so all the edges go back to hard. Scoped to
+   *  the box selection when there is one — otherwise the whole drawing. */
+  clearFeather() {
+    var _a;
+    if (this.mode !== "shape") return;
+    this.snapshot();
+    if (this.sel.size) {
+      for (const k of this.sel) {
+        const [si, i] = k.split(",").map(Number);
+        const p2 = (_a = this.shapes[si]) == null ? void 0 : _a.pts[i];
+        if (p2) p2.fo = null;
+      }
+    } else {
+      for (const s of this.shapes) for (const p2 of s.pts) p2.fo = null;
+    }
+    this.commit();
+  }
+  /** How many points currently carry a feather clone, for the status bar. */
+  get featherCount() {
+    if (this.mode !== "shape") return 0;
+    let n = 0;
+    for (const s of this.shapes) for (const p2 of s.pts) if (p2.fo) n++;
+    return n;
+  }
   clearAll() {
     this.snapshot();
     this.shapes = [];
     this.pins = [];
     this.active = -1;
     this.selPt = -1;
+    this.sel.clear();
     this.commit();
   }
   /** Finish the shape being drawn, so the next click starts a new one. */
@@ -12872,13 +13276,15 @@ class SplineEditor {
         pins: this.pins.map((p2) => ({
           x: round(p2.x),
           y: round(p2.y),
-          blur: round(p2.blur)
+          blur: round(p2.blur),
+          r: round(p2.r)
         }))
       });
     }
     const key = this.mode === "shape" ? "shapes" : "paths";
     const items = this.shapes.filter((s) => s.pts.length >= (this.mode === "shape" ? MIN_PTS.shape : MIN_PTS.path)).map((s) => {
       const closed = this.mode === "shape" ? true : s.closed;
+      const { poly, us } = flattenP(s.pts, s.type, closed);
       const base = {
         type: s.type,
         closed,
@@ -12886,15 +13292,31 @@ class SplineEditor {
           x: round(p2.x),
           y: round(p2.y),
           ...p2.h ? { h: p2.h.map(round) } : {},
-          ...p2.corner ? { corner: true } : {}
+          ...p2.corner ? { corner: true } : {},
+          ...p2.fo ? { fo: [round2(p2.fo[0]), round2(p2.fo[1])] } : {},
+          ...p2.sp != null && p2.sp !== 1 ? { sp: round2(p2.sp) } : {}
         })),
-        poly: flatten(s.pts, s.type, closed).map((q) => [round(q[0]), round(q[1])])
+        poly: poly.map((q) => [round(q[0]), round(q[1])])
       };
       if (this.mode === "shape") {
         base.op = s.op;
-        base.feather = Math.round(s.feather);
+        base.feather = round2(s.feather);
+        if (s.pts.some((p2) => p2.fo)) {
+          const fx = sampleAttr(s.pts, s.type, closed, us, (p2) => {
+            var _a;
+            return ((_a = p2.fo) == null ? void 0 : _a[0]) ?? 0;
+          });
+          const fy = sampleAttr(s.pts, s.type, closed, us, (p2) => {
+            var _a;
+            return ((_a = p2.fo) == null ? void 0 : _a[1]) ?? 0;
+          });
+          base.fo = fx.map((v, i) => [round2(v), round2(fy[i])]);
+        }
       } else {
         base.speed = round(s.speed);
+        if (s.pts.some((p2) => (p2.sp ?? 1) !== 1)) {
+          base.sv = sampleAttr(s.pts, s.type, closed, us, (p2) => Math.max(0, p2.sp ?? 1)).map((v) => round2(Math.max(0, v)));
+        }
       }
       return base;
     });
@@ -12910,12 +13332,16 @@ class SplineEditor {
     }
     this.active = -1;
     this.selPt = -1;
+    this.sel.clear();
     if (this.mode === "pin") {
       const raw = Array.isArray(data == null ? void 0 : data.pins) ? data.pins : [];
       this.pins = raw.map((p2) => ({
         x: clamp01(num(p2 == null ? void 0 : p2.x, 0.5)),
         y: clamp01(num(p2 == null ? void 0 : p2.y, 0.5)),
-        blur: clamp01(num(p2 == null ? void 0 : p2.blur, 0.5))
+        blur: clamp01(num(p2 == null ? void 0 : p2.blur, 0.5)),
+        // Absent in pins saved before reach existed — the default is what they
+        // were rendered with, so old workflows come back identical.
+        r: Math.max(0.01, num(p2 == null ? void 0 : p2.r, DEFAULT_INFLUENCE))
       }));
     } else {
       const raw = Array.isArray(data == null ? void 0 : data.shapes) ? data.shapes : Array.isArray(data == null ? void 0 : data.paths) ? data.paths : [];
@@ -12923,32 +13349,71 @@ class SplineEditor {
         type: (s == null ? void 0 : s.type) === "bspline" || (s == null ? void 0 : s.type) === "xspline" ? "bspline" : "bezier",
         op: (s == null ? void 0 : s.op) === "sub" ? "sub" : "add",
         closed: (s == null ? void 0 : s.closed) ?? this.mode === "shape",
-        feather: Math.max(0, Math.round(num(s == null ? void 0 : s.feather, 0))),
+        feather: Math.max(0, num(s == null ? void 0 : s.feather, 0)),
         speed: Math.max(0, num(s == null ? void 0 : s.speed, 1)),
         pts: (Array.isArray(s == null ? void 0 : s.pts) ? s.pts : []).map((p2) => ({
           x: num(p2 == null ? void 0 : p2.x, 0),
           y: num(p2 == null ? void 0 : p2.y, 0),
           h: Array.isArray(p2 == null ? void 0 : p2.h) && p2.h.length === 4 ? p2.h.map((v) => num(v, 0)) : null,
           corner: !!(p2 == null ? void 0 : p2.corner),
-          w: Math.max(MIN_W$1, Math.min(MAX_W, num(p2 == null ? void 0 : p2.w, MIN_W$1)))
+          w: Math.max(MIN_W$1, Math.min(MAX_W, num(p2 == null ? void 0 : p2.w, MIN_W$1))),
+          fo: Array.isArray(p2 == null ? void 0 : p2.fo) && p2.fo.length === 2 ? [num(p2.fo[0], 0), num(p2.fo[1], 0)] : null,
+          sp: Math.max(0, num(p2 == null ? void 0 : p2.sp, 1))
         }))
       })).filter((s) => s.pts.length > 0);
     }
+    this.geomRev++;
+    this.matteKey = "";
     this.draw();
     (_a = this.onState) == null ? void 0 : _a.call(this);
   }
   emit(commit) {
     var _a;
-    if (this.mode === "shape" && this.view !== "source") this.buildMatte();
+    this.geomRev++;
     if (this.mode === "pin" && this.live) this.preview = null;
-    this.onEdit(this.serialise(), commit);
+    if (commit) this.onEdit(this.serialise());
     this.draw();
     if (commit) (_a = this.onState) == null ? void 0 : _a.call(this);
   }
   /** Rebuild whatever this mode uses as a backdrop and repaint. */
   refreshView() {
-    if (this.mode === "shape") this.buildMatte();
+    this.matteKey = "";
     this.draw();
+  }
+  /**
+   * The flattened outline and feather offsets of a shape, memoized.
+   *
+   * The matte builder and the on-canvas guides both want exactly this, and a
+   * drag redraws both every frame. Keyed on the edit counter and the tolerance,
+   * so a hover or a selection change reuses it and a zoom does not.
+   */
+  shapeGeom(s) {
+    const tol = this.drawTol;
+    const hit = this.geomCache.get(s);
+    if (hit && hit.rev === this.geomRev && hit.tol === tol) return hit;
+    let entry;
+    if (this.mode === "shape" && s.pts.some((p2) => p2.fo)) {
+      const got = flattenFeathered(
+        s.pts,
+        s.type,
+        s.closed,
+        tol,
+        (p2) => {
+          var _a;
+          return (((_a = p2.fo) == null ? void 0 : _a[0]) ?? 0) / this.imgW;
+        },
+        (p2) => {
+          var _a;
+          return (((_a = p2.fo) == null ? void 0 : _a[1]) ?? 0) / this.imgH;
+        }
+      );
+      entry = { rev: this.geomRev, tol, ...got };
+    } else {
+      const { poly, us } = flattenP(s.pts, s.type, s.closed, tol);
+      entry = { rev: this.geomRev, tol, poly, us, off: null };
+    }
+    this.geomCache.set(s, entry);
+    return entry;
   }
   /**
    * The backend result no longer matches the settings, so drop it.
@@ -13009,21 +13474,37 @@ class SplineEditor {
     for (let i = this.pins.length - 1; i >= 0; i--) {
       const [cx, cy] = this.toScreen(this.pins[i].x, this.pins[i].y);
       if (hitDot(px, py, cx, cy)) {
+        if (e.ctrlKey || e.metaKey) {
+          this.selPt = i;
+          this.snapshot();
+          this.drag = { kind: "radius", s: 0, i };
+          this.emit(true);
+          return;
+        }
         if (e.shiftKey) {
           this.snapshot();
           this.pins.splice(i, 1);
           this.selPt = -1;
+          this.sel.clear();
           this.commit();
           return;
         }
+        const inSel = this.sel.has(SplineEditor.key(0, i));
+        if (!inSel && this.sel.size) this.sel.clear();
         this.selPt = i;
         this.snapshot();
         const [nx2, ny2] = this.toNorm(px, py);
-        this.drag = { kind: "pin", i, dx: this.pins[i].x - nx2, dy: this.pins[i].y - ny2 };
+        this.drag = {
+          kind: "pin",
+          i,
+          dx: this.pins[i].x - nx2,
+          dy: this.pins[i].y - ny2,
+          group: inSel ? this.targets(0, i) : void 0
+        };
         this.emit(true);
         return;
       }
-      if (hitRing(px, py, cx, cy)) {
+      if (hitRing(px, py, cx, cy) && !e.shiftKey) {
         this.selPt = i;
         this.snapshot();
         const pin = this.pins[i];
@@ -13037,12 +13518,82 @@ class SplineEditor {
         return;
       }
     }
+    if (e.shiftKey) {
+      this.drag = { kind: "marquee", x0: px, y0: py, x1: px, y1: py };
+      this.draw();
+      return;
+    }
+    this.sel.clear();
     this.snapshot();
     const [nx, ny] = this.toNorm(px, py);
-    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0 });
+    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0, r: DEFAULT_INFLUENCE });
     this.selPt = this.pins.length - 1;
     this.drag = { kind: "pin", i: this.selPt, dx: 0, dy: 0 };
     this.emit(true);
+  }
+  /**
+   * The Ctrl-drag, and the drag of a feather clone once it exists.
+   *
+   * For a mask the cursor *is* the answer: the clone goes where it is put, so
+   * the soft edge reaches exactly there. A box selection moves every clone by
+   * the same offset rather than stacking them all on the cursor — the whole
+   * point of selecting several is to keep their relationship.
+   *
+   * The other two modes have nothing to place — a stroke's direction comes from
+   * the flow and a pin's reach is a radius — so there the drag is a distance.
+   */
+  dragRadius(s, i, nx, ny) {
+    var _a, _b, _c, _d, _e;
+    if (this.mode === "pin") {
+      const p22 = this.pins[i];
+      const d = Math.hypot(nx - p22.x, ny - p22.y);
+      for (const [, j] of this.targets(0, i)) {
+        this.pins[j].r = Math.max(0.01, Math.min(4, d));
+      }
+      this.emit(false);
+      return;
+    }
+    const p2 = (_a = this.shapes[s]) == null ? void 0 : _a.pts[i];
+    if (!p2) return;
+    if (this.mode === "shape") {
+      const want = [(nx - p2.x) * this.imgW, (ny - p2.y) * this.imgH];
+      const was = p2.fo ?? [0, 0];
+      const dx = want[0] - was[0], dy = want[1] - was[1];
+      for (const [ts, ti] of this.targets(s, i)) {
+        const q = (_b = this.shapes[ts]) == null ? void 0 : _b.pts[ti];
+        if (!q) continue;
+        if (ts === s && ti === i) q.fo = want;
+        else q.fo = [(((_c = q.fo) == null ? void 0 : _c[0]) ?? 0) + dx, (((_d = q.fo) == null ? void 0 : _d[1]) ?? 0) + dy];
+      }
+      this.emit(false);
+      return;
+    }
+    const px = this.distPx(nx, ny, p2.x, p2.y);
+    for (const [ts, ti] of this.targets(s, i)) {
+      const q = (_e = this.shapes[ts]) == null ? void 0 : _e.pts[ti];
+      if (q) q.sp = Math.min(8, px / Math.max(1, this.strength));
+    }
+    this.emit(false);
+  }
+  /** Select every point inside the marquee. A click-sized rect just clears. */
+  finishMarquee(d) {
+    const x0 = Math.min(d.x0, d.x1), x1 = Math.max(d.x0, d.x1);
+    const y0 = Math.min(d.y0, d.y1), y1 = Math.max(d.y0, d.y1);
+    this.sel.clear();
+    if (x1 - x0 < MARQUEE_MIN && y1 - y0 < MARQUEE_MIN) return;
+    const inside = (nx, ny) => {
+      const [x, y] = this.toScreen(nx, ny);
+      return x >= x0 && x <= x1 && y >= y0 && y <= y1;
+    };
+    if (this.mode === "pin") {
+      this.pins.forEach((p2, i) => {
+        if (inside(p2.x, p2.y)) this.sel.add(SplineEditor.key(0, i));
+      });
+    } else {
+      this.shapes.forEach((s, si) => s.pts.forEach((p2, i) => {
+        if (inside(p2.x, p2.y)) this.sel.add(SplineEditor.key(si, i));
+      }));
+    }
   }
   /* ── Matte ─────────────────────────────────────────────────────────────── */
   /**
@@ -13057,10 +13608,39 @@ class SplineEditor {
    * Cheap enough to redo on every mouse move, which is why this one preview is
    * genuinely live while the blurs need a round trip.
    */
+  /**
+   * Rebuild the matte only when something it depends on actually moved.
+   *
+   * It is drawn in *screen* space, so panning and zooming change it as much as
+   * editing does — but a hover, a selection or a cursor change do not, and those
+   * are most of the redraws.
+   */
+  ensureMatte() {
+    const key = `${this.geomRev}|${this.panX}|${this.panY}|${this.viewW}|${this.viewH}|${this.canvas.width}|${this.canvas.height}|${this.drag ? 1 : 0}`;
+    if (key === this.matteKey) return;
+    this.matteKey = key;
+    this.buildMatte();
+  }
+  /**
+   * Composite the shapes into a matte at *screen* resolution.
+   *
+   * Image resolution is the obvious choice and it is the wrong one twice over. A
+   * fixed 1024 stretched to a zoomed-in view is visibly blocky — a hard edge
+   * survives that upscale looking merely sharp, but a feather gradient turns to
+   * stair-steps, which is exactly when it starts to matter. And in the other
+   * direction it is wasted work: a 6000 px plate zoomed out to fit is drawn into
+   * a fraction of that many pixels either way.
+   *
+   * One matte pixel per screen pixel is crisp at every zoom AND bounded by the
+   * window, so the cost no longer follows the plate size at all.
+   */
   buildMatte() {
     if (this.mode !== "shape") return;
-    const w = Math.min(1024, Math.max(16, Math.round(this.imgW)));
-    const h = Math.max(16, Math.round(w * this.imgH / this.imgW));
+    const { width: lw, height: lh } = this.logicalSize();
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const q = Math.max(1, Math.min(dpr, Math.sqrt(MATTE_MAX_PX / Math.max(1, lw * lh))));
+    const w = Math.max(16, Math.round(lw * q));
+    const h = Math.max(16, Math.round(lh * q));
     if (!this.matte) this.matte = document.createElement("canvas");
     const acc = this.matte;
     if (acc.width !== w || acc.height !== h) {
@@ -13072,47 +13652,109 @@ class SplineEditor {
     a.globalCompositeOperation = "source-over";
     a.fillStyle = "#000";
     a.fillRect(0, 0, w, h);
-    const tmp = document.createElement("canvas");
-    tmp.width = w;
-    tmp.height = h;
+    if (!this.scratch) this.scratch = document.createElement("canvas");
+    const tmp = this.scratch;
+    if (tmp.width !== w || tmp.height !== h) {
+      tmp.width = w;
+      tmp.height = h;
+    }
     const t = tmp.getContext("2d");
-    const scale = w / Math.max(1, this.imgW);
+    const sx = this.viewW * q, sy = this.viewH * q;
+    const ox = this.panX * q, oy = this.panY * q;
+    const scale = sx / Math.max(1, this.imgW);
     for (const s of this.shapes) {
       if (s.pts.length < 3 || !s.closed) continue;
-      const poly = flatten(s.pts, s.type, s.closed, this.drawTol);
+      const { poly, off } = this.shapeGeom(s);
       if (poly.length < 3) continue;
       const sub = s.op === "sub";
+      const rings = this.featherRings(s, poly, off);
       t.setTransform(1, 0, 0, 1, 0, 0);
       t.filter = "none";
       t.globalCompositeOperation = "source-over";
-      t.fillStyle = sub ? "#fff" : "#000";
+      t.fillStyle = "#000";
       t.fillRect(0, 0, w, h);
-      if (s.feather > 0) t.filter = `blur(${(s.feather * scale).toFixed(2)}px)`;
-      t.fillStyle = sub ? "#000" : "#fff";
+      const k = rings.length;
+      const outward = polyArea(rings[k - 1]) >= polyArea(rings[0]);
+      const seq = outward ? rings.slice().reverse() : rings;
+      const trace = (ring) => {
+        t.moveTo(ox + ring[0][0] * sx, oy + ring[0][1] * sy);
+        for (let i = 1; i < ring.length; i++) {
+          t.lineTo(ox + ring[i][0] * sx, oy + ring[i][1] * sy);
+        }
+        t.closePath();
+      };
+      t.globalCompositeOperation = "lighter";
+      t.fillStyle = "#fff";
       t.beginPath();
-      t.moveTo(poly[0][0] * w, poly[0][1] * h);
-      for (let i = 1; i < poly.length; i++) t.lineTo(poly[i][0] * w, poly[i][1] * h);
-      t.closePath();
+      trace(seq[k - 1]);
       t.fill();
+      for (let i = 0; i < k - 1; i++) {
+        const level = Math.round(255 * (i + 1) / k);
+        t.fillStyle = `rgb(${level},${level},${level})`;
+        t.beginPath();
+        trace(seq[i]);
+        trace(seq[i + 1]);
+        t.fill("evenodd");
+      }
+      t.globalCompositeOperation = "source-over";
+      if (sub) {
+        t.globalCompositeOperation = "difference";
+        t.fillStyle = "#fff";
+        t.fillRect(0, 0, w, h);
+      }
+      a.filter = s.feather > 0 ? `blur(${(s.feather * scale).toFixed(2)}px)` : "none";
       a.globalCompositeOperation = sub ? "darken" : "lighten";
       a.drawImage(tmp, 0, 0);
+      a.filter = "none";
     }
     a.globalCompositeOperation = "source-over";
+  }
+  /**
+   * The nested outlines whose average IS the per-point feather gradient.
+   *
+   * A pixel inside j of them has coverage j/K, and `rampOffsets` places them so
+   * that works out to a smoothstep across the band rather than a straight ramp.
+   * No distance transform, and nothing that has to be written twice —
+   * `blur_core._shape_rings` builds the identical list.
+   *
+   * With no per-point feather this is one ring, the outline itself, and the fill
+   * below is what it was before feathering existed.
+   */
+  featherRings(s, poly, off) {
+    if (!off) return [poly];
+    let reach = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const d = Math.hypot(off[i][0] * this.imgW, off[i][1] * this.imgH);
+      if (d > reach) reach = d;
+    }
+    let k = rampRings(reach * (this.viewW / Math.max(1, this.imgW)));
+    if (this.drag) k = Math.min(k, DRAG_RINGS);
+    return rampOffsets(k).map((t) => poly.map((p2, i) => [p2[0] + off[i][0] * t, p2[1] + off[i][1] * t]));
   }
   /* ── Drawing ───────────────────────────────────────────────────────────── */
   drawBackdrop() {
     const ctx = this.ctx;
     const box = [this.panX, this.panY, this.viewW, this.viewH];
     if (this.mode === "shape") {
+      if (this.view !== "source") this.ensureMatte();
+      const { width: lw, height: lh } = this.logicalSize();
+      const put = () => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(...box);
+        ctx.clip();
+        ctx.drawImage(this.matte, 0, 0, lw, lh);
+        ctx.restore();
+      };
       if (this.view === "matte" && this.matte) {
-        ctx.drawImage(this.matte, ...box);
+        put();
         return;
       }
       if (this.image) ctx.drawImage(this.image, ...box);
       if (this.view === "source" || !this.matte) return;
       ctx.globalCompositeOperation = "multiply";
       ctx.globalAlpha = 0.55;
-      ctx.drawImage(this.matte, ...box);
+      put();
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
       return;
@@ -13137,6 +13779,7 @@ class SplineEditor {
     if (src) ctx.drawImage(src, ...box);
   }
   draw() {
+    var _a;
     const ctx = this.ctx;
     const { width, height } = this.logicalSize();
     ctx.clearRect(0, 0, width, height);
@@ -13147,8 +13790,136 @@ class SplineEditor {
     ctx.strokeStyle = "rgba(255,255,255,0.18)";
     ctx.lineWidth = 1;
     ctx.strokeRect(this.panX, this.panY, this.viewW, this.viewH);
-    if (this.mode === "pin") return this.drawPins();
-    this.shapes.forEach((s, si) => this.drawShape(s, si));
+    if (!this.showCurves) return;
+    if (this.mode === "pin") this.drawPins();
+    else this.shapes.forEach((s, si) => this.drawShape(s, si));
+    if (((_a = this.drag) == null ? void 0 : _a.kind) === "marquee") {
+      const d = this.drag;
+      const x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1);
+      ctx.save();
+      ctx.fillStyle = "rgba(74,180,255,0.10)";
+      ctx.fillRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
+      ctx.strokeStyle = C.marquee;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.strokeRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
+      ctx.restore();
+    }
+  }
+  /**
+   * The softness guide: a second outline offset by each point's own feather,
+   * dashed, with a tether to the point it belongs to.
+   *
+   * Fusion's convention, and it is the right one — the value being edited is a
+   * distance on the image, so showing it as a distance on the image beats any
+   * number in a panel. A point with no feather has no clone to draw.
+   */
+  drawFeather(s, si) {
+    if (this.mode !== "shape" || !s.closed || s.pts.length < 3) return;
+    const ctx = this.ctx;
+    const { poly, off } = this.shapeGeom(s);
+    if (poly.length < 3 || !off) return;
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = si === this.active ? C.soft : C.softDim;
+    ctx.fillStyle = si === this.active ? C.soft : C.softDim;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    const [x0, y0] = this.toScreen(poly[0][0] + off[0][0], poly[0][1] + off[0][1]);
+    ctx.moveTo(x0, y0);
+    for (let i = 1; i < poly.length; i++) {
+      const [x, y] = this.toScreen(poly[i][0] + off[i][0], poly[i][1] + off[i][1]);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+    s.pts.forEach((p2, i) => {
+      var _a, _b;
+      if (!p2.fo) return;
+      const [cx, cy] = this.toScreen(p2.x, p2.y);
+      const [gx, gy] = this.clonePos(p2);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(gx, gy);
+      ctx.stroke();
+      const hot = ((_a = this.hoverClone) == null ? void 0 : _a.s) === si && ((_b = this.hoverClone) == null ? void 0 : _b.i) === i;
+      ctx.beginPath();
+      ctx.arc(gx, gy, hot ? 5.5 : 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = C.ptStroke;
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = si === this.active ? C.soft : C.softDim;
+      ctx.lineWidth = 1.2;
+    });
+    ctx.restore();
+  }
+  /** A feather clone's position on screen. */
+  clonePos(p2) {
+    const fo = p2.fo ?? [0, 0];
+    return this.toScreen(p2.x + fo[0] / this.imgW, p2.y + fo[1] / this.imgH);
+  }
+  /** Which feather clone is under the cursor. They are grabbed directly, with no
+   *  modifier — once one exists it is just another point on the canvas. */
+  pickClone(px, py) {
+    if (this.mode !== "shape") return null;
+    const order = this.shapes.map((_, i) => i).sort((a, b) => (b === this.active ? 1 : 0) - (a === this.active ? 1 : 0));
+    for (const si of order) {
+      const s = this.shapes[si];
+      if (!s.closed) continue;
+      for (let i = 0; i < s.pts.length; i++) {
+        if (!s.pts[i].fo) continue;
+        const [gx, gy] = this.clonePos(s.pts[i]);
+        if (Math.hypot(px - gx, py - gy) <= CLONE_HIT) return { s: si, i };
+      }
+    }
+    return null;
+  }
+  /** A stroke point's own speed, drawn as the distance that pixel will travel. */
+  drawSpeedGhost(s, si) {
+    if (this.mode !== "path" || s.pts.length < 2) return;
+    const ctx = this.ctx;
+    const poly = flatten(s.pts, s.type, s.closed, this.drawTol);
+    if (poly.length < 2) return;
+    ctx.save();
+    ctx.setLineDash([5, 4]);
+    ctx.strokeStyle = si === this.active ? C.soft : C.softDim;
+    ctx.fillStyle = si === this.active ? C.soft : C.softDim;
+    ctx.lineWidth = 1.2;
+    s.pts.forEach((p2) => {
+      const sp = p2.sp ?? 1;
+      if (sp === 1) return;
+      let best = 0, bd = Infinity;
+      poly.forEach((q, j) => {
+        const d = Math.hypot(q[0] - p2.x, q[1] - p2.y);
+        if (d < bd) {
+          bd = d;
+          best = j;
+        }
+      });
+      const nxt = poly[Math.min(poly.length - 1, best + 1)];
+      const prv = poly[Math.max(0, best - 1)];
+      let tx = (nxt[0] - prv[0]) * this.imgW, ty = (nxt[1] - prv[1]) * this.imgH;
+      const len = Math.hypot(tx, ty) || 1;
+      tx /= len;
+      ty /= len;
+      const travel = sp * this.strength;
+      const [cx, cy] = this.toScreen(p2.x, p2.y);
+      const [gx, gy] = this.toScreen(
+        p2.x + tx * travel / this.imgW,
+        p2.y + ty * travel / this.imgH
+      );
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(gx, gy);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(gx, gy, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.restore();
   }
   tracePath(ctx, s) {
     ctx.beginPath();
@@ -13192,6 +13963,8 @@ class SplineEditor {
       ctx.stroke();
       if (!s.closed) this.drawArrow(s, color);
     }
+    this.drawFeather(s, si);
+    this.drawSpeedGhost(s, si);
     if (s.type === "bspline" && s.pts.length >= 2) {
       ctx.save();
       ctx.setLineDash([3, 4]);
@@ -13251,6 +14024,13 @@ class SplineEditor {
       ctx.strokeStyle = C.ptStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
+      if (this.sel.has(SplineEditor.key(si, i))) {
+        ctx.strokeStyle = C.marquee;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, r + 3, 0, Math.PI * 2);
+        ctx.stroke();
+      }
       ctx.restore();
     });
   }
@@ -13291,17 +14071,49 @@ class SplineEditor {
         ctx.stroke();
         ctx.restore();
       }
+      if (p2.r !== DEFAULT_INFLUENCE) {
+        ctx.save();
+        ctx.strokeStyle = i === this.selPt ? C.soft : C.softDim;
+        ctx.setLineDash([6, 5]);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.ellipse(x, y, p2.r * this.viewW, p2.r * this.viewH, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
       drawRing(ctx, x, y, p2.blur, C.add, i === this.selPt, `${Math.round(radius)} px`);
+      if (this.sel.has(SplineEditor.key(0, i))) {
+        ctx.save();
+        ctx.strokeStyle = C.marquee;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(x, y, 9, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
     });
   }
+  /** How many points the marquee is currently holding, for the status bar. */
+  get selectionSize() {
+    return this.sel.size;
+  }
 }
+const polyArea = (poly) => {
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p2 = poly[i], q = poly[(i + 1) % poly.length];
+    a += p2[0] * q[1] - q[0] * p2[1];
+  }
+  return Math.abs(a) / 2;
+};
 const round = (v) => Math.round(v * 1e5) / 1e5;
+const round2 = (v) => Math.round(v * 100) / 100;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const num = (v, d) => Number.isFinite(Number(v)) ? Number(v) : d;
 const HINTS = {
-  shape: "click to add points · click the first point or double-click empty space to close · click on the curve to insert a point · double-click a point for a corner · shift-click to delete · alt-drag pans · wheel zooms",
-  path: "click to draw a stroke in the direction of movement · Enter finishes it · click on the stroke to insert a point · alt-drag pans · wheel zooms",
-  pin: "click to drop a pin · drag the ring to set its blur (shift for fine) · shift-click to delete · alt-drag pans · wheel zooms"
+  shape: "click to add points · click the first point or double-click empty space to close · click on the curve to insert a point · double-click a point for a corner · ctrl-drag a point to pull out a feather clone, then drag the clone to say how far the edge fades (shift-click it to remove) · shift-drag empty space to box-select · shift-click to delete · click away from a finished shape to deselect it · H hides the curves · alt-drag pans · wheel zooms",
+  path: "click to draw a stroke in the direction of movement · Enter finishes it · click on the stroke to insert a point · ctrl-drag a point for its own speed · shift-drag empty space to box-select · H hides the curves · alt-drag pans · wheel zooms",
+  pin: "click to drop a pin · drag the ring to set its blur (shift for fine) · ctrl-drag a pin to widen its reach · shift-drag empty space to box-select · shift-click to delete · H hides the pins · alt-drag pans · wheel zooms"
 };
 function openSplineOverlay(opts) {
   var _a;
@@ -13310,9 +14122,9 @@ function openSplineOverlay(opts) {
   let note = "";
   const editor = new SplineEditor({
     mode: opts.mode,
-    onEdit: (json, commit) => {
+    onEdit: (json) => {
       opts.onChange(json);
-      if (commit) requestPreview(json);
+      requestPreview(json);
     },
     onState: () => refreshBar()
   });
@@ -13394,6 +14206,7 @@ function openSplineOverlay(opts) {
   const settings = ((_a = opts.previewParams) == null ? void 0 : _a.call(opts)) ?? {};
   if (Number.isFinite(Number(settings.max_blur))) editor.maxBlur = Number(settings.max_blur);
   if (Number.isFinite(Number(settings.falloff))) editor.falloff = Number(settings.falloff);
+  if (Number.isFinite(Number(settings.strength))) editor.strength = Number(settings.strength);
   editor.setImage(opts.image, opts.imageW, opts.imageH);
   const savedAspect = readAspect(opts.json);
   const status = document.createElement("span");
@@ -13432,9 +14245,17 @@ function openSplineOverlay(opts) {
       right.append(add, sub);
       const feather = nkdSlider(
         "Feather",
-        { min: 0, max: 128, step: 1, value: 0 },
+        {
+          min: 0,
+          max: 128,
+          step: 0.5,
+          value: 0,
+          width: 220,
+          fine: 0.05,
+          format: (v) => `${v.toFixed(2)} px`
+        },
         (v) => editor.setActiveProp("feather", v),
-        "Soften this shape's edge, before it is combined with the others."
+        "Soften this shape's edge evenly, before it is combined with the others. Hold Shift while dragging for fine control — the radius is continuous, so a fraction of a pixel is a real difference and not a rounding."
       );
       right.appendChild(feather);
       const fill = nkdToggle(
@@ -13447,21 +14268,36 @@ function openSplineOverlay(opts) {
         "Tint the inside of each shape, so you can tell them apart."
       );
       right.appendChild(fill);
+      const noFeather = nkdButton(
+        "Clear feather",
+        () => editor.clearFeather(),
+        "Remove every feather clone and put all the edges back to hard. With points box-selected it only clears those."
+      );
+      right.appendChild(noFeather);
       refreshBar = () => {
+        const soft = editor.featherCount;
+        noFeather.textContent = soft ? `Clear feather (${soft})` : "Clear feather";
+        noFeather.disabled = soft === 0;
         const s = editor.activeShape;
         bezier.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bezier");
         bspline.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bspline");
         add.classList.toggle("on", ((s == null ? void 0 : s.op) ?? editor.newOp) === "add");
         sub.classList.toggle("on", ((s == null ? void 0 : s.op) ?? editor.newOp) === "sub");
-        const rng = feather.querySelector("input");
-        rng.disabled = !s;
-        if (s) rng.value = String(s.feather);
+        feather.setDisabled(!s);
+        if (s) feather.sync(s.feather);
         setStatus(`${editor.shapes.length} shape${editor.shapes.length === 1 ? "" : "s"}`);
       };
     } else {
       const speed = nkdSlider(
         "Speed",
-        { min: 0, max: 2, step: 0.05, value: 1 },
+        {
+          min: 0,
+          max: 2,
+          step: 0.05,
+          value: 1,
+          width: 180,
+          format: (v) => `x${v.toFixed(2)}`
+        },
         (v) => editor.setActiveProp("speed", v),
         "How fast this stroke moves, relative to the others. The node's Strength sets what full speed means in pixels."
       );
@@ -13470,9 +14306,8 @@ function openSplineOverlay(opts) {
         const s = editor.activeShape;
         bezier.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bezier");
         bspline.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bspline");
-        const rng = speed.querySelector("input");
-        rng.disabled = !s;
-        if (s) rng.value = String(s.speed);
+        speed.setDisabled(!s);
+        if (s) speed.sync(s.speed);
         setStatus(`${editor.shapes.length} stroke${editor.shapes.length === 1 ? "" : "s"}`);
       };
     }
@@ -13498,20 +14333,34 @@ function openSplineOverlay(opts) {
     };
     const maxBlur = nkdSlider(
       "Max Blur",
-      { min: 0, max: 512, step: 1, value: editor.maxBlur },
+      {
+        min: 0,
+        max: 512,
+        step: 1,
+        value: editor.maxBlur,
+        width: 180,
+        format: (v) => `${Math.round(v)} px`
+      },
       (v) => setNumber("max_blur", v),
       "What a pin turned all the way up means, in pixels."
     );
     const falloff = nkdSlider(
       "Falloff",
-      { min: 0.5, max: 8, step: 0.1, value: editor.falloff },
+      {
+        min: 0.5,
+        max: 8,
+        step: 0.1,
+        value: editor.falloff,
+        width: 140,
+        format: (v) => v.toFixed(2)
+      },
       (v) => setNumber("falloff", v),
       "How tightly each pin holds its own area. Raise it to stop a sharp pin from being dragged blurry by the ones around it."
     );
     right.append(maxBlur, falloff);
     refreshBar = () => {
-      maxBlur.querySelector("input").value = String(editor.maxBlur);
-      falloff.querySelector("input").value = String(editor.falloff);
+      maxBlur.sync(editor.maxBlur);
+      falloff.sync(editor.falloff);
       const n = editor.pins.length;
       setStatus(n ? `${n} pin${n === 1 ? "" : "s"} · up to ${Math.round(editor.maxBlur)} px` : "click to drop a pin");
     };
@@ -13529,20 +14378,29 @@ function openSplineOverlay(opts) {
     refreshBar();
   }, opts.mode === "shape" ? "Cycle the backdrop: the image with everything outside the mask dimmed, the mask on its own, or the untouched image. (V)" : opts.mode === "pin" ? "Cycle the backdrop: the blurred result, the blur field as a grey map — which is what shows you where the transition actually falls — or the untouched image. (V)" : "Show the rendered result or the untouched image. (V)");
   right.appendChild(viewBtn);
+  const curvesBtn = nkdToggle("Curves", true, (on) => {
+    editor.showCurves = on;
+    editor.draw();
+  }, "Show or hide the vectors. Hidden, you get the backdrop with nothing drawn over it — the only way to judge an edge that has a control point sitting on it. Editing still works while they are hidden. (H)");
+  right.appendChild(curvesBtn);
   right.appendChild(nkdButton("Clear", () => editor.clearAll(), "Remove everything."));
   right.appendChild(nkdButton("Fit", () => editor.fitView(), "Reset the view. (F)"));
   window.addEventListener("keydown", onViewKey, true);
   function onViewKey(e) {
-    if (e.key !== "v" && e.key !== "V") return;
     if (!editor.canvas.isConnected) return;
-    viewBtn.click();
+    if (e.key === "h" || e.key === "H") {
+      curvesBtn.click();
+      return;
+    }
+    if (e.key === "v" || e.key === "V") viewBtn.click();
   }
   function setStatus(text) {
     viewBtn.textContent = VIEW_LABEL[editor.view];
     viewBtn.classList.toggle("on", editor.view !== "source");
+    const picked = editor.selectionSize ? ` · ${editor.selectionSize} point${editor.selectionSize === 1 ? "" : "s"} selected` : "";
     const mismatch = savedAspect != null && Math.abs(savedAspect - editor.aspect) > 0.01;
     const warn = mismatch ? ` — drawn at a different aspect ratio (${savedAspect.toFixed(2)} vs ${editor.aspect.toFixed(2)}); shapes are stretched` : "";
-    status.textContent = text + warn + (note ? ` — ${note}` : "");
+    status.textContent = text + picked + warn + (note ? ` — ${note}` : "");
     status.classList.toggle("bad", mismatch || note.startsWith("preview failed"));
   }
   modal.addPrimary("Save & close");

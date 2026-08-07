@@ -85,11 +85,10 @@ def erode(x: torch.Tensor, radius: int) -> torch.Tensor:
     return 1.0 - dilate(1.0 - x, radius)
 
 
-def blur(x: torch.Tensor, radius: int) -> torch.Tensor:
-    """Three box passes per axis — a gaussian for the eye, at conv cost."""
-    if radius <= 0:
+def _box3(x: torch.Tensor, k: int) -> torch.Tensor:
+    """Three box passes per axis at kernel `k` — a gaussian for the eye, at conv cost."""
+    if k <= 1:
         return x
-    k = int(radius) | 1
     pad = k // 2
     box = torch.ones(1, 1, 1, k, device=x.device, dtype=x.dtype) / k
     box_v = box.transpose(2, 3)
@@ -101,6 +100,33 @@ def blur(x: torch.Tensor, radius: int) -> torch.Tensor:
         return t.clamp(0.0, 1.0)
 
     return _map_frames(run, x)
+
+
+def blur(x: torch.Tensor, radius: float) -> torch.Tensor:
+    """Soften by `radius` pixels — continuously, including fractions of one.
+
+    A box kernel has to be an odd number of pixels to stay centred, so the widths
+    available are 1, 3, 5, … and a radius is otherwise quantized to every *second*
+    pixel: 4 and 5 came out identical, and half the travel of a feather slider did
+    nothing at all. Blending the two kernels either side makes the radius
+    continuous, which is what lets a feather be dialled to a fraction of a pixel
+    instead of snapped to the nearest odd one.
+
+    The cost is two blurs rather than one, and only when the radius actually falls
+    between two kernels — the exact odd values still take a single pass.
+    """
+    r = float(radius)
+    if r <= 1.0:
+        return x                               # a 1-px box is the identity
+    lo = int(r) | 1                            # nearest odd at or below r
+    if lo > r:
+        lo -= 2
+    t = (r - lo) / 2.0                         # kernels are 2 px apart
+    if t <= 1e-6:
+        return _box3(x, lo)
+    a = _box3(x, lo)
+    b = _box3(x, lo + 2)
+    return a + (b - a) * t
 
 
 def reconstruct(seed: torch.Tensor, guide: torch.Tensor, max_iter: int = 32) -> torch.Tensor:

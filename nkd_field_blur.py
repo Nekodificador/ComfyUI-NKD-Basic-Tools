@@ -41,9 +41,13 @@ def apply_field_blur(image, pins, max_blur, mask=None, falloff=2.0):
                           device=device, dtype=torch.float32).clamp(0.0, 1.0)
         amt = torch.tensor([float(p.get("blur", 1.0)) for p in items],
                            device=device, dtype=torch.float32).clamp(0.0, 1.0)
+        # Absent on pins saved before reach existed, so they keep rendering as
+        # they always did.
+        reach = torch.tensor([float(p.get("r", blur_core.NEUTRAL_REACH)) for p in items],
+                             device=device, dtype=torch.float32).clamp(0.01, 4.0)
 
         radius = blur_core.idw_field(xy, amt, min(_FIELD_SIZE, h), min(_FIELD_SIZE, w),
-                                     power=max(0.1, float(falloff)))
+                                     power=max(0.1, float(falloff)), reach=reach)
         radius = F.interpolate(radius[None, None] * float(max_blur), size=(h, w),
                                mode="bilinear", align_corners=False)
 
@@ -85,8 +89,10 @@ class NKDFieldBlur(io.ComfyNode):
                 "everywhere in between is interpolated smoothly. One pin blurs "
                 "the whole frame evenly, two pins give you a gradient — the "
                 "usual way to fake a shallow depth of field or push a background "
-                "back without a depth map. Pin strengths are relative; Max Blur "
-                "sets what a fully-turned-up pin means in pixels."
+                "back without a depth map. Ctrl-drag a pin to widen its reach, so "
+                "a single sharp pin can hold a whole subject in focus instead of "
+                "being dragged blurry by the ones around it. Pin strengths are "
+                "relative; Max Blur sets what a fully-turned-up pin means in pixels."
             ),
             is_output_node=True,
             inputs=[

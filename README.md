@@ -185,6 +185,36 @@ graph.
   you one.
 - **Subtract shapes cut holes** in the shapes before them, each with its own
   feather — so a soft cut-out is one shape rather than a second node.
+- **Ctrl-drag a point to pull a feather clone out of it**, exactly as in Fusion.
+  The clone is a real point you place by hand: drag it to say where the edge has
+  faded to nothing, drag it again later to move it, shift-click it to take it
+  away and the edge goes back to hard. It isn't a width pushed straight out — you
+  can skew it along the edge, make the softness wider at one end than the other,
+  or pull it *inside* the shape to feather inward. That's how you blend a shadow
+  side away while the lit edge next to it stays razor sharp; a single shape-wide
+  feather can only do one or the other.
+  Between clones the softness runs on the **same spline as the shape**, so on a
+  B-spline it eases in and out along the curve like everything else, with no
+  crease at the control points. And it falls off on a smoothstep rather than a
+  straight ramp — a linear gradient has a corner in its slope at each end, and
+  those corners read as edges, which is the one thing feathering exists to
+  remove.
+- **Shift-drag empty space to box-select points**, then move them as a pack,
+  delete them together, or Ctrl-drag one to move every selected clone by the
+  same offset. Same gesture as the 😺NKD Color Warp grid. `Esc` drops the
+  selection.
+- **Clear feather** removes every clone at once and puts all the edges back to
+  hard — or just the box-selected ones, if there's a selection.
+- **The shape-wide Feather slider is continuous**, down to hundredths of a pixel
+  — hold `Shift` while dragging for fine control, and it reads out the radius in
+  px. (It used to snap to odd kernel widths, so 4 and 5 were the same blur and
+  most of the slider's travel did nothing.)
+- **Clicking away from a finished shape deselects it**, and only the *next*
+  click on empty canvas starts a new one — so looking at a closed outline
+  without its selection never leaves a stray point behind.
+- **`H` hides the curves**, leaving the backdrop with nothing drawn over it,
+  which is the only way to judge an edge that has a control point sitting on it.
+  Editing still works while they're hidden.
 - **Live preview**: the editor composites the real matte as you drag — subtract
   shapes actually cutting, feather actually soft. `V` cycles between the image
   with everything outside the mask dimmed, the mask on its own, and the
@@ -226,6 +256,13 @@ stroke carries its own speed.
 
 - Areas far from every stroke stay sharp — **Spread** sets how far the influence
   reaches.
+- **Ctrl-drag a point for its own speed**, on top of the stroke's. The stroke's
+  Speed slider is then the overall intensity of that path and the per-point
+  value is the shape of it along its length, so one stroke can accelerate
+  instead of needing a stroke per speed. The dashed clone sits where that pixel
+  will actually end up, at the current **Strength**.
+- **Shift-drag empty space to box-select points** and move, delete or Ctrl-drag
+  them as a pack.
 - **No occlusion information exists**, so at the end of a stroke the background
   will smear over whatever is in front of it. That is what the `mask` input is
   for: where it's white the original is kept.
@@ -249,6 +286,10 @@ is interpolated. One pin blurs evenly, two give you a gradient.
 - **Falloff** is how tightly a pin holds its own area. Raise it and a sharp pin
   on your subject stops being dragged blurry by the ones around it — with it low,
   every pin pulls on the whole frame.
+- **Ctrl-drag a pin to widen its reach**, shown as a dashed ellipse. Falloff is
+  global; reach is per pin, so you can let one zero-blur pin cover a whole
+  subject without flattening the transition everywhere else. Box-select with
+  shift-drag on empty space to move or retune several pins at once.
 - It's a variable gaussian, not bokeh — no iris shape and no highlight bloom.
 - Blur destroys grain, and a plastic-smooth area butted against a grainy sharp
   one is what makes a fake depth of field read as fake. Put it back with

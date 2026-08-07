@@ -32,6 +32,18 @@ export type SplinePoint = {
   corner?: boolean;
   /** B-spline rational weight, 1..10. Higher pulls the curve onto the point. */
   w?: number;
+  /**
+   * Per-point feather, as the offset of a freely placed clone of this point, in
+   * image pixels. Vector Mask only; absent means a hard edge here.
+   *
+   * A vector rather than a width on purpose: the softness of a real edge is not
+   * the same distance in every direction, and it is rarely perpendicular to the
+   * outline. Placing the clone by hand says where the edge has faded to nothing,
+   * which is the thing being decided; a scalar can only push it straight out.
+   */
+  fo?: [number, number] | null;
+  /** Per-point speed multiplier on top of the stroke's own. Path Blur only. */
+  sp?: number;
 };
 
 export type SplineType = "bezier" | "bspline";
@@ -54,6 +66,10 @@ export const MAX_W = 10;
  *  S-shaped span can have its midpoint sit exactly on the chord. */
 const MIN_SPLITS = 3;
 const MAX_DEPTH = 14;
+/** Depth cap for the offset curve's own flatness pass. Shallower than the
+ *  outline's: this is a soft edge, and every point it adds is one more vertex in
+ *  every ring of the gradient. */
+const OFFSET_MAX_DEPTH = 7;
 
 const clampW = (v: number | undefined) =>
   Math.max(MIN_W, Math.min(MAX_W, Number.isFinite(v as number) ? (v as number) : MIN_W));
@@ -77,15 +93,16 @@ function segDist(p: Pt, a: Pt, b: Pt): number {
  * thousands of points on the flat parts.
  */
 function adaptive(f: (t: number) => Pt, t0: number, t1: number, p0: Pt, p1: Pt,
-                  tol: number, out: Pt[], depth: number): void {
+                  tol: number, out: Pt[], us: number[], depth: number): void {
   const tm = (t0 + t1) / 2;
   const pm = f(tm);
   if (depth >= MIN_SPLITS && (segDist(pm, p0, p1) <= tol || depth >= MAX_DEPTH)) {
     out.push(p1);
+    us.push(t1);
     return;
   }
-  adaptive(f, t0, tm, p0, pm, tol, out, depth + 1);
-  adaptive(f, tm, t1, pm, p1, tol, out, depth + 1);
+  adaptive(f, t0, tm, p0, pm, tol, out, us, depth + 1);
+  adaptive(f, tm, t1, pm, p1, tol, out, us, depth + 1);
 }
 
 /* ── Bezier ──────────────────────────────────────────────────────────────── */
@@ -280,9 +297,10 @@ function greville(b: BSpline): number[] {
   return out;
 }
 
-function bsplinePolyline(pts: SplinePoint[], closed: boolean, tol: number): Pt[] {
+function bsplinePolyline(pts: SplinePoint[], closed: boolean, tol: number,
+                        us: number[]): Pt[] {
   const b = bsplineSetup(pts, closed);
-  if (!b) return pts.map((p) => [p.x, p.y] as Pt);
+  if (!b) return pts.map((p, i) => { us.push(i); return [p.x, p.y] as Pt; });
   const { P, weights, knots, degree } = b;
 
   // One adaptive pass per knot span rather than one over the whole curve, so a
@@ -293,8 +311,8 @@ function bsplinePolyline(pts: SplinePoint[], closed: boolean, tol: number): Pt[]
     const u0 = knots[i], u1 = knots[i + 1];
     if (!(u1 > u0)) continue;
     const a = ev(u0);
-    if (!out.length) out.push(a);              // seeded from the CURVE, not a control point
-    adaptive(ev, u0, u1, a, ev(u1), tol, out, 0);
+    if (!out.length) { out.push(a); us.push(u0); }  // seeded from the CURVE, not a control point
+    adaptive(ev, u0, u1, a, ev(u1), tol, out, us, 0);
   }
   return out;
 }
@@ -307,7 +325,7 @@ function bsplinePolyline(pts: SplinePoint[], closed: boolean, tol: number): Pt[]
  * extra point gets two. This claws those back and keeps the serialized polyline
  * in the single-digit kilobytes even at a fine tolerance.
  */
-function simplify(pts: Pt[], tol: number): Pt[] {
+function simplify(pts: Pt[], us: number[], tol: number): Pt[] {
   if (pts.length < 3) return pts;
   const keep = new Uint8Array(pts.length);
   keep[0] = keep[pts.length - 1] = 1;
@@ -325,7 +343,11 @@ function simplify(pts: Pt[], tol: number): Pt[] {
     keep[best] = 1;
     stack.push([lo, best], [best, hi]);
   }
-  return pts.filter((_, i) => keep[i]);
+  const kept = pts.filter((_, i) => keep[i]);
+  const keptU = us.filter((_, i) => keep[i]);
+  us.length = 0;
+  us.push(...keptU);
+  return kept;
 }
 
 /**
@@ -340,15 +362,19 @@ function simplify(pts: Pt[], tol: number): Pt[] {
  * `prev` is the last *kept* point rather than the previous input point, so a run
  * of redundant samples collapses in this single pass.
  */
-function dropCollinearWrapped(pts: Pt[], tol: number): Pt[] {
+function dropCollinearWrapped(pts: Pt[], us: number[], tol: number): Pt[] {
   const n = pts.length;
   if (n < 4) return pts;
   const out: Pt[] = [];
+  const outU: number[] = [];
   for (let i = 0; i < n; i++) {
     const prev = out.length ? out[out.length - 1] : pts[n - 1];
-    if (segDist(pts[i], prev, pts[(i + 1) % n]) > tol) out.push(pts[i]);
+    if (segDist(pts[i], prev, pts[(i + 1) % n]) > tol) { out.push(pts[i]); outU.push(us[i]); }
   }
-  return out.length >= 3 ? out : pts;
+  if (out.length < 3) return pts;
+  us.length = 0;
+  us.push(...outU);
+  return out;
 }
 
 /**
@@ -455,23 +481,218 @@ export function insertionIndex(pts: SplinePoint[], type: SplineType, closed: boo
  */
 export function flatten(pts: SplinePoint[], type: SplineType, closed: boolean,
                         tol: number = FLATTEN_TOL): Pt[] {
-  if (pts.length < 2) return pts.map((p) => [p.x, p.y] as Pt);
+  return flattenP(pts, type, closed, tol).poly;
+}
+
+/**
+ * `flatten`, plus the curve parameter each output vertex came from.
+ *
+ * The parameter is what lets a *per control point* value — a feather width, a
+ * speed — be resolved at every vertex of the dense polyline, which is the only
+ * form Python ever sees. Doing it geometrically instead ("which control point is
+ * this vertex nearest to") is wrong for exactly the reason `insertionIndex`
+ * documents: a B-spline control point can sit a long way off its own curve.
+ *
+ * Units are per curve type and meaningless on their own — `sampleAttr` is the
+ * only thing that should read them.
+ */
+export function flattenP(pts: SplinePoint[], type: SplineType, closed: boolean,
+                         tol: number = FLATTEN_TOL): { poly: Pt[]; us: number[] } {
+  const us: number[] = [];
+  if (pts.length < 2) {
+    return { poly: pts.map((p, i) => { us.push(i); return [p.x, p.y] as Pt; }), us };
+  }
 
   let out: Pt[];
   if (type === "bspline") {
-    out = bsplinePolyline(pts, closed, tol);
+    out = bsplinePolyline(pts, closed, tol, us);
   } else {
     out = [[pts[0].x, pts[0].y]];
+    us.push(0);
+    let seg = 0;
     for (const [p0, c1, c2, p3] of bezierSegments(pts, closed)) {
-      adaptive(cubic(p0, c1, c2, p3), 0, 1, p0, p3, tol, out, 0);
+      const local: number[] = [];
+      adaptive(cubic(p0, c1, c2, p3), 0, 1, p0, p3, tol, out, local, 0);
+      for (const t of local) us.push(seg + t);   // segment index + t, so u is global
+      seg++;
     }
   }
 
-  out = simplify(out, tol);
+  out = simplify(out, us, tol);
   if (closed && out.length > 1) {
     const a = out[0], b = out[out.length - 1];
-    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < tol) out.pop();
-    out = dropCollinearWrapped(out, tol);
+    if (Math.hypot(a[0] - b[0], a[1] - b[1]) < tol) { out.pop(); us.pop(); }
+    out = dropCollinearWrapped(out, us, tol);
+  }
+  return { poly: out, us };
+}
+
+/**
+ * A per control point value, resolved at every parameter in `us`.
+ *
+ * The value rides the *same basis as the curve*, treated as one more coordinate
+ * of the control point: the rational B-spline with the same knots and weights,
+ * or the same Catmull-Rom-to-Bezier tangents. That is what keeps it smooth.
+ * Interpolating linearly between control points instead — the obvious thing —
+ * is smooth nowhere: every control point becomes a crease in the value, and on
+ * a feather that crease is a visible kink running down the gradient even though
+ * the shape it belongs to is perfectly round. A corner point flattens the value
+ * on both sides, for the same reason it retracts its handles.
+ *
+ * Signed, and unclamped: the callers are a feather offset — a vector, whose
+ * components are negative half the time — and a speed, which clamps itself.
+ *
+ * ponytail: a Catmull-Rom span can overshoot past both its endpoints. On a
+ * feather offset that reads as the soft edge bulging slightly between two
+ * clones, which is what a spline through them looks like and is wanted. A
+ * monotone cubic (Fritsch-Carlson) is the upgrade if it ever is not.
+ */
+function attrEvaluator(pts: SplinePoint[], type: SplineType, closed: boolean,
+                       attr: (p: SplinePoint) => number): (u: number) => number {
+  if (type === "bspline") {
+    const b = bsplineSetup(pts, closed);
+    if (!b) { const v = attr(pts[0]); return () => v; }
+    // The value as a 1-D control point through the identical rational basis, so
+    // it is exactly as smooth as the outline it belongs to — including the way
+    // a repeated (corner) control point pins it.
+    const V: Pt[] = b.srcOf.map((i) => [attr(pts[i]), 0]);
+    return (u) => nurbsEvaluate(V, b.weights, b.knots, b.degree, u)[0];
+  }
+
+  // Bezier: the same tangent construction `controlPoints` uses, on one scalar.
+  const n = pts.length;
+  const v = (i: number) => attr(at(pts, i, closed));
+  const last = closed ? n : n - 1;
+  return (u) => {
+    const i = Math.max(0, Math.min(last - 1, Math.floor(u)));
+    const t = Math.max(0, Math.min(1, u - i));
+    const p1 = at(pts, i, closed), p2 = at(pts, i + 1, closed);
+    const a = v(i), d = v(i + 1);
+    const c1 = p1.corner ? a : a + (v(i + 1) - v(i - 1)) / 6;
+    const c2 = p2.corner ? d : d - (v(i + 2) - v(i)) / 6;
+    const w = 1 - t;
+    return w * w * w * a + 3 * w * w * t * c1 + 3 * w * t * t * c2 + t * t * t * d;
+  };
+}
+
+export function sampleAttr(pts: SplinePoint[], type: SplineType, closed: boolean,
+                           us: number[], attr: (p: SplinePoint) => number): number[] {
+  if (!pts.length) return us.map(() => 0);
+  return us.map(attrEvaluator(pts, type, closed, attr));
+}
+
+/** The curve point at a global parameter, in the units `flattenP` reports. */
+function pointEvaluator(pts: SplinePoint[], type: SplineType,
+                        closed: boolean): (u: number) => Pt {
+  if (type === "bspline") {
+    const b = bsplineSetup(pts, closed);
+    if (!b) return () => [pts[0].x, pts[0].y];
+    return (u) => nurbsEvaluate(b.P, b.weights, b.knots, b.degree, u);
+  }
+  const segs = bezierSegments(pts, closed);
+  const last = segs.length;
+  return (u) => {
+    const i = Math.max(0, Math.min(last - 1, Math.floor(u)));
+    const t = Math.max(0, Math.min(1, u - i));
+    const [p0, c1, c2, p3] = segs[i];
+    return cubic(p0, c1, c2, p3)(t);
+  };
+}
+
+/** The parameter span a closed curve wraps over. 0 for an open one. */
+function period(pts: SplinePoint[], type: SplineType, closed: boolean): number {
+  if (!closed) return 0;
+  if (type !== "bspline") return pts.length;
+  const b = bsplineSetup(pts, closed);
+  return b ? b.knots[b.P.length] - b.knots[b.degree] : 0;
+}
+
+/**
+ * `flattenP`, sampled finely enough for the *offset* curve as well as the outline.
+ *
+ * The outline's own flattening is adaptive, so a straight edge gets two points
+ * and nothing else — correct, and useless here. The offset curve over that same
+ * edge is not straight: the clones at either end can point in different
+ * directions and by different amounts, and the spline between them bends. Sample
+ * it at the outline's vertices and you get the outline's answer — a chord — so
+ * the soft edge is visibly faceted while the hard one it belongs to is smooth.
+ *
+ * So the same flatness test runs a second time, on the offset curve, and splits
+ * where *it* is not flat. Adaptive both times: a stretch where the softness is
+ * constant costs nothing extra, and only the spans that actually bend get more
+ * points.
+ */
+export function flattenFeathered(
+  pts: SplinePoint[], type: SplineType, closed: boolean, tol: number,
+  offX: (p: SplinePoint) => number, offY: (p: SplinePoint) => number,
+): { poly: Pt[]; us: number[]; off: Pt[] } {
+  const base = flattenP(pts, type, closed, tol);
+  const fx = attrEvaluator(pts, type, closed, offX);
+  const fy = attrEvaluator(pts, type, closed, offY);
+  if (base.poly.length < 2) {
+    return { ...base, off: base.us.map((u) => [fx(u), fy(u)] as Pt) };
+  }
+  const pt = pointEvaluator(pts, type, closed);
+
+  const us: number[] = [];
+  const poly: Pt[] = [];
+  const off: Pt[] = [];
+  const push = (u: number, p: Pt, o: Pt) => { us.push(u); poly.push(p); off.push(o); };
+  const outer = (p: Pt, o: Pt): Pt => [p[0] + o[0], p[1] + o[1]];
+
+  /** Split until the offset curve's chord is within `tol` of it. */
+  const bisect = (u0: number, u1: number, p0: Pt, o0: Pt, p1: Pt, o1: Pt,
+                  depth: number): void => {
+    if (depth >= OFFSET_MAX_DEPTH) return;
+    const um = (u0 + u1) / 2;
+    const pm = pt(um);
+    const om: Pt = [fx(um), fy(um)];
+    if (segDist(outer(pm, om), outer(p0, o0), outer(p1, o1)) <= tol) return;
+    bisect(u0, um, p0, o0, pm, om, depth + 1);
+    push(um, pm, om);
+    bisect(um, u1, pm, om, p1, o1, depth + 1);
+  };
+
+  let pu = base.us[0];
+  let pp = base.poly[0];
+  let po: Pt = [fx(pu), fy(pu)];
+  push(pu, pp, po);
+  for (let i = 1; i < base.us.length; i++) {
+    const u = base.us[i], p = base.poly[i];
+    const o: Pt = [fx(u), fy(u)];
+    bisect(pu, u, pp, po, p, o, 0);
+    push(u, p, o);
+    pu = u; pp = p; po = o;
+  }
+  // The closing span wraps past the end of the parameter range, so it is not one
+  // of the pairs above — and it is a span like any other, which can bend.
+  const span = period(pts, type, closed);
+  if (span > 0) {
+    const u1 = base.us[0] + span;
+    bisect(pu, u1, pp, po, base.poly[0], off[0], 0);
+  }
+  return { poly, us, off };
+}
+
+/**
+ * Where to place the nested outlines so the gradient between them is a
+ * smoothstep rather than a straight ramp.
+ *
+ * Evenly spaced rings give coverage 1 - q: correct, and ugly. It has a corner in
+ * its slope at both ends, so the eye reads a hard line where the softness starts
+ * and another where it stops — the softening is visible precisely as an edge,
+ * which is the one thing it was supposed to remove.
+ *
+ * Coverage is the fraction of rings outside a point, so the profile is chosen by
+ * where the rings are put: place them at the inverse of the profile you want.
+ * `smoothstep⁻¹(x) = ½ - sin(asin(1 - 2x) / 3)` is the closed form, so this
+ * costs nothing over the even spacing. Mirrored in `blur_core.ramp_offsets`.
+ */
+export function rampOffsets(rings: number): number[] {
+  const out: number[] = [];
+  for (let j = 0; j < rings; j++) {
+    const x = (j + 0.5) / rings;
+    out.push(0.5 - Math.sin(Math.asin(1 - 2 * x) / 3));
   }
   return out;
 }

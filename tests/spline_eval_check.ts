@@ -1,5 +1,5 @@
 /** Self-check for the spline evaluators: npm run test:ts */
-import { flatten, bezierSegments, insertionIndex, FLATTEN_TOL, type SplinePoint } from "../src/splineEval";
+import { flatten, flattenP, flattenFeathered, sampleAttr, rampOffsets, bezierSegments, insertionIndex, FLATTEN_TOL, type SplinePoint } from "../src/splineEval";
 
 function ok(cond: boolean, msg: string): void {
   if (!cond) throw new Error(msg);
@@ -278,6 +278,157 @@ for (const n of [3, 5, 8, 16]) {
   // still lands, with distances scaled by the aspect.
   const wide = flatten(pts, "bspline", true);
   ok(insertionIndex(pts, "bspline", true, wide[3], 1e-3, 1.78) != null, "aspect-scaled hit");
+}
+
+// ── sampleAttr: a per-point value resolved along the dense polyline ───
+// This is what carries per-point feather and per-point speed to Python, so it
+// has to hit each control point's own value and stay inside the range between.
+for (const type of ["bezier", "bspline"] as const) {
+  const pts = ring(6, 0.3, 1);
+  const vals = [0, 10, 20, 30, 20, 10];
+  const { poly, us } = flattenP(pts, type, true);
+  ok(us.length === poly.length, `${type}: ${us.length} params for ${poly.length} points`);
+  const got = sampleAttr(pts, type, true, us, (_p) => vals[pts.indexOf(_p)]);
+  ok(got.length === poly.length, `${type}: sampled ${got.length} of ${poly.length}`);
+  ok(Math.min(...got) >= 0, `${type}: went negative (${Math.min(...got)})`);
+  ok(Math.max(...got) <= 34, `${type}: overshot badly (${Math.max(...got)})`);
+  // A B-spline is approximating, so it need not touch 30 — but it has to get
+  // most of the way there, or setting a feather on a point would barely show.
+  ok(Math.max(...got) > (type === "bspline" ? 20 : 28),
+     `${type}: never reached the peak (${Math.max(...got)})`);
+  ok(Math.min(...got) < (type === "bspline" ? 6 : 2),
+     `${type}: never reached the trough (${Math.min(...got)})`);
+  // A constant is constant — no ringing from the parameter mapping.
+  const flat = sampleAttr(pts, type, true, us, () => 7);
+  ok(flat.every((v) => Math.abs(v - 7) < 1e-9), `${type}: constant did not stay constant`);
+
+  // The point of the exercise: SMOOTH, not piecewise-linear. Interpolating in a
+  // straight line between control points puts a crease in the value at every one
+  // of them, and on a feather that crease is a visible kink running down the
+  // gradient of a shape that is itself perfectly round.
+  //
+  // Sampled on an even grid of the parameter, NOT on the polyline's own
+  // vertices: those are adaptively spaced, so a second difference across them
+  // measures where the sampler put points, not how smooth the value is.
+  const u0 = Math.min(...us), u1 = Math.max(...us);
+  const grid = Array.from({ length: 400 }, (_, i) => u0 + ((u1 - u0) * i) / 399);
+  const even = sampleAttr(pts, type, true, grid, (_p) => vals[pts.indexOf(_p)]);
+  const d1 = even.slice(1).map((v, i) => v - even[i]);
+  const d2 = d1.slice(1).map((v, i) => Math.abs(v - d1[i]));
+  const peak = Math.max(...d2);
+  const mean = d2.reduce((a, b) => a + b, 0) / d2.length;
+  // A linear interpolant is flat between control points and turns all at once
+  // at each of them, which puts this ratio in the hundreds. A cubic spreads the
+  // curvature over the whole span.
+  ok(peak < 6 * mean, `${type}: creases at the control points (peak ${peak}, mean ${mean})`);
+}
+
+// ── A feather offset is a VECTOR, and both components must stay signed ─
+// The clone is placed by hand, so its offset points wherever it was dragged —
+// including back inside the shape. Clamping a component at zero (which an
+// earlier width-shaped version did) would quietly refuse half the directions.
+{
+  const pts = ring(6, 0.3, 1);
+  const fo: Array<[number, number]> = [
+    [30, 0], [0, 0], [-25, 12], [0, 0], [0, -18], [0, 0],
+  ];
+  const withFo = pts.map((p, i) => ({ ...p, fo: fo[i] }));
+  for (const type of ["bezier", "bspline"] as const) {
+    const { poly, us } = flattenP(withFo, type, true);
+    const fx = sampleAttr(withFo, type, true, us, (p) => p.fo?.[0] ?? 0);
+    const fy = sampleAttr(withFo, type, true, us, (p) => p.fo?.[1] ?? 0);
+    ok(fx.length === poly.length && fy.length === poly.length, `${type}: length`);
+    ok(Math.min(...fx) < -5, `${type}: negative x offsets were lost (${Math.min(...fx)})`);
+    ok(Math.min(...fy) < -5, `${type}: negative y offsets were lost (${Math.min(...fy)})`);
+    ok(Math.max(...fx) > 10, `${type}: positive x offsets were lost (${Math.max(...fx)})`);
+    // Both components stay bounded by the values that were set, give or take the
+    // overshoot a cubic through them is entitled to.
+    ok(Math.max(...fx.map(Math.abs)) < 45, `${type}: x blew up (${Math.max(...fx)})`);
+    ok(Math.max(...fy.map(Math.abs)) < 30, `${type}: y blew up (${Math.max(...fy)})`);
+  }
+}
+
+// ── The OFFSET curve gets the outline's flatness, not the outline's points ──
+// A straight edge is two points and no more, which is right for the edge and
+// useless for the soft curve beside it: the clones at either end can point in
+// different directions, so the offset curve over that same span bends. Sampling
+// it at the outline's vertices draws a chord, and the soft edge comes out
+// faceted next to a hard edge that is perfectly smooth.
+{
+  // Long straight spans, clones swinging hard between neighbours — the shape of
+  // the bug, on purpose.
+  const pts: SplinePoint[] = [
+    { x: 0.30, y: 0.55, fo: [-140, -260] }, { x: 0.62, y: 0.50, fo: [40, -230] },
+    { x: 0.78, y: 0.58, fo: [190, -300] },  { x: 0.80, y: 0.66, fo: [150, -60] },
+    { x: 0.55, y: 0.72, fo: [-30, 60] },    { x: 0.28, y: 0.62, fo: [-190, 90] },
+  ];
+  const IMG = 1094, IMGH = 845;
+  const ox = (p: SplinePoint) => (p.fo?.[0] ?? 0) / IMG;
+  const oy = (p: SplinePoint) => (p.fo?.[1] ?? 0) / IMGH;
+  const TOL = FLATTEN_TOL * 40;                 // a screen-ish drawing tolerance
+
+  for (const type of ["bezier", "bspline"] as const) {
+    const plain = flattenP(pts, type, true, TOL);
+    const fine = flattenFeathered(pts, type, true, TOL, ox, oy);
+    ok(fine.poly.length === fine.off.length && fine.poly.length === fine.us.length,
+       `${type}: ragged output`);
+    ok(fine.us.every((u, i) => i === 0 || u > fine.us[i - 1]),
+       `${type}: parameters came back out of order`);
+
+    /** Worst gap between the drawn offset polyline and the real offset curve. */
+    const facet = (poly: typeof plain.poly, us: number[],
+                   off: Array<[number, number]>) => {
+      let worst = 0;
+      for (let i = 0; i + 1 < us.length; i++) {
+        const um = (us[i] + us[i + 1]) / 2;
+        const [mx] = sampleAttr(pts, type, true, [um], ox);
+        const [my] = sampleAttr(pts, type, true, [um], oy);
+        // The base curve at the midpoint, taken from a much finer flattening.
+        const ref = flattenP(pts, type, true, FLATTEN_TOL);
+        let k = 0, bd = Infinity;
+        ref.us.forEach((u, j) => { const d = Math.abs(u - um); if (d < bd) { bd = d; k = j; } });
+        const m: [number, number] = [ref.poly[k][0] + mx, ref.poly[k][1] + my];
+        const a: [number, number] = [poly[i][0] + off[i][0], poly[i][1] + off[i][1]];
+        const b: [number, number] = [poly[i + 1][0] + off[i + 1][0], poly[i + 1][1] + off[i + 1][1]];
+        const dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy;
+        const t = l2 < 1e-18 ? 0 : Math.max(0, Math.min(1, ((m[0] - a[0]) * dx + (m[1] - a[1]) * dy) / l2));
+        worst = Math.max(worst, dist(m, [a[0] + t * dx, a[1] + t * dy]));
+      }
+      return worst;
+    };
+
+    const before = facet(plain.poly, plain.us,
+      sampleAttr(pts, type, true, plain.us, ox)
+        .map((v, i) => [v, sampleAttr(pts, type, true, plain.us, oy)[i]] as [number, number]));
+    const after = facet(fine.poly, fine.us, fine.off);
+    ok(after <= TOL * 2.5, `${type}: offset curve still faceted by ${after} (tol ${TOL})`);
+    ok(after < before / 3, `${type}: refinement barely helped (${before} -> ${after})`);
+    // And it pays for that with points only where the bend is, not everywhere.
+    ok(fine.poly.length < plain.poly.length * 3,
+       `${type}: refinement exploded (${plain.poly.length} -> ${fine.poly.length})`);
+  }
+
+  // No clones at all: nothing to refine, so nothing is added.
+  const bare = pts.map(({ x, y }) => ({ x, y }));
+  for (const type of ["bezier", "bspline"] as const) {
+    const a = flattenP(bare, type, true, FLATTEN_TOL);
+    const b = flattenFeathered(bare, type, true, FLATTEN_TOL, () => 0, () => 0);
+    ok(a.poly.length === b.poly.length, `${type}: zero offset changed the sampling`);
+    ok(b.off.every((o) => o[0] === 0 && o[1] === 0), `${type}: phantom offsets`);
+  }
+}
+
+// ── rampOffsets: the smoothstep spacing, parity with blur_core ────────
+{
+  const off = rampOffsets(16);
+  ok(off.length === 16, `${off.length} offsets`);
+  ok(off.every((v, i) => i === 0 || v > off[i - 1]), "offsets must be sorted");
+  ok(off[0] > 0 && off[off.length - 1] < 1, `offsets left the band (${off[0]}, ${off[15]})`);
+  const gaps = off.slice(1).map((v, i) => v - off[i]);
+  ok(gaps[gaps.length >> 1] < gaps[0] * 0.6, "rings must cluster toward the middle");
+  // Same two numbers as tests/test_blur_core.py: smoothstep⁻¹(¼) = ½ - sin(10°).
+  ok(Math.abs(rampOffsets(1)[0] - 0.5) < 1e-12, `${rampOffsets(1)}`);
+  ok(Math.abs(rampOffsets(2)[0] - (0.5 - Math.sin(Math.PI / 18))) < 1e-12, `${rampOffsets(2)}`);
 }
 
 console.log("splineEval ok");

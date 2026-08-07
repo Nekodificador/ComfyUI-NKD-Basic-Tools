@@ -32,7 +32,7 @@ void main() {
 const FRAG = `#version 300 es
 precision highp float;
 uniform sampler2D uImg;
-uniform vec3 uPins[${MAX_PINS}];   // x, y, blur (0..1)
+uniform vec4 uPins[${MAX_PINS}];   // x, y, blur (0..1), reach scale
 uniform int uCount;
 uniform float uMaxBlur;            // pixels at texture resolution
 uniform float uPower;              // IDW falloff
@@ -44,10 +44,12 @@ out vec4 frag;
 void main() {
   // Inverse-distance weighting, the same form the backend solves. Distances are
   // in normalized units on both sides, so a non-square image skews identically.
+  // A pin's reach divides its distance, so widening one lets it hold ground the
+  // pins around it would otherwise take — including a reach of zero blur.
   float num = 0.0, den = 0.0;
   for (int i = 0; i < ${MAX_PINS}; i++) {
     if (i >= uCount) break;
-    vec2 d = vUv - uPins[i].xy;
+    vec2 d = (vUv - uPins[i].xy) / max(uPins[i].w, 1e-4);
     float w = pow(dot(d, d) + 1e-9, -uPower * 0.5);
     num += w * uPins[i].z;
     den += w;
@@ -73,7 +75,11 @@ void main() {
   frag = vec4(c / 6.0, 1.0);
 }`;
 
-export type PinData = { x: number; y: number; blur: number };
+export type PinData = { x: number; y: number; blur: number; r: number };
+
+/** Reach is stored as a radius; the weighting wants it as a multiple of the
+ *  neutral one, so a field of default pins is exactly what it always was. */
+const NEUTRAL_REACH = 0.25;
 
 export class FieldPreview {
   readonly canvas: HTMLCanvasElement;
@@ -160,11 +166,12 @@ export class FieldPreview {
     if (!gl || !this.ready || !this.prog) return false;
 
     const n = Math.min(pins.length, MAX_PINS);
-    const flat = new Float32Array(MAX_PINS * 3);
+    const flat = new Float32Array(MAX_PINS * 4);
     for (let i = 0; i < n; i++) {
-      flat[i * 3] = pins[i].x;
-      flat[i * 3 + 1] = pins[i].y;
-      flat[i * 3 + 2] = pins[i].blur;
+      flat[i * 4] = pins[i].x;
+      flat[i * 4 + 1] = pins[i].y;
+      flat[i * 4 + 2] = pins[i].blur;
+      flat[i * 4 + 3] = Math.max(0.01, pins[i].r ?? NEUTRAL_REACH) / NEUTRAL_REACH;
     }
 
     gl.useProgram(this.prog);
@@ -172,7 +179,7 @@ export class FieldPreview {
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, this.tex);
     gl.uniform1i(this.loc.uImg, 0);
-    gl.uniform3fv(this.loc.uPins, flat);
+    gl.uniform4fv(this.loc.uPins, flat);
     gl.uniform1i(this.loc.uCount, n);
     // The texture may be smaller than the full image; the radius has to shrink
     // with it or the preview would blur harder than the render.
