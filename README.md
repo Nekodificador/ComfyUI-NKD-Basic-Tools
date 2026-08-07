@@ -1,11 +1,12 @@
 # 😺NKD Basic Tools
 
 A grab-bag of everyday ComfyUI nodes that remove wiring and busywork: detail an
-inpaint at the right resolution, transfer skin texture after a relight, recolor
-by brightness, make procedural noise or film grain, and turn one text box into a
-whole batch of prompts. Each node shows a **live preview in the node itself**, so
-you tune it while you look at it — no separate preview node, and most update
-without even running the graph.
+inpaint at the right resolution, roto a mask by hand with a pen tool, fake a
+shallow depth of field or motion blur that curves, transfer skin texture after a
+relight, recolor by brightness, make procedural noise or film grain, and turn one
+text box into a whole batch of prompts. Each node shows a **live preview in the
+node itself**, so you tune it while you look at it — no separate preview node,
+and most update without even running the graph.
 
 ---
 
