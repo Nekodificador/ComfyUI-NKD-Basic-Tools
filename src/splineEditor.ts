@@ -14,6 +14,7 @@
  */
 import { flatten, bezierSegments, insertionIndex, MIN_W, MAX_W, type Pt, type SplinePoint, type SplineType } from "./splineEval";
 import { drawRing, hitDot, hitRing, startScrub } from "./arcGizmo";
+import { FieldPreview } from "./fieldPreview";
 
 export type EditorMode = "shape" | "path" | "pin";
 
@@ -66,7 +67,7 @@ export type EditorOptions = {
 };
 
 /** How the backdrop is shown while editing. */
-export type ViewMode = "source" | "result" | "matte";
+export type ViewMode = "source" | "result" | "matte" | "field";
 
 export class SplineEditor {
   readonly canvas: HTMLCanvasElement;
@@ -95,6 +96,12 @@ export class SplineEditor {
   view: ViewMode = "result";
   /** Backend-rendered result for the blur modes; null until one arrives. */
   preview: CanvasImageSource | null = null;
+  /** The node's own settings, so the pin gizmos can show real pixels and the
+   *  live shader can match what the graph will do. */
+  maxBlur = 48;
+  falloff = 2;
+  /** GPU guide for pin mode. Drives the canvas between backend results. */
+  private live: FieldPreview | null = null;
   /** Offscreen matte for shape mode, rebuilt on every edit — cheap and exact. */
   private matte: HTMLCanvasElement | null = null;
 
@@ -133,6 +140,7 @@ export class SplineEditor {
   destroy(): void {
     this.ro.disconnect();
     window.removeEventListener("keydown", this.onKey, true);
+    this.destroyLive();
   }
 
   /* ── View ──────────────────────────────────────────────────────────────── */
@@ -143,7 +151,16 @@ export class SplineEditor {
     this.imgH = Math.max(1, h);
     this.preview = null;                       // the old result is not this frame
     if (this.mode === "shape") this.buildMatte();
+    if (this.mode === "pin" && img) {
+      if (!this.live) this.live = new FieldPreview();
+      this.live.setImage(img, this.imgW, this.imgH);
+    }
     this.fitView();
+  }
+
+  destroyLive(): void {
+    this.live?.destroy();
+    this.live = null;
   }
 
   get aspect(): number {
@@ -400,6 +417,9 @@ export class SplineEditor {
 
   private emit(commit: boolean): void {
     if (this.mode === "shape" && this.view !== "source") this.buildMatte();
+    // Whatever the backend last sent is now out of date, so drop it and let the
+    // live shader carry the view until the next result lands.
+    if (this.mode === "pin" && this.live) this.preview = null;
     this.onEdit(this.serialise(), commit);
     this.draw();
     if (commit) this.onState?.();
@@ -408,6 +428,19 @@ export class SplineEditor {
   /** Rebuild whatever this mode uses as a backdrop and repaint. */
   refreshView(): void {
     if (this.mode === "shape") this.buildMatte();
+    this.draw();
+  }
+
+  /**
+   * The backend result no longer matches the settings, so drop it.
+   *
+   * Needed for anything that changes the render WITHOUT touching the geometry —
+   * the sliders. Without it the stale result keeps holding the backdrop and the
+   * live shader never gets a look in, so the view only caught up when you
+   * happened to nudge a pin.
+   */
+  invalidatePreview(): void {
+    this.preview = null;
     this.draw();
   }
 
@@ -590,7 +623,9 @@ export class SplineEditor {
     }
     this.snapshot();
     const [nx, ny] = this.toNorm(px, py);
-    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0.5 });
+    // Sharp by default: a new pin is normally there to hold something in focus,
+    // and starting at zero means dropping one never disturbs what you have.
+    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0 });
     this.selPt = this.pins.length - 1;
     this.drag = { kind: "pin", i: this.selPt, dx: 0, dy: 0 };
     this.emit(true);
@@ -811,7 +846,24 @@ export class SplineEditor {
       return;
     }
 
-    const src = this.view === "result" && this.preview ? this.preview : this.image;
+    if (this.view === "source") {
+      if (this.image) ctx.drawImage(this.image, ...box);
+      return;
+    }
+
+    // Pin mode steers on the GPU and confirms on the backend: the shader repaints
+    // every mouse move, and whenever an exact result has arrived it wins. Any
+    // edit drops that result, so the shader takes back over instantly.
+    if (this.mode === "pin" && this.live && (!this.preview || this.view === "field")) {
+      const scale = this.live.canvas.width / Math.max(1, this.imgW);
+      if (this.live.render(this.pins, this.maxBlur * scale, this.falloff,
+                           this.view === "field")) {
+        ctx.drawImage(this.live.canvas, ...box);
+        return;
+      }
+    }
+
+    const src = this.preview ?? this.image;
     if (src) ctx.drawImage(src, ...box);
   }
 
@@ -976,9 +1028,28 @@ export class SplineEditor {
   }
 
   private drawPins(): void {
+    const ctx = this.ctx;
+    const px = this.viewW / Math.max(1, this.imgW);      // image px → screen px
+
     this.pins.forEach((p, i) => {
       const [x, y] = this.toScreen(p.x, p.y);
-      drawRing(this.ctx, x, y, p.blur, C.add, i === this.selPt);
+      const radius = p.blur * this.maxBlur;
+
+      // The blur radius at true scale. Without it "0.62" means nothing until you
+      // run the graph — this is how big the blur actually is on this image.
+      const rs = radius * px;
+      if (rs > 2) {
+        ctx.save();
+        ctx.strokeStyle = i === this.selPt ? "rgba(74,180,255,0.55)" : "rgba(74,180,255,0.22)";
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, rs, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawRing(ctx, x, y, p.blur, C.add, i === this.selPt, `${Math.round(radius)} px`);
     });
   }
 }

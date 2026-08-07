@@ -10512,14 +10512,14 @@ function mixLuma(hex, dl) {
 }
 const LUT_SIZE = 33;
 const DRAFT_SIZE = 17;
-const VERT$1 = `#version 300 es
+const VERT$2 = `#version 300 es
 in vec2 aPos;
 out vec2 vUv;
 void main() {
   vUv = aPos * 0.5 + 0.5;
   gl_Position = vec4(aPos, 0.0, 1.0);
 }`;
-const FRAG$1 = `#version 300 es
+const FRAG$2 = `#version 300 es
 precision highp float;
 precision highp sampler3D;
 in vec2 vUv;
@@ -10622,8 +10622,8 @@ class ColorWarpPreview {
       }
       return s;
     };
-    const vs = compile(gl.VERTEX_SHADER, VERT$1);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAG$1);
+    const vs = compile(gl.VERTEX_SHADER, VERT$2);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG$2);
     if (!vs || !fs) return false;
     const prog = gl.createProgram();
     gl.attachShader(prog, vs);
@@ -10904,7 +10904,7 @@ class ColorWarpPreview {
   }
 }
 const RAD = Math.PI / 180;
-const VERT = `#version 300 es
+const VERT$1 = `#version 300 es
 in vec3 aPos;
 in vec3 aCol;
 uniform mat4 uMVP;
@@ -10915,7 +10915,7 @@ void main() {
   gl_PointSize = uPtSize / max(gl_Position.w, 0.1);
   vCol = aCol;
 }`;
-const FRAG = `#version 300 es
+const FRAG$1 = `#version 300 es
 precision mediump float;
 in vec3 vCol;
 uniform float uAlpha;
@@ -11071,8 +11071,8 @@ class ColorWarpScope3D {
       }
       return s;
     };
-    const vs = compile(gl.VERTEX_SHADER, VERT);
-    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    const vs = compile(gl.VERTEX_SHADER, VERT$1);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG$1);
     if (!vs || !fs) return false;
     const prog = gl.createProgram();
     gl.attachShader(prog, vs);
@@ -12199,7 +12199,7 @@ function hitRing(px, py, cx, cy) {
 function hitDot(px, py, cx, cy, r = 9) {
   return Math.hypot(px - cx, py - cy) <= r;
 }
-function drawRing(ctx, cx, cy, value, color, selected) {
+function drawRing(ctx, cx, cy, value, color, selected, label) {
   const v = Math.max(0, Math.min(1, value));
   const w = 2 + v * (RING.maxWidth - 2);
   ctx.save();
@@ -12221,10 +12221,15 @@ function drawRing(ctx, cx, cy, value, color, selected) {
   ctx.fill();
   ctx.stroke();
   if (selected) {
-    ctx.fillStyle = "#c8d0e0";
+    const text = label ?? v.toFixed(2);
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(v.toFixed(2), cx, cy - RING.inner - RING.maxWidth - 6);
+    const ty = cy - RING.inner - RING.maxWidth - 6;
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, cx, ty);
+    ctx.fillStyle = "#c8d0e0";
+    ctx.fillText(text, cx, ty);
   }
   ctx.restore();
 }
@@ -12235,6 +12240,172 @@ function startScrub(startY, get, set) {
     prev = y;
     set(Math.max(0, Math.min(1, get() + delta)));
   };
+}
+const MAX_PINS = 64;
+const VERT = `#version 300 es
+in vec2 aPos;
+out vec2 vUv;
+void main() {
+  // y is flipped on the way in, not on upload. Clip space puts +1 at the top of
+  // the screen while an uploaded image puts its top row at v = 0, so the naive
+  // aPos * 0.5 + 0.5 samples the picture upside down. Doing it here rather than
+  // with UNPACK_FLIP_Y keeps vUv in the same frame as the pins, which are
+  // normalized image coordinates with y running down.
+  vUv = vec2(aPos.x * 0.5 + 0.5, 0.5 - aPos.y * 0.5);
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+const FRAG = `#version 300 es
+precision highp float;
+uniform sampler2D uImg;
+uniform vec3 uPins[${MAX_PINS}];   // x, y, blur (0..1)
+uniform int uCount;
+uniform float uMaxBlur;            // pixels at texture resolution
+uniform float uPower;              // IDW falloff
+uniform vec2 uTexel;
+uniform int uField;                // 1 = draw the radius field instead
+in vec2 vUv;
+out vec4 frag;
+
+void main() {
+  // Inverse-distance weighting, the same form the backend solves. Distances are
+  // in normalized units on both sides, so a non-square image skews identically.
+  float num = 0.0, den = 0.0;
+  for (int i = 0; i < ${MAX_PINS}; i++) {
+    if (i >= uCount) break;
+    vec2 d = vUv - uPins[i].xy;
+    float w = pow(dot(d, d) + 1e-9, -uPower * 0.5);
+    num += w * uPins[i].z;
+    den += w;
+  }
+  float unit = den > 0.0 ? num / den : 0.0;
+
+  if (uField == 1) {
+    frag = vec4(vec3(clamp(unit, 0.0, 1.0)), 1.0);
+    return;
+  }
+
+  float r = unit * uMaxBlur;
+  float lod = log2(max(r, 1.0));
+  // A handful of taps around the point, because a straight mip lookup goes
+  // visibly blocky once the level is high and that reads as an artefact rather
+  // than as blur.
+  vec3 c = textureLod(uImg, vUv, lod).rgb * 2.0;
+  float o = r * 0.5;
+  c += textureLod(uImg, vUv + vec2( o, 0.0) * uTexel, lod).rgb;
+  c += textureLod(uImg, vUv + vec2(-o, 0.0) * uTexel, lod).rgb;
+  c += textureLod(uImg, vUv + vec2(0.0,  o) * uTexel, lod).rgb;
+  c += textureLod(uImg, vUv + vec2(0.0, -o) * uTexel, lod).rgb;
+  frag = vec4(c / 6.0, 1.0);
+}`;
+class FieldPreview {
+  constructor() {
+    __publicField(this, "canvas");
+    __publicField(this, "gl");
+    __publicField(this, "prog", null);
+    __publicField(this, "tex", null);
+    __publicField(this, "loc", {});
+    __publicField(this, "ready", false);
+    this.canvas = document.createElement("canvas");
+    this.gl = this.canvas.getContext("webgl2", { premultipliedAlpha: false });
+    if (!this.gl) return;
+    const gl = this.gl;
+    const compile = (type, src) => {
+      const s = gl.createShader(type);
+      gl.shaderSource(s, src);
+      gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+        console.warn("[NKD Field Blur] shader:", gl.getShaderInfoLog(s));
+        return null;
+      }
+      return s;
+    };
+    const vs = compile(gl.VERTEX_SHADER, VERT);
+    const fs = compile(gl.FRAGMENT_SHADER, FRAG);
+    if (!vs || !fs) {
+      this.gl = null;
+      return;
+    }
+    const prog = gl.createProgram();
+    gl.attachShader(prog, vs);
+    gl.attachShader(prog, fs);
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      console.warn("[NKD Field Blur] link:", gl.getProgramInfoLog(prog));
+      this.gl = null;
+      return;
+    }
+    this.prog = prog;
+    gl.useProgram(prog);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const aPos = gl.getAttribLocation(prog, "aPos");
+    gl.enableVertexAttribArray(aPos);
+    gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+    for (const n of ["uImg", "uPins", "uCount", "uMaxBlur", "uPower", "uTexel", "uField"]) {
+      this.loc[n] = gl.getUniformLocation(prog, n);
+    }
+  }
+  get available() {
+    return !!this.gl && this.ready;
+  }
+  /** Upload the backdrop. Mipmaps are the blur, so they are built once here. */
+  setImage(src, w, h) {
+    const gl = this.gl;
+    if (!gl) return;
+    this.canvas.width = Math.max(1, w);
+    this.canvas.height = Math.max(1, h);
+    if (!this.tex) this.tex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+    try {
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    } catch {
+      this.ready = false;
+      return;
+    }
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    this.ready = true;
+  }
+  /** Repaint. `field` draws the radius map instead of the blurred image. */
+  render(pins, maxBlur, falloff, field) {
+    const gl = this.gl;
+    if (!gl || !this.ready || !this.prog) return false;
+    const n = Math.min(pins.length, MAX_PINS);
+    const flat = new Float32Array(MAX_PINS * 3);
+    for (let i = 0; i < n; i++) {
+      flat[i * 3] = pins[i].x;
+      flat[i * 3 + 1] = pins[i].y;
+      flat[i * 3 + 2] = pins[i].blur;
+    }
+    gl.useProgram(this.prog);
+    gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, this.tex);
+    gl.uniform1i(this.loc.uImg, 0);
+    gl.uniform3fv(this.loc.uPins, flat);
+    gl.uniform1i(this.loc.uCount, n);
+    gl.uniform1f(this.loc.uMaxBlur, maxBlur);
+    gl.uniform1f(this.loc.uPower, falloff);
+    gl.uniform2f(this.loc.uTexel, 1 / this.canvas.width, 1 / this.canvas.height);
+    gl.uniform1i(this.loc.uField, field ? 1 : 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    return true;
+  }
+  destroy() {
+    var _a;
+    const gl = this.gl;
+    if (!gl) return;
+    if (this.tex) gl.deleteTexture(this.tex);
+    if (this.prog) gl.deleteProgram(this.prog);
+    (_a = gl.getExtension("WEBGL_lose_context")) == null ? void 0 : _a.loseContext();
+    this.gl = null;
+    this.ready = false;
+  }
 }
 const C = {
   bg: "#0b0d12",
@@ -12278,6 +12449,12 @@ class SplineEditor {
     __publicField(this, "view", "result");
     /** Backend-rendered result for the blur modes; null until one arrives. */
     __publicField(this, "preview", null);
+    /** The node's own settings, so the pin gizmos can show real pixels and the
+     *  live shader can match what the graph will do. */
+    __publicField(this, "maxBlur", 48);
+    __publicField(this, "falloff", 2);
+    /** GPU guide for pin mode. Drives the canvas between backend results. */
+    __publicField(this, "live", null);
     /** Offscreen matte for shape mode, rebuilt on every edit — cheap and exact. */
     __publicField(this, "matte", null);
     __publicField(this, "zoom", 1);
@@ -12505,6 +12682,7 @@ class SplineEditor {
   destroy() {
     this.ro.disconnect();
     window.removeEventListener("keydown", this.onKey, true);
+    this.destroyLive();
   }
   /* ── View ──────────────────────────────────────────────────────────────── */
   setImage(img, w, h) {
@@ -12513,7 +12691,16 @@ class SplineEditor {
     this.imgH = Math.max(1, h);
     this.preview = null;
     if (this.mode === "shape") this.buildMatte();
+    if (this.mode === "pin" && img) {
+      if (!this.live) this.live = new FieldPreview();
+      this.live.setImage(img, this.imgW, this.imgH);
+    }
     this.fitView();
+  }
+  destroyLive() {
+    var _a;
+    (_a = this.live) == null ? void 0 : _a.destroy();
+    this.live = null;
   }
   get aspect() {
     return this.imgW / this.imgH;
@@ -12753,6 +12940,7 @@ class SplineEditor {
   emit(commit) {
     var _a;
     if (this.mode === "shape" && this.view !== "source") this.buildMatte();
+    if (this.mode === "pin" && this.live) this.preview = null;
     this.onEdit(this.serialise(), commit);
     this.draw();
     if (commit) (_a = this.onState) == null ? void 0 : _a.call(this);
@@ -12760,6 +12948,18 @@ class SplineEditor {
   /** Rebuild whatever this mode uses as a backdrop and repaint. */
   refreshView() {
     if (this.mode === "shape") this.buildMatte();
+    this.draw();
+  }
+  /**
+   * The backend result no longer matches the settings, so drop it.
+   *
+   * Needed for anything that changes the render WITHOUT touching the geometry —
+   * the sliders. Without it the stale result keeps holding the backdrop and the
+   * live shader never gets a look in, so the view only caught up when you
+   * happened to nudge a pin.
+   */
+  invalidatePreview() {
+    this.preview = null;
     this.draw();
   }
   commit() {
@@ -12839,7 +13039,7 @@ class SplineEditor {
     }
     this.snapshot();
     const [nx, ny] = this.toNorm(px, py);
-    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0.5 });
+    this.pins.push({ x: clamp01(nx), y: clamp01(ny), blur: 0 });
     this.selPt = this.pins.length - 1;
     this.drag = { kind: "pin", i: this.selPt, dx: 0, dy: 0 };
     this.emit(true);
@@ -12917,7 +13117,23 @@ class SplineEditor {
       ctx.globalCompositeOperation = "source-over";
       return;
     }
-    const src = this.view === "result" && this.preview ? this.preview : this.image;
+    if (this.view === "source") {
+      if (this.image) ctx.drawImage(this.image, ...box);
+      return;
+    }
+    if (this.mode === "pin" && this.live && (!this.preview || this.view === "field")) {
+      const scale = this.live.canvas.width / Math.max(1, this.imgW);
+      if (this.live.render(
+        this.pins,
+        this.maxBlur * scale,
+        this.falloff,
+        this.view === "field"
+      )) {
+        ctx.drawImage(this.live.canvas, ...box);
+        return;
+      }
+    }
+    const src = this.preview ?? this.image;
     if (src) ctx.drawImage(src, ...box);
   }
   draw() {
@@ -13059,9 +13275,23 @@ class SplineEditor {
     ctx.restore();
   }
   drawPins() {
+    const ctx = this.ctx;
+    const px = this.viewW / Math.max(1, this.imgW);
     this.pins.forEach((p2, i) => {
       const [x, y] = this.toScreen(p2.x, p2.y);
-      drawRing(this.ctx, x, y, p2.blur, C.add, i === this.selPt);
+      const radius = p2.blur * this.maxBlur;
+      const rs = radius * px;
+      if (rs > 2) {
+        ctx.save();
+        ctx.strokeStyle = i === this.selPt ? "rgba(74,180,255,0.55)" : "rgba(74,180,255,0.22)";
+        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x, y, rs, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      drawRing(ctx, x, y, p2.blur, C.add, i === this.selPt, `${Math.round(radius)} px`);
     });
   }
 }
@@ -13074,6 +13304,7 @@ const HINTS = {
   pin: "click to drop a pin · drag the ring to set its blur (shift for fine) · shift-click to delete · alt-drag pans · wheel zooms"
 };
 function openSplineOverlay(opts) {
+  var _a;
   let refreshBar = () => {
   };
   let note = "";
@@ -13089,7 +13320,7 @@ function openSplineOverlay(opts) {
   let timer;
   let shut = false;
   const post = (json, frame) => {
-    var _a;
+    var _a2;
     return api.fetchApi("/nkd/spline/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -13097,7 +13328,7 @@ function openSplineOverlay(opts) {
         node: opts.nodeId,
         kind: opts.previewKind,
         params: {
-          ...((_a = opts.previewParams) == null ? void 0 : _a.call(opts)) ?? {},
+          ...((_a2 = opts.previewParams) == null ? void 0 : _a2.call(opts)) ?? {},
           [opts.previewKey]: json,
           ...frame ? { frame } : {}
         }
@@ -13108,7 +13339,7 @@ function openSplineOverlay(opts) {
     if (shut || !opts.previewKind || !opts.previewKey || opts.nodeId == null) return;
     clearTimeout(timer);
     timer = setTimeout(async () => {
-      var _a;
+      var _a2;
       const mine = ++token;
       note = "rendering…";
       refreshBar();
@@ -13135,7 +13366,7 @@ function openSplineOverlay(opts) {
         }
         const bitmap = await createImageBitmap(await res.blob());
         if (mine !== token) {
-          (_a = bitmap.close) == null ? void 0 : _a.call(bitmap);
+          (_a2 = bitmap.close) == null ? void 0 : _a2.call(bitmap);
           return;
         }
         editor.preview = bitmap;
@@ -13160,6 +13391,9 @@ function openSplineOverlay(opts) {
   });
   modal.body.appendChild(editor.canvas);
   editor.deserialise(opts.json);
+  const settings = ((_a = opts.previewParams) == null ? void 0 : _a.call(opts)) ?? {};
+  if (Number.isFinite(Number(settings.max_blur))) editor.maxBlur = Number(settings.max_blur);
+  if (Number.isFinite(Number(settings.falloff))) editor.falloff = Number(settings.falloff);
   editor.setImage(opts.image, opts.imageW, opts.imageH);
   const savedAspect = readAspect(opts.json);
   const status = document.createElement("span");
@@ -13253,19 +13487,47 @@ function openSplineOverlay(opts) {
       "Delete the selected shape. (Del)"
     ));
   } else {
-    refreshBar = () => setStatus(`${editor.pins.length} pin${editor.pins.length === 1 ? "" : "s"}`);
+    const setNumber = (name, v) => {
+      var _a2;
+      if (name === "max_blur") editor.maxBlur = v;
+      else editor.falloff = v;
+      (_a2 = opts.onSetting) == null ? void 0 : _a2.call(opts, name, v);
+      editor.invalidatePreview();
+      requestPreview(editor.serialise());
+      refreshBar();
+    };
+    const maxBlur = nkdSlider(
+      "Max Blur",
+      { min: 0, max: 512, step: 1, value: editor.maxBlur },
+      (v) => setNumber("max_blur", v),
+      "What a pin turned all the way up means, in pixels."
+    );
+    const falloff = nkdSlider(
+      "Falloff",
+      { min: 0.5, max: 8, step: 0.1, value: editor.falloff },
+      (v) => setNumber("falloff", v),
+      "How tightly each pin holds its own area. Raise it to stop a sharp pin from being dragged blurry by the ones around it."
+    );
+    right.append(maxBlur, falloff);
+    refreshBar = () => {
+      maxBlur.querySelector("input").value = String(editor.maxBlur);
+      falloff.querySelector("input").value = String(editor.falloff);
+      const n = editor.pins.length;
+      setStatus(n ? `${n} pin${n === 1 ? "" : "s"} · up to ${Math.round(editor.maxBlur)} px` : "click to drop a pin");
+    };
   }
-  const VIEWS = opts.mode === "shape" ? ["result", "matte", "source"] : ["result", "source"];
+  const VIEWS = opts.mode === "shape" ? ["result", "matte", "source"] : opts.mode === "pin" ? ["result", "field", "source"] : ["result", "source"];
   const VIEW_LABEL = {
     result: opts.mode === "shape" ? "View: masked" : "View: result",
     matte: "View: matte",
+    field: "View: blur field",
     source: "View: original"
   };
   const viewBtn = nkdButton("", () => {
     editor.view = VIEWS[(VIEWS.indexOf(editor.view) + 1) % VIEWS.length];
     editor.refreshView();
     refreshBar();
-  }, opts.mode === "shape" ? "Cycle the backdrop: the image with everything outside the mask dimmed, the mask on its own, or the untouched image. (V)" : "Show the rendered result or the untouched image. (V)");
+  }, opts.mode === "shape" ? "Cycle the backdrop: the image with everything outside the mask dimmed, the mask on its own, or the untouched image. (V)" : opts.mode === "pin" ? "Cycle the backdrop: the blurred result, the blur field as a grey map — which is what shows you where the transition actually falls — or the untouched image. (V)" : "Show the rendered result or the untouched image. (V)");
   right.appendChild(viewBtn);
   right.appendChild(nkdButton("Clear", () => editor.clearAll(), "Remove everything."));
   right.appendChild(nkdButton("Fit", () => editor.fitView(), "Reset the view. (F)"));
@@ -14199,6 +14461,14 @@ function registerSplineNode(nodeName, widgetName, mode, title, buttonLabel, prev
             previewKind: preview == null ? void 0 : preview.kind,
             previewKey: widgetName,
             previewParams: preview ? () => widgetValues(node, preview.params) : void 0,
+            onSetting: (name, value) => {
+              var _a2, _b;
+              const w = (_a2 = node.widgets) == null ? void 0 : _a2.find((x) => x.name === name);
+              if (!w) return;
+              w.value = value;
+              (_b = w.callback) == null ? void 0 : _b.call(w, value);
+              node.setDirtyCanvas(true, true);
+            },
             onChange: (json) => {
               if (dataW) dataW.value = json;
               node.setDirtyCanvas(true, true);
@@ -14248,7 +14518,7 @@ registerSplineNode(
   "pin",
   "😺 Field Blur",
   "Place blur pins",
-  { kind: "field", params: ["max_blur"] }
+  { kind: "field", params: ["max_blur", "falloff"] }
 );
 console.log("[NKD Basic Tools] spline editors loaded (vector mask · path blur · field blur)");
 (function() {

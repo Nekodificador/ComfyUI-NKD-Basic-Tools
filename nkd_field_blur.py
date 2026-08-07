@@ -25,7 +25,7 @@ _FIELD_SIZE = 256
 _LEVELS = 6
 
 
-def apply_field_blur(image, pins, max_blur, mask=None):
+def apply_field_blur(image, pins, max_blur, mask=None, falloff=2.0):
     """The whole node, minus ComfyUI. Shared with the editor's preview route so
     what the editor shows is what the graph renders — the only way a preview is
     worth trusting."""
@@ -42,7 +42,8 @@ def apply_field_blur(image, pins, max_blur, mask=None):
         amt = torch.tensor([float(p.get("blur", 1.0)) for p in items],
                            device=device, dtype=torch.float32).clamp(0.0, 1.0)
 
-        radius = blur_core.idw_field(xy, amt, min(_FIELD_SIZE, h), min(_FIELD_SIZE, w))
+        radius = blur_core.idw_field(xy, amt, min(_FIELD_SIZE, h), min(_FIELD_SIZE, w),
+                                     power=max(0.1, float(falloff)))
         radius = F.interpolate(radius[None, None] * float(max_blur), size=(h, w),
                                mode="bilinear", align_corners=False)
 
@@ -96,6 +97,13 @@ class NKDFieldBlur(io.ComfyNode):
                              display_name="Max Blur",
                              tooltip="How many pixels of blur a pin turned all the way up "
                                      "means. Every pin's strength is a fraction of this."),
+                io.Float.Input("falloff", default=2.0, min=0.5, max=8.0, step=0.1,
+                               display_name="Falloff",
+                               tooltip="How tightly each pin holds its own area. Low values "
+                                       "blend every pin across the whole frame for a soft "
+                                       "gradient; high values keep the change close to the "
+                                       "pins, which is what stops a sharp pin on a subject "
+                                       "from being dragged blurry by the ones around it."),
                 io.Mask.Input("mask", optional=True,
                               tooltip="Optional. Where the mask is white the original image "
                                       "is kept, so you can protect a subject from the blur "
@@ -106,9 +114,9 @@ class NKDFieldBlur(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, image, pins, max_blur, mask=None, unique_id=None) -> io.NodeOutput:
-        push_source(unique_id, image)
-        out = apply_field_blur(image, pins, max_blur, mask)
+    def execute(cls, image, pins, max_blur, falloff, mask=None, unique_id=None) -> io.NodeOutput:
+        push_source(unique_id, image, mask=mask)
+        out = apply_field_blur(image, pins, max_blur, mask, falloff=falloff)
         return io.NodeOutput(out, ui=ui.PreviewImage(preview_frames(out), cls=cls))
 
 

@@ -219,9 +219,21 @@ stroke carries its own speed.
 the ring around each one to set how much blur it wants, and everything in between
 is interpolated. One pin blurs evenly, two give you a gradient.
 
+- **Live preview.** The blur redraws on the GPU as you drag, with the exact
+  backend result taking over the moment you let go. `V` also cycles to the
+  **blur field** as a grey map, which is what actually shows you where the
+  transition falls.
 - **Max Blur** sets what a fully-turned-up pin means in pixels; the pins
-  themselves are relative. Hold shift while dragging a ring for fine adjustment.
+  themselves are relative. Both it and Falloff are in the editor too, so you
+  tune them against what you're looking at. Each pin shows its radius in pixels
+  and draws it at true scale. Hold shift while dragging a ring for fine control.
+- **Falloff** is how tightly a pin holds its own area. Raise it and a sharp pin
+  on your subject stops being dragged blurry by the ones around it — with it low,
+  every pin pulls on the whole frame.
 - It's a variable gaussian, not bokeh — no iris shape and no highlight bloom.
+- Blur destroys grain, and a plastic-smooth area butted against a grainy sharp
+  one is what makes a fake depth of field read as fake. Put it back with
+  😺NKD Film Grain after this node, masked so it only lands where you blurred.
 - Optional `mask` input protects a subject from the blur.
 
 ---

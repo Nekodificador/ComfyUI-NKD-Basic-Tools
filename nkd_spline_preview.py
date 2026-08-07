@@ -61,19 +61,39 @@ def _frame(unique_id, supplied=None):
     return _downscale(np.frombuffer(buf, dtype=np.uint8).reshape(h, w, 3))
 
 
+def _mask_for(unique_id, h: int, w: int):
+    """The node's cached mask, resized to the preview frame. None if unwired.
+
+    Without this the preview blurs straight over the area the node is about to
+    protect — it would be showing a result the graph will never produce.
+    """
+    m = helpers.cached_mask(unique_id)
+    if m is None:
+        return None
+    m = m.to(torch.float32)
+    if m.shape[-2:] != (h, w):
+        m = torch.nn.functional.interpolate(m.unsqueeze(1), size=(h, w),
+                                            mode="bilinear", align_corners=False).squeeze(1)
+    return m
+
+
 def render(unique_id, kind: str, params: dict):
     """Run the real node maths on the frame. Returns PNG bytes, or None."""
     image = _frame(unique_id, params.get("frame"))
     if image is None:
         return None
+    mask = _mask_for(unique_id, image.shape[1], image.shape[2])
 
     if kind == "field":
         out = apply_field_blur(image, params.get("pins") or "",
-                               int(params.get("max_blur", 48)))
+                               int(params.get("max_blur", 48)),
+                               mask=mask,
+                               falloff=float(params.get("falloff", 2.0)))
     elif kind == "path":
         out = apply_path_blur(image, params.get("paths") or "",
                               float(params.get("strength", 24.0)),
-                              float(params.get("spread", 0.15)))
+                              float(params.get("spread", 0.15)),
+                              mask=mask)
     else:
         return None
 

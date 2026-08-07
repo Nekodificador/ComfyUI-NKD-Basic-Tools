@@ -989,6 +989,13 @@ function registerSplineNode(nodeName: string, widgetName: string, mode: EditorMo
             previewKind: preview?.kind,
             previewKey: widgetName as "pins" | "paths",
             previewParams: preview ? () => widgetValues(node, preview.params) : undefined,
+            onSetting: (name: string, value: number) => {
+              const w = node.widgets?.find((x: any) => x.name === name);
+              if (!w) return;
+              w.value = value;
+              w.callback?.(value);            // the only hook both renderers fire
+              node.setDirtyCanvas(true, true);
+            },
             onChange: (json: string) => {
               if (dataW) dataW.value = json;
               node.setDirtyCanvas(true, true);
@@ -1029,6 +1036,6 @@ registerSplineNode("NKDPathBlur", "paths", "path",
                    { kind: "path", params: ["strength", "spread"] });
 registerSplineNode("NKDFieldBlur", "pins", "pin",
                    "😺 Field Blur", "Place blur pins",
-                   { kind: "field", params: ["max_blur"] });
+                   { kind: "field", params: ["max_blur", "falloff"] });
 
 console.log("[NKD Basic Tools] spline editors loaded (vector mask · path blur · field blur)");

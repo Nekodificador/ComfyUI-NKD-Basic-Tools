@@ -960,12 +960,23 @@ _SOURCE_CACHE: "dict[str, tuple[int, int, bytes]]" = {}
 _SOURCE_CACHE_MAX = 8
 
 
+# The mask that went with it, if one was wired. The editors' preview has to see
+# it or it shows blur over the very area the node is about to protect.
+_MASK_CACHE: "dict[str, torch.Tensor]" = {}
+
+
 def cached_source(unique_id):
     """(height, width, RGB uint8 bytes) of the last frame pushed for this node."""
     return _SOURCE_CACHE.get(str(unique_id))
 
 
-def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 1024) -> None:
+def cached_mask(unique_id):
+    """The last mask this node ran with, [1,H,W] on CPU, or None."""
+    return _MASK_CACHE.get(str(unique_id))
+
+
+def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 1024,
+                mask=None) -> None:
     """Push the first frame of `image` to the frontend as raw base64 RGB.
 
     The editors that draw over an image need a backdrop, and walking the graph
@@ -997,8 +1008,18 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
         buf = (frame * 255.0 + 0.5).astype(np.uint8).tobytes()
 
         if len(_SOURCE_CACHE) >= _SOURCE_CACHE_MAX:
-            _SOURCE_CACHE.pop(next(iter(_SOURCE_CACHE)))
+            drop = next(iter(_SOURCE_CACHE))
+            _SOURCE_CACHE.pop(drop)
+            _MASK_CACHE.pop(drop, None)
         _SOURCE_CACHE[str(unique_id)] = (h, w, buf)
+
+        # One frame of it is enough: the preview renders a single frame anyway,
+        # and holding a whole clip's masks here would dwarf the source cache.
+        if mask is None:
+            _MASK_CACHE.pop(str(unique_id), None)
+        else:
+            m = mask.detach()
+            _MASK_CACHE[str(unique_id)] = (m if m.dim() == 3 else m.unsqueeze(0))[:1].cpu()
 
         PromptServer.instance.send_sync(event, {
             "node": str(unique_id),

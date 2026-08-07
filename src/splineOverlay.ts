@@ -27,6 +27,8 @@ export type SplineOverlayOpts = {
   previewKey?: "pins" | "paths";
   /** The node's own settings, read fresh so the preview tracks its widgets. */
   previewParams?: () => Record<string, unknown>;
+  /** Write a node widget back from the editor's own controls. */
+  onSetting?: (name: string, value: number) => void;
 };
 
 export type SplineOverlayHandle = {
@@ -138,6 +140,11 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
   });
   modal.body.appendChild(editor.canvas);
   editor.deserialise(opts.json);
+  // Seed from the node before the first paint, so the pin gizmos show real
+  // pixels and the live shader matches straight away.
+  const settings = opts.previewParams?.() ?? {};
+  if (Number.isFinite(Number(settings.max_blur))) editor.maxBlur = Number(settings.max_blur);
+  if (Number.isFinite(Number(settings.falloff))) editor.falloff = Number(settings.falloff);
   editor.setImage(opts.image, opts.imageW, opts.imageH);
 
   // Normalized coordinates survive a resize, but a change of aspect silently
@@ -220,17 +227,49 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
     right.appendChild(nkdButton("Delete", () => editor.deleteActive(),
       "Delete the selected shape. (Del)"));
   } else {
-    refreshBar = () => setStatus(`${editor.pins.length} pin${editor.pins.length === 1 ? "" : "s"}`);
+    // Max Blur and Falloff live on the node, but they are what pin values MEAN,
+    // so tuning pins without them is guesswork — you would close, change the
+    // node, reopen. They are mirrored here and written straight back.
+    // These change the render without touching any geometry, so they have to
+    // invalidate the backend result themselves — otherwise the stale one keeps
+    // the backdrop and nothing appears to happen until a pin is nudged.
+    const setNumber = (name: "max_blur" | "falloff", v: number) => {
+      if (name === "max_blur") editor.maxBlur = v; else editor.falloff = v;
+      opts.onSetting?.(name, v);
+      editor.invalidatePreview();
+      requestPreview(editor.serialise());
+      refreshBar();
+    };
+    const maxBlur = nkdSlider("Max Blur", { min: 0, max: 512, step: 1, value: editor.maxBlur },
+      (v) => setNumber("max_blur", v),
+      "What a pin turned all the way up means, in pixels.");
+    const falloff = nkdSlider("Falloff", { min: 0.5, max: 8, step: 0.1, value: editor.falloff },
+      (v) => setNumber("falloff", v),
+      "How tightly each pin holds its own area. Raise it to stop a sharp pin " +
+      "from being dragged blurry by the ones around it.");
+    right.append(maxBlur, falloff);
+
+    refreshBar = () => {
+      (maxBlur.querySelector("input") as HTMLInputElement).value = String(editor.maxBlur);
+      (falloff.querySelector("input") as HTMLInputElement).value = String(editor.falloff);
+      const n = editor.pins.length;
+      setStatus(n
+        ? `${n} pin${n === 1 ? "" : "s"} · up to ${Math.round(editor.maxBlur)} px`
+        : "click to drop a pin");
+    };
   }
 
   // View cycle. Vector Mask composites its matte locally so all three states are
   // live; the blurs only have a result once the backend has sent one.
   const VIEWS: ViewMode[] = opts.mode === "shape"
     ? ["result", "matte", "source"]
-    : ["result", "source"];
+    : opts.mode === "pin"
+      ? ["result", "field", "source"]
+      : ["result", "source"];
   const VIEW_LABEL: Record<ViewMode, string> = {
     result: opts.mode === "shape" ? "View: masked" : "View: result",
     matte: "View: matte",
+    field: "View: blur field",
     source: "View: original",
   };
   const viewBtn = nkdButton("", () => {
@@ -240,7 +279,11 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
   }, opts.mode === "shape"
     ? "Cycle the backdrop: the image with everything outside the mask dimmed, "
       + "the mask on its own, or the untouched image. (V)"
-    : "Show the rendered result or the untouched image. (V)");
+    : opts.mode === "pin"
+      ? "Cycle the backdrop: the blurred result, the blur field as a grey map — "
+        + "which is what shows you where the transition actually falls — or the "
+        + "untouched image. (V)"
+      : "Show the rendered result or the untouched image. (V)");
   right.appendChild(viewBtn);
 
   right.appendChild(nkdButton("Clear", () => editor.clearAll(), "Remove everything."));

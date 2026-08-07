@@ -69,7 +69,7 @@ class NKDPathBlur(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, paths, strength, spread, mask=None, unique_id=None) -> io.NodeOutput:
-        push_source(unique_id, image)
+        push_source(unique_id, image, mask=mask)
         out = apply_path_blur(image, paths, strength, spread, mask)
         return io.NodeOutput(out, ui=ui.PreviewImage(preview_frames(out), cls=cls))
 

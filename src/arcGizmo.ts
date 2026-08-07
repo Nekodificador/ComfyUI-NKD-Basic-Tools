@@ -35,7 +35,8 @@ export function hitDot(px: number, py: number, cx: number, cy: number, r = 9): b
 }
 
 export function drawRing(ctx: CanvasRenderingContext2D, cx: number, cy: number,
-                         value: number, color: string, selected: boolean): void {
+                         value: number, color: string, selected: boolean,
+                         label?: string): void {
   const v = Math.max(0, Math.min(1, value));
   const w = 2 + v * (RING.maxWidth - 2);
 
@@ -61,11 +62,19 @@ export function drawRing(ctx: CanvasRenderingContext2D, cx: number, cy: number,
   ctx.fill();
   ctx.stroke();
 
+  // The value in the caller's own units — for a blur pin that is pixels, which
+  // is the only form of it anyone can act on. A bare 0..1 means nothing without
+  // knowing what the maximum is set to.
   if (selected) {
-    ctx.fillStyle = "#c8d0e0";
+    const text = label ?? v.toFixed(2);
     ctx.font = "11px system-ui, sans-serif";
     ctx.textAlign = "center";
-    ctx.fillText(v.toFixed(2), cx, cy - RING.inner - RING.maxWidth - 6);
+    const ty = cy - RING.inner - RING.maxWidth - 6;
+    ctx.strokeStyle = "rgba(0,0,0,0.75)";
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, cx, ty);
+    ctx.fillStyle = "#c8d0e0";
+    ctx.fillText(text, cx, ty);
   }
   ctx.restore();
 }
