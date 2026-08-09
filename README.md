@@ -125,6 +125,20 @@ Everything is in one place, and anything left at 0 is skipped:
 - **Smooth In Time** — video: averages across neighbouring frames so the mask
   edge stops flickering.
 
+- **`latent_mask` output** — with a VAE connected, the same mask already reduced
+  to latent resolution. **Use this one for Set Latent Noise Mask on video.** A
+  mask still in pixels gets resampled on the way in, spread evenly across the
+  frames — and a video VAE does not group them evenly. On a MiniMax H3 grid that
+  resample makes the mask of the leading one-frame latent vanish outright and
+  lands the next one a frame early. Reduced here, on the VAE's real grouping, it
+  arrives exactly as you built it.
+- **Connect your `model` too** and Blockify covers whatever the model actually
+  acts on. Most models never see the mask — the sampler blends it per latent, so
+  the latent is the unit. A few (MiniMax H3) take it into their own forward and
+  regenerate a whole token the moment any part of it is covered, and there the
+  block has to be a token wide. The node asks the model instead of assuming, so
+  it changes nothing for the models where it shouldn't.
+
 Steps run in a fixed order — clean, stabilize, shape, soften — so a feathered
 edge is never re-hardened by a later step. The node previews the result in
 itself, subsampled for long clips.
@@ -452,6 +466,19 @@ reproducibility. Shows the resolved prompt(s) in the node.
 https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 
 ---
+
+## Credits
+
+Work by other people this builds on:
+
+- [MaskVidExperiments](https://github.com/drozbay/MaskVidExperiments) — its
+  `Mask To Latent Space` node is where the idea of handing the sampler a mask
+  already in latent space comes from, and the conversation around it is what
+  turned up both the frame-grouping and the token-grid behaviour that 😺NKD Mask
+  Ops now handles.
+- [differential-diffusion](https://github.com/exx8/differential-diffusion) — the
+  soft-mask denoise schedule 😺NKD Inpaint Crop applies inline, same behavior as
+  core's DifferentialDiffusion node.
 
 ## License
 

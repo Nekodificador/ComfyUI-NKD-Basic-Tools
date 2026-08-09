@@ -56,6 +56,14 @@ class NKDMaskOps(io.ComfyNode):
                                      "a video VAE, the frames it collapses into a single latent. "
                                      "The mask then lands on latent boundaries exactly, with "
                                      "nothing bleeding into the neighbouring blocks."),
+                io.Model.Input("model", optional=True,
+                               tooltip="Optional, alongside the VAE. A few models (MiniMax H3) "
+                                       "read the mask themselves and regenerate a whole token "
+                                       "the moment any part of it is covered, so the block that "
+                                       "has to stay clean is bigger than one latent. Connect the "
+                                       "model and Blockify uses whichever of the two applies — "
+                                       "it asks the model rather than assuming, and changes "
+                                       "nothing for the models where the latent is the unit."),
                 io.Boolean.Input("invert", default=False,
                                  display_name="Invert",
                                  tooltip="Swap masked and unmasked before anything else runs."),
@@ -115,16 +123,27 @@ class NKDMaskOps(io.ComfyNode):
             outputs=[
                 io.Mask.Output(display_name="mask"),
                 io.Mask.Output(display_name="mask_inverted"),
+                io.Mask.Output(display_name="latent_mask",
+                               tooltip="With a VAE connected, the same mask already reduced to "
+                                       "latent resolution — feed this one to Set Latent Noise "
+                                       "Mask. It arrives exactly as built: a mask still in "
+                                       "pixels gets resampled on the way in, evenly across the "
+                                       "frames, which is not how a video VAE groups them. Same "
+                                       "as the mask output when no VAE is connected."),
             ],
         )
 
     @classmethod
     def execute(cls, mask, invert, black_point, white_point, despeckle, fill_holes,
                 close_gaps, temporal_expand, temporal_smooth, expand, blockify,
-                blockify_threshold, feather, vae=None) -> io.NodeOutput:
+                blockify_threshold, feather, vae=None, model=None) -> io.NodeOutput:
         time_groups = None
+        stride = 1
         if vae is not None:  # connecting the VAE is the switch — see the tooltip
-            blockify, time_groups = mask_core.latent_grid(vae, mask.shape[0])
+            stride, time_groups = mask_core.latent_grid(vae, mask.shape[0])
+            # the VAE says how big a latent is, the model whether it acts on one
+            # at a time or on a whole token of them
+            blockify = stride * (mask_core.token_patch(model) if model is not None else 1)
         out = mask_core.process(
             mask,
             invert=invert,
@@ -142,6 +161,7 @@ class NKDMaskOps(io.ComfyNode):
             feather_px=feather,
         )
         return io.NodeOutput(out, 1.0 - out,
+                             mask_core.to_latent(out, stride, time_groups),
                              ui=ui.PreviewMask(_preview(out), cls=cls))
 
 

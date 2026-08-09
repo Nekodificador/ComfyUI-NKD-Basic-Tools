@@ -23,6 +23,8 @@ Three ideas do the heavy lifting:
 """
 from __future__ import annotations
 
+import inspect
+
 import torch
 import torch.nn.functional as F
 
@@ -309,6 +311,60 @@ def _chunked_groups(vae, frames: int):
     return torch.repeat_interleave(torch.arange(len(counts)), torch.tensor(counts))
 
 
+def to_latent(mask: torch.Tensor, stride: int, groups: "torch.Tensor | None" = None) -> torch.Tensor:
+    """Reduce a pixel-space mask to latent resolution — one value per latent.
+
+    Max over each block of pixels and each group of frames: if any pixel of a
+    latent is masked, the latent is. Handed to Set Latent Noise Mask this way,
+    nothing resamples it, which is the point. ComfyUI reshapes a mask that
+    doesn't already match the latent by interpolating, and along time that is a
+    uniform resample — but a causal video VAE's frames are not uniformly
+    grouped. On a MiniMax H3 grid the mask of the leading single-frame latent
+    is shorter than one resample step and disappears completely, and the next
+    one lands a frame early.
+    """
+    x = mask if mask.dim() == 4 else mask.unsqueeze(1)
+    if stride > 1:
+        pad_h, pad_w = (-x.shape[-2]) % stride, (-x.shape[-1]) % stride
+        if pad_h or pad_w:
+            x = F.pad(x, (0, pad_w, 0, pad_h), mode="replicate")
+        x = F.max_pool2d(x, stride, stride)
+    if groups is not None and x.shape[0] > 1:
+        counts = torch.unique_consecutive(groups.cpu(), return_counts=True)[1].tolist()
+        x = torch.stack([seg.amax(0) for seg in torch.split(x, counts)])
+    return x.squeeze(1)
+
+
+def token_patch(model) -> int:
+    """Latents per token along one spatial axis, for a model that reads the mask.
+
+    Usually 1, and then the latent is the finest grid worth aligning to: the
+    sampler blends the mask over the latent tensor element by element, and the
+    model never sees it. A few architectures do take `denoise_mask` into their
+    own forward and reduce it to one flag per token — MiniMax H3 maxes it over
+    each 2×2 block of latents, so a token with any masked latent is regenerated
+    whole. There the mask should land on token boundaries, or part of a token is
+    regenerated and then composited away, which is what dirties the edge.
+
+    Both facts are asked of the model rather than tabulated by name: whether it
+    reads the mask, from its forward signature; the token size, from the
+    patchifier it built. LTX reads the mask too but patches one latent per
+    token, so it comes back 1 and nothing changes.
+    """
+    try:
+        dm = model.get_model_object("diffusion_model")
+    except Exception:
+        dm = getattr(getattr(model, "model", None), "diffusion_model", None)
+    if dm is None or "denoise_mask" not in inspect.signature(dm.forward).parameters:
+        return 1
+    patch = getattr(dm, "patch_size", None)
+    if patch is None:
+        patch = getattr(getattr(dm, "patchifier", None), "patch_size", None)
+    if patch is None:
+        return 1
+    return max(1, int(patch[-1] if isinstance(patch, (tuple, list)) else patch))
+
+
 def latent_grid(vae, frames: int):
     """(spatial stride, frame→latent index) for a VAE, straight from its own API.
 
@@ -317,6 +373,9 @@ def latent_grid(vae, frames: int):
     a callable in `downscale_ratio`, so evaluating it per frame gives the exact
     grouping — including the uneven group at the end that a fixed "every 4
     frames" rule gets wrong. Returns (stride, None) for image VAEs.
+
+    This is the VAE's own grid. What the *model* then does with it — whether it
+    acts on a single latent or on a whole token of them — is `token_patch`.
     """
     stride = int(vae.spacial_compression_encode())
     if frames >= 2:

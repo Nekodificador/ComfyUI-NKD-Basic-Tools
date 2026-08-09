@@ -6,7 +6,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mask_core import latent_grid, process  # noqa: E402
+from mask_core import latent_grid, process, to_latent, token_patch  # noqa: E402
 
 
 def demo():
@@ -112,6 +112,33 @@ def demo():
         runs = torch.unique_consecutive(g, return_counts=True)[1].tolist()
         assert len(runs) == latents and sum(runs) == n, (n, runs)
         assert runs[:5] == [1, 4, 4, 4, 4][:len(runs)]
+
+    # A model that reads the mask itself acts per token, so the block grows to
+    # cover one; a model that never sees it leaves the latent as the unit.
+    class _Model:
+        def __init__(self, reads, patch=(1, 2, 2)):
+            self.dm = type("DM", (), {"patch_size": patch})()
+            self.dm.forward = (lambda x, denoise_mask=None: x) if reads else (lambda x: x)
+
+        def get_model_object(self, name):
+            return self.dm
+
+    assert token_patch(_Model(reads=True)) == 2
+    assert token_patch(_Model(reads=False)) == 1
+    assert token_patch(_Model(reads=True, patch=1)) == 1   # LTX: one latent per token
+    assert token_patch(object()) == 1                      # anything unrecognizable
+
+    # The latent-resolution output lands each frame on its own latent. Straight
+    # to Set Latent Noise Mask nothing resamples it, which on this grid would
+    # drop the leading one-frame latent entirely and shift the rest.
+    stride, groups = latent_grid(_ChunkVae(), 22)
+    for target in range(int(groups.max()) + 1):
+        src = torch.zeros(22, 64, 64)
+        src[groups == target, 16:48, 16:48] = 1.0
+        lat = to_latent(process(src, time_groups=groups), stride, groups)
+        on = [i for i, f in enumerate(lat) if float(f.max()) > 0]
+        assert on == [target], (target, on)
+        assert lat.shape == (int(groups.max()) + 1, 4, 4), lat.shape
 
     # Invert, and the second output of the node is the complement.
     inv = process(m, invert=True)
