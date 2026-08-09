@@ -145,15 +145,60 @@ class NKDMaskOps(io.ComfyNode):
                              ui=ui.PreviewMask(_preview(out), cls=cls))
 
 
+class NKDMaskOpsLean(io.ComfyNode):
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="NKDMaskOpsLean",
+            display_name="😺NKD Mask Ops Lean",
+            category="😺NKD Nodes/Masking",
+            description=(
+                "The three mask tweaks a composite usually needs — fill holes, "
+                "expand/contract, feather — in one GPU pass over the whole "
+                "batch. Same engine as 😺NKD Mask Ops, without the rest of the "
+                "panel; reach for the full node when you need levels, speck "
+                "removal, gap closing, blockify or the temporal steps."
+            ),
+            is_output_node=True,
+            inputs=[
+                io.Mask.Input("mask", tooltip="Mask or mask batch (one per video frame)."),
+                io.Boolean.Input("fill_holes", default=False,
+                                 display_name="Fill Holes",
+                                 tooltip="Fill gaps fully enclosed by the mask, so each area "
+                                         "becomes a solid shape."),
+                io.Int.Input("expand", default=0, min=-512, max=512,
+                             display_name="Expand / Contract",
+                             tooltip="Grow the mask outward by this many pixels, or shrink it "
+                                     "with a negative value."),
+                io.Int.Input("feather", default=0, min=0, max=256,
+                             display_name="Feather",
+                             tooltip="Soften the edge by this many pixels. Runs last, so "
+                                     "nothing hardens it again."),
+            ],
+            outputs=[
+                io.Mask.Output(display_name="mask"),
+                io.Mask.Output(display_name="mask_inverted"),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, mask, fill_holes, expand, feather) -> io.NodeOutput:
+        out = mask_core.process(mask, fill=fill_holes, expand_px=expand,
+                                feather_px=feather)
+        return io.NodeOutput(out, 1.0 - out,
+                             ui=ui.PreviewMask(_preview(out), cls=cls))
+
+
 class NKDMaskOpsExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [NKDMaskOps]
+        return [NKDMaskOps, NKDMaskOpsLean]
 
 
 async def comfy_entrypoint() -> NKDMaskOpsExtension:
     return NKDMaskOpsExtension()
 
 
-NODE_CLASS_MAPPINGS = {"NKDMaskOps": NKDMaskOps}
-NODE_DISPLAY_NAME_MAPPINGS = {"NKDMaskOps": "😺NKD Mask Ops"}
+NODE_CLASS_MAPPINGS = {"NKDMaskOps": NKDMaskOps, "NKDMaskOpsLean": NKDMaskOpsLean}
+NODE_DISPLAY_NAME_MAPPINGS = {"NKDMaskOps": "😺NKD Mask Ops",
+                              "NKDMaskOpsLean": "😺NKD Mask Ops Lean"}

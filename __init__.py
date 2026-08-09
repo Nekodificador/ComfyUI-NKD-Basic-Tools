@@ -11,7 +11,7 @@ from .nkd_film_grain import NKDFilmGrain
 from .nkd_noise import NKDNoise
 from .nkd_frequency import NKDFrequencySeparate, NKDFrequencyCombine
 from .nkd_color_warp import NKDColorWarp
-from .nkd_mask_ops import NKDMaskOps
+from .nkd_mask_ops import NKDMaskOps, NKDMaskOpsLean
 from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
@@ -39,6 +39,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDFrequencyCombine,
             NKDColorWarp,
             NKDMaskOps,
+            NKDMaskOpsLean,
             NKDMaskPainter,
             NKDVectorMask,
             NKDFieldBlur,
@@ -64,6 +65,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDFrequencyCombine": NKDFrequencyCombine,
     "NKDColorWarp": NKDColorWarp,
     "NKDMaskOps": NKDMaskOps,
+    "NKDMaskOpsLean": NKDMaskOpsLean,
     "NKDMaskPainter": NKDMaskPainter,
     "NKDVectorMask": NKDVectorMask,
     "NKDFieldBlur": NKDFieldBlur,
@@ -83,6 +85,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDFrequencyCombine": "😺NKD Frequency Combine",
     "NKDColorWarp": "😺NKD Color Warp",
     "NKDMaskOps": "😺NKD Mask Ops",
+    "NKDMaskOpsLean": "😺NKD Mask Ops Lean",
     "NKDMaskPainter": "😺NKD Mask Painter",
     "NKDVectorMask": "😺NKD Vector Mask",
     "NKDFieldBlur": "😺NKD Field Blur",
