@@ -97,6 +97,22 @@ def demo():
     quant = process(clip, time_groups=groups)
     assert [float(f.sum()) for f in quant] == [0, 0, 0, 0, 4, 4, 4, 4, 0]
 
+    # A chunking encoder (MiniMax H3: 17-frame clips, temporal ratio 4) is read
+    # from the encoder, not from its total-count downscale_ratio: 17k+5 frames
+    # must land on 5k+2 latents, in [1,4,4,4,4] runs per clip.
+    class _ChunkVae:
+        class first_stage_model:
+            clip_length, vae_ratio_t = 17, 4
+        downscale_ratio = (lambda a: max(1, (a - 5) // 17 * 5 + 2) if a > 1 else 1, 16, 16)
+        def spacial_compression_encode(self):  # noqa: E301
+            return 16
+
+    for n, latents in ((5, 2), (22, 7), (39, 12)):
+        _, g = latent_grid(_ChunkVae(), n)
+        runs = torch.unique_consecutive(g, return_counts=True)[1].tolist()
+        assert len(runs) == latents and sum(runs) == n, (n, runs)
+        assert runs[:5] == [1, 4, 4, 4, 4][:len(runs)]
+
     # Invert, and the second output of the node is the complement.
     inv = process(m, invert=True)
     assert torch.equal(inv[0], 1.0 - m[0])

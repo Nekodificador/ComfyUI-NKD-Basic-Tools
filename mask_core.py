@@ -250,8 +250,9 @@ def blockify_time(x: torch.Tensor, groups: torch.Tensor) -> torch.Tensor:
         return x
     # A VAE's frame→latent mapping is monotonic, so the groups are consecutive
     # runs and a split by run length says everything (and avoids the beta
-    # index_reduce, which warns on every call).
-    counts = torch.bincount(groups.cpu()).tolist()
+    # index_reduce, which warns on every call). Run lengths, not bincount: some
+    # VAEs (MiniMax H3) skip latent indices, and a skipped index is an empty bin.
+    counts = torch.unique_consecutive(groups.cpu(), return_counts=True)[1].tolist()
     pooled = torch.stack([seg.amax(0) for seg in torch.split(x, counts)])
     return pooled.repeat_interleave(torch.tensor(counts, device=x.device), dim=0)
 
@@ -282,6 +283,32 @@ def temporal_smooth(x: torch.Tensor, frames: int) -> torch.Tensor:
     return _temporal(x, frames, "mean")
 
 
+def _chunked_groups(vae, frames: int):
+    """frame→latent index for an encoder that works in fixed frame chunks.
+
+    Asked of the encoder rather than of `downscale_ratio`, because for MiniMax
+    H3 that callable is a total-count formula, not a per-frame index: evaluated
+    frame by frame it claims 17 frames collapse into a single latent, which
+    max-pools the mask into 17-frame blocks and slides the edit off in time.
+    The encoder itself is unambiguous — it slices the video into clips of
+    `clip_length` and front-pads each to a multiple of the temporal ratio, so a
+    clip's first latent covers only the leftover frames and the rest cover the
+    ratio each. Returns None for a VAE that doesn't chunk (Wan, LTX, …), whose
+    `downscale_ratio` is a genuine per-frame mapping.
+    """
+    inner = getattr(vae, "first_stage_model", None)
+    clip = int(getattr(inner, "clip_length", 0) or 0)
+    ratio = int(getattr(inner, "vae_ratio_t", 0) or 0)
+    if clip < 1 or ratio < 2:
+        return None
+    pattern = [ratio - (-clip) % ratio] + [ratio] * ((clip + (-clip) % ratio) // ratio - 1)
+    counts, total = [], 0
+    while total < frames:
+        counts.append(min(pattern[len(counts) % len(pattern)], frames - total))
+        total += counts[-1]
+    return torch.repeat_interleave(torch.arange(len(counts)), torch.tensor(counts))
+
+
 def latent_grid(vae, frames: int):
     """(spatial stride, frame→latent index) for a VAE, straight from its own API.
 
@@ -292,12 +319,17 @@ def latent_grid(vae, frames: int):
     frames" rule gets wrong. Returns (stride, None) for image VAEs.
     """
     stride = int(vae.spacial_compression_encode())
+    if frames >= 2:
+        chunked = _chunked_groups(vae, frames)
+        if chunked is not None:
+            return stride, chunked
     ratio = getattr(vae, "downscale_ratio", None)
     fn = ratio[0] if isinstance(ratio, (tuple, list)) and callable(ratio[0]) else None
     if fn is None or frames < 2:
         return stride, None
     groups = torch.tensor([max(0, int(fn(t + 1)) - 1) for t in range(frames)], dtype=torch.long)
-    return stride, (groups if int(groups.max()) + 1 < frames else None)
+    runs = int(torch.unique_consecutive(groups).numel())
+    return stride, (groups if runs < frames else None)
 
 
 # ---------------------------------------------------------------------------
