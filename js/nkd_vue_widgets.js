@@ -15535,7 +15535,7 @@ registerSplineNode(
   "Place blur pins",
   { kind: "field", params: ["max_blur", "falloff"] }
 );
-console.log("[NKD Basic Tools] v1.8.1 — spline editors + color warp loaded (window.NKD_DEBUG=true traces how the editors load their image)");
+console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DEBUG=true traces how the editors load their image)");
 (function() {
   "use strict";
   try {

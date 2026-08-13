@@ -1004,7 +1004,11 @@ _MASK_CACHE: "dict[str, torch.Tensor]" = {}
 
 
 def cached_source(unique_id):
-    """(height, width, RGB uint8 bytes) of the last frame pushed for this node."""
+    """(height, width, RGB uint8 bytes, full width) of the last frame pushed.
+
+    The frame is downscaled; `full width` is the width the node actually
+    rendered at, which is what pixel-denominated settings are expressed in.
+    """
     return _SOURCE_CACHE.get(str(unique_id))
 
 
@@ -1048,6 +1052,7 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
         if hasattr(frame, "detach"):
             frame = frame.detach().cpu().numpy()
         frame = np.clip(np.asarray(frame, dtype=np.float32), 0.0, 1.0)[:, :, :3]
+        full_h, full_w = frame.shape[:2]
 
         longest = max(frame.shape[:2])
         if longest > max_side:
@@ -1060,7 +1065,9 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
             drop = next(iter(_SOURCE_CACHE))
             _SOURCE_CACHE.pop(drop)
             _MASK_CACHE.pop(drop, None)
-        _SOURCE_CACHE[str(unique_id)] = (h, w, buf)
+        # full_w travels with it: blur strengths are in pixels of the image the
+        # NODE will render, so the preview needs the ratio to scale them down.
+        _SOURCE_CACHE[str(unique_id)] = (h, w, buf, full_w)
 
         # One frame of it is enough: the preview renders a single frame anyway,
         # and holding a whole clip's masks here would dwarf the source cache.

@@ -41,24 +41,34 @@ def _downscale(arr):
 
 
 def _frame(unique_id, supplied=None):
-    """Source frame → [1, H, W, 3] float tensor, downscaled for preview.
+    """(frame, scale): [1, H, W, 3] float tensor downscaled for preview, and its
+    width as a fraction of the width the node renders at.
+
+    That fraction is the whole point of returning a pair. Strength and max_blur
+    are distances in pixels, so the same number is a gentle smear across a
+    2000 px frame and a violent one across a 640 px preview — the preview has to
+    shrink them by the same factor it shrank the image, or it lies.
 
     The editor may supply the frame itself. That matters: the cache is only
     filled when the node runs, so without this a Load Image the user can already
     see in the editor would still say "run the graph first" — which is nonsense
-    from where they are sitting.
+    from where they are sitting. That frame is the full-size one on screen, so
+    it is its own reference.
     """
     if supplied:
         from PIL import Image
         raw = supplied.split(",", 1)[-1]                  # tolerate a data: URL
         img = Image.open(_io.BytesIO(base64.b64decode(raw))).convert("RGB")
-        return _downscale(np.asarray(img))
+        arr = np.asarray(img)
+        out = _downscale(arr)
+        return out, out.shape[2] / max(arr.shape[1], 1)
 
     got = helpers.cached_source(unique_id)
     if got is None:
-        return None
-    h, w, buf = got
-    return _downscale(np.frombuffer(buf, dtype=np.uint8).reshape(h, w, 3))
+        return None, 1.0
+    h, w, buf, full_w = got
+    out = _downscale(np.frombuffer(buf, dtype=np.uint8).reshape(h, w, 3))
+    return out, out.shape[2] / max(full_w, 1)
 
 
 def _mask_for(unique_id, h: int, w: int):
@@ -79,19 +89,21 @@ def _mask_for(unique_id, h: int, w: int):
 
 def render(unique_id, kind: str, params: dict):
     """Run the real node maths on the frame. Returns PNG bytes, or None."""
-    image = _frame(unique_id, params.get("frame"))
+    image, scale = _frame(unique_id, params.get("frame"))
     if image is None:
         return None
     mask = _mask_for(unique_id, image.shape[1], image.shape[2])
 
+    # Pixel distances shrink with the frame; `spread` and `falloff` are already
+    # relative to the image, so they ride along untouched.
     if kind == "field":
         out = apply_field_blur(image, params.get("pins") or "",
-                               int(params.get("max_blur", 48)),
+                               max(1, round(float(params.get("max_blur", 48)) * scale)),
                                mask=mask,
                                falloff=float(params.get("falloff", 2.0)))
     elif kind == "path":
         out = apply_path_blur(image, params.get("paths") or "",
-                              float(params.get("strength", 24.0)),
+                              float(params.get("strength", 24.0)) * scale,
                               float(params.get("spread", 0.15)),
                               mask=mask)
     else:
