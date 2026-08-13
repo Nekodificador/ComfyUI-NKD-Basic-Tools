@@ -14,7 +14,7 @@ from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io, ui
 
 from . import blur_core, mask_core
-from .helpers import preview_frames, push_source
+from .helpers import node_id, preview_frames, push_source
 
 _DEFAULT_SHAPES = '{"v":1,"shapes":[]}'
 
@@ -68,7 +68,7 @@ class NKDVectorMask(io.ComfyNode):
     def execute(cls, image, shapes, expand, feather, invert, unique_id=None) -> io.NodeOutput:
         # Pushed before anything else can fail: without a backdrop there is
         # nothing to draw on, and an empty shape list is the normal first run.
-        push_source(unique_id, image)
+        push_source(node_id(cls, unique_id), image)
 
         h, w = int(image.shape[1]), int(image.shape[2])
         cov = blur_core.rasterize(blur_core.parse_items(shapes, "shapes"), w, h)

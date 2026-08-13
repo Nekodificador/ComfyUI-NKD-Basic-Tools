@@ -734,6 +734,39 @@ def _crop_by_mask(
     return cropped, cm, (x1, y1, x2, y2), (oh, ow)
 
 
+def _label_boxes(frame: torch.Tensor, boxes, accent: torch.Tensor) -> torch.Tensor:
+    """Stamp 1..N inside the top-left corner of each box. frame: [H,W,3] in [0,1].
+
+    Pillow ships with ComfyUI, so no font file and no glyph drawing of our own.
+    Never raises — a missing label must not fail a render.
+    """
+    try:
+        from PIL import Image as _PILImage, ImageDraw, ImageFont
+    except Exception:
+        return frame
+    try:
+        h, w = frame.shape[:2]
+        size = max(14, min(h, w) // 18)
+        try:
+            font = ImageFont.load_default(size=size)   # Pillow >= 10.1
+        except TypeError:
+            font = ImageFont.load_default()            # tiny, but legible enough
+        pil = _PILImage.fromarray(
+            (frame.detach().cpu().clamp(0, 1).numpy() * 255.0 + 0.5).astype(np.uint8))
+        draw = ImageDraw.Draw(pil)
+        fill = tuple(int(c * 255) for c in accent.detach().cpu().tolist())
+        pad = max(3, size // 4)
+        for i, (x1, y1, _x2, _y2) in enumerate(boxes, start=1):
+            # Dark stroke: the crop area is left bright, so plain accent on a
+            # light region would vanish.
+            draw.text((x1 + pad, y1 + pad), str(i), font=font, fill=fill,
+                      stroke_width=max(2, size // 10), stroke_fill=(0, 0, 0))
+        out = torch.from_numpy(np.asarray(pil).astype(np.float32) / 255.0)
+        return out.to(frame.device, frame.dtype)
+    except Exception:
+        return frame
+
+
 def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
                  boxes, max_side: int = 768) -> torch.Tensor:
     """Render an in-node preview: original with the mask tinted in the NKD
@@ -761,6 +794,11 @@ def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
         img[0, max(y2 - t, 0):y2, x1:x2] = accent
         img[0, y1:y2, x1:min(x1 + t, w)] = accent
         img[0, y1:y2, max(x2 - t, 0):x2] = accent
+
+    # With several regions the order matters — they are cropped, sampled and
+    # stitched back in this order — so label each box with its place in it.
+    if len(boxes) > 1:
+        img[0] = _label_boxes(img[0], boxes, accent)
 
     if max(h, w) > max_side:
         scale = max_side / max(h, w)
@@ -973,6 +1011,17 @@ def cached_source(unique_id):
 def cached_mask(unique_id):
     """The last mask this node ran with, [1,H,W] on CPU, or None."""
     return _MASK_CACHE.get(str(unique_id))
+
+
+def node_id(cls, supplied=None):
+    """The id of the executing node.
+
+    The V3 API delivers hidden inputs on `cls.hidden`, NOT as kwargs to
+    execute — declaring `hidden=[io.Hidden.unique_id]` and then reading an
+    `unique_id=None` parameter silently yields None, and every websocket push
+    keyed by node id goes nowhere. `supplied` keeps the older kwarg working.
+    """
+    return supplied or getattr(getattr(cls, "hidden", None), "unique_id", None)
 
 
 def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 1024,

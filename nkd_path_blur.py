@@ -13,7 +13,7 @@ from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io, ui
 
 from . import blur_core, mask_core
-from .helpers import preview_frames, push_source
+from .helpers import node_id, preview_frames, push_source
 
 _DEFAULT_PATHS = '{"v":1,"paths":[]}'
 # The flow field is smooth by construction, so it is solved at this size and
@@ -71,7 +71,7 @@ class NKDPathBlur(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, paths, strength, spread, mask=None, unique_id=None) -> io.NodeOutput:
-        push_source(unique_id, image, mask=mask)
+        push_source(node_id(cls, unique_id), image, mask=mask)
         out = apply_path_blur(image, paths, strength, spread, mask)
         return io.NodeOutput(out, ui=ui.PreviewImage(preview_frames(out), cls=cls))
 

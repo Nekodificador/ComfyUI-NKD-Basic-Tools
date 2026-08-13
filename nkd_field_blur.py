@@ -15,7 +15,7 @@ from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io, ui
 
 from . import blur_core, mask_core
-from .helpers import preview_frames, push_source
+from .helpers import node_id, preview_frames, push_source
 
 _DEFAULT_PINS = '{"v":1,"pins":[]}'
 # The radius field varies slowly by construction (it is an interpolation of a
@@ -121,7 +121,7 @@ class NKDFieldBlur(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, pins, max_blur, falloff, mask=None, unique_id=None) -> io.NodeOutput:
-        push_source(unique_id, image, mask=mask)
+        push_source(node_id(cls, unique_id), image, mask=mask)
         out = apply_field_blur(image, pins, max_blur, mask, falloff=falloff)
         return io.NodeOutput(out, ui=ui.PreviewImage(preview_frames(out), cls=cls))
 

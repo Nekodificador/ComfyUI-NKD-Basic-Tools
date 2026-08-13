@@ -35,8 +35,13 @@ def bake_cube(mesh_json, path, size=_LUT_SIZE, title="NKD Color Warp"):
 # --- ComfyUI V3 node (only imported inside ComfyUI; guarded so tests skip it) ---
 try:
     import torch
-    from comfy_api.latest import ComfyExtension, io  # noqa: F401
+    from comfy_api.latest import ComfyExtension, io, ui  # noqa: F401
     import folder_paths
+
+    try:
+        from .helpers import node_id, preview_frames
+    except ImportError:
+        from helpers import node_id, preview_frames
 
     class NKDColorWarp(io.ComfyNode):
         @classmethod
@@ -65,11 +70,37 @@ try:
                 out_dir = folder_paths.get_output_directory()
                 path = os.path.join(out_dir, f"{lut_name}.cube")
                 bake_cube(mesh, path, size=_LUT_SIZE)
-            _push_source(unique_id, np_img)
-            return io.NodeOutput(torch.from_numpy(out).to(image.device).to(image.dtype))
+            _push_source(node_id(cls, unique_id), np_img)
+            out_t = torch.from_numpy(out).to(image.device).to(image.dtype)
+            return io.NodeOutput(out_t, ui=ui.PreviewImage(preview_frames(out_t), cls=cls))
 
 except Exception:  # not inside ComfyUI (e.g. running unit tests)
     NKDColorWarp = None
+
+
+# Last frame each node resolved, in insertion order (dict), so the oldest goes
+# first when it overflows. A few MB per entry at most — the frames are ≤1024px.
+_SOURCE_CACHE: dict = {}
+_SOURCE_CACHE_MAX = 8
+
+try:
+    from server import PromptServer as _PS
+    from aiohttp import web as _web
+
+    @_PS.instance.routes.get("/nkd/colorwarp/source")
+    async def _nkd_colorwarp_source(request):
+        """The frame this node last resolved, for the editor to open on.
+
+        Same payload as the websocket push. Needed because the push rides on
+        execution, and a node whose inputs did not change is served from the
+        executor's cache and never runs.
+        """
+        payload = _SOURCE_CACHE.get(request.rel_url.query.get("node_id", ""))
+        if payload is None:
+            return _web.Response(status=404, text="no frame for that node yet")
+        return _web.json_response(payload)
+except Exception:  # not inside ComfyUI (unit tests import this module bare)
+    pass
 
 
 def _push_source(unique_id, np_img):
@@ -95,12 +126,20 @@ def _push_source(unique_id, np_img):
             frame = frame[::step, ::step]
             h, w = frame.shape[:2]
         buf = (frame * 255.0 + 0.5).astype(np.uint8).tobytes()
-        PromptServer.instance.send_sync("nkd-colorwarp-source", {
+        payload = {
             "node": str(unique_id),
             "width": w, "height": h,
             "data": base64.b64encode(buf).decode("ascii"),
             "s16_width": s16_w, "s16_height": s16_h,
             "scatter16": base64.b64encode(s16_buf).decode("ascii"),
-        })
+        }
+        # Keep it: the push only fires when this node actually executes, and
+        # ComfyUI skips it whenever nothing upstream changed — which is the
+        # normal state when you go to open the editor. The frontend fetches
+        # this over /nkd/colorwarp/source instead of forcing a re-run.
+        _SOURCE_CACHE[str(unique_id)] = payload
+        while len(_SOURCE_CACHE) > _SOURCE_CACHE_MAX:
+            _SOURCE_CACHE.pop(next(iter(_SOURCE_CACHE)))
+        PromptServer.instance.send_sync("nkd-colorwarp-source", payload)
     except Exception:
-        pass
+        pass  # a missing backdrop must never fail a render

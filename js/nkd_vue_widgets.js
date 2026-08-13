@@ -14531,18 +14531,25 @@ function sizeDomWidgetToContent(node, domWidget, container, minW, estimate) {
   };
   return ro;
 }
+function getLink(node, linkId) {
+  var _a;
+  if (linkId == null) return null;
+  const links = (_a = node.graph) == null ? void 0 : _a.links;
+  if (!links) return null;
+  return (links instanceof Map ? links.get(linkId) : links[linkId]) ?? null;
+}
 function resolveDim(node, name, fallback) {
-  var _a, _b, _c, _d, _e, _f, _g;
+  var _a, _b, _c, _d, _e;
   const slot = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === name);
   if (slot && slot.link != null) {
-    const link = (_c = (_b = node.graph) == null ? void 0 : _b.links) == null ? void 0 : _c[slot.link];
-    const src = link && ((_d = node.graph) == null ? void 0 : _d.getNodeById(link.origin_id));
+    const link = getLink(node, slot.link);
+    const src = link && ((_b = node.graph) == null ? void 0 : _b.getNodeById(link.origin_id));
     if (src) {
-      const sw = ((_e = src.widgets) == null ? void 0 : _e.find((w2) => w2.name === name && Number.isFinite(Number(w2.value)))) ?? ((_f = src.widgets) == null ? void 0 : _f.find((w2) => Number.isFinite(Number(w2.value))));
+      const sw = ((_c = src.widgets) == null ? void 0 : _c.find((w2) => w2.name === name && Number.isFinite(Number(w2.value)))) ?? ((_d = src.widgets) == null ? void 0 : _d.find((w2) => Number.isFinite(Number(w2.value))));
       if (sw) return Number(sw.value);
     }
   }
-  const w = (_g = node.widgets) == null ? void 0 : _g.find((w2) => w2.name === name);
+  const w = (_e = node.widgets) == null ? void 0 : _e.find((w2) => w2.name === name);
   if (w && Number.isFinite(Number(w.value))) return Number(w.value);
   return fallback;
 }
@@ -14657,15 +14664,87 @@ app.registerExtension({
     };
   }
 });
-function findSourceImg(node, inputName = "image") {
-  var _a, _b, _c, _d, _e;
+function viewUrl(f) {
+  const q = new URLSearchParams({
+    filename: f.filename,
+    type: f.type || "input",
+    subfolder: f.subfolder || ""
+  });
+  return api.apiURL ? api.apiURL(`/view?${q}`) : `/view?${q}`;
+}
+function dbg(...args) {
+  if (window.NKD_DEBUG) console.log("[NKD]", ...args);
+}
+function upstreamImageUrl(node, inputName = "image") {
+  var _a, _b, _c, _d, _e, _f;
   const inp = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === inputName);
-  const linkId = inp == null ? void 0 : inp.link;
-  if (linkId == null) return null;
-  const link = (_c = (_b = node.graph) == null ? void 0 : _b.links) == null ? void 0 : _c[linkId];
-  if (!link) return null;
-  const srcNode = (_d = node.graph) == null ? void 0 : _d.getNodeById(link.origin_id);
-  return ((_e = srcNode == null ? void 0 : srcNode.imgs) == null ? void 0 : _e[0]) ?? null;
+  const link = getLink(node, inp == null ? void 0 : inp.link);
+  if (!link) {
+    dbg("no link on input", inputName, "of node", node.id, "slot:", inp);
+    return "";
+  }
+  const src = (_b = node.graph) == null ? void 0 : _b.getNodeById(link.origin_id);
+  if (!src) {
+    dbg("link origin", link.origin_id, "not in graph");
+    return "";
+  }
+  const outs = (_c = app.nodeOutputs) == null ? void 0 : _c[String(src.id)];
+  const out = (_d = outs == null ? void 0 : outs.images) == null ? void 0 : _d[0];
+  if (out == null ? void 0 : out.filename) {
+    dbg("source", src.type, src.id, "→ run output", out);
+    return viewUrl(out);
+  }
+  const w = (_e = src.widgets) == null ? void 0 : _e.find((x) => (x == null ? void 0 : x.name) === "image");
+  if (typeof (w == null ? void 0 : w.value) === "string" && w.value) {
+    dbg("source", src.type, src.id, "→ input file", w.value);
+    return viewUrl({ filename: w.value });
+  }
+  dbg(
+    "source",
+    src.type,
+    src.id,
+    "has no image address (outputs:",
+    outs,
+    "widgets:",
+    (_f = src.widgets) == null ? void 0 : _f.map((x) => x == null ? void 0 : x.name),
+    ")"
+  );
+  return "";
+}
+const srcImgCache = /* @__PURE__ */ new Map();
+function imgFor(url) {
+  let img = srcImgCache.get(url);
+  if (!img) {
+    img = new Image();
+    img.src = url;
+    srcImgCache.set(url, img);
+  }
+  return img;
+}
+function findSourceImg(node, inputName = "image") {
+  const url = upstreamImageUrl(node, inputName);
+  if (!url) return null;
+  const img = imgFor(url);
+  return img.complete && img.naturalWidth ? img : null;
+}
+function findSourceImgAsync(node, inputName = "image") {
+  const url = upstreamImageUrl(node, inputName);
+  if (!url) return Promise.resolve(null);
+  const img = imgFor(url);
+  if (img.complete) {
+    dbg("cached decode", url, img.naturalWidth + "x" + img.naturalHeight);
+    return Promise.resolve(img.naturalWidth ? img : null);
+  }
+  return new Promise((resolve) => {
+    img.addEventListener("load", () => {
+      dbg("decoded", url, img.naturalWidth + "x" + img.naturalHeight);
+      resolve(img);
+    }, { once: true });
+    img.addEventListener("error", () => {
+      dbg("decode FAILED", url);
+      resolve(null);
+    }, { once: true });
+  });
 }
 app.registerExtension({
   name: "NKD.BasicTools.GradientMapPreview.Vue",
@@ -15153,6 +15232,40 @@ function rgbBytesToCanvas(bytes, w, h) {
   ctx.putImageData(img, 0, 0);
   return c;
 }
+function b64Bytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function framePayload(d) {
+  try {
+    const canvas = rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height);
+    const s16 = d.scatter16 && d.s16_width && d.s16_height ? { data: new Uint16Array(b64Bytes(d.scatter16).buffer), width: d.s16_width, height: d.s16_height } : void 0;
+    return { canvas, w: d.width, h: d.height, s16 };
+  } catch (err) {
+    dbg("frame decode FAILED", err);
+    return null;
+  }
+}
+async function fetchPushedFrame(nodeId) {
+  try {
+    const res = await api.fetchApi(
+      `/nkd/colorwarp/source?node_id=${encodeURIComponent(nodeId)}`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) {
+      dbg("no stored frame for node", nodeId, "(", res.status, ")");
+      return null;
+    }
+    const frame = framePayload(await res.json());
+    dbg("stored frame for node", nodeId, frame ? `${frame.w}x${frame.h}` : "undecodable");
+    return frame;
+  } catch (err) {
+    dbg("stored-frame fetch failed", err);
+    return null;
+  }
+}
 app.registerExtension({
   name: "NKD.ColorWarp",
   async beforeRegisterNodeDef(nodeType, nodeData) {
@@ -15173,6 +15286,8 @@ app.registerExtension({
       const btn = this.addWidget("button", "🎨 Open Color Warper", null, () => {
         const img = findSourceImg(node, "image");
         const cached = colorWarpFrames.get(String(node.id));
+        const meshAtOpen = (meshW == null ? void 0 : meshW.value) ?? "";
+        dbg("ColorWarp open — node", node.id, "sync img:", !!img, "cached push:", !!cached);
         const handle = openColorWarpViewer({
           image: img,
           mesh: (meshW == null ? void 0 : meshW.value) || "",
@@ -15184,33 +15299,55 @@ app.registerExtension({
             if (json && meshW) meshW.value = json;
             node.setDirtyCanvas(true, true);
             if ((activeColorWarp == null ? void 0 : activeColorWarp.handle) === handle) activeColorWarp = null;
+            if (json && json !== meshAtOpen) {
+              dbg("ColorWarp mesh changed on close — running node", node.id);
+              void queueNode(node);
+            }
           }
         });
         activeColorWarp = { nodeId: String(node.id), handle };
         if (!img && cached) handle.setImage(cached.canvas, cached.w, cached.h, cached.s16);
+        void (async () => {
+          const live = () => (activeColorWarp == null ? void 0 : activeColorWarp.handle) === handle;
+          const loaded = await findSourceImgAsync(node, "image");
+          if (loaded) {
+            dbg(
+              "ColorWarp source ready",
+              loaded.naturalWidth + "x" + loaded.naturalHeight,
+              live() ? "→ setImage" : "(editor already closed)"
+            );
+            if (live()) handle.setImage(loaded, loaded.naturalWidth, loaded.naturalHeight);
+            return;
+          }
+          if (cached) return;
+          const stored = await fetchPushedFrame(String(node.id));
+          if (stored) {
+            colorWarpFrames.set(String(node.id), stored);
+            if (live()) handle.setImage(stored.canvas, stored.w, stored.h, stored.s16);
+            return;
+          }
+          dbg("ColorWarp has no source anywhere — queueing node", node.id);
+          void queueNode(node);
+        })();
       });
       btn.serialize = false;
       const onSource = (e) => {
         const d = e == null ? void 0 : e.detail;
+        dbg(
+          "colorwarp-source push for node",
+          d == null ? void 0 : d.node,
+          "(this node:",
+          node.id,
+          ")",
+          d ? `${d.width}x${d.height}` : "no detail"
+        );
         if (!d || String(d.node) !== String(node.id)) return;
-        try {
-          const bin = atob(d.data);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const c = rgbBytesToCanvas(bytes, d.width, d.height);
-          let s16;
-          if (d.scatter16 && d.s16_width && d.s16_height) {
-            const sbin = atob(d.scatter16);
-            const sbytes = new Uint8Array(sbin.length);
-            for (let i = 0; i < sbin.length; i++) sbytes[i] = sbin.charCodeAt(i);
-            s16 = { data: new Uint16Array(sbytes.buffer), width: d.s16_width, height: d.s16_height };
-          }
-          colorWarpFrames.set(String(node.id), { canvas: c, w: d.width, h: d.height, s16 });
-          if ((activeColorWarp == null ? void 0 : activeColorWarp.nodeId) === String(node.id)) {
-            activeColorWarp.handle.setImage(c, d.width, d.height, s16);
-          }
-        } catch {
-        }
+        const frame = framePayload(d);
+        if (!frame) return;
+        colorWarpFrames.set(String(node.id), frame);
+        const live = (activeColorWarp == null ? void 0 : activeColorWarp.nodeId) === String(node.id);
+        dbg("push decoded", frame.w + "x" + frame.h, live ? "→ setImage" : "(editor not open)");
+        if (live) activeColorWarp.handle.setImage(frame.canvas, frame.w, frame.h, frame.s16);
       };
       api.addEventListener("nkd-colorwarp-source", onSource);
       const origRemoved = this.onRemoved;
@@ -15258,11 +15395,24 @@ async function queueNode(node) {
       if (prompt == null ? void 0 : prompt.output) {
         const filtered = {};
         collectUpstream(String(node.id), prompt.output, filtered);
+        dbg(
+          "queueNode",
+          node.id,
+          "→ trimmed prompt to",
+          Object.keys(filtered).length,
+          "of",
+          Object.keys(prompt.output).length,
+          "nodes:",
+          Object.keys(filtered)
+        );
         prompt = { ...prompt, output: filtered };
+      } else {
+        dbg("queueNode", node.id, "— prompt has no .output, sending whole graph", prompt);
       }
       return origQueue.call(api, index, prompt);
     };
     await app.queuePrompt(0, 1);
+    dbg("queueNode", node.id, "submitted");
   } catch (err) {
     api.queuePrompt = origQueue;
     console.error("[NKD Basic Tools] queue failed:", err);
@@ -15339,6 +15489,13 @@ function registerSplineNode(nodeName, widgetName, mode, title, buttonLabel, prev
             }
           });
           openSpline = { nodeId: String(node.id), handle };
+          if (!img) {
+            void findSourceImgAsync(node, "image").then((loaded) => {
+              if (loaded && (openSpline == null ? void 0 : openSpline.handle) === handle) {
+                handle.setImage(loaded, loaded.naturalWidth, loaded.naturalHeight);
+              }
+            });
+          }
         });
         btn.serialize = false;
         const origRemoved = this.onRemoved;
@@ -15378,7 +15535,7 @@ registerSplineNode(
   "Place blur pins",
   { kind: "field", params: ["max_blur", "falloff"] }
 );
-console.log("[NKD Basic Tools] spline editors loaded (vector mask · path blur · field blur)");
+console.log("[NKD Basic Tools] v1.8.1 — spline editors + color warp loaded (window.NKD_DEBUG=true traces how the editors load their image)");
 (function() {
   "use strict";
   try {

@@ -136,10 +136,20 @@ function sizeDomWidgetToContent(
 // use this node's own widget value. A value COMPUTED at runtime upstream can't
 // be known before the graph runs — the render is still correct, only this
 // pre-run preview falls back to the widget default until the first run.
+// graph.links is a Map since frontend 1.16 and a plain object before it — read
+// through this or the lookup silently returns undefined and every upstream
+// thumbnail/dimension probe in this file goes blank.
+function getLink(node: any, linkId: number | null | undefined): any {
+  if (linkId == null) return null;
+  const links: any = node.graph?.links;
+  if (!links) return null;
+  return (links instanceof Map ? links.get(linkId) : links[linkId]) ?? null;
+}
+
 function resolveDim(node: any, name: string, fallback: number): number {
   const slot = node.inputs?.find((i: any) => i.name === name);
   if (slot && slot.link != null) {
-    const link = node.graph?.links?.[slot.link];
+    const link = getLink(node, slot.link);
     const src = link && node.graph?.getNodeById(link.origin_id);
     if (src) {
       const sw = src.widgets?.find((w: any) => w.name === name && Number.isFinite(Number(w.value)))
@@ -289,14 +299,76 @@ comfyApp.registerExtension({
 // ramp/invert/strength edits redraw instantly with zero backend round-trip.
 // Registered BEFORE the color-ramp extension (same ordering trick as
 // Gradient Generate) so the preview sits above the ramp bar.
-function findSourceImg(node: any, inputName = "image"): HTMLImageElement | null {
+// Frontend 1.42 dropped `node.imgs` (the decoded thumbnail litegraph used to
+// hang on the node) — previews now live in a Vue store. What survives is the
+// *address* of the picture, so resolve that instead and decode it here:
+//   · app.nodeOutputs[id] — what the node produced on the last run, any node
+//   · a Load Image-style `image` widget — a file in /input, no run needed
+function viewUrl(f: { filename: string; type?: string; subfolder?: string }): string {
+  const q = new URLSearchParams({
+    filename: f.filename, type: f.type || "input", subfolder: f.subfolder || "",
+  });
+  return (api as any).apiURL ? (api as any).apiURL(`/view?${q}`) : `/view?${q}`;
+}
+
+// Off unless asked for: `window.NKD_DEBUG = true` in the console traces how the
+// editors resolve their source frame, which is the thing that goes wrong.
+function dbg(...args: any[]): void {
+  if ((window as any).NKD_DEBUG) console.log("[NKD]", ...args);
+}
+
+function upstreamImageUrl(node: any, inputName = "image"): string {
   const inp = node.inputs?.find((i: any) => i.name === inputName);
-  const linkId = inp?.link;
-  if (linkId == null) return null;
-  const link = node.graph?.links?.[linkId];
-  if (!link) return null;
-  const srcNode = node.graph?.getNodeById(link.origin_id);
-  return srcNode?.imgs?.[0] ?? null;
+  const link = getLink(node, inp?.link);
+  if (!link) { dbg("no link on input", inputName, "of node", node.id, "slot:", inp); return ""; }
+  const src = node.graph?.getNodeById(link.origin_id);
+  if (!src) { dbg("link origin", link.origin_id, "not in graph"); return ""; }
+  const outs = (comfyApp as any).nodeOutputs?.[String(src.id)];
+  const out = outs?.images?.[0];
+  if (out?.filename) { dbg("source", src.type, src.id, "→ run output", out); return viewUrl(out); }
+  const w = src.widgets?.find((x: any) => x?.name === "image");
+  if (typeof w?.value === "string" && w.value) {
+    dbg("source", src.type, src.id, "→ input file", w.value);
+    return viewUrl({ filename: w.value });
+  }
+  dbg("source", src.type, src.id, "has no image address (outputs:", outs,
+      "widgets:", src.widgets?.map((x: any) => x?.name), ")");
+  return "";
+}
+
+// One <img> per URL, shared by every caller — the sync probes below poll on
+// every redraw and must not queue a fresh decode each time.
+const srcImgCache = new Map<string, HTMLImageElement>();
+function imgFor(url: string): HTMLImageElement {
+  let img = srcImgCache.get(url);
+  if (!img) { img = new Image(); img.src = url; srcImgCache.set(url, img); }
+  return img;
+}
+
+/** Decoded upstream frame, or null while it loads (the in-node previews poll). */
+function findSourceImg(node: any, inputName = "image"): HTMLImageElement | null {
+  const url = upstreamImageUrl(node, inputName);
+  if (!url) return null;
+  const img = imgFor(url);
+  return img.complete && img.naturalWidth ? img : null;
+}
+
+/** Same, but waits for the decode — for the editors, which open once. */
+function findSourceImgAsync(node: any, inputName = "image"): Promise<HTMLImageElement | null> {
+  const url = upstreamImageUrl(node, inputName);
+  if (!url) return Promise.resolve(null);
+  const img = imgFor(url);
+  if (img.complete) {
+    dbg("cached decode", url, img.naturalWidth + "x" + img.naturalHeight);
+    return Promise.resolve(img.naturalWidth ? img : null);
+  }
+  return new Promise((resolve) => {
+    img.addEventListener("load", () => {
+      dbg("decoded", url, img.naturalWidth + "x" + img.naturalHeight);
+      resolve(img);
+    }, { once: true });
+    img.addEventListener("error", () => { dbg("decode FAILED", url); resolve(null); }, { once: true });
+  });
 }
 
 comfyApp.registerExtension({
@@ -777,6 +849,45 @@ function rgbBytesToCanvas(bytes: Uint8Array, w: number, h: number): HTMLCanvasEl
   return c;
 }
 
+function b64Bytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// The {node,width,height,data,scatter16} payload — same shape whether it
+// arrived over the websocket or from /nkd/colorwarp/source.
+function framePayload(d: any): CachedFrame | null {
+  try {
+    const canvas = rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height);
+    // Optional 16-bit RGB companion (little-endian uint16) for the viewer's
+    // scatter cloud — quantization-free vectorscope.
+    const s16 = d.scatter16 && d.s16_width && d.s16_height
+      ? { data: new Uint16Array(b64Bytes(d.scatter16).buffer), width: d.s16_width, height: d.s16_height }
+      : undefined;
+    return { canvas, w: d.width, h: d.height, s16 };
+  } catch (err) {
+    dbg("frame decode FAILED", err);
+    return null;
+  }
+}
+
+/** The frame the backend resolved last time this node ran, if it still has it. */
+async function fetchPushedFrame(nodeId: string): Promise<CachedFrame | null> {
+  try {
+    const res = await api.fetchApi(`/nkd/colorwarp/source?node_id=${encodeURIComponent(nodeId)}`,
+                                   { cache: "no-store" });
+    if (!res.ok) { dbg("no stored frame for node", nodeId, "(", res.status, ")"); return null; }
+    const frame = framePayload(await res.json());
+    dbg("stored frame for node", nodeId, frame ? `${frame.w}x${frame.h}` : "undecodable");
+    return frame;
+  } catch (err) {
+    dbg("stored-frame fetch failed", err);
+    return null;
+  }
+}
+
 comfyApp.registerExtension({
   name: "NKD.ColorWarp",
   async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
@@ -802,6 +913,8 @@ comfyApp.registerExtension({
         // pushed, which is all a generated image can offer.
         const img = findSourceImg(node, "image");
         const cached = colorWarpFrames.get(String(node.id));
+        const meshAtOpen = meshW?.value ?? "";
+        dbg("ColorWarp open — node", node.id, "sync img:", !!img, "cached push:", !!cached);
         const handle = openColorWarpViewer({
           image: img,
           mesh: meshW?.value || "",
@@ -813,12 +926,46 @@ comfyApp.registerExtension({
             if (json && meshW) meshW.value = json;
             node.setDirtyCanvas(true, true);
             if (activeColorWarp?.handle === handle) activeColorWarp = null;
+            // Run the node so the in-node preview and everything downstream show
+            // the grade that was just dialled in. Only when the mesh actually
+            // moved — closing without touching anything runs nothing.
+            if (json && json !== meshAtOpen) {
+              dbg("ColorWarp mesh changed on close — running node", node.id);
+              void queueNode(node);
+            }
           },
         });
         activeColorWarp = { nodeId: String(node.id), handle };
         // setImage rather than passing it as `image`: it carries the 16-bit
         // companion the scatter cloud wants.
         if (!img && cached) handle.setImage(cached.canvas, cached.w, cached.h, cached.s16);
+        // The upstream picture usually needs a decode — hand it over when it
+        // lands, and if there is none at all, run this node (upstream stays
+        // cached) so the backend pushes the frame the listener below feeds in.
+        // ponytail: if the backend already has THIS node cached it won't
+        // re-execute and no push arrives (page reload after a run). Re-open
+        // after any mesh edit, or add a source route if it becomes a nuisance.
+        void (async () => {
+          const live = () => activeColorWarp?.handle === handle;
+          const loaded = await findSourceImgAsync(node, "image");
+          if (loaded) {
+            dbg("ColorWarp source ready", loaded.naturalWidth + "x" + loaded.naturalHeight,
+                live() ? "→ setImage" : "(editor already closed)");
+            if (live()) handle.setImage(loaded, loaded.naturalWidth, loaded.naturalHeight);
+            return;
+          }
+          if (cached) return;                       // already showing the push
+          // Generated source: ask the backend for the frame it resolved last
+          // run. Only if it has none is a run worth forcing.
+          const stored = await fetchPushedFrame(String(node.id));
+          if (stored) {
+            colorWarpFrames.set(String(node.id), stored);
+            if (live()) handle.setImage(stored.canvas, stored.w, stored.h, stored.s16);
+            return;
+          }
+          dbg("ColorWarp has no source anywhere — queueing node", node.id);
+          void queueNode(node);
+        })();
       });
       btn.serialize = false;
 
@@ -826,26 +973,15 @@ comfyApp.registerExtension({
       // resize/subgraph). Payload: {node,width,height,data} — RGB uint8 base64.
       const onSource = (e: any) => {
         const d = e?.detail;
+        dbg("colorwarp-source push for node", d?.node, "(this node:", node.id, ")",
+            d ? `${d.width}x${d.height}` : "no detail");
         if (!d || String(d.node) !== String(node.id)) return;
-        try {
-          const bin = atob(d.data);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          const c = rgbBytesToCanvas(bytes, d.width, d.height);
-          // Optional 16-bit RGB companion (little-endian uint16) for the
-          // viewer's scatter cloud — quantization-free vectorscope.
-          let s16: { data: Uint16Array; width: number; height: number } | undefined;
-          if (d.scatter16 && d.s16_width && d.s16_height) {
-            const sbin = atob(d.scatter16);
-            const sbytes = new Uint8Array(sbin.length);
-            for (let i = 0; i < sbin.length; i++) sbytes[i] = sbin.charCodeAt(i);
-            s16 = { data: new Uint16Array(sbytes.buffer), width: d.s16_width, height: d.s16_height };
-          }
-          colorWarpFrames.set(String(node.id), { canvas: c, w: d.width, h: d.height, s16 });
-          if (activeColorWarp?.nodeId === String(node.id)) {
-            activeColorWarp.handle.setImage(c, d.width, d.height, s16);
-          }
-        } catch { /* ignore malformed */ }
+        const frame = framePayload(d);
+        if (!frame) return;
+        colorWarpFrames.set(String(node.id), frame);
+        const live = activeColorWarp?.nodeId === String(node.id);
+        dbg("push decoded", frame.w + "x" + frame.h, live ? "→ setImage" : "(editor not open)");
+        if (live) activeColorWarp!.handle.setImage(frame.canvas, frame.w, frame.h, frame.s16);
       };
       api.addEventListener("nkd-colorwarp-source", onSource);
 
@@ -920,11 +1056,16 @@ async function queueNode(node: any): Promise<void> {
       if (prompt?.output) {
         const filtered = {};
         collectUpstream(String(node.id), prompt.output, filtered);
+        dbg("queueNode", node.id, "→ trimmed prompt to", Object.keys(filtered).length,
+            "of", Object.keys(prompt.output).length, "nodes:", Object.keys(filtered));
         prompt = { ...prompt, output: filtered };
+      } else {
+        dbg("queueNode", node.id, "— prompt has no .output, sending whole graph", prompt);
       }
       return origQueue.call(api, index, prompt);
     };
     await comfyApp.queuePrompt(0, 1);
+    dbg("queueNode", node.id, "submitted");
   } catch (err) {
     (api as any).queuePrompt = origQueue;
     console.error("[NKD Basic Tools] queue failed:", err);
@@ -1010,6 +1151,14 @@ function registerSplineNode(nodeName: string, widgetName: string, mode: EditorMo
             },
           });
           openSpline = { nodeId: String(node.id), handle };
+          // The upstream frame is a URL until it decodes; hand it over then.
+          if (!img) {
+            void findSourceImgAsync(node, "image").then((loaded) => {
+              if (loaded && openSpline?.handle === handle) {
+                handle.setImage(loaded, loaded.naturalWidth, loaded.naturalHeight);
+              }
+            });
+          }
         });
         btn.serialize = false;
 
@@ -1038,4 +1187,5 @@ registerSplineNode("NKDFieldBlur", "pins", "pin",
                    "😺 Field Blur", "Place blur pins",
                    { kind: "field", params: ["max_blur", "falloff"] });
 
-console.log("[NKD Basic Tools] spline editors loaded (vector mask · path blur · field blur)");
+console.log("[NKD Basic Tools] v1.8.1 — spline editors + color warp loaded " +
+            "(window.NKD_DEBUG=true traces how the editors load their image)");
