@@ -26,30 +26,83 @@ def _concat(video_latent, audio_latent):
     return LTXVConcatAVLatent.execute(video_latent, audio_latent)[0]
 
 
-def _audio_track(audio_samples, mask):
-    """Video mask -> one value per audio latent, shaped like that latent.
+def _time_axis(audio_samples):
+    """Which axis of an audio latent is time.
 
-    Which axis is time is not the same everywhere: MiniMax H3 encodes audio as
-    [B, 32, 2, T] and LTXV as [B, 8, T, 16] — 16 frequency bins, time one axis
-    earlier. Writing the timeline down the wrong one is silent, so it is picked
-    rather than assumed: the other axis is a fixed property of the architecture
-    (2 codes, 16 bins) while time grows with the clip, so the longer of the two
-    is time for any clip past a second or so. Anything shorter is ambiguous and
-    says so instead of guessing.
+    Not the same everywhere: MiniMax H3 encodes audio as [B, 32, 2, T] and LTXV as
+    [B, 8, T, 16] — 16 frequency bins, time one axis earlier. Reading the wrong one is
+    silent, so it is picked rather than assumed: the other axis is a fixed property of
+    the architecture (2 stereo codes, 16 bins) while time grows with the clip, so the
+    longer of the two is time for any clip past a second or so. Anything shorter is
+    ambiguous and says so instead of guessing.
     """
     shape = audio_samples.shape
     if audio_samples.ndim < 3:
-        raise ValueError("audio latent {} has no time axis to mask".format(tuple(shape)))
+        raise ValueError("audio latent {} has no time axis".format(tuple(shape)))
     if audio_samples.ndim == 3:                        # [B, C, T]
-        return mask_core.to_audio_latent(mask, shape[-1]).reshape(1, 1, shape[-1])
+        return -1
     if shape[-1] == shape[-2]:
         raise ValueError(
             "audio latent {} is square on its last two axes — cannot tell which one is "
             "time".format(tuple(shape)))
-    time_last = shape[-1] > shape[-2]
-    frames = shape[-1] if time_last else shape[-2]
+    return -1 if shape[-1] > shape[-2] else -2
+
+
+def _latents_per_second(audio_vae):
+    """How many audio latent frames the VAE writes per second — 40 on MiniMax H3.
+
+    `audio_sample_rate / downscale_ratio` (32000 / 800) is how `comfy.sd.VAE` itself
+    describes an audio VAE, so this is the model's own number and not a constant of
+    ours that goes stale the day a second AV model lands. Returns None when the VAE
+    doesn't describe itself that way, and then the length is left alone.
+    """
+    rate = getattr(audio_vae, "audio_sample_rate", None)
+    hop = getattr(audio_vae, "downscale_ratio", None)
+    if not isinstance(rate, (int, float)) or not isinstance(hop, (int, float)) or hop <= 0:
+        return None
+    return rate / float(hop)
+
+
+def _fit_audio(audio_latent, target):
+    """Trim or pad the encoded sound to the length the model expects for this clip.
+
+    `LTXVConcatAVLatent` DOES know how to do this — its `fit_audio` — but it only runs
+    when the video latent handed to it is ALREADY an AV latent, which is the one path
+    this node never takes. So an encode landing a frame or two off goes straight
+    through. Measured on the core node with a 192-frame video (canonical audio 320):
+    317 in -> 317 out, 325 in -> 325 out.
+
+    One audio latent frame is 1/40 s on H3, so the damage is small and permanent: the
+    two streams disagree about where the clip ends, which is the half of a lip-sync or
+    a join nobody thinks to check.
+
+    Not delegated to the core's version because that one assumes its own axis order,
+    and time is not always last (see `_time_axis`). The padding is silent, which is
+    what a clip shorter than its video should decode to.
+    """
+    samples = audio_latent["samples"]
+    axis = _time_axis(samples)
+    if samples.shape[axis] == target:
+        return audio_latent
+    out = audio_latent.copy()
+    if samples.shape[axis] > target:
+        out["samples"] = samples.narrow(axis, 0, target).contiguous()
+    else:
+        pad = list(samples.shape)
+        pad[axis] = target - samples.shape[axis]
+        out["samples"] = torch.cat([samples, samples.new_zeros(pad)], dim=axis)
+    return out
+
+
+def _audio_track(audio_samples, mask):
+    """Video mask -> one value per audio latent, shaped like that latent."""
+    shape = audio_samples.shape
+    axis = _time_axis(audio_samples)
+    if audio_samples.ndim == 3:                        # [B, C, T]
+        return mask_core.to_audio_latent(mask, shape[-1]).reshape(1, 1, shape[-1])
+    frames = shape[axis]
     track = mask_core.to_audio_latent(mask, frames)    # [1, 1, 1, frames]
-    if not time_last:
+    if axis == -2:
         track = track.reshape(1, 1, frames, 1)
     return track.expand(1, 1, shape[-2], shape[-1]).contiguous()
 
@@ -144,13 +197,23 @@ class NKDAVLatent(io.ComfyNode):
                                        "time a mask is on — audio mask if you connected one, the "
                                        "picture mask otherwise — to the nearest 1/40 s, the rate "
                                        "the sound is masked at."),
+                # Last, as the pack's rule says: `widgets_values` is positional, so a new
+                # widget in the middle repoints every saved value after it. Appended, an
+                # existing workflow just gains the default.
+                io.Float.Input("fps", default=24.0, min=1.0, max=240.0, step=0.01,
+                               tooltip="Frame rate of the video going in — MiniMax H3 is 24. "
+                                       "It is the only thing needed to know how long the "
+                                       "soundtrack should be: the sound is cut or padded to "
+                                       "exactly the number of audio frames the model expects "
+                                       "for this many pictures. Get it wrong and picture and "
+                                       "sound drift apart from each other."),
             ],
             outputs=[io.Latent.Output(display_name="latent")],
         )
 
     @classmethod
     def execute(cls, images, audio, video_vae, audio_vae, audio_mode="keep",
-                latent_mask=None, audio_mask=None) -> io.NodeOutput:
+                latent_mask=None, audio_mask=None, fps=24.0) -> io.NodeOutput:
         from comfy_extras.nodes_audio import VAEEncodeAudio
 
         video_latent = {"samples": video_vae.encode(images[:, :, :, :3])}
@@ -158,6 +221,12 @@ class NKDAVLatent(io.ComfyNode):
             video_latent["noise_mask"] = latent_mask.reshape((-1, 1) + latent_mask.shape[-2:])
 
         audio_latent = VAEEncodeAudio.execute(audio_vae, audio)[0]
+        # Length first, mask after: the mask is sized to the audio latent's own shape, so
+        # building it against a length that is about to change would size it wrong.
+        # Same arithmetic the model's own empty AV latent uses: round(duration * rate).
+        per_second = _latents_per_second(audio_vae)
+        if per_second is not None and fps > 0:
+            audio_latent = _fit_audio(audio_latent, round(images.shape[0] / fps * per_second))
         samples = audio_latent["samples"]
         # the combo decides, always: a connected audio mask only says *when*, and only
         # to the setting that asks. A wired input that silently overrides a widget is

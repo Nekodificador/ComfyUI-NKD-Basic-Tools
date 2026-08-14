@@ -111,6 +111,46 @@ def demo():
     except ValueError:
         pass
 
+    # An encode that lands off the canonical length is cut or padded to what the model
+    # expects for this many pictures: round(124 / 24 * 40) = 207. The core's Concat only
+    # fits when its VIDEO input is already an AV latent - the path this node never takes
+    # - so without this the mismatch sails through and the two streams disagree about
+    # where the clip ends.
+    from comfy_extras.nodes_lt import LTXVConcatAVLatent
+
+    def vae_returning(t):
+        return type("V", (), {"audio_sample_rate": 32000, "downscale_ratio": 800,
+                              "encode": lambda self, w: torch.ones(1, 32, 2, t)})()
+
+    for encoded in (207, 204, 211):                     # exact, short, long
+        out = av.NKDAVLatent.execute(images, audio, _VideoVae(), vae_returning(encoded),
+                                     audio_mode="follow mask", latent_mask=mask)[0]
+        assert out["samples"].unbind()[1].shape[-1] == 207, encoded
+        nm = out["noise_mask"].unbind()[1]
+        assert nm.shape[-1] == 207, (encoded, nm.shape)     # the mask is sized to it
+        # Built AFTER the fit, so the timing is read off the corrected length: a short
+        # encode must not squeeze the masked stretch into a shorter clip.
+        on = (nm.reshape(-1, 207)[0] > 0).nonzero().flatten().tolist()
+        assert on == list(range(len(on))) and abs(len(on) - 207 * 62 / 124) <= 1, (encoded, len(on))
+    # a short encode is padded with silence, not with a repeat of the tail
+    assert float(out["samples"].unbind()[1][..., -1].abs().max()) in (0.0, 1.0)
+
+    # The rate is read off the VAE, not hardcoded: halve it and the target halves.
+    half = type("V", (), {"audio_sample_rate": 32000, "downscale_ratio": 1600,
+                          "encode": lambda self, w: torch.zeros(1, 32, 2, 207)})()
+    out = av.NKDAVLatent.execute(images, audio, _VideoVae(), half, audio_mode="keep")[0]
+    assert out["samples"].unbind()[1].shape[-1] == 103, out["samples"].unbind()[1].shape
+
+    # A VAE that doesn't describe itself leaves the length alone rather than guessing.
+    mute = type("V", (), {"encode": lambda self, w: torch.zeros(1, 32, 2, 204)})()
+    out = av.NKDAVLatent.execute(images, audio, _VideoVae(), mute, audio_mode="keep")[0]
+    assert out["samples"].unbind()[1].shape[-1] == 204
+
+    # the core node on its own still does NOT fit - this is the gap being covered
+    raw = LTXVConcatAVLatent.execute({"samples": torch.zeros(1, 24, 37, 48, 84)},
+                                     {"samples": torch.zeros(1, 32, 2, 204)})[0]
+    assert raw["samples"].unbind()[1].shape[-1] == 204
+
     # ...and it drops into the real chain in place of both nodes.
     from comfy_extras.nodes_lt import LTXVConcatAVLatent
     joint = LTXVConcatAVLatent.execute({"samples": torch.zeros(1, 24, 37, 48, 84)}, lat)[0]

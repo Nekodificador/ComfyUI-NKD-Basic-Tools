@@ -119,6 +119,22 @@ class NKDMaskOps(io.ComfyNode):
                              display_name="Feather",
                              tooltip="Soften the edge by this many pixels. Runs last, so "
                                      "nothing hardens it again."),
+                # At the end, as the pack's rule says: `widgets_values` is positional, so
+                # appended ones just arrive at their default in a saved workflow.
+                io.Float.Input("edge_low", default=0.0, min=0.0, max=1.0, step=0.01,
+                               display_name="Edge Low",
+                               tooltip="Where the soft part of a feathered edge starts. Leave "
+                                       "0 and 1 and nothing happens. A per-token video model "
+                                       "does not read a mask evenly: on MiniMax H3 only the "
+                                       "0.85-0.95 band does anything, so a feather drawn 0 to 1 "
+                                       "collapses to a hard edge a couple of pixels wide. Set "
+                                       "0.85 here and 0.95 below and the whole feather becomes "
+                                       "the transition. Fully black and fully white are left "
+                                       "alone, so the material you are protecting stays "
+                                       "protected."),
+                io.Float.Input("edge_high", default=1.0, min=0.0, max=1.0, step=0.01,
+                               display_name="Edge High",
+                               tooltip="The other end of that band. 0.95 on MiniMax H3."),
             ],
             outputs=[
                 io.Mask.Output(display_name="mask"),
@@ -136,7 +152,8 @@ class NKDMaskOps(io.ComfyNode):
     @classmethod
     def execute(cls, mask, invert, black_point, white_point, despeckle, fill_holes,
                 close_gaps, temporal_expand, temporal_smooth, expand, blockify,
-                blockify_threshold, feather, vae=None, model=None) -> io.NodeOutput:
+                blockify_threshold, feather, edge_low=0.0, edge_high=1.0,
+                vae=None, model=None) -> io.NodeOutput:
         time_groups = None
         stride = 1
         if vae is not None:  # connecting the VAE is the switch — see the tooltip
@@ -159,6 +176,8 @@ class NKDMaskOps(io.ComfyNode):
             blockify_threshold=blockify_threshold,
             time_groups=time_groups,
             feather_px=feather,
+            edge_low=edge_low,
+            edge_high=edge_high,
         )
         return io.NodeOutput(out, 1.0 - out,
                              mask_core.to_latent(out, stride, time_groups),

@@ -170,6 +170,30 @@ def demo():
     assert to_audio_latent(torch.zeros(frames, 8, 8), audio_t).max() == 0.0
     assert to_audio_latent(one, audio_t).max() == 1.0
 
+    # Edge range: squeeze the soft part of a feathered edge into a narrow band, because
+    # a per-token model only reacts between about 0.85 and 0.95. The extremes must NOT
+    # move - sending the preserved side to 0.85 would start regenerating it.
+    ramp = torch.linspace(0.0, 1.0, 11).reshape(1, 1, 11).repeat(1, 4, 1)
+    out = process(ramp, edge_low=0.85, edge_high=0.95)
+    assert float(out[0, 0, 0]) == 0.0                     # fully preserved stays exact
+    assert float(out[0, 0, -1]) == 1.0                    # fully generated stays exact
+    mid = out[0, 0, 1:-1]
+    assert float(mid.min()) >= 0.85 and float(mid.max()) <= 0.95, mid
+    assert bool((mid[1:] > mid[:-1]).all())               # still monotone: it is a ramp
+    # The band is where the model actually reacts, so the ramp has to SPAN it, not sit
+    # in a corner of it - that is the whole difference from a plain 0..1 feather.
+    assert float(mid.max() - mid.min()) > 0.07, mid
+    # Left at 0/1 it is a no-op, so nobody pays for a widget they did not touch.
+    assert torch.equal(process(ramp), process(ramp, edge_low=0.0,
+                                                                  edge_high=1.0))
+    # A gaussian feather leaves 0.9997, not 1.0: an exact == 1 test would drag the
+    # plateau into the ramp and lift the whole masked area off white.
+    soft = torch.zeros(1, 64, 64)
+    soft[:, 16:48, 16:48] = 1.0
+    feathered = process(soft, feather_px=9, edge_low=0.85, edge_high=0.95)
+    assert float(feathered[0, 32, 32]) == 1.0, float(feathered[0, 32, 32])
+    assert float(feathered[0, 0, 0]) == 0.0
+
     print("mask ops OK")
 
 

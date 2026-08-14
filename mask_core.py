@@ -173,6 +173,33 @@ def levels(x: torch.Tensor, black: float, white: float) -> torch.Tensor:
     return ((x - black) / (white - black)).clamp(0.0, 1.0)
 
 
+def edge_range(x: torch.Tensor, low: float, high: float) -> torch.Tensor:
+    """Squeeze the SOFT part of an edge into [low, high]. 0 and 1 stay where they are.
+
+    The inverse of `levels`, and it exists because a per-token noise model does not read
+    a mask linearly. On MiniMax H3, per the author of the masking PR: "the actual range
+    of noise where the gradient matters is in the range of about 0.85 to 0.95 mask
+    levels. Anything above that it basically treats as fully new, anything below that it
+    treats it as if it had almost no noise". So a feather drawn 0 -> 1 spends nine tenths
+    of its width doing nothing and the visible transition collapses to a couple of pixels.
+
+    The flat regions are held OUT of the remap on purpose. Sending everything through
+    would put the fully-preserved side at `low` — 0.85 is the edge of the zone the model
+    still considers new, so that would quietly start regenerating the material the mask
+    was protecting. The step from 0 to `low` costs nothing precisely because the model
+    treats that whole span as "almost no noise".
+
+    The epsilon is not decoration: a gaussian feather leaves 0.9997, not 1.0, and an
+    exact `== 1` test would drag the plateau into the ramp.
+    """
+    high = max(low, high)
+    if low <= 0.0 and high >= 1.0:
+        return x
+    eps = 1e-3
+    soft = (x > eps) & (x < 1.0 - eps)
+    return torch.where(soft, low + x * (high - low), x)
+
+
 def despeckle(x: torch.Tensor, radius: int) -> torch.Tensor:
     """Drop blobs thinner than ~2·radius, keeping the survivors' exact outline.
 
@@ -425,13 +452,16 @@ def process(mask: torch.Tensor, *, invert: bool = False,
             temporal_expand_frames: int = 0, temporal_smooth_frames: int = 0,
             expand_px: int = 0, blockify_px: int = 0, blockify_threshold: float = 0.0,
             time_groups: "torch.Tensor | None" = None,
-            feather_px: int = 0) -> torch.Tensor:
+            feather_px: int = 0,
+            edge_low: float = 0.0, edge_high: float = 1.0) -> torch.Tensor:
     """Run the whole mask pipeline in one trip to the accelerator.
 
     The order is fixed and deliberate: clean the source (levels → despeckle →
     fill → close) before anything is grown, stabilize over time while the mask
     is still sharp, then shape it (expand → blockify) and only soften at the
-    very end, so a feathered edge is never re-hardened by a later stage.
+    very end, so a feathered edge is never re-hardened by a later stage. The edge
+    range is the one thing after that, because it reads the softness the feather
+    just produced.
     """
     if mask.dim() == 2:
         mask = mask.unsqueeze(0)
@@ -453,7 +483,10 @@ def process(mask: torch.Tensor, *, invert: bool = False,
         if time_groups is not None:
             x = blockify_time(x, time_groups)
         x = blur(x, feather_px)
-        return x.squeeze(1).clamp(0.0, 1.0)
+        # Dead last, after the feather it reshapes and after the clamp would have
+        # nothing left to say: the soft band only exists once the edge is soft.
+        x = edge_range(x.clamp(0.0, 1.0), edge_low, edge_high)
+        return x.squeeze(1)
 
     device = _work_device(mask)
     try:
