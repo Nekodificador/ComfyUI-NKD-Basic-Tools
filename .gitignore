@@ -3,3 +3,6 @@ __pycache__/
 node_modules/
 .claude/
 CLAUDE.md
+
+# Herramienta de diagnóstico nuestra, no parte del pack
+tools/audio_seam.py
