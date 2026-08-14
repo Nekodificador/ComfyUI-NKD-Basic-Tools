@@ -6,7 +6,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mask_core import latent_grid, process, to_latent, token_patch  # noqa: E402
+from mask_core import latent_grid, process, to_audio_latent, to_latent, token_patch  # noqa: E402
 
 
 def demo():
@@ -147,6 +147,28 @@ def demo():
     # Shape, dtype and device survive the round trip; a no-op is a no-op.
     assert process(m).shape == m.shape
     assert torch.equal(process(m), m)
+
+    # Audio: 124 frames at 24 fps against MiniMax H3's 207 audio latents.
+    frames, audio_t = 124, 207
+    src = torch.zeros(frames, 8, 8)
+    src[:62, 2:4, 2:4] = 1.0                    # first half of the clip, a corner of the frame
+    a = to_audio_latent(src, audio_t)
+    assert a.shape == (1, 1, 1, audio_t), a.shape
+    on = (a[0, 0, 0] > 0).nonzero().flatten().tolist()
+    assert on[0] == 0 and on == list(range(len(on)))          # one contiguous run from the start
+    assert abs(len(on) - audio_t * 62 / frames) <= 1, len(on)  # ends where the video mask does
+
+    # A single masked frame is shorter than a video latent but must still reach
+    # the audio — a uniform resample of the latent-space mask would drop it.
+    one = torch.zeros(frames, 8, 8)
+    one[100, 0, 0] = 1.0
+    hit = (to_audio_latent(one, audio_t)[0, 0, 0] > 0).nonzero().flatten().tolist()
+    assert hit and all(abs(i - 100 * audio_t / frames) <= 2 for i in hit), hit
+
+    # No mask, no audio touched; and the pooling is max, not mean, so a mask that
+    # covers one pixel of a frame still opens that frame's audio fully.
+    assert to_audio_latent(torch.zeros(frames, 8, 8), audio_t).max() == 0.0
+    assert to_audio_latent(one, audio_t).max() == 1.0
 
     print("mask ops OK")
 

@@ -335,6 +335,30 @@ def to_latent(mask: torch.Tensor, stride: int, groups: "torch.Tensor | None" = N
     return x.squeeze(1)
 
 
+def to_audio_latent(mask: torch.Tensor, frames: int) -> torch.Tensor:
+    """Reduce a per-frame mask to one value per audio latent frame.
+
+    The audio stream carries no image, so all that survives is *when*: a frame's
+    mask collapses to its strongest pixel, and each audio latent takes the max
+    over the video frames it spans. Max, not average, for the same reason as
+    `to_latent` — a latent that overlaps anything masked is regenerated whole,
+    so a mean would only fade the edges of a window that is binary anyway.
+
+    Both streams cover the same duration at fixed rates (24 fps of video against
+    40 mask tokens per second on MiniMax H3 — 1/40 s is the finest cut the sound
+    can be masked at, straight from the model's author), so the spans are uniform and
+    `adaptive_max_pool1d` places them: it takes the max over
+    `[i*N/frames, (i+1)*N/frames)` per output, upsampling included — and audio
+    always outnumbers video here, so this is always an upsample.
+
+    Returns [1, 1, 1, frames], which is what ComfyUI's `reshape_mask` expects for
+    a 1-D stream: the row axis is replicated up to the audio latent's own and the
+    time axis already matches, so nothing is resampled a second time.
+    """
+    profile = mask.amax(dim=(-2, -1)).reshape(1, 1, -1).float()
+    return F.adaptive_max_pool1d(profile, frames).reshape(1, 1, 1, frames)
+
+
 def token_patch(model) -> int:
     """Latents per token along one spatial axis, for a model that reads the mask.
 
