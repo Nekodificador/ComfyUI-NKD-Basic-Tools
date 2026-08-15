@@ -66,15 +66,10 @@ def _latents_per_second(audio_vae):
 def _fit_audio(audio_latent, target):
     """Trim or pad the encoded sound to the length the model expects for this clip.
 
-    `LTXVConcatAVLatent` DOES know how to do this — its `fit_audio` — but it only runs
-    when the video latent handed to it is ALREADY an AV latent, which is the one path
-    this node never takes. So an encode landing a frame or two off goes straight
-    through. Measured on the core node with a 192-frame video (canonical audio 320):
-    317 in -> 317 out, 325 in -> 325 out.
-
-    One audio latent frame is 1/40 s on H3, so the damage is small and permanent: the
-    two streams disagree about where the clip ends, which is the half of a lip-sync or
-    a join nobody thinks to check.
+    The core's Concat AV Latent can do this, but only when the video latent handed to it
+    is ALREADY an AV latent - the one path this node never takes. So an encode landing a
+    frame or two off would go straight through, and the two streams would disagree about
+    where the clip ends: small, permanent, and the half of a lip-sync nobody checks.
 
     Not delegated to the core's version because that one assumes its own axis order,
     and time is not always last (see `_time_axis`). The padding is silent, which is

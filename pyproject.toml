@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "comfyui-nkd-basic-tools"
-version = "1.10.0"
+version = "1.10.1"
 description = "Everyday utility nodes for ComfyUI: inpaint crop & stitch, hand-drawn vector masks, path and field blur, mask painting and cleanup, colour grading, gradients, noise and grain — each with a live preview in the node."
 license = { text = "MIT" }
 requires-python = ">=3.10"

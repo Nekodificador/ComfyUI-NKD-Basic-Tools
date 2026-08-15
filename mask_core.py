@@ -176,18 +176,13 @@ def levels(x: torch.Tensor, black: float, white: float) -> torch.Tensor:
 def edge_range(x: torch.Tensor, low: float, high: float) -> torch.Tensor:
     """Squeeze the SOFT part of an edge into [low, high]. 0 and 1 stay where they are.
 
-    The inverse of `levels`, and it exists because a per-token noise model does not read
-    a mask linearly. On MiniMax H3, per the author of the masking PR: "the actual range
-    of noise where the gradient matters is in the range of about 0.85 to 0.95 mask
-    levels. Anything above that it basically treats as fully new, anything below that it
-    treats it as if it had almost no noise". So a feather drawn 0 -> 1 spends nine tenths
-    of its width doing nothing and the visible transition collapses to a couple of pixels.
+    The inverse of `levels`. A per-token noise model does not read a mask linearly: only a
+    narrow band of values does anything at all, so a feather drawn across the full range
+    behaves like a hard edge. This maps the soft part onto that band.
 
-    The flat regions are held OUT of the remap on purpose. Sending everything through
-    would put the fully-preserved side at `low` — 0.85 is the edge of the zone the model
-    still considers new, so that would quietly start regenerating the material the mask
-    was protecting. The step from 0 to `low` costs nothing precisely because the model
-    treats that whole span as "almost no noise".
+    The flat regions are held OUT of the remap on purpose - sending everything through
+    would lift the fully-preserved side into the range the model treats as new, and start
+    regenerating the material the mask was protecting.
 
     The epsilon is not decoration: a gaussian feather leaves 0.9997, not 1.0, and an
     exact `== 1` test would drag the plateau into the ramp.

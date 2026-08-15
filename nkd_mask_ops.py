@@ -124,17 +124,15 @@ class NKDMaskOps(io.ComfyNode):
                 io.Float.Input("edge_low", default=0.0, min=0.0, max=1.0, step=0.01,
                                display_name="Edge Low",
                                tooltip="Where the soft part of a feathered edge starts. Leave "
-                                       "0 and 1 and nothing happens. A per-token video model "
-                                       "does not read a mask evenly: on MiniMax H3 only the "
-                                       "0.85-0.95 band does anything, so a feather drawn 0 to 1 "
-                                       "collapses to a hard edge a couple of pixels wide. Set "
-                                       "0.85 here and 0.95 below and the whole feather becomes "
-                                       "the transition. Fully black and fully white are left "
-                                       "alone, so the material you are protecting stays "
-                                       "protected."),
+                                       "0 and 1 and nothing happens. Some video models only "
+                                       "react to a narrow band of mask values, so a feather "
+                                       "drawn across the full range behaves like a hard edge; "
+                                       "set that band here and the whole feather becomes the "
+                                       "transition. Fully black and fully white are left "
+                                       "alone, so what the mask protects stays protected."),
                 io.Float.Input("edge_high", default=1.0, min=0.0, max=1.0, step=0.01,
                                display_name="Edge High",
-                               tooltip="The other end of that band. 0.95 on MiniMax H3."),
+                               tooltip="The other end of that band."),
             ],
             outputs=[
                 io.Mask.Output(display_name="mask"),
