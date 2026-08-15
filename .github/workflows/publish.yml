@@ -9,6 +9,7 @@ on:
 
 permissions:
   issues: write
+  contents: write   # the tag and release below
 
 jobs:
   publish-node:
@@ -22,3 +23,22 @@ jobs:
         uses: Comfy-Org/publish-node-action@v1
         with:
           personal_access_token: ${{ secrets.REGISTRY_ACCESS_TOKEN }}
+      # Anchor each published version to an exact commit. Without a tag, reproducing what
+      # a user actually has means hunting for the commit that last touched pyproject.toml.
+      # NOT a distribution channel: the Manager installs from the registry and its git path
+      # pulls the branch. This is for support, and for being able to go back.
+      - name: Tag and create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(grep -m1 '^version' pyproject.toml | sed -E 's/.*"([^"]+)".*/\1/')"
+          if [ -z "$VERSION" ]; then echo "::error::No version found in pyproject.toml"; exit 1; fi
+          TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists - skipping."
+          else
+            gh release create "$TAG" \
+              --target "$GITHUB_SHA" \
+              --title "$TAG" \
+              --generate-notes
+          fi
