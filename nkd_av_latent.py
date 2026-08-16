@@ -89,14 +89,15 @@ def _fit_audio(audio_latent, target):
     return out
 
 
-def _audio_track(audio_samples, mask):
+def _audio_track(audio_samples, mask, ramp_ticks=0, ramp_shape="cosine", ramp_out_ticks=0):
     """Video mask -> one value per audio latent, shaped like that latent."""
     shape = audio_samples.shape
     axis = _time_axis(audio_samples)
-    if audio_samples.ndim == 3:                        # [B, C, T]
-        return mask_core.to_audio_latent(mask, shape[-1]).reshape(1, 1, shape[-1])
-    frames = shape[axis]
+    frames = shape[-1] if audio_samples.ndim == 3 else shape[axis]
     track = mask_core.to_audio_latent(mask, frames)    # [1, 1, 1, frames]
+    track = mask_core.audio_ramp(track, ramp_ticks, ramp_shape, ramp_out_ticks)
+    if audio_samples.ndim == 3:                        # [B, C, T]
+        return track.reshape(1, 1, frames)
     if axis == -2:
         track = track.reshape(1, 1, frames, 1)
     return track.expand(1, 1, shape[-2], shape[-1]).contiguous()
@@ -135,16 +136,41 @@ class NKDAudioMask(io.ComfyNode):
                                               "frame. Only its timing survives: a frame counts as "
                                               "masked if any pixel of it is, and the mask is read "
                                               "as covering the whole clip."),
+                # Appended last — `widgets_values` is positional, saved workflows
+                # just gain the defaults.
+                io.Int.Input("ramp_ticks", default=0, min=0, max=40,
+                             display_name="Ramp In",
+                             tooltip="Run-up INTO each regenerated stretch, in audio ticks "
+                                     "(1/40 s). The last ticks of the ORIGINAL sound before it "
+                                     "rise toward the cut, so the model may rework the very end "
+                                     "of the real audio to land on the generated one; the first "
+                                     "regenerated tick is already fully new. 0 keeps the seam "
+                                     "hard. 8 ticks = 200 ms."),
+                io.Int.Input("ramp_out_ticks", default=0, min=0, max=40,
+                             display_name="Ramp Out",
+                             tooltip="Descent OUT of each regenerated stretch, back into the "
+                                     "original sound. Separate from Ramp In because the exit "
+                                     "usually wants a hard cut: a descent there lets the model "
+                                     "keep 'transitioning' over audio that should simply "
+                                     "resume. Leave at 0 unless the return sounds abrupt."),
+                io.Combo.Input("ramp_shape", options=mask_core.RAMP_SHAPES,
+                               default="cosine", display_name="Ramp Shape",
+                               tooltip="Both ramps. cosine eases in and out; linear is the "
+                                       "control; high band spends the whole ramp between 0.85 "
+                                       "and 0.995, the narrow range of mask values the model "
+                                       "actually distinguishes."),
             ],
             outputs=[io.Latent.Output(display_name="audio_latent")],
         )
 
     @classmethod
-    def execute(cls, audio_latent, mask) -> io.NodeOutput:
+    def execute(cls, audio_latent, mask, ramp_ticks=0, ramp_shape="cosine",
+                ramp_out_ticks=0) -> io.NodeOutput:
         samples = audio_latent["samples"]
         samples = samples.unbind()[-1] if getattr(samples, "is_nested", False) else samples
         out = audio_latent.copy()                    # the audio latent's own shape, so the
-        out["noise_mask"] = _audio_track(samples, mask).to(samples.device)
+        out["noise_mask"] = _audio_track(samples, mask, ramp_ticks, ramp_shape,
+                                         ramp_out_ticks).to(samples.device)
         return io.NodeOutput(out)                    # sampler never resamples it
 
 
@@ -202,13 +228,36 @@ class NKDAVLatent(io.ComfyNode):
                                        "exactly the number of audio frames the model expects "
                                        "for this many pictures. Get it wrong and picture and "
                                        "sound drift apart from each other."),
+                io.Int.Input("ramp_ticks", default=0, min=0, max=40,
+                             display_name="Ramp In",
+                             tooltip="Follow mask only. Run-up INTO each regenerated stretch, "
+                                     "in audio ticks (1/40 s): the last ticks of the ORIGINAL "
+                                     "sound before it rise toward the cut, so the model may "
+                                     "rework the very end of the real audio to land on the "
+                                     "generated one; the first regenerated tick is already "
+                                     "fully new. 0 keeps the seam hard. 8 ticks = 200 ms."),
+                io.Int.Input("ramp_out_ticks", default=0, min=0, max=40,
+                             display_name="Ramp Out",
+                             tooltip="Follow mask only. Descent OUT of each regenerated "
+                                     "stretch, back into the original sound. Separate from "
+                                     "Ramp In because the exit usually wants a hard cut: a "
+                                     "descent there lets the model keep 'transitioning' over "
+                                     "audio that should simply resume. Leave at 0 unless the "
+                                     "return sounds abrupt."),
+                io.Combo.Input("ramp_shape", options=mask_core.RAMP_SHAPES,
+                               default="cosine", display_name="Ramp Shape",
+                               tooltip="Both ramps. cosine eases in and out; linear is the "
+                                       "control; high band spends the whole ramp between 0.85 "
+                                       "and 0.995, the narrow range of mask values the model "
+                                       "actually distinguishes."),
             ],
             outputs=[io.Latent.Output(display_name="latent")],
         )
 
     @classmethod
     def execute(cls, images, audio, video_vae, audio_vae, audio_mode="keep",
-                latent_mask=None, audio_mask=None, fps=24.0) -> io.NodeOutput:
+                latent_mask=None, audio_mask=None, fps=24.0,
+                ramp_ticks=0, ramp_shape="cosine", ramp_out_ticks=0) -> io.NodeOutput:
         from comfy_extras.nodes_audio import VAEEncodeAudio
 
         video_latent = {"samples": video_vae.encode(images[:, :, :, :3])}
@@ -228,7 +277,8 @@ class NKDAVLatent(io.ComfyNode):
         # a widget that looks broken.
         timing = audio_mask if audio_mask is not None else latent_mask
         if audio_mode == "follow mask" and timing is not None:
-            audio_latent["noise_mask"] = _audio_track(samples, timing).to(samples.device)
+            audio_latent["noise_mask"] = _audio_track(samples, timing, ramp_ticks, ramp_shape,
+                                                      ramp_out_ticks).to(samples.device)
         elif audio_mode == "keep":
             audio_latent["noise_mask"] = torch.zeros_like(samples)
         # "regenerate" leaves it unset: the concat fills a missing mask with ones,

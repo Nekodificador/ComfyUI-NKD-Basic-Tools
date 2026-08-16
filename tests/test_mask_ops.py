@@ -6,7 +6,8 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from mask_core import latent_grid, process, to_audio_latent, to_latent, token_patch  # noqa: E402
+from mask_core import (audio_ramp, latent_grid, process, to_audio_latent, to_latent,  # noqa: E402
+                       token_patch)
 
 
 def demo():
@@ -193,6 +194,34 @@ def demo():
     feathered = process(soft, feather_px=9, edge_low=0.85, edge_high=0.95)
     assert float(feathered[0, 32, 32]) == 1.0, float(feathered[0, 32, 32])
     assert float(feathered[0, 0, 0]) == 0.0
+
+    # Audio ramp: the run-up lives in the PRESERVED tail and rises toward the cut;
+    # the generated stretch is untouched — the first generated tick is already 1.
+    track = torch.zeros(1, 1, 1, 40)
+    track[..., 20:] = 1.0                       # preserve 0..19, generate 20..39
+    ramped = audio_ramp(track, 8, "cosine")
+    assert torch.equal(ramped[..., 20:], track[..., 20:])       # generate side untouched
+    assert float(ramped[..., :12].max()) == 0.0                  # deep preserve untouched
+    run_up = ramped[0, 0, 0, 12:20]
+    assert bool((run_up[1:] > run_up[:-1]).all()), run_up        # rising toward the cut
+    assert float(run_up.min()) >= 0.0599 and float(run_up.max()) <= 0.9901, run_up
+    # In and out are separate knobs. With out at 0 (the default) the return to the
+    # original is a HARD cut: only the entrance of a mid-clip gap gets a ramp.
+    gap = torch.ones(1, 1, 1, 40)
+    gap[..., :15] = 0.0
+    gap[..., 25:] = 0.0                          # generate 15..24, preserve around it
+    g = audio_ramp(gap, 4, "high band")
+    assert torch.equal(g[..., 15:25], gap[..., 15:25])
+    assert float(g[0, 0, 0, 14]) > float(g[0, 0, 0, 11])         # rises into the gap
+    assert float(g[0, 0, 0, 14]) >= 0.85                         # high band starts high
+    assert float(g[..., 25:].max()) == 0.0                       # exit stays a hard cut
+    # Asking for a ramp out gives the exit its own descent, without touching the in.
+    g2 = audio_ramp(gap, 0, "cosine", out_ticks=4)
+    assert float(g2[..., :15].max()) == 0.0                      # entrance untouched now
+    assert float(g2[0, 0, 0, 25]) > float(g2[0, 0, 0, 28])       # descends back out
+    # ticks=0 is a no-op, and a seamless track (all 0 / all 1) has nothing to ramp.
+    assert torch.equal(audio_ramp(track, 0), track)
+    assert torch.equal(audio_ramp(torch.ones(1, 1, 1, 10), 4), torch.ones(1, 1, 1, 10))
 
     print("mask ops OK")
 

@@ -24,6 +24,7 @@ Three ideas do the heavy lifting:
 from __future__ import annotations
 
 import inspect
+import math
 
 import torch
 import torch.nn.functional as F
@@ -379,6 +380,93 @@ def to_audio_latent(mask: torch.Tensor, frames: int) -> torch.Tensor:
     """
     profile = mask.amax(dim=(-2, -1)).reshape(1, 1, -1).float()
     return F.adaptive_max_pool1d(profile, frames).reshape(1, 1, 1, frames)
+
+
+RAMP_SHAPES = ["cosine", "linear", "high band", "exponential in", "exponential out"]
+
+
+def audio_ramp(track: torch.Tensor, ticks: int, shape: str = "cosine",
+               out_ticks: int = 0) -> torch.Tensor:
+    """Denoise run-up in the tail of the PRESERVED audio, rising to 1 at the cut.
+
+    A temporal smooth is symmetric and wastes half its ramp graying the generated
+    side, which holds back the very ticks that should be fully new. What lands the
+    seam is the opposite: the first generated tick stays at 1, and the last `ticks`
+    preserved ticks before it rise toward the cut, letting the model rework the end
+    of the original sound just enough to meet the generation.
+
+    The two sides of a generate run are SEPARATE knobs, because they are different
+    situations: `ticks` ramps INTO the generation (original easing toward the cut),
+    `out_ticks` ramps OUT of it (a descent letting the model touch the original
+    AFTER the generated stretch). Out defaults to 0 — a hard cut — because measured
+    in practice a descent there reads as the model "transitioning" a second time
+    over material that should simply resume. Where both ramps reach the same tick
+    (a short preserved island between two runs) the higher value wins.
+
+    This deliberately un-protects part of the original audio: the ramp value IS
+    how much the model may change it. Shapes: `cosine` is the schedule seitanism
+    tested on H3's seam hiccup, `linear` the control, `high band` starts at 0.85 —
+    the range where the author of the mask mechanism observed the gradient
+    actually matters. Values are clamped to (0.06, 0.99): the model's own mask
+    processing collapses <=0.05 to "preserve" and >=0.995 to "generate", so a
+    tick outside that band asks for nothing. Where the track is already
+    fractional the higher value wins — the ramp only ever ADDS freedom near the
+    seam, it never re-protects a tick an upstream feather already released.
+    """
+    if ticks <= 0 and out_ticks <= 0:
+        return track
+    flat = track.reshape(-1)
+    gen = (flat > 0.5).tolist()
+    n = len(gen)
+    if all(gen) or not any(gen):
+        return track                       # no seam: nothing to ramp against
+    inf = n + 1
+    d_next = [inf] * n                     # preserved tick -> next generate tick
+    d_prev = [inf] * n                     # preserved tick -> previous generate tick
+    last = None
+    for i in range(n):
+        if gen[i]:
+            last = i
+        elif last is not None:
+            d_prev[i] = i - last
+    last = None
+    for i in range(n - 1, -1, -1):
+        if gen[i]:
+            last = i
+        elif last is not None:
+            d_next[i] = last - i
+
+    def _shape(x):
+        if shape == "linear":
+            return x
+        if shape == "high band":
+            return 0.85 + (0.995 - 0.85) * x
+        if shape == "exponential in":
+            # lingers low and rises late — the complement of high band, to bracket
+            # where in the value range the model actually reacts. Mapped onto
+            # [0.06, 1) rather than [0, 1): a raw k=4 exponential parks its first
+            # ticks under the model's 0.05 collapse threshold, where the floor
+            # clamp flattens them into identical wasted ticks.
+            return 0.06 + (0.99 - 0.06) * (math.exp(4.0 * x) - 1.0) / (math.exp(4.0) - 1.0)
+        if shape == "exponential out":
+            # the mirror: jumps early and flattens near the top — most of the ramp
+            # is spent almost-generating, like high band but reaching it smoothly
+            # from the floor instead of starting there.
+            return 0.06 + (0.99 - 0.06) * (1.0 - math.exp(-4.0 * x)) / (1.0 - math.exp(-4.0))
+        return (1.0 - math.cos(math.pi * x)) / 2.0
+
+    out = flat.clone()
+    for i in range(n):
+        if gen[i]:
+            continue
+        v = 0.0
+        if ticks > 0 and d_next[i] <= ticks:          # run-up into the generation
+            v = _shape((ticks + 1.0 - d_next[i]) / (ticks + 1.0))
+        if out_ticks > 0 and d_prev[i] <= out_ticks:  # descent back to the original
+            v = max(v, _shape((out_ticks + 1.0 - d_prev[i]) / (out_ticks + 1.0)))
+        if v > 0.0:
+            out[i] = max(float(out[i]), max(0.06, min(0.99, v)))
+    return out.reshape(track.shape)
 
 
 def token_patch(model) -> int:
