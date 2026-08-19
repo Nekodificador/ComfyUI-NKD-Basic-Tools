@@ -13,6 +13,18 @@ import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
 import { openColorWarpViewer, ColorWarpViewerHandle } from "./colorWarpViewer";
 import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import type { EditorMode } from "./splineEditor";
+import { guardPackWidgetOrder } from "./schemaGuard";
+
+// Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
+// skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
+// deliberate breaking reorder of its widgets.
+guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
+  NKDInpaintCrop: 1, NKDInpaintStitch: 1, NKDStringSplit: 1, NKDPromptVariables: 1,
+  NKDGradientMap: 1, NKDGradientGenerate: 1, NKDFilmGrain: 1, NKDNoise: 1,
+  NKDFrequencySeparate: 1, NKDFrequencyCombine: 1, NKDColorWarp: 1,
+  NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
+  NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
+});
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";

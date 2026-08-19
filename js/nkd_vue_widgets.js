@@ -14436,6 +14436,76 @@ function readAspect(json) {
     return null;
   }
 }
+const PROP = "nkdSchema";
+const findW = (node, name) => {
+  var _a;
+  return (_a = node.widgets) == null ? void 0 : _a.find((w) => w.name === name);
+};
+function guardWidgetOrder(nodeType, nodeName, version2) {
+  const origCreated = nodeType.prototype.onNodeCreated;
+  nodeType.prototype.onNodeCreated = function() {
+    const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+    this.properties = this.properties || {};
+    this.properties[PROP] = version2;
+    return r;
+  };
+  const origConfigure = nodeType.prototype.onConfigure;
+  nodeType.prototype.onConfigure = function(info) {
+    var _a, _b, _c, _d, _e;
+    const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+    const named = info == null ? void 0 : info.widgets_values_named;
+    if (named && typeof named === "object" && !Array.isArray(named)) {
+      for (const [name, val] of Object.entries(named)) {
+        const w = findW(this, name);
+        if (w && w.value !== val) {
+          w.value = val;
+          (_a = w.callback) == null ? void 0 : _a.call(w, val);
+        }
+      }
+    } else if (version2 > 1 && ((_b = info == null ? void 0 : info.properties) == null ? void 0 : _b[PROP]) !== version2 && Array.isArray(info == null ? void 0 : info.widgets_values) && info.widgets_values.length) {
+      (_e = (_d = (_c = app.extensionManager) == null ? void 0 : _c.toast) == null ? void 0 : _d.add) == null ? void 0 : _e.call(_d, {
+        severity: "warn",
+        summary: `😺${nodeName}`,
+        detail: `"${this.title ?? nodeName}" was saved before a widget reorder: its values may have loaded into the wrong widgets. Delete and re-add the node, then re-check its settings.`,
+        life: 12e3
+      });
+    }
+    return r;
+  };
+}
+function guardPackWidgetOrder(extName, versions) {
+  app.registerExtension({
+    name: extName,
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      const version2 = versions[nodeData == null ? void 0 : nodeData.name];
+      if (!version2) return;
+      if (nodeType.prototype.__nkdSchemaGuarded) return;
+      nodeType.prototype.__nkdSchemaGuarded = true;
+      guardWidgetOrder(nodeType, nodeData.name, version2);
+    }
+  });
+}
+guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
+  NKDInpaintCrop: 1,
+  NKDInpaintStitch: 1,
+  NKDStringSplit: 1,
+  NKDPromptVariables: 1,
+  NKDGradientMap: 1,
+  NKDGradientGenerate: 1,
+  NKDFilmGrain: 1,
+  NKDNoise: 1,
+  NKDFrequencySeparate: 1,
+  NKDFrequencyCombine: 1,
+  NKDColorWarp: 1,
+  NKDMaskOps: 1,
+  NKDMaskOpsLean: 1,
+  NKDAudioMask: 1,
+  NKDAVLatent: 1,
+  NKDMaskPainter: 1,
+  NKDVectorMask: 1,
+  NKDFieldBlur: 1,
+  NKDPathBlur: 1
+});
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
