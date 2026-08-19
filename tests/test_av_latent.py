@@ -156,6 +156,52 @@ def demo():
     joint = LTXVConcatAVLatent.execute({"samples": torch.zeros(1, 24, 37, 48, 84)}, lat)[0]
     assert torch.equal(joint["noise_mask"].unbind()[1], lat["noise_mask"])
 
+    # --- AV Latent Extend: the masked-extension combiner ---------------------
+    # Fixture: Ablejones' MiniMaxH3_BasicMaskedExtension v1.4, the workflow this
+    # node replaces. 2 overlap chunks there = 22 pixel frames, 7 video tokens,
+    # 37 audio ticks, 0.925 s of audio trim.
+    assert av.h3_overlap(1) == (5, 2, 8)
+    assert av.h3_overlap(2) == (22, 7, 37)
+    assert av.h3_overlap(3) == (39, 12, 65)
+
+    def av_latent(tokens, ticks, fill):
+        video = {"samples": torch.full((1, 4, tokens, 8, 6), float(fill))}
+        sound = {"samples": torch.full((1, 32, 2, ticks), float(fill))}
+        return LTXVConcatAVLatent.execute(video, sound)[0]
+
+    prev = av_latent(12, 70, 2.0)
+    new = av_latent(37, 207, 0.0)
+    joint, frames, trim = av.NKDAVLatentExtend.execute(prev, new, overlap_chunks=2).args
+    assert (frames, trim) == (22, 0.925)
+
+    v, a = joint["samples"].unbind()
+    assert v.shape[2] == 37 and a.shape[-1] == 207       # output length IS the new segment's
+    assert float(v[:, :, :7].min()) == 2.0               # planted tail from previous
+    assert float(v[:, :, 7:].abs().max()) == 0.0
+    assert float(a[..., :37].min()) == 2.0
+    assert float(a[..., 37:].abs().max()) == 0.0
+
+    vm, am = joint["noise_mask"].unbind()
+    assert float(vm[:7].max()) == 0.0 and float(vm[7:].min()) == 1.0    # 0=keep, 1=generate
+    assert am.shape == a.shape                            # audio mask in the latent's own shape
+    assert float(am[..., :37].max()) == 0.0 and float(am[..., 37:].min()) == 1.0
+
+    # A plain (non-AV) latent must be refused: unbind() on it would silently
+    # split the batch axis and read garbage as audio.
+    try:
+        av.NKDAVLatentExtend.execute({"samples": torch.zeros(1, 4, 37, 8, 6)}, new)
+        raise SystemExit("a non-AV latent should have been refused")
+    except ValueError:
+        pass
+
+    # Too short on either side is an error, not a silent partial plant.
+    for bad_prev, bad_new in ((av_latent(5, 20, 2.0), new), (prev, av_latent(7, 37, 0.0))):
+        try:
+            av.NKDAVLatentExtend.execute(bad_prev, bad_new, overlap_chunks=2)
+            raise SystemExit("an overlap that does not fit should have been refused")
+        except ValueError:
+            pass
+
     print("av latent OK")
 
 

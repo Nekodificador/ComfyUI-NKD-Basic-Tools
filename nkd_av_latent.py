@@ -287,16 +287,154 @@ class NKDAVLatent(io.ComfyNode):
         return io.NodeOutput(_concat(video_latent, audio_latent))
 
 
+# MiniMax H3's own grid, all four from the core (comfy/ldm/minimax/model.py:30,
+# comfy_extras/nodes_minimax_h3.py): a clip is 5 frames (2 tokens) plus whole
+# 17-frame chunks of 5 tokens each, sound runs at 40 latent ticks per second,
+# picture at 24 fps. ponytail: H3 only — a second AV model with verified numbers
+# turns these into a preset combo, not before.
+H3_FIRST_FRAMES, H3_FIRST_TOKENS = 5, 2
+H3_CHUNK_FRAMES, H3_CHUNK_TOKENS = 17, 5
+H3_AUDIO_RATE, H3_FPS = 40.0, 24.0
+
+
+def h3_overlap(chunks):
+    """(pixel frames, video tokens, audio ticks) covered by that many chunks."""
+    frames = H3_CHUNK_FRAMES * (chunks - 1) + H3_FIRST_FRAMES
+    tokens = H3_CHUNK_TOKENS * (chunks - 1) + H3_FIRST_TOKENS
+    ticks = round(frames * H3_AUDIO_RATE / H3_FPS)
+    return frames, tokens, ticks
+
+
+def _av_streams(latent, name):
+    """The two streams of an AV latent — refusing a plain one out loud.
+
+    `unbind()` on a NON-nested tensor happily unbinds the batch axis instead,
+    so feeding a video-only latent here would silently read garbage as audio.
+    """
+    samples = latent["samples"]
+    if not getattr(samples, "is_nested", False):
+        raise ValueError(
+            "{} is not an AV latent (expected the joint video+audio latent an AV "
+            "model samples, e.g. from MiniMax H3 Reference To Video or a KSampler "
+            "fed one)".format(name))
+    video, audio = samples.unbind()
+    return video, audio
+
+
+class NKDAVLatentExtend(io.ComfyNode):
+    """Chained extension: continue a sampled AV latent into a fresh empty one.
+
+    The pattern is Ablejones' masked-extension workflow collapsed to one node:
+    the tail of the previous latent replaces the head of the new empty one, and
+    a step noise mask pins it (0 = keep) so the denoise is forced to continue
+    its motion and sound. No blending — the seam is hard on purpose; the model
+    does the mixing, and the regenerated overlap is discarded in pixel space
+    afterwards (that is what the overlap_frames / trim_seconds outputs feed).
+    """
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        return io.Schema(
+            node_id="NKDAVLatentExtend",
+            display_name="😺NKD AV Latent Extend",
+            category="😺NKD Nodes/Masking",
+            description=(
+                "Extend a MiniMax H3 clip: the tail of the previous AV latent is "
+                "planted at the start of the new empty one and masked as 'keep', "
+                "so the sampler generates a continuation of its motion and "
+                "sound. Feed the result to the KSampler; after decoding, drop "
+                "the regenerated overlap with Image Batch Extend With Overlap "
+                "(overlap_frames) and Trim Audio Duration (trim_seconds)."
+            ),
+            inputs=[
+                io.Latent.Input("previous",
+                                tooltip="The AV latent of the segment to continue — the "
+                                        "previous stage's KSampler output, before decoding."),
+                io.Latent.Input("new_latent", display_name="new (empty)",
+                                tooltip="The empty AV latent of the new segment, from MiniMax "
+                                        "H3 Reference To Video. Its length is the length "
+                                        "rendered; the overlap eats its first chunks."),
+                io.Int.Input("overlap_chunks", default=2, min=1, max=16,
+                             display_name="Overlap Chunks",
+                             tooltip="How much of the previous clip the model sees to "
+                                     "continue from, in latent chunks. 1 chunk = 5 frames, "
+                                     "each extra adds 17 (2 = 22 frames, ~0.9 s — the "
+                                     "workflow default). More = smoother continuity, less "
+                                     "new footage per stage."),
+            ],
+            outputs=[
+                io.Latent.Output(display_name="latent",
+                                 tooltip="Masked AV latent, ready for the KSampler."),
+                io.Int.Output(display_name="overlap_frames",
+                              tooltip="Pixel frames of overlap. Feed Image Batch Extend "
+                                      "With Overlap (side=source, mode=cut) to drop the "
+                                      "regenerated head after decoding."),
+                io.Float.Output(display_name="trim_seconds",
+                                tooltip="The same overlap in seconds, on the AUDIO latent "
+                                        "grid (1/40 s) — feed Trim Audio Duration's "
+                                        "start_index. Cutting at the video-frame time "
+                                        "instead drifts a few ms per stage."),
+            ],
+        )
+
+    @classmethod
+    def execute(cls, previous, new_latent, overlap_chunks=2) -> io.NodeOutput:
+        v_prev, a_prev = _av_streams(previous, "previous")
+        v_new, a_new = _av_streams(new_latent, "new_latent")
+        frames, tokens, ticks = h3_overlap(overlap_chunks)
+
+        t_axis = v_new.ndim - 3                      # [..., T, H, W]
+        a_axis = _time_axis(a_new)
+        if v_prev.shape[-2:] != v_new.shape[-2:]:
+            raise ValueError("previous {} and new {} latents differ in size — the tail "
+                             "cannot be planted".format(tuple(v_prev.shape), tuple(v_new.shape)))
+        if v_prev.shape[t_axis] < tokens or a_prev.shape[a_axis] < ticks:
+            raise ValueError("previous clip is shorter than {} overlap chunks "
+                             "({} tokens)".format(overlap_chunks, tokens))
+        if v_new.shape[t_axis] <= tokens or a_new.shape[a_axis] <= ticks:
+            raise ValueError("new latent is no longer than the overlap ({} tokens) — "
+                             "nothing left to generate".format(tokens))
+
+        # The tail REPLACES the head of the new latent, so the output length is
+        # exactly the new segment's. Those tokens decode against a chunk pattern
+        # anchored at frame 0, so their pixel meaning shifts slightly — fine,
+        # because the whole overlap is regenerated context that gets discarded
+        # in pixel space; only the continuation past it survives.
+        video = v_new.clone()
+        video.narrow(t_axis, 0, tokens).copy_(
+            v_prev.narrow(t_axis, v_prev.shape[t_axis] - tokens, tokens))
+        audio = a_new.clone()
+        audio.narrow(a_axis, 0, ticks).copy_(
+            a_prev.narrow(a_axis, a_prev.shape[a_axis] - ticks, ticks))
+
+        # Step masks, 0 = keep the planted tail, 1 = generate. Hard on purpose:
+        # the reference workflow uses interpolation=none and lets the denoise
+        # blend. Video mask in the Set Latent Noise Mask shape ([T,1,h,w], the
+        # sampler maps it onto the token grid); audio mask in the latent's own
+        # shape, so nothing resamples it (same rule as NKDAudioMask).
+        v_mask = torch.ones((v_new.shape[t_axis], 1) + tuple(v_new.shape[-2:]),
+                            device=video.device)
+        v_mask[:tokens] = 0.0
+        a_mask = torch.ones_like(audio)
+        a_mask.narrow(a_axis, 0, ticks).zero_()
+
+        joint = _concat({"samples": video, "noise_mask": v_mask},
+                        {"samples": audio, "noise_mask": a_mask})
+        return io.NodeOutput(joint, frames, ticks / H3_AUDIO_RATE)
+
+
 class NKDAVExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [NKDAudioMask, NKDAVLatent]
+        return [NKDAudioMask, NKDAVLatent, NKDAVLatentExtend]
 
 
 async def comfy_entrypoint() -> NKDAVExtension:
     return NKDAVExtension()
 
 
-NODE_CLASS_MAPPINGS = {"NKDAudioMask": NKDAudioMask, "NKDAVLatent": NKDAVLatent}
+NODE_CLASS_MAPPINGS = {"NKDAudioMask": NKDAudioMask, "NKDAVLatent": NKDAVLatent,
+                       "NKDAVLatentExtend": NKDAVLatentExtend}
 NODE_DISPLAY_NAME_MAPPINGS = {"NKDAudioMask": "😺NKD Audio Mask",
-                              "NKDAVLatent": "😺NKD AV Latent"}
+                              "NKDAVLatent": "😺NKD AV Latent",
+                              "NKDAVLatentExtend": "😺NKD AV Latent Extend"}

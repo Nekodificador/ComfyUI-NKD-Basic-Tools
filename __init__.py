@@ -12,7 +12,7 @@ from .nkd_noise import NKDNoise
 from .nkd_frequency import NKDFrequencySeparate, NKDFrequencyCombine
 from .nkd_color_warp import NKDColorWarp
 from .nkd_mask_ops import NKDMaskOps, NKDMaskOpsLean
-from .nkd_av_latent import NKDAudioMask, NKDAVLatent
+from .nkd_av_latent import NKDAudioMask, NKDAVLatent, NKDAVLatentExtend
 from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
@@ -43,6 +43,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDMaskOpsLean,
             NKDAudioMask,
             NKDAVLatent,
+            NKDAVLatentExtend,
             NKDMaskPainter,
             NKDVectorMask,
             NKDFieldBlur,
@@ -71,6 +72,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDMaskOpsLean": NKDMaskOpsLean,
     "NKDAudioMask": NKDAudioMask,
     "NKDAVLatent": NKDAVLatent,
+    "NKDAVLatentExtend": NKDAVLatentExtend,
     "NKDMaskPainter": NKDMaskPainter,
     "NKDVectorMask": NKDVectorMask,
     "NKDFieldBlur": NKDFieldBlur,
@@ -93,6 +95,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDMaskOpsLean": "😺NKD Mask Ops Lean",
     "NKDAudioMask": "😺NKD Audio Mask",
     "NKDAVLatent": "😺NKD AV Latent",
+    "NKDAVLatentExtend": "😺NKD AV Latent Extend",
     "NKDMaskPainter": "😺NKD Mask Painter",
     "NKDVectorMask": "😺NKD Vector Mask",
     "NKDFieldBlur": "😺NKD Field Blur",
