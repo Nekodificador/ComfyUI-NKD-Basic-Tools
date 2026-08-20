@@ -384,6 +384,8 @@ several and each stage stays editable.
 
 ### 😺NKD Face Rig
 
+https://github.com/user-attachments/assets/97beddd1-99ca-475d-97b8-e0d2115fef28
+
 **Use it to** pose a portrait's expression by dragging handles that sit on the
 face itself — brows, eyelids, gaze, mouth corners, jaw, head — with the result
 re-rendering live while you drag. Powered by LivePortrait (vendored, MIT): a
