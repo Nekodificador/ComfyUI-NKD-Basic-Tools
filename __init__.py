@@ -21,6 +21,12 @@ from .nkd_minimax_guides import NKDMiniMaxGuides
 from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
 try:
+    from .nkd_face_crop import NKDFaceCrop, NKDFaceMask, NKDFaceStitch
+except Exception as exc:  # onnxruntime and friends are optional
+    NKDFaceCrop = NKDFaceMask = NKDFaceStitch = None
+    logging.warning("[NKD Basic Tools] 😺NKD Face Crop unavailable: %s", exc)
+
+try:
     from .nkd_face_rig import NKDFaceRig
     from . import nkd_face_rig_routes  # noqa: F401 — registers /nkd/facerig/*
 except Exception as exc:  # onnxruntime and friends are optional
@@ -35,7 +41,7 @@ WEB_DIRECTORY = "./js"
 class NKDBasicToolsExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [
+        nodes = [
             NKDInpaintCrop,
             NKDInpaintStitch,
             NKDStringSplit,
@@ -57,7 +63,12 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDFieldBlur,
             NKDPathBlur,
             NKDMiniMaxGuides,
-        ] + ([NKDFaceRig] if NKDFaceRig is not None else [])
+        ]
+        if NKDFaceCrop is not None:
+            nodes += [NKDFaceCrop, NKDFaceMask, NKDFaceStitch]
+        if NKDFaceRig is not None:
+            nodes.append(NKDFaceRig)
+        return nodes
 
 
 async def comfy_entrypoint() -> NKDBasicToolsExtension:
@@ -112,6 +123,14 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDPathBlur": "😺NKD Path Blur",
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
 }
+
+if NKDFaceCrop is not None:
+    NODE_CLASS_MAPPINGS["NKDFaceCrop"] = NKDFaceCrop
+    NODE_CLASS_MAPPINGS["NKDFaceMask"] = NKDFaceMask
+    NODE_CLASS_MAPPINGS["NKDFaceStitch"] = NKDFaceStitch
+    NODE_DISPLAY_NAME_MAPPINGS["NKDFaceCrop"] = "😺NKD Face Crop"
+    NODE_DISPLAY_NAME_MAPPINGS["NKDFaceMask"] = "😺NKD Face Mask"
+    NODE_DISPLAY_NAME_MAPPINGS["NKDFaceStitch"] = "😺NKD Face Stitch"
 
 if NKDFaceRig is not None:
     NODE_CLASS_MAPPINGS["NKDFaceRig"] = NKDFaceRig

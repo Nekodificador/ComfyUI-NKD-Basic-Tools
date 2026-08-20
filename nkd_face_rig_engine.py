@@ -40,7 +40,6 @@ from dataclasses import dataclass
 
 import cv2
 import numpy as np
-import onnxruntime
 import torch
 import yaml
 
@@ -50,74 +49,25 @@ from .nkd_liveportrait.modules.spade_generator import SPADEDecoder
 from .nkd_liveportrait.modules.stitching_retargeting_network import StitchingRetargetingNetwork
 from .nkd_liveportrait.modules.warping_network import WarpingNetwork
 from .nkd_liveportrait.utils.camera import get_rotation_matrix, headpose_pred_to_degree
-from .nkd_liveportrait.utils.crop import _transform_pts, crop_image
-from .nkd_liveportrait.utils.human_landmark_runner import LandmarkRunner
 
-HF_REPO = "KlingTeam/LivePortrait"
-
-# Only what a human portrait needs. The animals models and XPose (435 MB on its
-# own) are not downloaded, and neither is InsightFace — see the note above.
-WEIGHTS = {
-    "appearance_feature_extractor": "liveportrait/base_models/appearance_feature_extractor.pth",
-    "motion_extractor": "liveportrait/base_models/motion_extractor.pth",
-    "warping_module": "liveportrait/base_models/warping_module.pth",
-    "spade_generator": "liveportrait/base_models/spade_generator.pth",
-    "stitching_retargeting_module": "liveportrait/retargeting_models/stitching_retargeting_module.pth",
-    "landmark": "liveportrait/landmark.onnx",
-}
+from .nkd_face_core import (  # noqa: F401 — re-exported, the routes and tests import them from here
+    HF_REPO,
+    WEIGHTS,
+    FaceLandmarks,
+    _ANCHORS,
+    _OUTLINES,
+    _OUTLINE_STEP,
+    download_weights,
+    face_boxes,
+    missing_weights,
+    model_dir,
+    weight_path,
+    yolo_boxes,
+)
 
 _HERE = osp.dirname(osp.abspath(__file__))
 _CFG = osp.join(_HERE, "nkd_liveportrait", "config", "models.yaml")
 _MASK = osp.join(_HERE, "nkd_liveportrait", "utils", "mask_template.png")
-
-
-def model_dir() -> str:
-    """`ComfyUI/models/liveportrait`, or a local folder when run outside ComfyUI."""
-    try:
-        import folder_paths  # noqa: PLC0415 — absent in unit tests
-        return osp.join(folder_paths.models_dir, "liveportrait")
-    except Exception:
-        return osp.join(_HERE, "models", "liveportrait")
-
-
-def weight_path(key: str) -> str:
-    return osp.join(model_dir(), WEIGHTS[key])
-
-
-def missing_weights() -> list:
-    return [k for k in WEIGHTS if not osp.exists(weight_path(k))]
-
-
-def download_weights(progress=None) -> None:
-    """Fetch whatever is missing from Hugging Face into `models/liveportrait`.
-
-    Raises with the exact folder and the manual command when the network is
-    not available — a silent download failure leaves people guessing at a
-    path, and that guess is a recurring support ticket across the ecosystem.
-    """
-    missing = missing_weights()
-    if not missing:
-        return
-    try:
-        from huggingface_hub import hf_hub_download
-    except ImportError as exc:
-        raise RuntimeError(
-            "huggingface_hub is required to download the LivePortrait weights"
-        ) from exc
-
-    root = model_dir()
-    for key in missing:
-        if progress:
-            progress(f"downloading {WEIGHTS[key]}")
-        try:
-            hf_hub_download(repo_id=HF_REPO, filename=WEIGHTS[key], local_dir=root)
-        except Exception as exc:
-            raise RuntimeError(
-                "Could not download {} from {}: {}\n"
-                "Place the weights manually under {}, keeping the same layout, with:\n"
-                '  huggingface-cli download {} --local-dir "{}" --include "liveportrait/*"'
-                .format(WEIGHTS[key], HF_REPO, exc, root, HF_REPO, root)
-            ) from exc
 
 
 def _load_state(path: str):
@@ -198,17 +148,9 @@ class Engine:
             # The stitching nets run in plain fp32, outside the autocast.
             self.stitch_nets[name] = net.to(self.device).eval()
 
-        # Ask for CUDA only when onnxruntime actually has it. A plain
-        # `pip install onnxruntime` is the CPU build, and asking it for a
-        # provider it does not have is a wall of warnings and, on some
-        # versions, a hard failure. On CPU the landmark model still runs; it is
-        # only used when preparing a photo and when a drag ends.
-        cuda = "CUDAExecutionProvider" in onnxruntime.get_available_providers()
-        self.landmark = LandmarkRunner(
-            ckpt_path=weight_path("landmark"),
-            onnx_provider="cuda" if (cuda and self.device.type == "cuda") else "cpu",
-        )
-        self._yolo = None  # lazy; see _face_bbox
+        # The landmark model is shared with the crop and mask nodes, which
+        # load it without any of the above. One session either way.
+        self.landmark = FaceLandmarks.get()
 
     @classmethod
     def get(cls):
@@ -227,104 +169,33 @@ class Engine:
 
     # --- detection -------------------------------------------------------
 
-    def _coarse(self, rgb: np.ndarray) -> np.ndarray:
-        """A first guess at the landmarks, on a letterboxed square.
-
-        Upstream's no-seed path resizes the whole picture to 224x224 and then
-        undoes it with a single uniform scale. Those two do not match unless
-        the picture was already square: squashing 736x1104 into a square
-        compresses x and y by different factors, and multiplying both back by
-        `max(h, w) / 224` leaves x out by 1.5x. On the square sample image it
-        looks perfect, which is exactly why it survived to here — the drift
-        only shows up on portraits, and portraits are the whole point.
-
-        Padding to a square first makes the uniform scale honest. Nothing is
-        distorted, so undoing it is just a translation away.
-        """
-        h, w = rgb.shape[:2]
-        side = max(h, w)
-        if h == w:
-            return self.landmark.run(rgb)
-        square = np.zeros((side, side, 3), rgb.dtype)
-        oy, ox = (side - h) // 2, (side - w) // 2
-        square[oy:oy + h, ox:ox + w] = rgb
-        lmk = self.landmark.run(square)
-        lmk[:, 0] -= ox
-        lmk[:, 1] -= oy
-        return lmk
-
-    def locate(self, rgb: np.ndarray, crop_factor: float = 1.7, rounds: int = 5):
-        """(203 landmarks in picture coordinates, settled).
-
-        Upstream seeds its landmark model with an InsightFace bounding box. We
-        do not want InsightFace (non-commercial clause) and MediaPipe turned out
-        to be no bargain either: 0.10.33 dropped the `mp.solutions` API
-        entirely, and the replacement wants its own `.task` download.
-
-        So the crop bootstraps itself. A coarse pass guesses where the face is,
-        then each round re-crops around that guess and measures again. Since the
-        crop centres on the landmarks, every round frames the face better than
-        the last — which is precisely the job the detector was doing. One pass
-        is enough for a head-and-shoulders portrait; a full-length shot with a
-        small face needs the extra rounds, and without them the landmarks land
-        somewhere between the face and the middle of the picture.
-
-        `settled` is false when it never stopped moving. That is the honest
-        answer for a picture with no face in it: the model will still return
-        203 points, confidently, in a ring around nothing.
-        """
-        lmk = self.landmark.run(rgb, self._coarse(rgb))
-        settled = False
-        for _ in range(rounds):
-            crop = crop_image(rgb, lmk, dsize=512, scale=crop_factor, vy_ratio=-0.125)
-            seed = _transform_pts(lmk, crop["M_o2c"][:2])
-            back = _transform_pts(self.landmark.run(crop["img_crop"], seed),
-                                  crop["M_c2o"][:2])
-            # Judged against the size of the face, not in absolute pixels: one
-            # pixel is a rounding error on a 2048 px portrait and a real miss on
-            # a small one. Measured convergence on real portraits lands under
-            # 0.002 within four rounds; anything still wandering above this
-            # after five is not converging at all.
-            span = float(np.linalg.norm(lmk.max(0) - lmk.min(0))) or 1.0
-            moved = float(np.abs(back - lmk).max())
-            lmk = back
-            if moved / span < 0.008:
-                settled = True
-                break
-        if not np.isfinite(lmk).all():
-            raise RuntimeError("No face found in the source image")
-        return lmk, settled
+    def locate(self, rgb: np.ndarray, crop_factor: float = 1.7, rounds: int = 5,
+               box=None):
+        """The landmark walk — see `FaceLandmarks.locate`."""
+        return self.landmark.locate(rgb, crop_factor, rounds, box)
 
     # --- the expensive half, run once per photo --------------------------
 
     def _face_bbox(self, rgb: np.ndarray):
-        """((x1, y1, x2, y2), settled) — the standard detector when available.
+        """((x1, y1, x2, y2), settled) — the face, in the order that keeps parity.
 
-        The stock YOLOv8 face model, conf 0.7, first box wins — so the crop
-        math downstream sees the numbers the ecosystem expects. Without
-        ultralytics the bbox comes from the landmark walk instead: close
-        enough to use, not close enough to promise pixel parity.
+        The stock YOLOv8 face model first, conf 0.7, first box wins: that is
+        what makes the crop math downstream see the numbers the ecosystem
+        expects, and while it answers nothing else runs. YuNet is the fallback,
+        for the machines without ultralytics (AGPL, so never ours to install)
+        and for the pictures YOLO comes up empty on — its box is the same kind
+        of thing, a tight face rectangle, so the crop behaves.
+
+        Last of all the landmark walk, whose extent is not a detector box at
+        all. It used to be the only fallback, and it is the one that loses a
+        face that is small in a wide picture — hence everything above it.
         """
-        try:
-            from ultralytics import YOLO  # noqa: PLC0415 — optional
-        except ImportError:
-            lmk, settled = self.locate(rgb)
-            (x1, y1), (x2, y2) = lmk.min(0)[:2], lmk.max(0)[:2]
-            return (float(x1), float(y1), float(x2), float(y2)), settled
-        if self._yolo is None:
-            path = osp.join(model_dir(), "..", "ultralytics", "face_yolov8n.pt")
-            if not osp.exists(path):
-                from huggingface_hub import hf_hub_download  # noqa: PLC0415
-                path = hf_hub_download(repo_id="Bingsu/adetailer",
-                                       filename="face_yolov8n.pt")
-            self._yolo = YOLO(path)
-        boxes = self._yolo(rgb, conf=0.7, device="", verbose=False)[0].boxes.xyxy.cpu().numpy()
-        if len(boxes) == 0:
-            # Nothing detected: fall back to the whole picture, and good luck.
-            h, w = rgb.shape[:2]
-            return (0.0, 0.0, float(w), float(h)), False
-        x1, y1, x2, y2 = boxes[0]
-        return (float(x1), float(y1), float(x2), float(y2)), True
+        boxes = yolo_boxes(rgb, 0.7) or face_boxes(rgb, second_opinion=False)
+        if boxes:
+            return boxes[0], True
+        lmk, settled = self.locate(rgb)
+        (x1, y1), (x2, y2) = lmk.min(0)[:2], lmk.max(0)[:2]
+        return (float(x1), float(y1), float(x2), float(y2)), settled
 
     @torch.no_grad()
     def prepare(self, rgb: np.ndarray, crop_factor: float = 2.0) -> PreparedSource:
@@ -518,50 +389,7 @@ class Engine:
         return out
 
 
-# Where each control hangs, as indices into the 203 landmarks.
-#
-# LivePortrait publishes no map of these either, so `tools/kp_atlas.py`'s
-# sibling walk found them by drawing them numbered on a face: eyes take 24
-# points each (0-23 and 24-47), the mouth runs 48-107 with the corners at 48
-# and 66 and the inner lip at 90/102, the outline is 108-143 with the chin at
-# 126, the brows are 144-164 and 165-184, and the nose finishes at 185-202.
-# Two of these were already known from upstream's own `retargeting_utils`,
-# which measures eye opening between 6/18 and 30/42 — that agrees, which is
-# the cheapest confirmation available that the rest is read right.
-#
-# "L" is the left of the picture, which is the side the handle sits on and the
-# side the matching `_L` axis was measured to move.
-_ANCHORS = {
-    "brow_L": list(range(144, 165)),
-    "brow_R": list(range(165, 185)),
-    "lid_L": [6],
-    "lid_R": [30],
-    "gaze": list(range(0, 48)),
-    "corner_L": [48],
-    "corner_R": [66],
-    "lips": [102],
-    "jaw": [126],
-}
-
-
-# The outline each control is *shaped* like. A control that looks like the
-# eyebrow it moves reads at a glance; a circle around the eyebrow reads as a
-# circle. Since the landmarks are already here, the shape can be the person's
-# own eyebrow rather than a symbol standing in for one.
-# Ranges confirmed by drawing them (see the outline sweep in tools/): each one
-# closes on itself without a stray point cutting across the face. 145 rather
-# than 144 for the left brow — 144 sits well off the brow and closing through
-# it drew a line across the whole picture.
-_OUTLINES = {
-    "brow_L": list(range(145, 165)),
-    "brow_R": list(range(165, 185)),
-    "eye_L": list(range(0, 24)),
-    "eye_R": list(range(24, 48)),
-    "lips": list(range(48, 72)),
-}
-# Every other point, which is plenty for a control outline and keeps the header
-# under a kilobyte.
-_OUTLINE_STEP = 2
+# The landmark atlas (`_ANCHORS`, `_OUTLINES`) lives in `nkd_face_core`.
 
 
 def anchors(src: PreparedSource, lmk=None) -> dict:
