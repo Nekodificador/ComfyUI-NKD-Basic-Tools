@@ -238,6 +238,36 @@ Mask** and the soundtrack comes back regenerated from end to end no matter what
 the mask said, with no error to tell you. It reads a mask as a picture, and a
 soundtrack has no picture in it.
 
+### 😺NKD MiniMax Guides
+
+**Use it to** anchor every guide of a MiniMax H3 shot from one node instead of a
+row of **Add Guide for MiniMax H3** nodes, each dragging the same four cables in
+from far upstream — move one and the canvas turns to spaghetti.
+
+```
+positive ──▶ 😺NKD MiniMax Guides ──▶ positive
+video vae ─▶                       ──▶ video vae
+audio vae ─▶                       ──▶ audio vae
+latent ────▶                       ──▶ latent
+image ─────▶  guide 1
+video ─────▶  guide 2
+audio ─────▶  guide 3
+              guide 4  (grows)
+```
+
+The guide list grows as you fill it: each slot takes a still, a frame sequence, a
+video (picture **and** its soundtrack) or bare audio, and a **position** widget
+appears next to it for the frame it lands on. Negative positions count from the
+end. Two slots on the same position — a clip and its sound — become one guide.
+
+`latent`, `video vae` and `audio vae` come straight back out, so the sampler and
+the next node hang off this one instead of reaching back across the graph. Both
+VAEs are required inputs rather than optional ones so they stay at the top of the
+node, above the guide list that grows.
+
+The anchoring itself is the core node's: same clip-length snapping, same audio
+cropping, same errors.
+
 ### 😺NKD Mask Painter
 
 **Use it to** paint a mask onto an image that doesn't exist as a file yet —

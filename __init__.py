@@ -17,6 +17,7 @@ from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
 from .nkd_path_blur import NKDPathBlur
+from .nkd_minimax_guides import NKDMiniMaxGuides
 from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
@@ -48,6 +49,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDVectorMask,
             NKDFieldBlur,
             NKDPathBlur,
+            NKDMiniMaxGuides,
         ]
 
 
@@ -77,6 +79,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDVectorMask": NKDVectorMask,
     "NKDFieldBlur": NKDFieldBlur,
     "NKDPathBlur": NKDPathBlur,
+    "NKDMiniMaxGuides": NKDMiniMaxGuides,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -100,6 +103,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDVectorMask": "😺NKD Vector Mask",
     "NKDFieldBlur": "😺NKD Field Blur",
     "NKDPathBlur": "😺NKD Path Blur",
+    "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

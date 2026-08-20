@@ -102,6 +102,29 @@ const RULES = {
       refreshNode(node);
     },
   },
+  // The guide sockets grow on their own (autogrow); the position widget of a slot
+  // only means something once something is plugged into that slot, so it rides along.
+  NKDMiniMaxGuides: {
+    watch: [],
+    apply(node) {
+      // Deferred: autogrow adds and removes the guide sockets from its own
+      // connection handler, and ours may run before it has done so.
+      requestAnimationFrame(() => RULES.NKDMiniMaxGuides.sync(node));
+    },
+    sync(node) {
+      let found = false;
+      for (const w of node.widgets ?? []) {
+        if (!w.name?.startsWith("position_")) continue;
+        found = true;
+        const slot = `guide_${w.name.slice("position_".length)}`;
+        // endsWith, not ===: a dynamic input can arrive namespaced (guides.guide_3).
+        const input = node.inputs?.find((i) => i.name === slot || i.name?.endsWith(`.${slot}`));
+        if (input && input.link != null) showWidget(w);
+        else hideWidget(w);
+      }
+      if (found) refreshNode(node);
+    },
+  },
 };
 
 // widget.callback is the ONLY hook that fires in both renderers.
