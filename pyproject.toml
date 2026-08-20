@@ -4,16 +4,18 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "comfyui-nkd-basic-tools"
-version = "1.12.0"
-description = "Everyday utility nodes for ComfyUI: inpaint crop & stitch, hand-drawn vector masks, path and field blur, mask painting and cleanup, colour grading, gradients, noise and grain — each with a live preview in the node."
+version = "1.13.0"
+description = "Everyday utility nodes for ComfyUI: inpaint crop & stitch, a live face rig for portrait expressions, hand-drawn vector masks, path and field blur, mask painting and cleanup, colour grading, gradients, noise and grain — each with a live preview in the node."
 license = { text = "MIT" }
 requires-python = ">=3.10"
-dependencies = []
+# onnxruntime runs the LivePortrait landmark model for 😺NKD Face Rig; the
+# rest of the pack loads without it. ultralytics is optional on top (the
+# standard face detector) and never installed by us — its AGPL license must
+# be the user's own choice, and most setups already have it.
+dependencies = ["onnxruntime", "huggingface_hub"]
 
 [project.urls]
 Repository = "https://github.com/Nekodificador/ComfyUI-NKD-Basic-Tools"
 
 [tool.comfy]
 PublisherId = "nekodificador"
-DisplayName = "NKD Basic Tools"
-Icon = ""

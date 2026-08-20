@@ -6,3 +6,9 @@ CLAUDE.md
 
 # Herramienta de diagnóstico nuestra, no parte del pack
 tools/audio_seam.py
+
+js/facerig_dev.*
+.claude/
+tests/parity/out/
+tests/parity/
+src/faceRigDev.ts

@@ -20,6 +20,13 @@ from .nkd_path_blur import NKDPathBlur
 from .nkd_minimax_guides import NKDMiniMaxGuides
 from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
+try:
+    from .nkd_face_rig import NKDFaceRig
+    from . import nkd_face_rig_routes  # noqa: F401 — registers /nkd/facerig/*
+except Exception as exc:  # onnxruntime and friends are optional
+    NKDFaceRig = None
+    logging.warning("[NKD Basic Tools] 😺NKD Face Rig unavailable: %s", exc)
+
 logging.info("[NKD Basic Tools] loaded — Crop outputs: model, image, mask, latent, crop_data")
 
 WEB_DIRECTORY = "./js"
@@ -50,7 +57,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDFieldBlur,
             NKDPathBlur,
             NKDMiniMaxGuides,
-        ]
+        ] + ([NKDFaceRig] if NKDFaceRig is not None else [])
 
 
 async def comfy_entrypoint() -> NKDBasicToolsExtension:
@@ -105,5 +112,9 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDPathBlur": "😺NKD Path Blur",
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
 }
+
+if NKDFaceRig is not None:
+    NODE_CLASS_MAPPINGS["NKDFaceRig"] = NKDFaceRig
+    NODE_DISPLAY_NAME_MAPPINGS["NKDFaceRig"] = "😺NKD Face Rig"
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS", "WEB_DIRECTORY"]

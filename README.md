@@ -380,6 +380,29 @@ several and each stage stays editable.
 
 ---
 
+## Faces
+
+### 😺NKD Face Rig
+
+**Use it to** pose a portrait's expression by dragging handles that sit on the
+face itself — brows, eyelids, gaze, mouth corners, jaw, head — with the result
+re-rendering live while you drag. Powered by LivePortrait (vendored, MIT): a
+facial rig on the picture instead of a bank of number boxes, and byte-exact
+compatibility with the slider values of classic expression workflows.
+
+The editor lives right in the node — no modal, no extra window. Handles hang
+off the detected landmarks and follow the face when it turns; left/right
+brows and eyelids move independently, with a breakable mirror; expression
+presets (happy, surprised, sad, angry, afraid, disgusted) are the standard
+EMFACS action-unit combinations, layered on dials rather than overwriting
+your pose. Ctrl+Z undoes (while the pointer is over the editor), Shift is
+fine adjust, double-click resets a handle.
+
+Runs standalone — no other custom nodes needed. Weights (~600 MB) download
+automatically from Hugging Face into `models/liveportrait` on first use. If
+`ultralytics` is installed, the crop uses the standard YOLOv8 face detector;
+without it a built-in landmark bootstrap does the job.
+
 ## Blur
 
 > Both blur editors preview the **real** result, not an approximation: the

@@ -6549,7 +6549,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       }
       if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
     }
-    function serialise() {
+    function serialise2() {
       const el = editor.value;
       if (!el) return "";
       let out = "";
@@ -6571,12 +6571,12 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       walk(el);
       return out;
     }
-    function deserialise(text) {
+    function deserialise2(text) {
       renderText(text);
     }
     function emitChange() {
       window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => props.onChange(serialise()), 120);
+      debounceTimer = window.setTimeout(() => props.onChange(serialise2()), 120);
     }
     function onInput() {
       emitChange();
@@ -6655,7 +6655,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     }
     onMounted(() => {
     });
-    __expose({ serialise, deserialise, setVariables, cleanup });
+    __expose({ serialise: serialise2, deserialise: deserialise2, setVariables, cleanup });
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
         class: "nkd-pv",
@@ -7129,7 +7129,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       redraw();
     }
     let debounceTimer;
-    function serialise() {
+    function serialise2() {
       return JSON.stringify({
         stops: [...stops.value].sort((a, b) => a.pos - b.pos),
         interp: interp2.value
@@ -7137,9 +7137,9 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     }
     function emitChange() {
       window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => props.onChange(serialise()), 60);
+      debounceTimer = window.setTimeout(() => props.onChange(serialise2()), 60);
     }
-    function deserialise(json) {
+    function deserialise2(json) {
       try {
         const data = JSON.parse(json);
         if (Array.isArray(data.stops) && data.stops.length >= 2) {
@@ -7243,7 +7243,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       loadPresets();
     });
     onBeforeUnmount(cleanup);
-    __expose({ serialise, deserialise, forceResize, cleanup });
+    __expose({ serialise: serialise2, deserialise: deserialise2, forceResize, cleanup });
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
         class: "nkd-root",
@@ -7748,13 +7748,13 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     function emitChange() {
       window.clearTimeout(debounceTimer);
       debounceTimer = window.setTimeout(() => {
-        props.onChange(serialise());
+        props.onChange(serialise2());
       }, 40);
     }
-    function serialise() {
+    function serialise2() {
       return JSON.stringify({ p0: p0.value, p1: p1.value, mid: mid.value });
     }
-    function deserialise(json) {
+    function deserialise2(json) {
       try {
         const data = JSON.parse(json);
         if (Array.isArray(data.p0) && Array.isArray(data.p1)) {
@@ -7805,7 +7805,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       syncCanvasSize();
     });
     onBeforeUnmount(cleanup);
-    __expose({ serialise, deserialise, refreshExternal, forceResize, cleanup, setSentImage });
+    __expose({ serialise: serialise2, deserialise: deserialise2, refreshExternal, forceResize, cleanup, setSentImage });
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
         class: "nkd-root",
@@ -11956,7 +11956,10 @@ function nkdSlider(label, cfg, onInput, title) {
     if (e.button !== 0 || rng.disabled) return;
     e.preventDefault();
     rng.focus();
-    rng.setPointerCapture(e.pointerId);
+    try {
+      rng.setPointerCapture(e.pointerId);
+    } catch {
+    }
     const rect = rng.getBoundingClientRect();
     const span = cfg.max - cfg.min;
     const width = Math.max(1, rect.width);
@@ -11988,7 +11991,10 @@ function nkdSlider(label, cfg, onInput, title) {
     const q = e.shiftKey ? fine : cfg.step;
     apply2(parseFloat(rng.value) + dir * q, e.shiftKey);
   });
-  wrap.append(document.createTextNode(label), rng);
+  const txt = document.createElement("span");
+  txt.className = "nkd-modal-lbl-txt";
+  txt.textContent = label;
+  wrap.append(txt, rng);
   if (out) wrap.appendChild(out);
   show(cfg.value);
   wrap.sync = (v) => {
@@ -12399,7 +12405,7 @@ function rampOffsets(rings) {
 }
 const RING = { inner: 16, maxWidth: 18, tol: 5 };
 const SCRUB_PX = 90;
-const FINE = 0.1;
+const FINE$1 = 0.1;
 function hitRing(px, py, cx, cy) {
   const d = Math.hypot(px - cx, py - cy);
   return d >= RING.inner - RING.tol && d <= RING.inner + RING.maxWidth + RING.tol;
@@ -12444,7 +12450,7 @@ function drawRing(ctx, cx, cy, value, color, selected, label) {
 function startScrub(startY, get, set) {
   let prev = startY;
   return (y, fine) => {
-    const delta = (prev - y) / SCRUB_PX * (fine ? FINE : 1);
+    const delta = (prev - y) / SCRUB_PX * (fine ? FINE$1 : 1);
     prev = y;
     set(Math.max(0, Math.min(1, get() + delta)));
   };
@@ -12642,7 +12648,7 @@ const HIT = 10;
 const PT_R = { idle: 4.5, hover: 6, active: 7 };
 const HANDLE_HIT = 7;
 const CLONE_HIT = 8;
-const UNDO_DEPTH = 30;
+const UNDO_DEPTH$1 = 30;
 const MIN_PTS = { shape: 3, path: 2 };
 const MARQUEE_MIN = 4;
 const RAMP_PX_PER_RING = 1;
@@ -13113,7 +13119,7 @@ class SplineEditor {
   /* ── Model ─────────────────────────────────────────────────────────────── */
   snapshot() {
     this.undo.push(this.serialise());
-    if (this.undo.length > UNDO_DEPTH) this.undo.shift();
+    if (this.undo.length > UNDO_DEPTH$1) this.undo.shift();
   }
   newShape() {
     return {
@@ -14436,6 +14442,923 @@ function readAspect(json) {
     return null;
   }
 }
+const STATE_DEFAULTS = {
+  rot: [0, 0, 0],
+  scale: 0,
+  trans: [0, 0],
+  ortho: false,
+  mirror: true
+};
+function deserialise(text) {
+  const state = { w: {}, p: {}, ...structuredClone(STATE_DEFAULTS) };
+  if (!text) return state;
+  try {
+    const raw = JSON.parse(text);
+    for (const [k, v] of Object.entries(raw.w ?? {})) state.w[k] = Number(v);
+    for (const [k, v] of Object.entries(raw.p ?? {})) state.p[k] = Number(v);
+    for (const k of Object.keys(STATE_DEFAULTS)) {
+      if (k in raw) state[k] = raw[k];
+    }
+  } catch {
+  }
+  return state;
+}
+const r5 = (v) => Math.round(v * 1e5) / 1e5;
+function serialise(s) {
+  const out = { v: 1, w: {} };
+  for (const [k, v] of Object.entries(s.w)) if (v) out.w[k] = r5(v);
+  const p2 = {};
+  for (const [k, v] of Object.entries(s.p)) if (v) p2[k] = r5(v);
+  if (Object.keys(p2).length) out.p = p2;
+  for (const k of Object.keys(STATE_DEFAULTS)) {
+    let v = s[k];
+    if (Array.isArray(v)) v = v.map((n) => r5(n));
+    if (JSON.stringify(v) !== JSON.stringify(STATE_DEFAULTS[k])) out[k] = v;
+  }
+  return JSON.stringify(out);
+}
+const CONTROLS = [
+  {
+    id: "brow_L",
+    kind: "pad",
+    anchor: "brow_L",
+    side: "L",
+    label: "brow",
+    yNeg: { axis: "au1_2_L", per: 1 },
+    // up = raise
+    xPos: { axis: "au4_L", per: 1 },
+    // inward (right, for the left brow) = furrow
+    mirror: "brow_R"
+  },
+  {
+    id: "brow_R",
+    kind: "pad",
+    anchor: "brow_R",
+    side: "R",
+    label: "brow",
+    yNeg: { axis: "au1_2_R", per: 1 },
+    xNeg: { axis: "au4_R", per: 1 },
+    mirror: "brow_L"
+  },
+  {
+    id: "lid_L",
+    kind: "slider",
+    anchor: "lid_L",
+    side: "L",
+    label: "eyelid",
+    yPos: { axis: "au45_L", per: 1 },
+    // down = close
+    mirror: "lid_R"
+  },
+  {
+    id: "lid_R",
+    kind: "slider",
+    anchor: "lid_R",
+    side: "R",
+    label: "eyelid",
+    yPos: { axis: "au45_R", per: 1 },
+    mirror: "lid_L"
+  },
+  // gaze is NOT here: it lives in the eye gizmo in the corner of the viewer,
+  // because a floating pad between the eyes overlapped brows and corners.
+  // The mouth corners both drive the same central axes — the latent space has
+  // no honest left/right smile split (kp14 IS the right corner; the real pair
+  // is 5x weaker). Two handles, one gesture: grab whichever corner is closer.
+  {
+    id: "corner_L",
+    kind: "pad",
+    anchor: "corner_L",
+    side: "C",
+    label: "smile · pucker",
+    yNeg: { axis: "au12", per: 1 },
+    // up = smile, down = frown
+    xPos: { axis: "au18", per: 1 },
+    // inward = pucker
+    xNeg: { axis: "au20", per: 1 }
+  },
+  // outward = stretch
+  {
+    id: "corner_R",
+    kind: "pad",
+    anchor: "corner_R",
+    side: "C",
+    label: "smile · pucker",
+    yNeg: { axis: "au12", per: 1 },
+    xNeg: { axis: "au18", per: 1 },
+    xPos: { axis: "au20", per: 1 }
+  },
+  {
+    id: "jaw",
+    kind: "slider",
+    anchor: "jaw",
+    side: "C",
+    label: "jaw",
+    yPos: { axis: "au26", per: 1 }
+  }
+  // down = open
+];
+const SIDE_COLOR = { L: "#4a90ff", R: "#ff5c5c", C: "#ffd24a" };
+const ACTIVE_COLOR = "#ffffff";
+const HANDLE_R = 17;
+const FINE = 0.1;
+const ROT_MAX = 20;
+const UNDO_DEPTH = 30;
+function mountFaceRig(host, opts) {
+  ensureNkdModalStyles();
+  const api2 = opts.apiBase ?? "";
+  let state = deserialise(opts.json);
+  const axisInfo = /* @__PURE__ */ new Map();
+  let anchors = {};
+  let outlines = {};
+  let frameImg = null;
+  const root = document.createElement("div");
+  root.className = "nkd-facerig";
+  root.style.cssText = "display:flex;flex-direction:column;gap:8px;width:100%;box-sizing:border-box;padding:4px 2px 12px;font:12px system-ui,sans-serif;color:#c8d0e0;";
+  const canvasWrap = document.createElement("div");
+  canvasWrap.style.cssText = "position:relative;width:100%;";
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "display:block;width:100%;touch-action:none;cursor:default;background:#0b0d12;border-radius:6px;";
+  canvasWrap.appendChild(canvas);
+  if (!document.getElementById("nkd-facerig-styles")) {
+    const st = document.createElement("style");
+    st.id = "nkd-facerig-styles";
+    st.textContent = ".nkd-fr-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(11,13,18,0.45);border-radius:6px;pointer-events:none;}.nkd-fr-loading span{color:rgba(255,255,255,0.6);font-size:11px;}.nkd-fr-dots{display:flex;gap:6px;}.nkd-fr-dots i{width:7px;height:7px;border-radius:50%;background:#4ab4ff;animation:nkd-fr-bounce 1.1s ease-in-out infinite;}.nkd-fr-dots i:nth-child(2){animation-delay:0.18s}.nkd-fr-dots i:nth-child(3){animation-delay:0.36s}@keyframes nkd-fr-bounce{0%,80%,100%{transform:scale(0.7);opacity:0.4}40%{transform:scale(1.15);opacity:1}}";
+    document.head.appendChild(st);
+  }
+  const loading = document.createElement("div");
+  loading.className = "nkd-fr-loading";
+  loading.style.display = "none";
+  loading.innerHTML = "<div class='nkd-fr-dots'><i></i><i></i><i></i></div><span>preparing…</span>";
+  canvasWrap.appendChild(loading);
+  let loadingTimer = 0;
+  function loadingSoon() {
+    if (!loadingTimer) {
+      loadingTimer = window.setTimeout(() => {
+        loading.style.display = "flex";
+      }, 300);
+    }
+  }
+  function loadingDone() {
+    if (loadingTimer) {
+      clearTimeout(loadingTimer);
+      loadingTimer = 0;
+    }
+    loading.style.display = "none";
+  }
+  root.appendChild(canvasWrap);
+  const ctx = canvas.getContext("2d");
+  const optRow = document.createElement("div");
+  optRow.style.cssText = "display:flex;gap:6px;";
+  const mirrorBtn = nkdToggle("mirror L ↔ R", state.mirror, (on) => {
+    state.mirror = on;
+    commit();
+  }, "Dragging a paired handle moves its twin too");
+  const resetBtn = nkdButton("reset pose", () => {
+    var _a;
+    pushUndo();
+    state = { w: {}, p: {}, ...structuredClone(STATE_DEFAULTS), mirror: state.mirror };
+    (_a = opts.onPresetsReset) == null ? void 0 : _a.call(opts);
+    drawOverlay();
+    commit();
+  });
+  mirrorBtn.style.flex = resetBtn.style.flex = "1 1 0";
+  optRow.append(mirrorBtn, resetBtn);
+  root.appendChild(optRow);
+  const statusRow = document.createElement("div");
+  statusRow.style.cssText = "display:flex;gap:8px;min-height:14px;font-size:11px;";
+  const status = document.createElement("span");
+  status.className = "nkd-modal-status";
+  const warn = document.createElement("span");
+  warn.className = "nkd-modal-status bad";
+  const hint = document.createElement("span");
+  hint.style.cssText = "color:rgba(255,255,255,0.3);margin-left:auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+  hint.title = "Shift = fine · Alt = one side · double-click = reset · Ctrl+Z = undo";
+  hint.textContent = "Shift fine · Alt one side · dblclick reset · Ctrl+Z";
+  statusRow.append(status, warn, hint);
+  root.appendChild(statusRow);
+  host.appendChild(root);
+  const undoStack = [];
+  const redoStack = [];
+  function pushUndo() {
+    undoStack.push(serialise(state));
+    if (undoStack.length > UNDO_DEPTH) undoStack.shift();
+    redoStack.length = 0;
+  }
+  function restore(json) {
+    const p2 = state.p;
+    state = deserialise(json);
+    state.p = p2;
+    mirrorBtn.classList.toggle("on", state.mirror);
+    drawOverlay();
+    commit();
+  }
+  function onKey(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "z") return;
+    if (!root.matches(":hover")) return;
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.shiftKey) {
+      if (redoStack.length) {
+        undoStack.push(serialise(state));
+        restore(redoStack.pop());
+      }
+    } else if (undoStack.length) {
+      redoStack.push(serialise(state));
+      restore(undoStack.pop());
+    }
+  }
+  window.addEventListener("keydown", onKey, true);
+  let inflight = false;
+  let wanted = null;
+  let firstRender = true;
+  let sentCrop = null;
+  let token = 0;
+  function poseChanged() {
+    drawOverlay();
+    requestRender("drag");
+  }
+  function commit() {
+    var _a;
+    (_a = opts.onChange) == null ? void 0 : _a.call(opts, serialise(state));
+    requestRender("final");
+  }
+  function requestRender(quality) {
+    wanted = wanted === "final" ? "final" : quality;
+    if (inflight) return;
+    void pump();
+  }
+  async function pump() {
+    var _a, _b;
+    while (wanted) {
+      const quality = wanted;
+      wanted = null;
+      if (opts.hasSource && !opts.hasSource()) {
+        frameImg = null;
+        anchors = {};
+        outlines = {};
+        warn.textContent = "";
+        status.textContent = "";
+        drawAll();
+        break;
+      }
+      inflight = true;
+      loadingSoon();
+      const t0 = performance.now();
+      const my = ++token;
+      try {
+        const crop = opts.cropFactor();
+        const body = {
+          node: opts.nodeId,
+          rig: serialise(state),
+          quality,
+          crop_factor: crop,
+          src_ratio: opts.srcRatio()
+        };
+        if (sentCrop !== crop) {
+          const f = (_a = opts.frame) == null ? void 0 : _a.call(opts);
+          if (f) {
+            body.frame = f;
+            sentCrop = crop;
+          }
+        }
+        let res = await fetch(api2 + "/nkd/facerig/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body)
+        });
+        let data = await res.json();
+        if (data.needsFrame) {
+          const frame = (_b = opts.frame) == null ? void 0 : _b.call(opts);
+          if (!frame) {
+            warn.textContent = "connect an image, then drag a handle";
+            break;
+          }
+          body.frame = frame;
+          sentCrop = crop;
+          res = await fetch(api2 + "/nkd/facerig/preview", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body)
+          });
+          data = await res.json();
+        }
+        if (data.error) {
+          warn.textContent = data.error;
+          break;
+        }
+        if (my !== token) continue;
+        warn.textContent = data.warning ?? "";
+        if (data.anchors && (quality === "final" || !Object.keys(anchors).length)) {
+          anchors = data.anchors;
+          outlines = data.outlines ?? {};
+        }
+        await setFrame(data.image);
+        const dt = performance.now() - t0;
+        if (firstRender) firstRender = false;
+        status.textContent = `${dt.toFixed(0)} ms`;
+      } catch (e) {
+        warn.textContent = String((e == null ? void 0 : e.message) ?? e);
+        break;
+      } finally {
+        inflight = false;
+        loadingDone();
+      }
+    }
+    inflight = false;
+    loadingDone();
+  }
+  function setFrame(dataUrl) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        frameImg = img;
+        layout();
+        drawAll();
+        resolve();
+      };
+      img.onerror = () => resolve();
+      img.src = dataUrl;
+    });
+  }
+  let view = { size: 300, dpr: 1 };
+  function layout() {
+    const size = Math.max(64, Math.floor(root.clientWidth || host.clientWidth || 300));
+    const rectW = canvas.getBoundingClientRect().width;
+    const zoom = rectW > 0 ? rectW / size : 1;
+    const scale = Math.min(3, Math.max(1, (window.devicePixelRatio || 1) * zoom));
+    const px = Math.round(size * scale);
+    if (canvas.width !== px || canvas.height !== px) {
+      canvas.width = px;
+      canvas.height = px;
+      canvas.style.height = size + "px";
+    }
+    view = { size, dpr: scale };
+  }
+  const GIZMO_R = 30;
+  const GIZMO_RING = 11;
+  const gizmoCenter = () => {
+    const m = GIZMO_R + GIZMO_RING + 10;
+    return [view.size - m, view.size - m];
+  };
+  const GAZE_RX = 32;
+  const GAZE_RY = 20;
+  const gazeCenter = () => [GAZE_RX + 16, view.size - GAZE_RY - 18];
+  const gazeVal = () => [
+    (state.w["au61"] ?? 0) - (state.w["au62"] ?? 0),
+    // +x = look right
+    (state.w["au64"] ?? 0) - (state.w["au63"] ?? 0)
+    // +y = look down
+  ];
+  function gizmoZone(x, y) {
+    if (view.size < 200) return null;
+    const [gx, gy] = gizmoCenter();
+    const d = Math.hypot(x - gx, y - gy);
+    if (d <= GIZMO_R) return "sphere";
+    if (d <= GIZMO_R + GIZMO_RING + 4) return "ring";
+    const [ex, ey] = gazeCenter();
+    const nx = (x - ex) / (GAZE_RX + 5), ny = (y - ey) / (GAZE_RY + 6);
+    if (nx * nx + ny * ny <= 1) return "gaze";
+    return null;
+  }
+  let gizmoActive = null;
+  function drawGazeGizmo() {
+    const [ex, ey] = gazeCenter();
+    const on = gizmoActive === "gaze";
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(11,13,18,0.55)";
+    ctx.strokeStyle = on ? ACTIVE_COLOR : "rgba(200,208,224,0.5)";
+    ctx.beginPath();
+    ctx.moveTo(ex - GAZE_RX, ey);
+    ctx.quadraticCurveTo(ex, ey - GAZE_RY * 2, ex + GAZE_RX, ey);
+    ctx.quadraticCurveTo(ex, ey + GAZE_RY * 2, ex - GAZE_RX, ey);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    const [vx, vy] = gazeVal();
+    const ix = ex + vx * (GAZE_RX - 12);
+    const iy = ey + vy * (GAZE_RY - 8);
+    ctx.strokeStyle = on ? ACTIVE_COLOR : SIDE_COLOR.C;
+    ctx.beginPath();
+    ctx.arc(ix, iy, 8, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = on ? ACTIVE_COLOR : SIDE_COLOR.C;
+    ctx.beginPath();
+    ctx.arc(ix, iy, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    if (on || vx !== 0 || vy !== 0) {
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.fillText("gaze", ex - GAZE_RX, ey - GAZE_RY - 8);
+    }
+    ctx.restore();
+  }
+  function drawHeadGizmo() {
+    const [gx, gy] = gizmoCenter();
+    const rollRad = state.rot[2] * Math.PI / 180;
+    ctx.save();
+    ctx.lineWidth = 1;
+    const rr = GIZMO_R + GIZMO_RING / 2 + 2;
+    ctx.strokeStyle = gizmoActive === "ring" ? ACTIVE_COLOR : "rgba(200,208,224,0.45)";
+    ctx.beginPath();
+    ctx.arc(gx, gy, rr, 0, Math.PI * 2);
+    ctx.stroke();
+    if (state.rot[2] !== 0) {
+      ctx.strokeStyle = SIDE_COLOR.C;
+      ctx.beginPath();
+      ctx.arc(gx, gy, rr, -Math.PI / 2, -Math.PI / 2 + rollRad, rollRad < 0);
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.lineWidth = 1;
+    }
+    ctx.strokeStyle = gizmoActive === "ring" ? ACTIVE_COLOR : SIDE_COLOR.C;
+    ctx.beginPath();
+    ctx.moveTo(gx + (rr - 6) * Math.sin(rollRad), gy - (rr - 6) * Math.cos(rollRad));
+    ctx.lineTo(gx + (rr + 6) * Math.sin(rollRad), gy - (rr + 6) * Math.cos(rollRad));
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.fillStyle = "rgba(11,13,18,0.55)";
+    ctx.beginPath();
+    ctx.arc(gx, gy, GIZMO_R, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = gizmoActive === "sphere" ? ACTIVE_COLOR : "rgba(200,208,224,0.5)";
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(200,208,224,0.18)";
+    ctx.beginPath();
+    ctx.ellipse(gx, gy, GIZMO_R * 0.55, GIZMO_R, 0, 0, Math.PI * 2);
+    ctx.moveTo(gx - GIZMO_R, gy);
+    ctx.lineTo(gx + GIZMO_R, gy);
+    ctx.stroke();
+    const bx = gx + state.rot[1] / ROT_MAX * (GIZMO_R - 7);
+    const by = gy + state.rot[0] / ROT_MAX * (GIZMO_R - 7);
+    ctx.strokeStyle = gizmoActive === "sphere" ? ACTIVE_COLOR : SIDE_COLOR.C;
+    ctx.strokeRect(bx - 4.5, by - 4.5, 9, 9);
+    if (gizmoActive || state.rot.some((v) => v !== 0)) {
+      ctx.fillStyle = "rgba(255,255,255,0.6)";
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(
+        `${state.rot[1].toFixed(0)}° ${state.rot[0].toFixed(0)}° ${state.rot[2].toFixed(0)}°`,
+        gx,
+        gy - GIZMO_R - GIZMO_RING - 8
+      );
+      ctx.textAlign = "left";
+    }
+    ctx.restore();
+  }
+  const toScreen = (p2) => [p2[0] * view.size, p2[1] * view.size];
+  function handleOffset(c) {
+    const get = (d) => d ? (state.w[d.axis] ?? 0) / d.per : 0;
+    let dx = 0, dy = 0;
+    if (c.kind === "pad") {
+      dx = get(c.xPos) - get(c.xNeg);
+      dy = get(c.yPos) - get(c.yNeg);
+    } else {
+      dy = get(c.yPos) - get(c.yNeg);
+    }
+    return [dx * HANDLE_R, dy * HANDLE_R];
+  }
+  function handleCenter(c) {
+    const a = anchors[c.anchor];
+    if (!a) return null;
+    const [ax, ay] = toScreen(a);
+    const [dx, dy] = handleOffset(c);
+    return [ax + dx, ay + dy];
+  }
+  let active2 = null;
+  let hover = null;
+  const FADE_MS = 100;
+  const fadeA = /* @__PURE__ */ new Map();
+  let fadeTimer = 0;
+  let lastFadeTs = 0;
+  const targetAlpha = (c) => active2 === c || !active2 && hover === c ? 1 : 0;
+  function stepFade() {
+    fadeTimer = 0;
+    const now = performance.now();
+    const dt = lastFadeTs ? now - lastFadeTs : 16;
+    lastFadeTs = now;
+    let busy = false;
+    for (const c of CONTROLS) {
+      const cur = fadeA.get(c.id) ?? 0;
+      const tgt = targetAlpha(c);
+      if (cur === tgt) continue;
+      const step = dt / FADE_MS;
+      fadeA.set(c.id, cur < tgt ? Math.min(tgt, cur + step) : Math.max(tgt, cur - step));
+      busy = true;
+    }
+    drawOverlay();
+    if (busy) fadeTimer = window.setTimeout(stepFade, 16);
+    else lastFadeTs = 0;
+  }
+  function kickFade() {
+    if (!fadeTimer) {
+      lastFadeTs = 0;
+      fadeTimer = window.setTimeout(stepFade, 0);
+    }
+  }
+  const OUTLINE_FOR = {
+    brow_L: ["brow_L"],
+    brow_R: ["brow_R"],
+    lid_L: ["eye_L"],
+    lid_R: ["eye_R"],
+    corner_L: ["lips"],
+    corner_R: ["lips"],
+    jaw: ["lips"]
+  };
+  function outlineAlpha(name) {
+    var _a;
+    let a = 0;
+    for (const c of CONTROLS) {
+      if ((_a = OUTLINE_FOR[c.id]) == null ? void 0 : _a.includes(name)) a = Math.max(a, fadeA.get(c.id) ?? 0);
+    }
+    return a;
+  }
+  function drawAll() {
+    ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
+    ctx.clearRect(0, 0, view.size, view.size);
+    if (frameImg) ctx.drawImage(frameImg, 0, 0, view.size, view.size);
+    else {
+      ctx.fillStyle = "rgba(255,255,255,0.25)";
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("connect an image", view.size / 2, view.size / 2);
+      ctx.textAlign = "left";
+    }
+    drawOverlay(true);
+  }
+  function drawOverlay(alreadyCleared = false) {
+    if (!alreadyCleared) {
+      drawAll();
+      return;
+    }
+    ctx.lineWidth = 1;
+    for (const [name, pts] of Object.entries(outlines)) {
+      if (!(pts == null ? void 0 : pts.length)) continue;
+      const oa = outlineAlpha(name);
+      if (oa <= 0.01) continue;
+      const side = name.endsWith("_L") ? "L" : name.endsWith("_R") ? "R" : "C";
+      ctx.globalAlpha = oa * 0.33;
+      ctx.strokeStyle = SIDE_COLOR[side];
+      ctx.beginPath();
+      pts.forEach((p2, i) => {
+        const [x, y] = toScreen(p2);
+        i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+      });
+      ctx.closePath();
+      ctx.stroke();
+    }
+    for (const c of CONTROLS) {
+      const a = anchors[c.anchor];
+      if (!a) continue;
+      const fa = fadeA.get(c.id) ?? 0;
+      if (fa <= 0.01) continue;
+      const [ax, ay] = toScreen(a);
+      const isActive = active2 === c || !active2 && hover === c;
+      const color = isActive ? ACTIVE_COLOR : SIDE_COLOR[c.side];
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      if (c.kind === "pad") {
+        ctx.globalAlpha = fa * 0.9;
+        ctx.beginPath();
+        ctx.arc(ax, ay, HANDLE_R, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        ctx.globalAlpha = fa * 0.9;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay - HANDLE_R);
+        ctx.lineTo(ax, ay + HANDLE_R);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(ax - 4, ay - HANDLE_R);
+        ctx.lineTo(ax + 4, ay - HANDLE_R);
+        ctx.moveTo(ax - 4, ay + HANDLE_R);
+        ctx.lineTo(ax + 4, ay + HANDLE_R);
+        ctx.stroke();
+      }
+      const [hx, hy] = handleCenter(c);
+      ctx.globalAlpha = fa;
+      if (c.kind === "pad") {
+        ctx.strokeRect(hx - 4.5, hy - 4.5, 9, 9);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(hx - 5, hy);
+        ctx.lineTo(hx + 4, hy - 5);
+        ctx.lineTo(hx + 4, hy + 5);
+        ctx.closePath();
+        ctx.stroke();
+      }
+      if (isActive) {
+        ctx.globalAlpha = fa * 0.8;
+        ctx.font = "11px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(c.label, ax, ay - HANDLE_R - 6);
+        ctx.textAlign = "left";
+      }
+    }
+    ctx.globalAlpha = 1;
+    if (frameImg && view.size >= 200) {
+      drawHeadGizmo();
+      drawGazeGizmo();
+    }
+  }
+  function pick(x, y) {
+    let best = null;
+    let bestD = 22;
+    for (const c of CONTROLS) {
+      const hc = handleCenter(c);
+      if (!hc) continue;
+      const d = Math.hypot(hc[0] - x, hc[1] - y);
+      if (d < bestD) {
+        bestD = d;
+        best = c;
+      }
+    }
+    return best;
+  }
+  function clampAxis(name, v) {
+    const info = axisInfo.get(name);
+    const lo = (info == null ? void 0 : info.lo) ?? -1, hi = (info == null ? void 0 : info.hi) ?? 1;
+    return Math.max(lo, Math.min(hi, v));
+  }
+  function setAxis(name, v, mirrorFrom, noMirror = false) {
+    v = clampAxis(name, v);
+    if (v) state.w[name] = v;
+    else delete state.w[name];
+    if (!noMirror && state.mirror && (mirrorFrom == null ? void 0 : mirrorFrom.mirror)) {
+      const twin = name.endsWith("_L") ? name.slice(0, -2) + "_R" : name.endsWith("_R") ? name.slice(0, -2) + "_L" : null;
+      if (twin && axisInfo.has(twin)) {
+        const tv = clampAxis(twin, v);
+        if (tv) state.w[twin] = tv;
+        else delete state.w[twin];
+      }
+    }
+  }
+  const zoomScale = () => {
+    const r = canvas.getBoundingClientRect();
+    return r.width > 0 ? view.size / r.width : 1;
+  };
+  const canvasXY = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const k = r.width > 0 ? view.size / r.width : 1;
+    return [(e.clientX - r.left) * k, (e.clientY - r.top) * k];
+  };
+  canvas.addEventListener("pointermove", (e) => {
+    if (active2 || gizmoActive) return;
+    const [x, y] = canvasXY(e);
+    const z = frameImg ? gizmoZone(x, y) : null;
+    const h = z ? null : pick(x, y);
+    if (h !== hover) {
+      hover = h;
+      kickFade();
+    }
+    canvas.style.cursor = z || h ? "grab" : "default";
+  });
+  canvas.addEventListener("pointerleave", () => {
+    if (active2 || gizmoActive) return;
+    if (hover) {
+      hover = null;
+      kickFade();
+    }
+    canvas.style.cursor = "default";
+  });
+  canvas.addEventListener("dblclick", (e) => {
+    const [x, y] = canvasXY(e);
+    const z = frameImg ? gizmoZone(x, y) : null;
+    if (z) {
+      pushUndo();
+      if (z === "sphere") {
+        state.rot[0] = 0;
+        state.rot[1] = 0;
+      } else if (z === "ring") state.rot[2] = 0;
+      else for (const a of ["au61", "au62", "au63", "au64"]) delete state.w[a];
+      poseChanged();
+      commit();
+      return;
+    }
+    const c = pick(x, y);
+    if (!c) return;
+    pushUndo();
+    for (const d of [c.xPos, c.xNeg, c.yPos, c.yNeg]) {
+      if (!d) continue;
+      delete state.w[d.axis];
+      if (state.mirror) {
+        const twin = d.axis.endsWith("_L") ? d.axis.slice(0, -2) + "_R" : d.axis.endsWith("_R") ? d.axis.slice(0, -2) + "_L" : null;
+        if (twin) delete state.w[twin];
+      }
+    }
+    poseChanged();
+    commit();
+  });
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const [px, py] = canvasXY(e);
+    const z = frameImg ? gizmoZone(px, py) : null;
+    if (z) {
+      startGizmoDrag(e, z, px, py);
+      return;
+    }
+    const c = pick(px, py);
+    if (!c) {
+      if (!frameImg) requestRender("final");
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+    }
+    active2 = c;
+    kickFade();
+    canvas.style.cursor = "grabbing";
+    pushUndo();
+    const k = zoomScale();
+    let prevX = e.clientX, prevY = e.clientY;
+    const move = (ev) => {
+      const gain = (ev.shiftKey ? FINE : 1) * k / HANDLE_R;
+      const dx = (ev.clientX - prevX) * gain;
+      const dy = (ev.clientY - prevY) * gain;
+      prevX = ev.clientX;
+      prevY = ev.clientY;
+      const noMir = ev.altKey;
+      const bump = (pos, neg, d = 0) => {
+        if (!d) return;
+        if (pos && neg) {
+          const cur = (state.w[pos.axis] ?? 0) - (state.w[neg.axis] ?? 0);
+          const next = cur + d;
+          setAxis(pos.axis, Math.max(0, next), c, noMir);
+          setAxis(neg.axis, Math.max(0, -next), c, noMir);
+        } else if (pos) {
+          setAxis(pos.axis, (state.w[pos.axis] ?? 0) + d, c, noMir);
+        } else if (neg) {
+          setAxis(neg.axis, (state.w[neg.axis] ?? 0) - d, c, noMir);
+        }
+      };
+      if (c.kind === "pad") bump(c.xPos, c.xNeg, dx);
+      bump(c.yPos, c.yNeg, dy);
+      poseChanged();
+    };
+    const up = (ev) => {
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", up);
+      try {
+        canvas.releasePointerCapture(ev.pointerId);
+      } catch {
+      }
+      active2 = null;
+      kickFade();
+      canvas.style.cursor = "grab";
+      commit();
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+  });
+  function startGizmoDrag(e, zone, px, py) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+    }
+    gizmoActive = zone;
+    canvas.style.cursor = "grabbing";
+    pushUndo();
+    const k = zoomScale();
+    const [gx, gy] = gizmoCenter();
+    const g = ROT_MAX / (GIZMO_R - 7);
+    let prevX = e.clientX, prevY = e.clientY;
+    let prevAngle = Math.atan2(px - gx, -(py - gy));
+    const drain = (pos, neg, d) => {
+      if (!d) return;
+      const cur = (state.w[pos] ?? 0) - (state.w[neg] ?? 0);
+      const next = Math.max(-1, Math.min(1, cur + d));
+      if (next >= 0) {
+        state.w[pos] = next;
+        delete state.w[neg];
+      } else {
+        state.w[neg] = -next;
+        delete state.w[pos];
+      }
+      if (!state.w[pos]) delete state.w[pos];
+      if (!state.w[neg]) delete state.w[neg];
+    };
+    const move = (ev) => {
+      const fine = ev.shiftKey ? FINE : 1;
+      if (zone === "gaze") {
+        drain("au61", "au62", (ev.clientX - prevX) * k * fine / (GAZE_RX - 12));
+        drain("au64", "au63", (ev.clientY - prevY) * k * fine / (GAZE_RY - 8));
+        prevX = ev.clientX;
+        prevY = ev.clientY;
+      } else if (zone === "sphere") {
+        state.rot[1] = Math.max(-ROT_MAX, Math.min(
+          ROT_MAX,
+          state.rot[1] + (ev.clientX - prevX) * k * g * fine
+        ));
+        state.rot[0] = Math.max(-ROT_MAX, Math.min(
+          ROT_MAX,
+          state.rot[0] + (ev.clientY - prevY) * k * g * fine
+        ));
+        prevX = ev.clientX;
+        prevY = ev.clientY;
+      } else {
+        const [mx, my] = canvasXY(ev);
+        const angle = Math.atan2(mx - gx, -(my - gy));
+        let d = angle - prevAngle;
+        if (d > Math.PI) d -= 2 * Math.PI;
+        if (d < -Math.PI) d += 2 * Math.PI;
+        prevAngle = angle;
+        state.rot[2] = Math.max(-ROT_MAX, Math.min(
+          ROT_MAX,
+          state.rot[2] + d * 180 / Math.PI * fine
+        ));
+      }
+      poseChanged();
+    };
+    const up = (ev) => {
+      canvas.removeEventListener("pointermove", move);
+      canvas.removeEventListener("pointerup", up);
+      canvas.removeEventListener("pointercancel", up);
+      try {
+        canvas.releasePointerCapture(ev.pointerId);
+      } catch {
+      }
+      gizmoActive = null;
+      canvas.style.cursor = "grab";
+      commit();
+    };
+    canvas.addEventListener("pointermove", move);
+    canvas.addEventListener("pointerup", up);
+    canvas.addEventListener("pointercancel", up);
+  }
+  function ensureLaidOut(tries = 0) {
+    layout();
+    if (view.size <= 64 && tries < 20) setTimeout(() => ensureLaidOut(tries + 1), 50);
+    else drawAll();
+  }
+  const ro = new ResizeObserver(() => {
+    layout();
+    drawAll();
+  });
+  ro.observe(root);
+  let lastRectW = 0;
+  const zoomPoll = window.setInterval(() => {
+    const w = canvas.getBoundingClientRect().width;
+    if (Math.abs(w - lastRectW) > 1) {
+      lastRectW = w;
+      layout();
+      drawAll();
+    }
+  }, 400);
+  ensureLaidOut();
+  void fetch(api2 + "/nkd/facerig/library").then(async (r) => {
+    const lib = await r.json();
+    for (const a of lib.axes ?? []) axisInfo.set(a.name, a);
+  }).catch(() => {
+  });
+  requestRender("final");
+  window.__nkdFaceRig = {
+    get state() {
+      return state;
+    },
+    get anchors() {
+      return anchors;
+    },
+    canvas,
+    handleXY: (id) => handleCenter(CONTROLS.find((c) => c.id === id)),
+    serialise: () => serialise(state)
+  };
+  return {
+    root,
+    serialise: () => serialise(state),
+    retry: () => requestRender("final"),
+    refreshSource() {
+      sentCrop = null;
+      requestRender("final");
+    },
+    setJson(json) {
+      const p2 = state.p;
+      state = deserialise(json);
+      state.p = p2;
+      mirrorBtn.classList.toggle("on", state.mirror);
+      drawOverlay();
+      requestRender("final");
+    },
+    setPresets(p2) {
+      state.p = p2;
+      poseChanged();
+    },
+    destroy() {
+      window.removeEventListener("keydown", onKey, true);
+      ro.disconnect();
+      clearInterval(zoomPoll);
+      if (fadeTimer) clearTimeout(fadeTimer);
+      root.remove();
+    }
+  };
+}
 const PROP = "nkdSchema";
 const findW = (node, name) => {
   var _a;
@@ -14504,7 +15427,8 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDMaskPainter: 1,
   NKDVectorMask: 1,
   NKDFieldBlur: 1,
-  NKDPathBlur: 1
+  NKDPathBlur: 1,
+  NKDFaceRig: 1
 });
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -15605,6 +16529,179 @@ registerSplineNode(
   "Place blur pins",
   { kind: "field", params: ["max_blur", "falloff"] }
 );
+app.registerExtension({
+  name: "NKD.BasicTools.NKDFaceRig",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDFaceRig") return;
+    if (nodeType.prototype["__nkd_NKDFaceRig"]) return;
+    nodeType.prototype["__nkd_NKDFaceRig"] = true;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      var _a, _b, _c;
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const node = this;
+      const hideW = (w) => {
+        w.hidden = true;
+        if (w.options) w.options.hidden = true;
+        w.computedHeight = 0;
+        w.computeSize = () => [0, -4];
+      };
+      const showW = (w) => {
+        w.hidden = false;
+        if (w.options) w.options.hidden = false;
+        delete w.computeSize;
+        w.computedHeight = void 0;
+      };
+      const refreshNode = () => {
+        var _a2, _b2;
+        if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
+        (_b2 = (_a2 = node.graph) == null ? void 0 : _a2.trigger) == null ? void 0 : _b2.call(_a2, "node:property:changed", {
+          type: "node:property:changed",
+          nodeId: node.id,
+          property: "bgcolor",
+          oldValue: node.bgcolor,
+          newValue: node.bgcolor
+          // unchanged → visually a no-op
+        });
+        if (node.size) node.setSize([node.size[0], node.computeSize()[1]]);
+        node.setDirtyCanvas(true, true);
+      };
+      const dataW = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "rig");
+      if (dataW) {
+        dataW.type = "hidden";
+        hideW(dataW);
+      }
+      const container = document.createElement("div");
+      container.style.cssText = "width:100%;box-sizing:border-box;overflow:hidden;";
+      const PRESET_NAMES = ["happy", "surprised", "sad", "angry", "afraid", "disgusted"];
+      const presetWs = PRESET_NAMES.map((n) => {
+        var _a2;
+        return (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === n);
+      }).filter(Boolean);
+      const collectPresets = () => {
+        const p2 = {};
+        for (const w of presetWs) if (Number(w.value)) p2[w.name] = Number(w.value);
+        return p2;
+      };
+      const rig = mountFaceRig(container, {
+        nodeId: String(node.id),
+        json: (dataW == null ? void 0 : dataW.value) || "",
+        cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2),
+        srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1),
+        hasSource: () => {
+          var _a2, _b2;
+          return ((_b2 = (_a2 = node.inputs) == null ? void 0 : _a2.find((i) => i.name === "image")) == null ? void 0 : _b2.link) != null;
+        },
+        onPresetsReset: () => {
+          for (const w of presetWs) w.value = 0;
+          node.setDirtyCanvas(true, true);
+        },
+        frame: () => {
+          const img = findSourceImg(node, "image");
+          if (!img) {
+            void findSourceImgAsync(node, "image");
+            return null;
+          }
+          const c = document.createElement("canvas");
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          c.getContext("2d").drawImage(img, 0, 0);
+          try {
+            return c.toDataURL("image/png");
+          } catch {
+            return null;
+          }
+        },
+        onChange: (json) => {
+          if (dataW) dataW.value = json;
+          node.setDirtyCanvas(true, true);
+        }
+      });
+      const domW = this.addDOMWidget("face_rig_editor", "FACE_RIG_EDITOR", container, {
+        getValue: () => rig.serialise(),
+        setValue: (v) => {
+          if (dataW) dataW.value = v;
+          rig.setJson(v || "");
+        },
+        serialize: false
+        // the `rig` STRING widget is the store
+      });
+      if (domW) domW.serialize = false;
+      sizeDomWidgetToContent(node, domW, container, 300, (w) => w + 70);
+      for (const w of presetWs) {
+        const orig = w.callback;
+        w.callback = function(...args) {
+          const r = orig == null ? void 0 : orig.apply(this, args);
+          rig.setPresets(collectPresets());
+          return r;
+        };
+      }
+      for (const name of ["crop_factor", "src_ratio"]) {
+        const w = (_b = this.widgets) == null ? void 0 : _b.find((x) => x.name === name);
+        if (!w) continue;
+        const orig = w.callback;
+        w.callback = function(...args) {
+          const r = orig == null ? void 0 : orig.apply(this, args);
+          rig.retry();
+          return r;
+        };
+      }
+      if (Object.keys(collectPresets()).length) rig.setPresets(collectPresets());
+      const expW = (_c = this.widgets) == null ? void 0 : _c.find((w) => w.name === "expressions");
+      const showPresets = (on) => {
+        for (const w of presetWs) (on ? showW : hideW)(w);
+        refreshNode();
+      };
+      setTimeout(() => showPresets(!!(expW == null ? void 0 : expW.value)), 0);
+      if (expW) {
+        const origExp = expW.callback;
+        expW.callback = function(...args) {
+          const r = origExp == null ? void 0 : origExp.apply(this, args);
+          showPresets(!!expW.value);
+          return r;
+        };
+      }
+      for (const t of [250, 750, 1500]) {
+        setTimeout(() => {
+          if (!node.size) return;
+          const needed = node.computeSize();
+          if (Math.abs(needed[1] - node.size[1]) > 2) {
+            node.setSize([node.size[0], needed[1]]);
+            node.setDirtyCanvas(true, true);
+          }
+        }, t);
+      }
+      const origConn = this.onConnectionsChange;
+      this.onConnectionsChange = function() {
+        origConn == null ? void 0 : origConn.apply(this, arguments);
+        void findSourceImgAsync(node, "image").then(() => rig.retry());
+      };
+      let lastSrcUrl = upstreamImageUrl(node, "image");
+      const srcPoll = window.setInterval(() => {
+        const url = upstreamImageUrl(node, "image");
+        if (url === lastSrcUrl) return;
+        lastSrcUrl = url;
+        void findSourceImgAsync(node, "image").then(() => rig.refreshSource());
+      }, 500);
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        setTimeout(() => {
+          rig.setPresets(collectPresets());
+          showPresets(!!(expW == null ? void 0 : expW.value));
+          if (dataW == null ? void 0 : dataW.value) rig.setJson(String(dataW.value));
+        }, 0);
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        clearInterval(srcPoll);
+        rig.destroy();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
 console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DEBUG=true traces how the editors load their image)");
 (function() {
   "use strict";

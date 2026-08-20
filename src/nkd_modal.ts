@@ -323,7 +323,7 @@ export function nkdSlider(label: string, cfg: NkdSliderCfg,
     if (e.button !== 0 || rng.disabled) return;
     e.preventDefault();                        // ours now, not the browser's
     rng.focus();
-    rng.setPointerCapture(e.pointerId);
+    try { rng.setPointerCapture(e.pointerId); } catch { /* synthetic events have no real pointer */ }
     const rect = rng.getBoundingClientRect();
     const span = cfg.max - cfg.min;
     const width = Math.max(1, rect.width);
@@ -362,7 +362,12 @@ export function nkdSlider(label: string, cfg: NkdSliderCfg,
     apply(parseFloat(rng.value) + dir * q, e.shiftKey);
   });
 
-  wrap.append(document.createTextNode(label), rng);
+  // A span, not a bare text node, so callers can align a column of sliders
+  // by giving every label the same width (see the face rig's panel).
+  const txt = document.createElement("span");
+  txt.className = "nkd-modal-lbl-txt";
+  txt.textContent = label;
+  wrap.append(txt, rng);
   if (out) wrap.appendChild(out);
   show(cfg.value);
 

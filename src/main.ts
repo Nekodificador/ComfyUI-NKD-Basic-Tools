@@ -12,6 +12,7 @@ import NoisePreviewWidget from "./NoisePreviewWidget.vue";
 import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
 import { openColorWarpViewer, ColorWarpViewerHandle } from "./colorWarpViewer";
 import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
+import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
 
@@ -24,6 +25,7 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDFrequencySeparate: 1, NKDFrequencyCombine: 1, NKDColorWarp: 1,
   NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
+  NKDFaceRig: 1,
 });
 
 const NODE_NAME = "NKDPromptVariables";
@@ -1198,6 +1200,221 @@ registerSplineNode("NKDPathBlur", "paths", "path",
 registerSplineNode("NKDFieldBlur", "pins", "pin",
                    "😺 Field Blur", "Place blur pins",
                    { kind: "field", params: ["max_blur", "falloff"] });
+
+// ── 😺NKD Face Rig ─────────────────────────────────────────────────────────
+// The editor lives inside the node, Relight-style: no modal, no button. The
+// pose still lives in the hidden `rig` STRING widget (that is what the graph
+// serialises and the backend reads); the DOM widget is presentation only.
+
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.NKDFaceRig",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDFaceRig") return;
+    if (nodeType.prototype["__nkd_NKDFaceRig"]) return;
+    nodeType.prototype["__nkd_NKDFaceRig"] = true;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+      const node = this;
+
+      // Widget hiding that BOTH renderers respect (see the comfyui-node-frontend
+      // skill): the classic canvas reads `widget.hidden` + the computeSize
+      // collapse, the Vue renderer (Nodes 2.0) reads `widget.options.hidden`.
+      const hideW = (w: any) => {
+        w.hidden = true;
+        if (w.options) w.options.hidden = true;
+        w.computedHeight = 0;
+        w.computeSize = () => [0, -4];
+      };
+      const showW = (w: any) => {
+        w.hidden = false;
+        if (w.options) w.options.hidden = false;
+        delete w.computeSize;
+        w.computedHeight = undefined;
+      };
+      // Nodes 2.0 keeps widgets in a cached reactive snapshot that clones
+      // options.hidden — mutating it is not observed. Invalidate the snapshot
+      // and nudge the node's reactive data (the frontend's own trick), then
+      // do the classic-renderer resize.
+      const refreshNode = () => {
+        if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
+        node.graph?.trigger?.("node:property:changed", {
+          type: "node:property:changed",
+          nodeId: node.id,
+          property: "bgcolor",
+          oldValue: node.bgcolor,
+          newValue: node.bgcolor,           // unchanged → visually a no-op
+        });
+        if (node.size) node.setSize([node.size[0], node.computeSize()[1]]);
+        node.setDirtyCanvas(true, true);
+      };
+
+      const dataW = this.widgets?.find((w: any) => w.name === "rig");
+      if (dataW) {
+        dataW.type = "hidden";              // classic: never mount the textarea
+        hideW(dataW);
+      }
+
+      const container = document.createElement("div");
+      container.style.cssText = "width:100%;box-sizing:border-box;overflow:hidden;";
+
+      const PRESET_NAMES = ["happy", "surprised", "sad", "angry", "afraid", "disgusted"];
+      const presetWs = PRESET_NAMES
+        .map((n) => this.widgets?.find((w: any) => w.name === n))
+        .filter(Boolean);
+      const collectPresets = () => {
+        const p: Record<string, number> = {};
+        for (const w of presetWs) if (Number(w.value)) p[w.name] = Number(w.value);
+        return p;
+      };
+
+      const rig = mountFaceRig(container, {
+        nodeId: String(node.id),
+        json: dataW?.value || "",
+        cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2.0),
+        srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1.0),
+        hasSource: () => node.inputs?.find((i: any) => i.name === "image")?.link != null,
+        onPresetsReset: () => {
+          for (const w of presetWs) w.value = 0;
+          node.setDirtyCanvas(true, true);
+        },
+        frame: () => {
+          const img = findSourceImg(node, "image");
+          if (!img) {
+            // Kick off the decode so the next attempt has it.
+            void findSourceImgAsync(node, "image");
+            return null;
+          }
+          const c = document.createElement("canvas");
+          c.width = img.naturalWidth;
+          c.height = img.naturalHeight;
+          c.getContext("2d")!.drawImage(img, 0, 0);
+          try { return c.toDataURL("image/png"); } catch { return null; }
+        },
+        onChange: (json: string) => {
+          if (dataW) dataW.value = json;
+          node.setDirtyCanvas(true, true);
+        },
+      });
+
+      const domW = this.addDOMWidget("face_rig_editor", "FACE_RIG_EDITOR", container, {
+        getValue: () => rig.serialise(),
+        setValue: (v: string) => {
+          if (dataW) dataW.value = v;
+          rig.setJson(v || "");
+        },
+        serialize: false,             // the `rig` STRING widget is the store
+      });
+      // The option above is not enough on current frontends — the widget still
+      // lands a duplicate copy of the pose in widgets_values without this.
+      if (domW) domW.serialize = false;
+      // Editor height ≈ canvas (square, node width) + button row + status.
+      sizeDomWidgetToContent(node, domW, container, 300, (w) => w + 70);
+
+      // The preset dials are native widgets. Their callbacks feed the editor
+      // so the preview follows live, exactly like dragging a handle.
+      for (const w of presetWs) {
+        const orig = w.callback;
+        w.callback = function (...args: any[]) {
+          const r = orig?.apply(this, args);
+          rig.setPresets(collectPresets());
+          return r;
+        };
+      }
+
+      // crop_factor and src_ratio are read fresh on every preview request,
+      // but a request still has to be *asked for* when they change. A new
+      // crop_factor re-prepares (the editor resends the frame on its own
+      // when the crop it last sent differs); src_ratio is just a render.
+      for (const name of ["crop_factor", "src_ratio"]) {
+        const w = this.widgets?.find((x: any) => x.name === name);
+        if (!w) continue;
+        const orig = w.callback;
+        w.callback = function (...args: any[]) {
+          const r = orig?.apply(this, args);
+          rig.retry();
+          return r;
+        };
+      }
+      if (Object.keys(collectPresets()).length) rig.setPresets(collectPresets());
+
+      // `expressions` folds the six dials away — reversible in both renderers.
+      const expW = this.widgets?.find((w: any) => w.name === "expressions");
+      const showPresets = (on: boolean) => {
+        for (const w of presetWs) (on ? showW : hideW)(w);
+        refreshNode();
+      };
+      // Initial pass deferred a tick, so 2.0 has mounted the widgets first.
+      // setTimeout, not rAF — rAF never fires in a non-compositing tab.
+      setTimeout(() => showPresets(!!expW?.value), 0);
+      if (expW) {
+        const origExp = expW.callback;
+        expW.callback = function (...args: any[]) {
+          const r = origExp?.apply(this, args);
+          showPresets(!!expW.value);
+          return r;
+        };
+      }
+      // Vue Nodes mode applies its own default size after creation, on top of
+      // whatever the ResizeObserver already set; a few delayed re-applies win
+      // that race without fighting it frame by frame.
+      for (const t of [250, 750, 1500]) {
+        setTimeout(() => {
+          if (!node.size) return;
+          const needed = node.computeSize();
+          if (Math.abs(needed[1] - node.size[1]) > 2) {
+            node.setSize([node.size[0], needed[1]]);
+            node.setDirtyCanvas(true, true);
+          }
+        }, t);
+      }
+
+      // When the image input (re)connects, warm the decode and re-render —
+      // otherwise the editor sits on "connect an image" until a manual click.
+      const origConn = this.onConnectionsChange;
+      this.onConnectionsChange = function () {
+        origConn?.apply(this, arguments);
+        // Connect: warm the decode, then render. Disconnect: retry() hits the
+        // hasSource gate and clears the view instead.
+        void findSourceImgAsync(node, "image").then(() => rig.retry());
+      };
+
+      // The picture behind the same connection can change too — LoadImage
+      // switched files, or the upstream node re-ran with a new output. The
+      // URL is the cheap tell: poll it, and on a change push the new frame
+      // through (the backend fingerprints, so no-changes cost nothing).
+      let lastSrcUrl = upstreamImageUrl(node, "image");
+      const srcPoll = window.setInterval(() => {
+        const url = upstreamImageUrl(node, "image");
+        if (url === lastSrcUrl) return;
+        lastSrcUrl = url;
+        void findSourceImgAsync(node, "image").then(() => rig.refreshSource());
+      }, 500);
+
+      // Restore on workflow load: onConfigure runs after widget values land.
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        origConfigure?.apply(this, arguments);
+        // Deferred a tick so the restored widget values have landed first.
+        setTimeout(() => {
+          rig.setPresets(collectPresets());
+          showPresets(!!expW?.value);
+          if (dataW?.value) rig.setJson(String(dataW.value));
+        }, 0);
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        clearInterval(srcPoll);
+        rig.destroy();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
 
 console.log("[NKD Basic Tools] spline editors + color warp loaded " +
             "(window.NKD_DEBUG=true traces how the editors load their image)");
