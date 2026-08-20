@@ -142,7 +142,12 @@ interface AxisInfo { name: string; label: string; group: string; side: string; l
 // ── the editor ─────────────────────────────────────────────────────────────
 
 export interface FaceRigOpts {
-  nodeId: string;
+  /** Read fresh, never captured. The editor mounts from `onNodeCreated`, and
+   *  at that point LiteGraph has not assigned an id yet — `node.id` is -1
+   *  until `graph.add()` runs. A captured id stays -1 for the node's whole
+   *  life, so every request lands on the wrong per-node cache and two rigs in
+   *  one graph share it. */
+  nodeId: () => string;
   json: string;
   /** Full-size source frame as a data URL, read fresh on demand. */
   frame?: () => string | null;
@@ -155,6 +160,10 @@ export interface FaceRigOpts {
   srcRatio: () => number;
   apiBase?: string;
   onChange?: (json: string) => void;
+  /** No picture anywhere: not upstream, not in the backend's cache. The host
+   *  answers by running this node and its inputs, which is the only way to
+   *  reach a face that is computed rather than loaded from a file. */
+  onNeedsSource?: () => void;
 }
 
 export interface FaceRigMount {
@@ -314,6 +323,9 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
   let wanted: "drag" | "final" | null = null;
   let firstRender = true;
   let sentCrop: number | null = null;  // crop_factor the backend prepared with
+  // One automatic run per dead end. Without the latch a run that finds no
+  // face answers with "no source", which asks for another run, forever.
+  let askedForRun = false;
   let token = 0;
 
   function poseChanged() {
@@ -359,7 +371,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
       try {
         const crop = opts.cropFactor();
         const body: any = {
-          node: opts.nodeId, rig: serialise(state), quality,
+          node: opts.nodeId(), rig: serialise(state), quality,
           crop_factor: crop, src_ratio: opts.srcRatio(),
         };
         // The frame rides along whenever the backend may need to (re)prepare:
@@ -377,7 +389,21 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
         let data = await res.json();
         if (data.needsFrame) {
           const frame = opts.frame?.();
-          if (!frame) { warn.textContent = "connect an image, then drag a handle"; break; }
+          if (!frame) {
+            // Upstream has no thumbnail to steal — it is computed, not loaded.
+            // Running the node resolves its inputs and leaves the prepared
+            // source in the backend cache; the host retries when it lands.
+            if (opts.onNeedsSource && !askedForRun) {
+              askedForRun = true;
+              warn.textContent = "";
+              status.textContent = "computing the input…";
+              opts.onNeedsSource();
+            } else {
+              status.textContent = "";
+              warn.textContent = "run the node once to load the image";
+            }
+            break;
+          }
           body.frame = frame;
           sentCrop = crop;
           res = await fetch(api + "/nkd/facerig/preview", {
@@ -394,6 +420,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
           outlines = data.outlines ?? {};
         }
         await setFrame(data.image);
+        askedForRun = false;                    // a picture arrived; arm it again
         const dt = performance.now() - t0;
         // The very first round-trip pays for loading the engine and preparing
         // the photo; it says nothing about drag latency.
@@ -1015,6 +1042,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
     retry: () => requestRender("final"),
     refreshSource() {
       sentCrop = null;                // forces the frame onto the next request
+      askedForRun = false;            // a new picture deserves a new attempt
       requestRender("final");
     },
     setJson(json: string) {

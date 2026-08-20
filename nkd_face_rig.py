@@ -26,6 +26,7 @@ from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 
 from . import nkd_face_rig_axes as axes
+from .helpers import node_id, push_source
 from .nkd_face_rig_engine import Engine
 
 NKDExpression = io.Custom("NKD_EXPRESSION")
@@ -162,6 +163,14 @@ class NKDFaceRig(io.ComfyNode):
                 "independently, and the expression presets are the standard FACS "
                 "combinations rather than invented ones."
             ),
+            # An output node so the editor can run just this node and whatever
+            # feeds it. Without that the only picture it can reach is a Load
+            # Image thumbnail, and anything computed upstream — a 😺NKD Face
+            # Crop straightening the head, a VAE Decode — has no thumbnail to
+            # reach for until the graph has run. The play button is the fix:
+            # press it, the inputs get computed, and the rig picks the face up
+            # from there.
+            is_output_node=True,
             inputs=[
                 io.Image.Input("image", tooltip="The portrait to pose. Only the first frame is used."),
                 io.String.Input(
@@ -200,6 +209,11 @@ class NKDFaceRig(io.ComfyNode):
     @classmethod
     def execute(cls, image, rig, crop_factor, src_ratio, stitching,
                 expression=None):
+        # Pushed before anything else can fail. The editor does not draw with
+        # this frame — it wants the full-resolution original, and the backend
+        # already holds that — but the push arriving is how the editor learns
+        # the run finished and there is now a source to ask for.
+        push_source(node_id(cls), image)
         rgb = to_uint8(image)
         src = prepared_source(cls.hidden.unique_id, rgb, float(crop_factor))
 

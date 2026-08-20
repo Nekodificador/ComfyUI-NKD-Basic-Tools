@@ -14675,6 +14675,7 @@ function mountFaceRig(host, opts) {
   let wanted = null;
   let firstRender = true;
   let sentCrop = null;
+  let askedForRun = false;
   let token = 0;
   function poseChanged() {
     drawOverlay();
@@ -14711,7 +14712,7 @@ function mountFaceRig(host, opts) {
       try {
         const crop = opts.cropFactor();
         const body = {
-          node: opts.nodeId,
+          node: opts.nodeId(),
           rig: serialise(state),
           quality,
           crop_factor: crop,
@@ -14733,7 +14734,15 @@ function mountFaceRig(host, opts) {
         if (data.needsFrame) {
           const frame = (_b = opts.frame) == null ? void 0 : _b.call(opts);
           if (!frame) {
-            warn.textContent = "connect an image, then drag a handle";
+            if (opts.onNeedsSource && !askedForRun) {
+              askedForRun = true;
+              warn.textContent = "";
+              status.textContent = "computing the input…";
+              opts.onNeedsSource();
+            } else {
+              status.textContent = "";
+              warn.textContent = "run the node once to load the image";
+            }
             break;
           }
           body.frame = frame;
@@ -14756,6 +14765,7 @@ function mountFaceRig(host, opts) {
           outlines = data.outlines ?? {};
         }
         await setFrame(data.image);
+        askedForRun = false;
         const dt = performance.now() - t0;
         if (firstRender) firstRender = false;
         status.textContent = `${dt.toFixed(0)} ms`;
@@ -15339,6 +15349,7 @@ function mountFaceRig(host, opts) {
     retry: () => requestRender("final"),
     refreshSource() {
       sentCrop = null;
+      askedForRun = false;
       requestRender("final");
     },
     setJson(json) {
@@ -16550,7 +16561,7 @@ app.registerExtension({
       const container = document.createElement("div");
       container.style.cssText = "width:100%;box-sizing:border-box;overflow:hidden;";
       const rig = mountFaceRig(container, {
-        nodeId: String(node.id),
+        nodeId: () => String(node.id),
         json: (dataW == null ? void 0 : dataW.value) || "",
         cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2),
         srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1),
@@ -16577,8 +16588,24 @@ app.registerExtension({
         onChange: (json) => {
           if (dataW) dataW.value = json;
           node.setDirtyCanvas(true, true);
+        },
+        // Nothing to draw with and nothing cached: run this node and its
+        // inputs. The node is an output node so a trimmed prompt actually
+        // executes, and it pushes its resolved frame when it does — which is
+        // the listener below, and what turns the editor back on.
+        // ponytail: if ComfyUI decides the node is already up to date it will
+        // not re-execute and no push arrives; the editor says so once rather
+        // than asking again. Press Run if that ever happens.
+        onNeedsSource: () => {
+          void queueNode(node);
         }
       });
+      const onPushed = (e) => {
+        var _a2;
+        if (String((_a2 = e == null ? void 0 : e.detail) == null ? void 0 : _a2.node) !== String(node.id)) return;
+        rig.retry();
+      };
+      api.addEventListener("nkd-source", onPushed);
       const domW = this.addDOMWidget("face_rig_editor", "FACE_RIG_EDITOR", container, {
         getValue: () => rig.serialise(),
         setValue: (v) => {
@@ -16632,6 +16659,7 @@ app.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function() {
         clearInterval(srcPoll);
+        api.removeEventListener("nkd-source", onPushed);
         rig.destroy();
         origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
       };

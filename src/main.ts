@@ -1234,7 +1234,7 @@ comfyApp.registerExtension({
       container.style.cssText = "width:100%;box-sizing:border-box;overflow:hidden;";
 
       const rig = mountFaceRig(container, {
-        nodeId: String(node.id),
+        nodeId: () => String(node.id),
         json: dataW?.value || "",
         cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2.0),
         srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1.0),
@@ -1256,7 +1256,24 @@ comfyApp.registerExtension({
           if (dataW) dataW.value = json;
           node.setDirtyCanvas(true, true);
         },
+        // Nothing to draw with and nothing cached: run this node and its
+        // inputs. The node is an output node so a trimmed prompt actually
+        // executes, and it pushes its resolved frame when it does — which is
+        // the listener below, and what turns the editor back on.
+        // ponytail: if ComfyUI decides the node is already up to date it will
+        // not re-execute and no push arrives; the editor says so once rather
+        // than asking again. Press Run if that ever happens.
+        onNeedsSource: () => { void queueNode(node); },
       });
+
+      // The push says the run finished and the backend now holds a prepared
+      // source at full resolution. The pixels in it are a downscaled preview,
+      // so they are not what gets drawn — the retry is.
+      const onPushed = (e: any) => {
+        if (String(e?.detail?.node) !== String(node.id)) return;
+        rig.retry();
+      };
+      api.addEventListener("nkd-source", onPushed);
 
       const domW = this.addDOMWidget("face_rig_editor", "FACE_RIG_EDITOR", container, {
         getValue: () => rig.serialise(),
@@ -1335,6 +1352,7 @@ comfyApp.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
         clearInterval(srcPoll);
+        api.removeEventListener("nkd-source", onPushed);
         rig.destroy();
         origRemoved?.apply(this, arguments);
       };
