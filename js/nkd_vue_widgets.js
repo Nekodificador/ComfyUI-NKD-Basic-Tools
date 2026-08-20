@@ -14614,10 +14614,8 @@ function mountFaceRig(host, opts) {
     commit();
   }, "Dragging a paired handle moves its twin too");
   const resetBtn = nkdButton("reset pose", () => {
-    var _a;
     pushUndo();
     state = { w: {}, p: {}, ...structuredClone(STATE_DEFAULTS), mirror: state.mirror };
-    (_a = opts.onPresetsReset) == null ? void 0 : _a.call(opts);
     drawOverlay();
     commit();
   });
@@ -15345,10 +15343,6 @@ function mountFaceRig(host, opts) {
       mirrorBtn.classList.toggle("on", state.mirror);
       drawOverlay();
       requestRender("final");
-    },
-    setPresets(p2) {
-      state.p = p2;
-      poseChanged();
     },
     destroy() {
       window.removeEventListener("keydown", onKey, true);
@@ -16537,52 +16531,19 @@ app.registerExtension({
     nodeType.prototype["__nkd_NKDFaceRig"] = true;
     const origCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function() {
-      var _a, _b, _c;
+      var _a, _b;
       const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
       const node = this;
-      const hideW = (w) => {
-        w.hidden = true;
-        if (w.options) w.options.hidden = true;
-        w.computedHeight = 0;
-        w.computeSize = () => [0, -4];
-      };
-      const showW = (w) => {
-        w.hidden = false;
-        if (w.options) w.options.hidden = false;
-        delete w.computeSize;
-        w.computedHeight = void 0;
-      };
-      const refreshNode = () => {
-        var _a2, _b2;
-        if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
-        (_b2 = (_a2 = node.graph) == null ? void 0 : _a2.trigger) == null ? void 0 : _b2.call(_a2, "node:property:changed", {
-          type: "node:property:changed",
-          nodeId: node.id,
-          property: "bgcolor",
-          oldValue: node.bgcolor,
-          newValue: node.bgcolor
-          // unchanged → visually a no-op
-        });
-        if (node.size) node.setSize([node.size[0], node.computeSize()[1]]);
-        node.setDirtyCanvas(true, true);
-      };
       const dataW = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "rig");
       if (dataW) {
         dataW.type = "hidden";
-        hideW(dataW);
+        dataW.hidden = true;
+        if (dataW.options) dataW.options.hidden = true;
+        dataW.computedHeight = 0;
+        dataW.computeSize = () => [0, -4];
       }
       const container = document.createElement("div");
       container.style.cssText = "width:100%;box-sizing:border-box;overflow:hidden;";
-      const PRESET_NAMES = ["happy", "surprised", "sad", "angry", "afraid", "disgusted"];
-      const presetWs = PRESET_NAMES.map((n) => {
-        var _a2;
-        return (_a2 = this.widgets) == null ? void 0 : _a2.find((w) => w.name === n);
-      }).filter(Boolean);
-      const collectPresets = () => {
-        const p2 = {};
-        for (const w of presetWs) if (Number(w.value)) p2[w.name] = Number(w.value);
-        return p2;
-      };
       const rig = mountFaceRig(container, {
         nodeId: String(node.id),
         json: (dataW == null ? void 0 : dataW.value) || "",
@@ -16591,10 +16552,6 @@ app.registerExtension({
         hasSource: () => {
           var _a2, _b2;
           return ((_b2 = (_a2 = node.inputs) == null ? void 0 : _a2.find((i) => i.name === "image")) == null ? void 0 : _b2.link) != null;
-        },
-        onPresetsReset: () => {
-          for (const w of presetWs) w.value = 0;
-          node.setDirtyCanvas(true, true);
         },
         frame: () => {
           const img = findSourceImg(node, "image");
@@ -16628,14 +16585,6 @@ app.registerExtension({
       });
       if (domW) domW.serialize = false;
       sizeDomWidgetToContent(node, domW, container, 300, (w) => w + 70);
-      for (const w of presetWs) {
-        const orig = w.callback;
-        w.callback = function(...args) {
-          const r = orig == null ? void 0 : orig.apply(this, args);
-          rig.setPresets(collectPresets());
-          return r;
-        };
-      }
       for (const name of ["crop_factor", "src_ratio"]) {
         const w = (_b = this.widgets) == null ? void 0 : _b.find((x) => x.name === name);
         if (!w) continue;
@@ -16643,21 +16592,6 @@ app.registerExtension({
         w.callback = function(...args) {
           const r = orig == null ? void 0 : orig.apply(this, args);
           rig.retry();
-          return r;
-        };
-      }
-      if (Object.keys(collectPresets()).length) rig.setPresets(collectPresets());
-      const expW = (_c = this.widgets) == null ? void 0 : _c.find((w) => w.name === "expressions");
-      const showPresets = (on) => {
-        for (const w of presetWs) (on ? showW : hideW)(w);
-        refreshNode();
-      };
-      setTimeout(() => showPresets(!!(expW == null ? void 0 : expW.value)), 0);
-      if (expW) {
-        const origExp = expW.callback;
-        expW.callback = function(...args) {
-          const r = origExp == null ? void 0 : origExp.apply(this, args);
-          showPresets(!!expW.value);
           return r;
         };
       }
@@ -16687,8 +16621,6 @@ app.registerExtension({
       this.onConfigure = function() {
         origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
         setTimeout(() => {
-          rig.setPresets(collectPresets());
-          showPresets(!!(expW == null ? void 0 : expW.value));
           if (dataW == null ? void 0 : dataW.value) rig.setJson(String(dataW.value));
         }, 0);
       };

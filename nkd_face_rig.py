@@ -143,21 +143,6 @@ class NKDFaceRig(io.ComfyNode):
                     "stitching", default=True,
                     tooltip="Blend the posed face back into the original shoulders. Turn it "
                             "off only to see the raw crop."),
-                io.Boolean.Input(
-                    "enhanced_composite", default=True,
-                    tooltip="Bicubic upsampling when pasting the 512 render back into the "
-                            "picture. Off = classic bilinear paste, for byte-exact "
-                            "compatibility with older expression workflows."),
-                io.Boolean.Input(
-                    "expressions", default=False,
-                    tooltip="Show the expression preset sliders. They layer the standard "
-                            "EMFACS combinations on top of whatever the handles say."),
-                # The preset dials are native widgets so the graph shows and
-                # serialises them like any other value; the `expressions`
-                # toggle above folds them away (frontend behaviour).
-                *[io.Float.Input(name, default=0.0, min=0.0, max=1.0, step=0.05,
-                                 tooltip="Layered on top of the rig pose.")
-                  for name in axes.PRESETS],
                 NKDExpression.Input(
                     "expression", optional=True,
                     tooltip="An expression from another rig, added on top of this one."),
@@ -176,16 +161,15 @@ class NKDFaceRig(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, rig, crop_factor, src_ratio, stitching,
-                enhanced_composite=True, expressions=False, expression=None,
-                **presets):
+                expression=None):
         rgb = to_uint8(image)
         src = prepared_source(cls.hidden.unique_id, rgb, float(crop_factor))
 
-        # The preset widgets are the single source of truth for the dials —
-        # whatever `p` the rig JSON carries is a mirror kept by the editor and
-        # is replaced, never added, so nothing applies twice.
+        # Emotion presets were tried and cut: the latent axes are too coarse
+        # for recipe-driven expressions to read believably across faces, and
+        # the dials mostly disappointed. The pose is the handles, full stop.
         state = axes.deserialise(rig)
-        state["p"] = {k: float(v) for k, v in presets.items() if v}
+        state["p"] = {}
         pose = pose_from_state(state)
         if expression is not None:
             pose = pose + expression
@@ -193,7 +177,7 @@ class NKDFaceRig(io.ComfyNode):
         out = Engine.get().render(
             src, pose.exp, pose.rot, scale=pose.scale, trans=pose.trans,
             src_ratio=float(src_ratio), stitching=bool(stitching), paste=True,
-            composite="enhanced" if enhanced_composite else "classic",
+            composite="enhanced",
         )
         # The paste mask, aligned with the composited image: this is exactly
         # the region the 512 renderer touched, which is what a downstream

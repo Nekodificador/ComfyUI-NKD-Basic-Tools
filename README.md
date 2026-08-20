@@ -392,11 +392,12 @@ compatibility with the slider values of classic expression workflows.
 
 The editor lives right in the node — no modal, no extra window. Handles hang
 off the detected landmarks and follow the face when it turns; left/right
-brows and eyelids move independently, with a breakable mirror; expression
-presets (happy, surprised, sad, angry, afraid, disgusted) are the standard
-EMFACS action-unit combinations, layered on dials rather than overwriting
-your pose. Ctrl+Z undoes (while the pointer is over the editor), Shift is
-fine adjust, double-click resets a handle.
+brows and eyelids move independently, with a breakable mirror (Alt drags one
+side only — that's your wink); head turn/tilt and gaze get their own corner
+gizmos so the face stays clear. Ctrl+Z undoes (while the pointer is over the
+editor), Shift is fine adjust, double-click resets a handle. Alongside the
+image, the node outputs the face region as a MASK — point a face detailer at
+it to refine exactly what was re-rendered.
 
 Runs standalone — no other custom nodes needed. Weights (~600 MB) download
 automatically from Hugging Face into `models/liveportrait` on first use. If

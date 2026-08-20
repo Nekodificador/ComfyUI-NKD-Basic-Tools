@@ -1218,56 +1218,20 @@ comfyApp.registerExtension({
       const result = origCreated?.apply(this, arguments);
       const node = this;
 
-      // Widget hiding that BOTH renderers respect (see the comfyui-node-frontend
-      // skill): the classic canvas reads `widget.hidden` + the computeSize
-      // collapse, the Vue renderer (Nodes 2.0) reads `widget.options.hidden`.
-      const hideW = (w: any) => {
-        w.hidden = true;
-        if (w.options) w.options.hidden = true;
-        w.computedHeight = 0;
-        w.computeSize = () => [0, -4];
-      };
-      const showW = (w: any) => {
-        w.hidden = false;
-        if (w.options) w.options.hidden = false;
-        delete w.computeSize;
-        w.computedHeight = undefined;
-      };
-      // Nodes 2.0 keeps widgets in a cached reactive snapshot that clones
-      // options.hidden — mutating it is not observed. Invalidate the snapshot
-      // and nudge the node's reactive data (the frontend's own trick), then
-      // do the classic-renderer resize.
-      const refreshNode = () => {
-        if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
-        node.graph?.trigger?.("node:property:changed", {
-          type: "node:property:changed",
-          nodeId: node.id,
-          property: "bgcolor",
-          oldValue: node.bgcolor,
-          newValue: node.bgcolor,           // unchanged → visually a no-op
-        });
-        if (node.size) node.setSize([node.size[0], node.computeSize()[1]]);
-        node.setDirtyCanvas(true, true);
-      };
-
+      // Hidden in BOTH renderers (see the comfyui-node-frontend skill): the
+      // classic canvas reads `widget.hidden` + the computeSize collapse, the
+      // Vue renderer (Nodes 2.0) reads `widget.options.hidden`.
       const dataW = this.widgets?.find((w: any) => w.name === "rig");
       if (dataW) {
         dataW.type = "hidden";              // classic: never mount the textarea
-        hideW(dataW);
+        dataW.hidden = true;
+        if (dataW.options) dataW.options.hidden = true;
+        dataW.computedHeight = 0;
+        dataW.computeSize = () => [0, -4];
       }
 
       const container = document.createElement("div");
       container.style.cssText = "width:100%;box-sizing:border-box;overflow:hidden;";
-
-      const PRESET_NAMES = ["happy", "surprised", "sad", "angry", "afraid", "disgusted"];
-      const presetWs = PRESET_NAMES
-        .map((n) => this.widgets?.find((w: any) => w.name === n))
-        .filter(Boolean);
-      const collectPresets = () => {
-        const p: Record<string, number> = {};
-        for (const w of presetWs) if (Number(w.value)) p[w.name] = Number(w.value);
-        return p;
-      };
 
       const rig = mountFaceRig(container, {
         nodeId: String(node.id),
@@ -1275,10 +1239,6 @@ comfyApp.registerExtension({
         cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2.0),
         srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1.0),
         hasSource: () => node.inputs?.find((i: any) => i.name === "image")?.link != null,
-        onPresetsReset: () => {
-          for (const w of presetWs) w.value = 0;
-          node.setDirtyCanvas(true, true);
-        },
         frame: () => {
           const img = findSourceImg(node, "image");
           if (!img) {
@@ -1312,17 +1272,6 @@ comfyApp.registerExtension({
       // Editor height ≈ canvas (square, node width) + button row + status.
       sizeDomWidgetToContent(node, domW, container, 300, (w) => w + 70);
 
-      // The preset dials are native widgets. Their callbacks feed the editor
-      // so the preview follows live, exactly like dragging a handle.
-      for (const w of presetWs) {
-        const orig = w.callback;
-        w.callback = function (...args: any[]) {
-          const r = orig?.apply(this, args);
-          rig.setPresets(collectPresets());
-          return r;
-        };
-      }
-
       // crop_factor and src_ratio are read fresh on every preview request,
       // but a request still has to be *asked for* when they change. A new
       // crop_factor re-prepares (the editor resends the frame on its own
@@ -1334,25 +1283,6 @@ comfyApp.registerExtension({
         w.callback = function (...args: any[]) {
           const r = orig?.apply(this, args);
           rig.retry();
-          return r;
-        };
-      }
-      if (Object.keys(collectPresets()).length) rig.setPresets(collectPresets());
-
-      // `expressions` folds the six dials away — reversible in both renderers.
-      const expW = this.widgets?.find((w: any) => w.name === "expressions");
-      const showPresets = (on: boolean) => {
-        for (const w of presetWs) (on ? showW : hideW)(w);
-        refreshNode();
-      };
-      // Initial pass deferred a tick, so 2.0 has mounted the widgets first.
-      // setTimeout, not rAF — rAF never fires in a non-compositing tab.
-      setTimeout(() => showPresets(!!expW?.value), 0);
-      if (expW) {
-        const origExp = expW.callback;
-        expW.callback = function (...args: any[]) {
-          const r = origExp?.apply(this, args);
-          showPresets(!!expW.value);
           return r;
         };
       }
@@ -1398,8 +1328,6 @@ comfyApp.registerExtension({
         origConfigure?.apply(this, arguments);
         // Deferred a tick so the restored widget values have landed first.
         setTimeout(() => {
-          rig.setPresets(collectPresets());
-          showPresets(!!expW?.value);
           if (dataW?.value) rig.setJson(String(dataW.value));
         }, 0);
       };

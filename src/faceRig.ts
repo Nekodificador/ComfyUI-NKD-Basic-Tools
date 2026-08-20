@@ -147,8 +147,6 @@ export interface FaceRigOpts {
   srcRatio: () => number;
   apiBase?: string;
   onChange?: (json: string) => void;
-  /** "reset pose" also zeroes the preset dials, which live in node widgets. */
-  onPresetsReset?: () => void;
 }
 
 export interface FaceRigMount {
@@ -156,9 +154,6 @@ export interface FaceRigMount {
   serialise(): string;
   /** Replace the pose from outside (workflow load / configure). */
   setJson(json: string): void;
-  /** The preset dials are node widgets; the host pushes their values here
-   *  and the preview follows live. */
-  setPresets(p: Record<string, number>): void;
   /** Ask for a fresh final render — e.g. after the image input connects. */
   retry(): void;
   /** The upstream picture changed (new file, new run): resend the frame so
@@ -246,7 +241,6 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
   const resetBtn = nkdButton("reset pose", () => {
     pushUndo();
     state = { w: {}, p: {}, ...structuredClone(STATE_DEFAULTS), mirror: state.mirror };
-    opts.onPresetsReset?.();        // the dials are node widgets — zero them too
     drawOverlay();
     // A full commit, not a drag frame: only a "final" render re-measures the
     // anchors, and the handles must jump back with the face, not one head
@@ -1018,10 +1012,6 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
       mirrorBtn.classList.toggle("on", state.mirror);
       drawOverlay();
       requestRender("final");
-    },
-    setPresets(p: Record<string, number>) {
-      state.p = p;
-      poseChanged();                  // live, like dragging a handle
     },
     destroy() {
       window.removeEventListener("keydown", onKey, true);
