@@ -204,6 +204,27 @@ def demo():
         # "disgusted" once resolved to zero axes and a dial that did nothing.
         assert w, name
 
+    # --- per-side mouth aliases -----------------------------------------
+    # The latent has no left/right mouth, so the two corner handles are
+    # aliases resolved per render (the engine composites the halves).
+    assert not ax.is_sided({"au12_L": 0.7, "au12_R": 0.7}), "equal corners are symmetric"
+    assert ax.is_sided({"au12_L": 0.7, "au12_R": 0.0}), "a smirk needs the two-render path"
+    # A rig saved before the split carries the central name and must still
+    # read as symmetric — and resolve to exactly what it always meant.
+    assert not ax.is_sided({"au12": 0.8}), "a legacy rig is not suddenly asymmetric"
+    same(ax.compose(ax.resolve_sides({"au12": 0.8}), AX)[0],
+         C({"au12": 0.8})[0], "a legacy mouth weight still composes the same")
+    # Each render keeps its own side's value...
+    assert ax.resolve_sides({"au12_L": 0.9, "au12_R": 0.0}, "L")["au12"] == 0.9
+    assert "au12" not in ax.resolve_sides({"au12_L": 0.9, "au12_R": 0.0}, "R")
+    # ...and the aliases never leak into compose() as unknown axis names.
+    for keep in ("L", "R", None):
+        assert not (set(ax.resolve_sides({"au12_L": 0.5, "au18_R": 0.4}, keep))
+                    & set(ax.sided_names())), keep
+    # Out-of-range corner values are clamped by the central axis, because
+    # blend() cannot clamp a name that is not an axis.
+    assert ax.resolve_sides({"au12_L": 9.0}, "L")["au12"] == ax.by_name(AX)["au12"].hi
+
     # --- capture --------------------------------------------------------
     neutral = np.zeros((21, 3), np.float32)
     direction = C({"au12": 1.0})[0]

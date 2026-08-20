@@ -391,10 +391,11 @@ facial rig on the picture instead of a bank of number boxes, and byte-exact
 compatibility with the slider values of classic expression workflows.
 
 The editor lives right in the node — no modal, no extra window. Handles hang
-off the detected landmarks and follow the face when it turns; left/right
-brows and eyelids move independently, with a breakable mirror (Alt drags one
-side only — that's your wink); head turn/tilt and gaze get their own corner
-gizmos so the face stays clear. Ctrl+Z undoes (while the pointer is over the
+off the detected landmarks and follow the face when it turns. **Every side of
+the face moves on its own**: one raised brow, a wink, a one-sided smirk —
+each side stays exactly where you left it, to the pixel, with a mirror toggle
+for symmetric edits. Head turn/tilt and gaze get their own corner gizmos so
+the face stays clear. Ctrl+Z undoes (while the pointer is over the
 editor), Shift is fine adjust, double-click resets a handle. Alongside the
 image, the node outputs the face region as a MASK — point a face detailer at
 it to refine exactly what was re-rendered.

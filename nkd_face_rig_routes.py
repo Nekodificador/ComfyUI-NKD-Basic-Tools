@@ -32,7 +32,8 @@ import numpy as np
 import cv2
 
 from . import nkd_face_rig_axes as axes
-from .nkd_face_rig import cached_source, pose_from_state, prepared_source
+from .nkd_face_rig import (cached_source, pose_from_state, prepared_source,
+                           sided_poses)
 from .nkd_face_rig_engine import _MASK, Engine, anchors, relocate
 
 # The decoder renders 512 and that is all there is — 256 in, PixelShuffle x2 out.
@@ -85,7 +86,8 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
         if src is None:
             return None
 
-    pose = pose_from_state(axes.deserialise(rig), src=src)
+    state = axes.deserialise(rig)
+    pose = pose_from_state(state)
     # The editor shows the aligned crop — the one frame whose coordinates the
     # handles are expressed in — but composited exactly the way the node's
     # final paste-back composites it: warped face through the feathered mask,
@@ -97,10 +99,15 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
     # the pass it saved was a 126->65 MLP — while its translation offset moved
     # the whole face a few pixels the moment you touched a control. A preview
     # that jumps when you grab it is not a preview.
-    out = Engine.get().render(
-        src, pose.exp, pose.rot, scale=pose.scale, trans=pose.trans,
-        src_ratio=float(src_ratio), stitching=True, paste=False,
-    )
+    sided = sided_poses(state)
+    eng = Engine.get()
+    common = dict(src_ratio=float(src_ratio), stitching=True, paste=False)
+    if sided is not None:
+        out = eng.render_sided(src, sided[0].exp, sided[1].exp, pose.rot,
+                               scale=pose.scale, trans=pose.trans, **common)
+    else:
+        out = eng.render(src, pose.exp, pose.rot, scale=pose.scale,
+                         trans=pose.trans, **common)
     m = _mask512()
     out = np.clip(m * out + (1.0 - m) * src.crop_512, 0, 255).astype(np.uint8)
     body, mime = _encode(out, drag)

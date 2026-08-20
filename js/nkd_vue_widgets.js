@@ -14521,31 +14521,36 @@ const CONTROLS = [
   },
   // gaze is NOT here: it lives in the eye gizmo in the corner of the viewer,
   // because a floating pad between the eyes overlapped brows and corners.
-  // The mouth corners both drive the same central axes — the latent space has
-  // no honest left/right smile split (kp14 IS the right corner; the real pair
-  // is 5x weaker). Two handles, one gesture: grab whichever corner is closer.
+  //
+  // The mouth corners are per-side even though the latent has no left/right
+  // mouth (kp14 IS the right corner; the real pair is 5x weaker). The `_L` /
+  // `_R` names are aliases of one central axis: when the two corners
+  // disagree the backend renders both and takes each half of the face from
+  // its own render, which is how a one-sided smirk gets made at all.
   {
     id: "corner_L",
     kind: "pad",
     anchor: "corner_L",
-    side: "C",
+    side: "L",
     label: "smile · pucker",
-    yNeg: { axis: "au12", per: 1 },
+    yNeg: { axis: "au12_L", per: 1 },
     // up = smile, down = frown
-    xPos: { axis: "au18", per: 1 },
+    xPos: { axis: "au18_L", per: 1 },
     // inward = pucker
-    xNeg: { axis: "au20", per: 1 }
+    xNeg: { axis: "au20_L", per: 1 },
+    // outward = stretch
+    mirror: "corner_R"
   },
-  // outward = stretch
   {
     id: "corner_R",
     kind: "pad",
     anchor: "corner_R",
-    side: "C",
+    side: "R",
     label: "smile · pucker",
-    yNeg: { axis: "au12", per: 1 },
-    xNeg: { axis: "au18", per: 1 },
-    xPos: { axis: "au20", per: 1 }
+    yNeg: { axis: "au12_R", per: 1 },
+    xNeg: { axis: "au18_R", per: 1 },
+    xPos: { axis: "au20_R", per: 1 },
+    mirror: "corner_L"
   },
   {
     id: "jaw",
@@ -15075,7 +15080,7 @@ function mountFaceRig(host, opts) {
     return best;
   }
   function clampAxis(name, v) {
-    const info = axisInfo.get(name);
+    const info = axisInfo.get(name) ?? axisInfo.get(name.replace(/_[LR]$/, ""));
     const lo = (info == null ? void 0 : info.lo) ?? -1, hi = (info == null ? void 0 : info.hi) ?? 1;
     return Math.max(lo, Math.min(hi, v));
   }
@@ -15085,7 +15090,7 @@ function mountFaceRig(host, opts) {
     else delete state.w[name];
     if (!noMirror && state.mirror && (mirrorFrom == null ? void 0 : mirrorFrom.mirror)) {
       const twin = name.endsWith("_L") ? name.slice(0, -2) + "_R" : name.endsWith("_R") ? name.slice(0, -2) + "_L" : null;
-      if (twin && axisInfo.has(twin)) {
+      if (twin && (axisInfo.has(twin) || axisInfo.has(twin.replace(/_[LR]$/, "")))) {
         const tv = clampAxis(twin, v);
         if (tv) state.w[twin] = tv;
         else delete state.w[twin];

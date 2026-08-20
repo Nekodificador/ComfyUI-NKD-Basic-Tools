@@ -96,23 +96,54 @@ def to_tensor(rgb: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(rgb.astype(np.float32) / 255.0)[None]
 
 
+def sided_poses(state: dict, library=None):
+    """(pose_L, pose_R) or None when the rig is symmetric.
+
+    The keypoints cannot hold a one-sided brow: driving either brow keypoint
+    deforms the whole upper face. So when the two sides disagree, each side
+    is composed on its own and the engine renders both, taking each half of
+    the face from its own render (`Engine.render_sided`). Sides that agree
+    take the single-render path — same picture, half the work.
+    """
+    lib = library if library is not None else axes.load_axes()
+    w = axes.blend(state.get("w") or {}, state.get("p") or {}, lib)
+    pairs = [(a.name, axes.mirror_of(a.name)) for a in lib
+             if a.side == "L" and axes.mirror_of(a.name)]
+    asym = any(abs(w.get(l, 0.0) - w.get(r, 0.0)) > 1e-6 for l, r in pairs)
+    if not asym and not axes.is_sided(w):
+        return None
+    out = []
+    for keep in ("L", "R"):
+        side = dict(w)
+        for l, r in pairs:
+            # Each render carries only its own side's asymmetric values; the
+            # other side gets whatever both sides agree on (their minimum in
+            # magnitude), so the blend zone never disagrees with itself.
+            lo = min(w.get(l, 0.0), w.get(r, 0.0), key=abs)
+            side[l] = w.get(l, 0.0) if keep == "L" else lo
+            side[r] = w.get(r, 0.0) if keep == "R" else lo
+        out.append(_pose_from_weights(side, state, lib, keep))
+    return out[0], out[1]
+
+
+def _pose_from_weights(weights: dict, state: dict, lib, keep=None) -> Expression:
+    exp, rot = axes.compose(axes.resolve_sides(weights, keep, lib), lib)
+    return Expression(exp=exp, rot=rot + np.array(state.get("rot") or [0, 0, 0], np.float32),
+                      scale=float(state.get("scale", 0.0)),
+                      trans=np.array(state.get("trans") or [0, 0], np.float32))
+
+
 def pose_from_state(state: dict, library=None, src=None) -> Expression:
     """Rig state -> Expression, applying the axis library the state asks for.
 
-    `src` is accepted for signature stability but unused: a per-face brow
-    decoupling was tried here and reverted — the measured mixes were too
-    noise-sensitive (furrow amplitudes sit at landmark-noise level) and could
-    silently weaken the controls on some faces. The raw axes are the ones
-    that behave.
+    `src` is accepted for call-site symmetry with `sided_poses` and unused:
+    per-face keypoint remixing was tried and abandoned — see `render_sided`.
     """
     lib = library if library is not None else axes.load_axes()
     if state.get("ortho"):
         lib = axes.orthogonalize(lib)
     weights = axes.blend(state.get("w") or {}, state.get("p") or {}, lib)
-    exp, rot = axes.compose(weights, lib)
-    return Expression(exp=exp, rot=rot + np.array(state.get("rot") or [0, 0, 0], np.float32),
-                      scale=float(state.get("scale", 0.0)),
-                      trans=np.array(state.get("trans") or [0, 0], np.float32))
+    return _pose_from_weights(weights, state, lib)
 
 
 class NKDFaceRig(io.ComfyNode):
@@ -177,15 +208,21 @@ class NKDFaceRig(io.ComfyNode):
         # the dials mostly disappointed. The pose is the handles, full stop.
         state = axes.deserialise(rig)
         state["p"] = {}
-        pose = pose_from_state(state, src=src)
+        sided = sided_poses(state)
+        pose = pose_from_state(state)
         if expression is not None:
             pose = pose + expression
+            sided = None                 # a chained expression is whole-face
 
-        out = Engine.get().render(
-            src, pose.exp, pose.rot, scale=pose.scale, trans=pose.trans,
-            src_ratio=float(src_ratio), stitching=bool(stitching), paste=True,
-            composite="enhanced",
-        )
+        eng = Engine.get()
+        common = dict(src_ratio=float(src_ratio), stitching=bool(stitching),
+                      paste=True, composite="enhanced")
+        if sided is not None:
+            out = eng.render_sided(src, sided[0].exp, sided[1].exp, pose.rot,
+                                   scale=pose.scale, trans=pose.trans, **common)
+        else:
+            out = eng.render(src, pose.exp, pose.rot, scale=pose.scale,
+                             trans=pose.trans, **common)
         # The paste mask, aligned with the composited image: this is exactly
         # the region the 512 renderer touched, which is what a downstream
         # face detailer should be pointed at.

@@ -394,6 +394,43 @@ class Engine:
         )
 
     @torch.no_grad()
+    def render_sided(self, src: PreparedSource, exp_l, exp_r, rot,
+                     scale: float = 0.0, trans=None, src_ratio: float = 1.0,
+                     stitching: bool = True, paste: bool = True,
+                     composite: str = "classic") -> np.ndarray:
+        """Two renders composited down the face's midline.
+
+        The latent keypoints cannot express a one-sided brow or lid: driving
+        either brow keypoint deforms the whole upper face (measured as a
+        pixel-difference map — remixing keypoints was tried twice and only
+        moved the problem around). So asymmetry is done where it CAN be
+        exact: render the left side's gestures and the right side's gestures
+        separately, and take each half of the face from its own render. The
+        untouched side is untouched by construction, to the pixel.
+        """
+        a = self.render(src, exp_l, rot, scale=scale, trans=trans,
+                        src_ratio=src_ratio, stitching=stitching, paste=False)
+        b = self.render(src, exp_r, rot, scale=scale, trans=trans,
+                        src_ratio=src_ratio, stitching=stitching, paste=False)
+        # Vertical soft split through the face's own midline (nose bridge),
+        # feathered wide enough that neither render's global drift shows as a
+        # seam. Central features (mouth, nose, jaw axes) get identical values
+        # on both sides, so the blend zone agrees with itself.
+        mid = float(src.lmk_crop[list(range(185, 203)), 0].mean())
+        span = float(np.linalg.norm(src.lmk_crop.max(0) - src.lmk_crop.min(0))) or 512.0
+        x = np.arange(512, dtype=np.float32)
+        w = np.clip((x - mid) / (span * 0.12) + 0.5, 0.0, 1.0)[None, :, None]
+        out = (a.astype(np.float32) * (1.0 - w) + b.astype(np.float32) * w)
+        out = np.clip(out, 0, 255).astype(np.uint8)
+        if not paste:
+            return out
+        interp = cv2.INTER_CUBIC if composite == "enhanced" else cv2.INTER_LINEAR
+        full = cv2.warpAffine(out, src.crop_trans_m,
+                              (src.rgb.shape[1], src.rgb.shape[0]), flags=interp)
+        return np.clip(src.mask_ori * full + (1 - src.mask_ori) * src.rgb,
+                       0, 255).astype(np.uint8)
+
+    @torch.no_grad()
     def get_kp_info(self, t: torch.Tensor) -> dict:
         """Motion extractor output, with the pose bins turned into degrees."""
         with torch.autocast("cuda", torch.float16, enabled=self.autocast):

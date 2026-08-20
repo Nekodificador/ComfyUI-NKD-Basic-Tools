@@ -235,6 +235,56 @@ def default_axes() -> list:
 
 DEFAULT_ORDER = ("head", "mouth", "eyes", "brows", "custom")
 
+# Centre axes the EDITOR can drive per side, even though the latent cannot.
+# There is no left/right mouth in this space — kp14 is the right corner on
+# its own and the true pair is five times weaker — so a one-sided smirk is
+# impossible to express as weights. It is perfectly possible to *render*,
+# though: each half of the face comes from its own render (see
+# `Engine.render_sided`), and these names are how the two corner handles say
+# which value belongs to which half.
+SIDED_CENTRE = {
+    "au12": ("au12_L", "au12_R"),     # smile · frown
+    "au18": ("au18_L", "au18_R"),     # pucker
+    "au20": ("au20_L", "au20_R"),     # stretch
+}
+
+
+def sided_names() -> tuple:
+    """Every per-side alias the state may carry, flat."""
+    return tuple(n for pair in SIDED_CENTRE.values() for n in pair)
+
+
+def is_sided(weights: dict) -> bool:
+    """True when the two corner handles disagree — needs the two-render path."""
+    for c, (l, r) in SIDED_CENTRE.items():
+        base = weights.get(c, 0.0)
+        if abs(weights.get(l, base) - weights.get(r, base)) > 1e-6:
+            return True
+    return False
+
+
+def resolve_sides(weights: dict, keep=None, axes=None) -> dict:
+    """Fold the per-side aliases back into the central axis they drive.
+
+    `keep` picks whose value this render carries ("L" / "R"); without it the
+    stronger of the two wins, which is what a single-render (symmetric) pose
+    wants. Clamping happens here because `blend` cannot clamp a name that is
+    not an axis.
+    """
+    idx = by_name(axes if axes is not None else default_axes())
+    out = dict(weights)
+    for c, (l, r) in SIDED_CENTRE.items():
+        base = out.pop(c, 0.0)
+        vl = out.pop(l, base)
+        vr = out.pop(r, base)
+        v = vl if keep == "L" else vr if keep == "R" else max(vl, vr, key=abs)
+        ax = idx.get(c)
+        if ax is not None:
+            v = max(ax.lo, min(ax.hi, v))
+        if v:
+            out[c] = v
+    return out
+
 
 def by_name(axes) -> dict:
     return {a.name: a for a in axes}
