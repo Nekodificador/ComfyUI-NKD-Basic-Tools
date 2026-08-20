@@ -29,8 +29,11 @@ export interface RigState {
   mirror: boolean;
 }
 
+// mirror defaults OFF: independent sides are the point of this rig, and a
+// handle that quietly drags its twin reads as a bug, not a feature. The
+// toggle is right there for symmetric edits.
 const STATE_DEFAULTS: Omit<RigState, "w" | "p"> = {
-  rot: [0, 0, 0], scale: 0, trans: [0, 0], ortho: false, mirror: true,
+  rot: [0, 0, 0], scale: 0, trans: [0, 0], ortho: false, mirror: false,
 };
 
 export function deserialise(text: string): RigState {

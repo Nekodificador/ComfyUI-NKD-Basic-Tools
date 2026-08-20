@@ -213,6 +213,12 @@ def default_axes() -> list:
     # Brows ---------------------------------------------------------------
     # Keypoints 1 and 2 take opposite signs on the same gesture, so each side
     # keeps its own sign rather than being normalised to look consistent.
+    #
+    # These are the RAW halves. The warp bleeds them into each other — up to
+    # 85%, and by an amount that differs per face — so the engine measures
+    # the crosstalk on each prepared photo and remixes the weights before
+    # composing (see `Engine.calibrate_brows`). Keeping the axes raw keeps
+    # the table honest and the legacy parity checkable.
     a.append(_axis("au1_2_L", "raise", "AU1+AU2", "brows", "L",
                    [(1, 1, 0.001)], gain=FULL_BROW_UP, lo=-0.5, hi=1.0))
     a.append(_axis("au1_2_R", "raise", "AU1+AU2", "brows", "R",
@@ -449,9 +455,11 @@ def preset_weights(preset: str, intensity: float = 1.0, axes=None):
 STATE_V = 1
 # `src_ratio` and `stitching` are not here on purpose: they are node widgets,
 # and a value that lives in two places drifts apart in one of them.
+# mirror defaults False, matching the editor: independent sides are the point
+# of the rig; the mirror is an opt-in for symmetric edits.
 STATE_DEFAULTS = {
     "rot": [0.0, 0.0, 0.0], "scale": 0.0, "trans": [0.0, 0.0],
-    "ortho": False, "mirror": True,
+    "ortho": False, "mirror": False,
 }
 
 

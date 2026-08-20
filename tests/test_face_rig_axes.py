@@ -218,9 +218,9 @@ def demo():
 
     # --- state serialisation -------------------------------------------
     st = ax.deserialise("")
-    assert st["w"] == {} and st["p"] == {} and st["mirror"] is True, st
+    assert st["w"] == {} and st["p"] == {} and st["mirror"] is False, st
     st = {"w": {"au12": 0.5, "au26": 0.0}, "rot": [1.0, 0.0, 0.0],
-          "scale": 0.0, "trans": [0.0, 0.0], "ortho": False, "mirror": True}
+          "scale": 0.0, "trans": [0.0, 0.0], "ortho": False, "mirror": False}
     text = ax.serialise(st)
     # Zero weights and default fields are dropped, so the string stays small
     # and an old workflow keeps loading as new fields appear.
@@ -228,7 +228,9 @@ def demo():
     assert "rot" in text, text
     back = ax.deserialise(text)
     assert back["w"] == {"au12": 0.5}, back
-    assert back["mirror"] is True and back["rot"] == [1.0, 0.0, 0.0], back
+    assert back["mirror"] is False and back["rot"] == [1.0, 0.0, 0.0], back
+    # A non-default mirror survives the round trip.
+    assert ax.deserialise(ax.serialise(dict(st, mirror=True)))["mirror"] is True
     # A widget somebody typed into by hand must not take the node down.
     assert ax.deserialise("{not json")["w"] == {}, "malformed rig should read as empty"
 

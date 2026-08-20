@@ -14447,7 +14447,7 @@ const STATE_DEFAULTS = {
   scale: 0,
   trans: [0, 0],
   ortho: false,
-  mirror: true
+  mirror: false
 };
 function deserialise(text) {
   const state = { w: {}, p: {}, ...structuredClone(STATE_DEFAULTS) };

@@ -96,8 +96,15 @@ def to_tensor(rgb: np.ndarray) -> torch.Tensor:
     return torch.from_numpy(rgb.astype(np.float32) / 255.0)[None]
 
 
-def pose_from_state(state: dict, library=None) -> Expression:
-    """Rig state -> Expression, applying the axis library the state asks for."""
+def pose_from_state(state: dict, library=None, src=None) -> Expression:
+    """Rig state -> Expression, applying the axis library the state asks for.
+
+    `src` is accepted for signature stability but unused: a per-face brow
+    decoupling was tried here and reverted — the measured mixes were too
+    noise-sensitive (furrow amplitudes sit at landmark-noise level) and could
+    silently weaken the controls on some faces. The raw axes are the ones
+    that behave.
+    """
     lib = library if library is not None else axes.load_axes()
     if state.get("ortho"):
         lib = axes.orthogonalize(lib)
@@ -170,7 +177,7 @@ class NKDFaceRig(io.ComfyNode):
         # the dials mostly disappointed. The pose is the handles, full stop.
         state = axes.deserialise(rig)
         state["p"] = {}
-        pose = pose_from_state(state)
+        pose = pose_from_state(state, src=src)
         if expression is not None:
             pose = pose + expression
 

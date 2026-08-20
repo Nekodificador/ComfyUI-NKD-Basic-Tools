@@ -85,7 +85,7 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
         if src is None:
             return None
 
-    pose = pose_from_state(axes.deserialise(rig))
+    pose = pose_from_state(axes.deserialise(rig), src=src)
     # The editor shows the aligned crop — the one frame whose coordinates the
     # handles are expressed in — but composited exactly the way the node's
     # final paste-back composites it: warped face through the feathered mask,
