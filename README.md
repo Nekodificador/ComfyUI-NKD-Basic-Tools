@@ -94,7 +94,18 @@ https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 
 ## Credits
 
-Work by other people this builds on:
+### Shipped with the pack
+
+- [LivePortrait](https://github.com/KwaiVGI/LivePortrait) (MIT, Kuaishou Visual
+  Generation and Interaction Center) is vendored under `nkd_liveportrait/` and
+  does the rendering in 😺NKD Face Rig.
+- [Vue](https://vuejs.org) (MIT) is bundled into the node widgets.
+- [YuNet](https://github.com/opencv/opencv_zoo) (MIT), from OpenCV's model zoo,
+  is the face detector the crop nodes download on first use.
+- [Bingsu/adetailer](https://huggingface.co/Bingsu/adetailer) hosts the YOLOv8
+  face model the crop asks for instead when `ultralytics` is installed.
+
+### Work this builds on
 
 - [MaskVidExperiments](https://github.com/drozbay/MaskVidExperiments) — its
   `Mask To Latent Space` node is where the idea of handing the sampler a mask
@@ -104,6 +115,16 @@ Work by other people this builds on:
 - [differential-diffusion](https://github.com/exx8/differential-diffusion) — the
   soft-mask denoise schedule 😺NKD Inpaint Crop applies inline, same behavior as
   core's DifferentialDiffusion node.
+
+### Inspiration
+
+- [**VRGamedevgirl's FastFilmGrain**](https://github.com/vrgamegirl19/comfyui-vrgamedevgirl)
+  and [**radiance**](https://github.com/fxtdstudios/radiance) — between them, why
+  😺NKD Film Grain shimmers on a video batch instead of sitting frozen on top.
+- [**KJNodes**](https://github.com/kijai/ComfyUI-KJNodes) — the mask nodes
+  everyone reaches for first, and the bar 😺NKD Mask Ops had to clear.
+- [**rgthree-comfy**](https://github.com/rgthree/rgthree-comfy) — its widgets are
+  why the buttons in 😺NKD Mask Painter sit where they do.
 
 ## License
 
