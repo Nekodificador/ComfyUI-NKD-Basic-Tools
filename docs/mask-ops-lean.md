@@ -1,18 +1,18 @@
 # 😺NKD Mask Ops Lean
 
-**Use it to** do the three mask tweaks a composite actually needs — **Fill
-Holes**, **Expand / Contract**, **Feather** — without the rest of the panel on
-screen. Same engine as Mask Ops, same speed, three widgets.
+The three mask tweaks a composite actually needs, Fill Holes, Expand / Contract
+and Feather, without the rest of the panel on screen. Same engine as Mask Ops,
+same speed, three widgets.
 
 ```
 Mask ──▶ 😺NKD Mask Ops Lean ──▶ mask / mask_inverted
 ```
 
-That speed is the point, and the difference is not small. Growing or feathering
-a mask is usually done frame by frame on the CPU, one pixel of growth per pass,
+That speed is the point, and the difference isn't small. Growing or feathering a
+mask is usually done frame by frame on the CPU, one pixel of growth per pass,
 which is why it quietly becomes the slow step of a video graph. Here the whole
-batch makes a single trip to the GPU, and the radius is nearly free: expand by
-200 px and it costs about the same as expanding by 8.
+batch makes a single trip to the GPU and the radius is nearly free: expand by 200
+px and it costs about the same as expanding by 8.
 
 Expand + feather on 1080p, RTX 5090, against the usual per-frame CPU
 implementation:
@@ -28,8 +28,8 @@ implementation:
 
 Single image or 81 frames, same node.
 
-Reach for the full 😺NKD Mask Ops when you need levels, speck removal, gap
-closing, blockify or the temporal steps.
+Reach for the full [😺NKD Mask Ops](mask-ops.md) when you need levels, speck
+removal, gap closing, blockify or the temporal steps.
 
 ---
 

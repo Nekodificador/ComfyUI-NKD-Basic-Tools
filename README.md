@@ -1,65 +1,66 @@
 # 😺NKD Basic Tools
 
-A grab-bag of everyday ComfyUI nodes that remove wiring and busywork: detail an
-inpaint at the right resolution, roto a mask by hand with a pen tool, fake a
-shallow depth of field or motion blur that curves, transfer skin texture after a
-relight, recolor by brightness, make procedural noise or film grain, and turn one
-text box into a whole batch of prompts. Each node shows a **live preview in the
-node itself**, so you tune it while you look at it — no separate preview node,
-and most update without even running the graph.
+A grab-bag of everyday ComfyUI nodes that take the wiring and the busywork out of
+the way: detail an inpaint at the right resolution, roto a mask by hand with a
+pen tool, fake a shallow depth of field or a motion blur that curves, put skin
+texture back after a relight, recolor by brightness, make procedural noise or
+film grain, turn one text box into a whole batch of prompts.
 
-Every node has its own page below — click the one you need.
+Most of them preview inside the node, so you tune while you look, and most of
+those update without running the graph at all.
+
+Each node has its own page. Pick the one you need.
 
 ---
 
 ## Detailing & inpainting
 
-| Node | Use it to |
+| Node | What it does |
 |---|---|
-| [😺NKD Inpaint Crop / Stitch](docs/inpaint-crop-stitch.md) | Fix or add detail in one part of an image without re-rendering the whole thing — crop the masked area at your sampler's ideal resolution, stitch it back at full resolution with no seam. |
-| [😺NKD Frequency Separate / Combine](docs/frequency-separate-combine.md) | Split an image into a soft base and a detail layer and recombine — the classic job being restoring skin and fabric texture after a relight. |
-| [😺NKD Mask Ops](docs/mask-ops.md) | Get a mask ready to use in one node instead of six — levels, speck removal, holes, expand, feather, blockify, temporal steps — on the GPU, whole batch at once. |
-| [😺NKD Mask Ops Lean](docs/mask-ops-lean.md) | The three tweaks a composite actually needs — fill holes, expand/contract, feather — in three widgets, at the same speed. |
-| [😺NKD AV Latent](docs/av-latent.md) | Inpaint a video that carries its own soundtrack (MiniMax H3, LTXV) without wiring the same six nodes every time, and without the sound being regenerated behind your back. |
-| [😺NKD Audio Mask](docs/audio-mask.md) | Mask the audio branch on its own, fitted to the soundtrack's real timing, when you'd rather keep the chain in the open. |
-| [😺NKD MiniMax Guides](docs/minimax-guides.md) | Anchor every guide of a MiniMax H3 shot from one node instead of a row of guide nodes each dragging the same four cables across the canvas. |
-| [😺NKD Mask Painter](docs/mask-painter.md) | Paint a mask onto an image your graph just generated — and stack masks from anywhere while keeping the result paintable. |
-| [😺NKD Vector Mask](docs/vector-mask.md) | Draw a mask by hand with a pen tool the way you'd roto in Nuke, and keep it editable forever — what's saved is control points, not pixels. |
+| [😺NKD Inpaint Crop / Stitch](docs/inpaint-crop-stitch.md) | Fixes one part of an image without re-rendering the rest. Crops the masked area at your sampler's resolution and puts it back at full size, no seam. |
+| [😺NKD Frequency Separate / Combine](docs/frequency-separate-combine.md) | Splits an image into a soft base and a detail layer. The usual job is putting skin and fabric texture back after a relight. |
+| [😺NKD Mask Ops](docs/mask-ops.md) | A whole mask pipeline in one node: levels, specks, holes, expand, feather, blockify, temporal steps. Whole batch, one trip to the GPU. |
+| [😺NKD Mask Ops Lean](docs/mask-ops-lean.md) | The three a composite actually needs, fill holes, expand/contract and feather, at the same speed. |
+| [😺NKD AV Latent](docs/av-latent.md) | Inpaints a video that carries its own soundtrack (MiniMax H3, LTXV) without the sound being regenerated behind your back. |
+| [😺NKD Audio Mask](docs/audio-mask.md) | Masks the audio branch on its own, fitted to the soundtrack's real timing. |
+| [😺NKD MiniMax Guides](docs/minimax-guides.md) | Every guide of a MiniMax H3 shot from one node, instead of a row of them each dragging the same four cables across the canvas. |
+| [😺NKD Mask Painter](docs/mask-painter.md) | Paints a mask onto an image your graph just made, and stacks masks from anywhere while the result stays paintable. |
+| [😺NKD Vector Mask](docs/vector-mask.md) | Roto by hand with a pen tool. What gets saved is control points, so it's still editable next week. |
 
 ## Faces
 
-| Node | Use it to |
+| Node | What it does |
 |---|---|
-| [😺NKD Face Rig](docs/face-rig.md) | Pose a portrait's expression by dragging handles on the face itself — brows, eyelids, gaze, mouth, jaw, head — re-rendering live as you drag. |
-| [😺NKD Face Crop / Mask / Stitch](docs/face-crop-mask-stitch.md) | Hand a face to any model the way models like it — upright, square, tightly framed — then put the result back at the angle it came from. |
+| [😺NKD Face Rig](docs/face-rig.md) | Poses an expression by dragging handles on the face itself: brows, eyelids, gaze, mouth, jaw, head. Re-renders as you drag. |
+| [😺NKD Face Crop / Mask / Stitch](docs/face-crop-mask-stitch.md) | Hands a face to a model upright, square and tightly framed, then puts the result back at the angle it came from. |
 
 ## Blur
 
-| Node | Use it to |
+| Node | What it does |
 |---|---|
-| [😺NKD Path Blur](docs/path-blur.md) | Add directional motion blur that *curves*, instead of the single straight angle a normal motion blur gives you. |
-| [😺NKD Field Blur](docs/field-blur.md) | Fake a shallow depth of field without a depth map — drop pins, set how much blur each one wants, everything in between is interpolated. |
+| [😺NKD Path Blur](docs/path-blur.md) | Motion blur that curves, instead of the one straight angle a normal motion blur gives you. |
+| [😺NKD Field Blur](docs/field-blur.md) | A shallow depth of field without a depth map. Drop pins, set how much blur each wants, the rest is interpolated. |
 
 ## Color & gradients
 
-| Node | Use it to |
+| Node | What it does |
 |---|---|
-| [😺NKD Color Warp](docs/color-warp.md) | Grade by grabbing the colors themselves on a wheel your own image is scattered across — and export the grade as a `.cube` LUT. |
-| [😺NKD Gradient Map / Generate](docs/gradient-map-generate.md) | Recolor a photo by brightness (duotone, teal-orange), or build a gradient from scratch as a background, mask or light leak. |
+| [😺NKD Color Warp](docs/color-warp.md) | Grades by grabbing the colors themselves, on a wheel your own image is scattered across. Exports the grade as a `.cube` LUT. |
+| [😺NKD Gradient Map / Generate](docs/gradient-map-generate.md) | Recolors a photo by brightness, or builds a gradient from scratch as a background, a mask or a light leak. |
 
 ## Textures
 
-| Node | Use it to |
+| Node | What it does |
 |---|---|
-| [😺NKD Film Grain](docs/film-grain.md) | Add believable analog grain, with fresh grain per frame on a video batch so it shimmers like real emulsion. |
-| [😺NKD Noise](docs/noise.md) | Generate procedural fractal noise (fBm) for clouds, fog and smoke — as an image *and* a mask, with seamless looping animation. |
+| [😺NKD Film Grain](docs/film-grain.md) | Analog grain that holds up. Fresh grain per frame on a video batch, so it shimmers instead of sitting frozen on top. |
+| [😺NKD Noise](docs/noise.md) | Fractal noise (fBm) for clouds, fog and smoke, as an image and a mask, with seamless looping animation. |
 
 ## Prompt & text utilities
 
-| Node | Use it to |
+| Node | What it does |
 |---|---|
-| [😺NKD String Split](docs/string-split.md) | Turn one block of text into a batch — a list of prompts becomes N generations with no extra wiring. |
-| [😺NKD Prompt Variables](docs/prompt-variables.md) | Build a multiprompt with two nodes: drop variable chips into your prompt and feed each one from a socket or a list. |
+| [😺NKD String Split](docs/string-split.md) | Turns one block of text into a batch. A list of prompts becomes N generations with no extra wiring. |
+| [😺NKD Prompt Variables](docs/prompt-variables.md) | Drop variable chips into your prompt and feed each one from a socket or a list. |
 
 ---
 
