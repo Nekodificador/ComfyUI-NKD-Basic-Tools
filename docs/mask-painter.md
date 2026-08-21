@@ -7,23 +7,20 @@ image. Out come the image, the mask and its inverse.
 
 https://github.com/user-attachments/assets/fea39b77-1e47-4006-ba7f-51197db0f106
 
-Your masks survive. They're mirrored to `input/nkd_masks/`, so a restart or a
-temp cleanup doesn't wipe what you painted. The node turns green when it's
-carrying one.
-
-There's an optional `mask` input if you'd rather start from something upstream, a
-face detector, a segmenter, [😺NKD Mask Ops](mask-ops.md), and refine it by hand.
-`mask_input_mode` picks how the two combine: `Use as start` imports it once and
-then your edits stick, `Replace` overwrites, `Add` / `Subtract` / `Intersect` do
-the set operations, `Disconnected` ignores it. All of them only fire when the
-upstream mask really changes, so re-queueing never disturbs your work.
-
-`Clear` wipes and re-runs so downstream sees it immediately. `Reseed` re-applies
-the upstream mask on the next run without losing what you painted, which is the
-one you want when `Clear` would be too blunt.
-
-One mask per node, so drop several on the same image when you want independent
-masks.
+- Your masks survive. They're mirrored to `input/nkd_masks/`, so a restart or a
+  temp cleanup doesn't wipe what you painted. The node turns green when it's
+  carrying one.
+- The optional `mask` input lets you start from something upstream, a face
+  detector, a segmenter, [😺NKD Mask Ops](mask-ops.md), and refine it by hand.
+- `mask_input_mode` picks how the two combine. `Use as start` imports it once and
+  then your edits stick, `Replace` overwrites, `Add` / `Subtract` / `Intersect`
+  do the set operations, `Disconnected` ignores it. All of them only fire when
+  the upstream mask really changes, so re-queueing never disturbs your work.
+- `Clear` wipes and re-runs so downstream sees it immediately.
+- `Reseed` re-applies the upstream mask on the next run without losing what you
+  painted, which is the one you want when `Clear` would be too blunt.
+- One mask per node, so drop several on the same image when you want independent
+  masks.
 
 This is the node for stacking masks. Anything with a `MASK` output feeds it,
 [😺NKD Vector Mask](vector-mask.md) included, and the set operations composite

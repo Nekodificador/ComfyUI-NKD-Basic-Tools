@@ -14,24 +14,20 @@ original ─▶ 😺NKD Frequency Separate ─┬─ high_frequency ─▶ 😺N
                              relit image ───────────────── low_frequency
 ```
 
-There are four ways to build the base. `Gaussian` is the fast classic, `Guided`
-is edge-safe and won't halo, `Rolling Guidance` erases texture by size while
-keeping shapes, and `Median` is for spot blemishes. `Radius` sets the detail
-scale.
-
-`Divide` and `Subtract` are the two detail modes. Divide is a ratio, which makes
-it lighting-invariant, and that's what makes detail transfer between
-differently-lit images come out clean.
-
-`Luminance` detail keeps the texture achromatic, so recombining never shifts
-color. `RGB` carries chromatic detail as well.
-
-Everything is processed in linear light, which is what gives correct results;
-toggle it off for the classic gamma behaviour. `mode` and `linear` have to match
-between the two nodes.
-
-There's an optional `mask` output to confine the detail to a region, skin only
-for instance.
+- Four ways to build the base. `Gaussian` is the fast classic, `Guided` is
+  edge-safe and won't halo, `Rolling Guidance` erases texture by size while
+  keeping shapes, and `Median` is for spot blemishes. `Radius` sets the detail
+  scale.
+- `Divide` and `Subtract` are the two detail modes. Divide is a ratio, which
+  makes it lighting-invariant, and that's what makes detail transfer between
+  differently-lit images come out clean.
+- `Luminance` detail keeps the texture achromatic, so recombining never shifts
+  color. `RGB` carries chromatic detail as well.
+- `linear` processes in linear light, which is what gives correct results. Toggle
+  it off for the classic gamma behaviour.
+- `mode` and `linear` have to match between the two nodes.
+- The optional `mask` output confines the detail to a region, skin only for
+  instance.
 
 ## Preview
 

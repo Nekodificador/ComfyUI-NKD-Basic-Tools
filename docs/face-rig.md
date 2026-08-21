@@ -11,14 +11,15 @@ slider values of classic expression workflows.
 The editor lives right in the node. No modal, no extra window. Handles hang off
 the detected landmarks and follow the face when it turns.
 
-Every side of the face moves on its own: one raised brow, a wink, a one-sided
-smirk. Each side stays exactly where you left it, to the pixel, and there's a
-mirror toggle for symmetric edits. Head turn/tilt and gaze get their own corner
-gizmos so the face stays clear. Ctrl+Z undoes while the pointer is over the
-editor, Shift is fine adjust, double-click resets a handle.
-
-Alongside the image the node outputs the face region as a MASK, so you can point
-a face detailer at exactly what was re-rendered.
+- **Every side of the face moves on its own**: one raised brow, a wink, a
+  one-sided smirk. Each side stays exactly where you left it, to the pixel, and
+  there's a mirror toggle for symmetric edits.
+- **Head turn/tilt and gaze** get their own corner gizmos, so the face stays
+  clear.
+- **Ctrl+Z** undoes while the pointer is over the editor, **Shift** is fine
+  adjust, **double-click** resets a handle.
+- **A MASK output** alongside the image gives you the face region, so you can
+  point a face detailer at exactly what was re-rendered.
 
 The face doesn't have to come from a Load Image. Feed it anything, a
 [😺NKD Face Crop](face-crop-mask-stitch.md) straightening the head, a VAE Decode,

@@ -12,29 +12,25 @@ Mask ──▶ 😺NKD Mask Ops ──▶ mask / mask_inverted
 
 Everything sits in one panel, and anything left at 0 is skipped.
 
-**Levels** (`Black Point` / `White Point`) cuts the faint halo a segmentation
-model leaves behind. Set both to the same value for a hard threshold.
-
-**Remove Specks** drops blobs thinner than the width you give it. What survives
-keeps its exact outline, so fingers, hair and thin details don't get shaved off
-the way a normal cleanup pass shaves them.
-
-**Fill Holes** and **Close Gaps** give you solid shapes and bridged cracks.
-
-**Expand / Contract** and **Feather** are one signed value and one softness.
-
-**Blockify** snaps the mask to a grid of squares so it survives the trip into
-latent space without bleeding into the blocks next door. Connect your `vae` and
-it configures itself: the grid comes from that VAE, and on a video VAE the mask
-is quantized along time too, to the exact frames it collapses into one latent
-(uneven last group included, since that's read from the VAE rather than assumed).
-Without a VAE you set the size yourself. `Block Coverage` at 0 keeps each block's
-average as a gray value instead, for a pixelated look.
-
-**Expand In Time** is for video: each frame also covers what the mask covered a
-few frames before and after, so a segmentation that lags the motion still covers
-it. **Smooth In Time** averages across neighbouring frames so the edge stops
-flickering.
+- **Levels** (`Black Point` / `White Point`) cuts the faint halo a segmentation
+  model leaves behind. Set both to the same value for a hard threshold.
+- **Remove Specks** drops blobs thinner than the width you give it. What survives
+  keeps its exact outline, so fingers, hair and thin details don't get shaved off
+  the way a normal cleanup pass shaves them.
+- **Fill Holes** and **Close Gaps** give you solid shapes and bridged cracks.
+- **Expand / Contract** and **Feather** are one signed value and one softness.
+- **Blockify** snaps the mask to a grid of squares so it survives the trip into
+  latent space without bleeding into the blocks next door. Connect your `vae` and
+  it configures itself: the grid comes from that VAE, and on a video VAE the mask
+  is quantized along time too, to the exact frames it collapses into one latent
+  (uneven last group included, since that's read from the VAE rather than
+  assumed). Without a VAE you set the size yourself. `Block Coverage` at 0 keeps
+  each block's average as a gray value instead, for a pixelated look.
+- **Expand In Time** is for video: each frame also covers what the mask covered a
+  few frames before and after, so a segmentation that lags the motion still
+  covers it.
+- **Smooth In Time** averages across neighbouring frames so the edge stops
+  flickering.
 
 Steps run in a fixed order, clean then stabilize then shape then soften, so a
 feathered edge is never re-hardened by a later step. The node previews the result

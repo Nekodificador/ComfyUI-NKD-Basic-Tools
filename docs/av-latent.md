@@ -27,17 +27,18 @@ Mask there and it can only say *keep everything* or *redo everything*. The
   mask present on a single frame still reaches the sound, which matters because
   the picture side of a video latent is coarser than that.
 
-That setting decides in all three cases. The `audio mask` input doesn't override
-it; it only tells *follow mask* which moments to follow, in place of the picture
-mask, and reads nothing but its timing. Feed it at frame rate, not a latent one.
+The two optional inputs:
+
+- **`latent mask`** — leave it unconnected and the whole picture is generated.
+  Feed it the `latent_mask` output of [😺NKD Mask Ops](mask-ops.md), with its VAE
+  and model connected, and the edit lands on the model's own grid instead of
+  being stretched onto it here.
+- **`audio mask`** — it doesn't override the Audio setting. It only tells *follow
+  mask* which moments to follow, in place of the picture mask, and reads nothing
+  but its timing. Feed it at frame rate, not a latent one.
 
 Sound can be masked down to 1/40 s, so a mask edge lands within 25 ms of where
 you put it. Fine enough for a word, not for a consonant.
-
-Leave `latent mask` unconnected and the whole picture is generated. Feed it the
-`latent_mask` output of [😺NKD Mask Ops](mask-ops.md), with its VAE and model
-connected, and the edit lands on the model's own grid instead of being stretched
-onto it here.
 
 ---
 

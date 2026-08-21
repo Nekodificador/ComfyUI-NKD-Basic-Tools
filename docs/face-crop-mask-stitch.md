@@ -16,22 +16,21 @@ Load Image ──▶ 😺NKD Face Crop ──▶ face/mask ──▶ (your sampl
 
 ## Face Crop
 
-`Size` gives you the exact square your model wants. `Padding` sets how much
-around the face comes with it, and `Offset` slides the frame up or down.
+- `Size` gives you the exact square your model wants.
+- `Padding` sets how much around the face comes with it, and `Offset` slides the
+  frame up or down.
+- `Upright` on straightens the head, off keeps the original angle.
+- `Mask Region` picks what the mask covers: the whole face, the face with the
+  eyes and mouth left out, skin only, or just the features.
+- `Forehead` decides how far up the mask reaches, and `Refine Edges` lets the
+  picture itself settle the outline so it follows hair and jaw.
+- `Face` picks which face when there's more than one.
+- The `roll` output tells you how far the head was tilted, which is handy for
+  skipping the frames you'd rather not touch.
 
-`Upright` on straightens the head, off keeps the original angle.
-
-The face mask comes with it, no segmentation model and no extra download.
-`Mask Region` picks what it covers: the whole face, the face with the eyes and
-mouth left out, skin only, or just the features. `Forehead` decides how far up it
-reaches, and `Refine Edges` lets the picture itself settle the outline so it
-follows hair and jaw.
-
-The `roll` output tells you how far the head was tilted, which is handy for
-skipping the frames you'd rather not touch.
-
-It finds the face wherever it is: a head that's a small part of a wide shot works
-the same as a headshot. `Face` picks which one when there's more than one.
+The face mask comes with it, no segmentation model and no extra download. And it
+finds the face wherever it is: a head that's a small part of a wide shot works
+the same as a headshot.
 
 ## Face Stitch
 
