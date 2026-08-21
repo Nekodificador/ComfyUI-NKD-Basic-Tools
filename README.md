@@ -15,6 +15,11 @@ Each node has its own page. Pick the one you need.
 
 ## Detailing & inpainting
 
+Cut a piece out, work on it at the right resolution, put it back invisibly. Plus
+everything that gets a mask ready for the job.
+
+https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
+
 | Node | What it does |
 |---|---|
 | [😺NKD Inpaint Crop / Stitch](docs/inpaint-crop-stitch.md) | Fixes one part of an image without re-rendering the rest. Crops the masked area at your sampler's resolution and puts it back at full size, no seam. |
@@ -29,12 +34,21 @@ Each node has its own page. Pick the one you need.
 
 ## Faces
 
+Frame a face the way models want it, or pose its expression by hand.
+
+https://github.com/user-attachments/assets/97beddd1-99ca-475d-97b8-e0d2115fef28
+
 | Node | What it does |
 |---|---|
 | [😺NKD Face Rig](docs/face-rig.md) | Poses an expression by dragging handles on the face itself: brows, eyelids, gaze, mouth, jaw, head. Re-renders as you drag. |
 | [😺NKD Face Crop / Mask / Stitch](docs/face-crop-mask-stitch.md) | Hands a face to a model upright, square and tightly framed, then puts the result back at the angle it came from. |
 
 ## Blur
+
+Blur that follows something: the shape of a movement, or the depth of a scene.
+Both are drawn on the image and previewed with the real render.
+
+<!-- hero video goes here -->
 
 | Node | What it does |
 |---|---|
@@ -43,6 +57,11 @@ Each node has its own page. Pick the one you need.
 
 ## Color & gradients
 
+Push the colors that are already there, or map new ones onto the image by
+brightness.
+
+https://github.com/user-attachments/assets/909d881d-3b09-41d2-88ba-aff797db9898
+
 | Node | What it does |
 |---|---|
 | [😺NKD Color Warp](docs/color-warp.md) | Grades by grabbing the colors themselves, on a wheel your own image is scattered across. Exports the grade as a `.cube` LUT. |
@@ -50,12 +69,21 @@ Each node has its own page. Pick the one you need.
 
 ## Textures
 
+Put the noise back. Grain that moves like emulsion, and fractal noise to build
+clouds, fog and smoke out of nothing.
+
+https://github.com/user-attachments/assets/250a156d-e95d-499d-8a18-61454e95802f
+
 | Node | What it does |
 |---|---|
 | [😺NKD Film Grain](docs/film-grain.md) | Analog grain that holds up. Fresh grain per frame on a video batch, so it shimmers instead of sitting frozen on top. |
 | [😺NKD Noise](docs/noise.md) | Fractal noise (fBm) for clouds, fog and smoke, as an image and a mask, with seamless looping animation. |
 
 ## Prompt & text utilities
+
+One text box in, a whole batch of prompts out.
+
+https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 
 | Node | What it does |
 |---|---|
