@@ -27,6 +27,7 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD Mask Ops](docs/mask-ops.md) | A whole mask pipeline in one node: levels, specks, holes, expand, feather, blockify, temporal steps. Whole batch, one trip to the GPU. |
 | [😺NKD Mask Ops Lean](docs/mask-ops-lean.md) | The three a composite actually needs, fill holes, expand/contract and feather, at the same speed. |
 | [😺NKD AV Latent](docs/av-latent.md) | Inpaints a video that carries its own soundtrack (MiniMax H3, LTXV) without the sound being regenerated behind your back. |
+| [😺NKD AV Latent Extend](docs/av-latent-extend.md) | Continues a sampled clip into a new one, picture and sound together, so a long take can be built out of short stages. |
 | [😺NKD Audio Mask](docs/audio-mask.md) | Masks the audio branch on its own, fitted to the soundtrack's real timing. |
 | [😺NKD MiniMax Guides](docs/minimax-guides.md) | Every guide of a MiniMax H3 shot from one node, instead of a row of them each dragging the same four cables across the canvas. |
 | [😺NKD Mask Painter](docs/mask-painter.md) | Paints a mask onto an image your graph just made, and stacks masks from anywhere while the result stays paintable. |
@@ -115,6 +116,9 @@ https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 - [differential-diffusion](https://github.com/exx8/differential-diffusion) — the
   soft-mask denoise schedule 😺NKD Inpaint Crop applies inline, same behavior as
   core's DifferentialDiffusion node.
+- **Ablejones** — 😺NKD AV Latent Extend is their masked-extension workflow
+  collapsed into one node, and their `MiniMaxH3_BasicMaskedExtension` is the
+  fixture its tests are checked against.
 
 ### Inspiration
 
