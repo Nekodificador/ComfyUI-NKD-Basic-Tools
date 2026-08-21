@@ -4,8 +4,15 @@ The three mask tweaks a composite actually needs, Fill Holes, Expand / Contract
 and Feather, without the rest of the panel on screen. Same engine as Mask Ops,
 same speed, three widgets.
 
-```
-Mask ──▶ 😺NKD Mask Ops Lean ──▶ mask / mask_inverted
+```mermaid
+flowchart LR
+    M(["Mask"]):::input --> OPS["**NKD Mask Ops Lean**"]:::nkd
+    OPS --> O1(["mask"]):::output
+    OPS --> O2(["mask_inverted"]):::output
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
 That speed is the point, and the difference isn't small. Growing or feathering a

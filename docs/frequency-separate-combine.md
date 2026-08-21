@@ -8,10 +8,16 @@ micro-detail intact.
 
 <img width="1604" height="1106" alt="image" src="https://github.com/user-attachments/assets/2545613e-cb73-4b32-aac3-2ddc8fd9588b" />
 
-```
-original ─▶ 😺NKD Frequency Separate ─┬─ high_frequency ─▶ 😺NKD Frequency Combine ─▶ result
-                                      └─ (its detail)         ▲
-                             relit image ───────────────── low_frequency
+```mermaid
+flowchart LR
+    ORIG(["original"]):::input --> SEP
+    SEP["**NKD Frequency Separate**"]:::nkd -- "high_frequency<br/>(its detail)" --> COMB
+    RELIT(["relit image"]):::input -- low_frequency --> COMB
+    COMB["**NKD Frequency Combine**"]:::nkd --> OUT(["result"]):::output
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
 - Four ways to build the base. `Gaussian` is the fast classic, `Guided` is

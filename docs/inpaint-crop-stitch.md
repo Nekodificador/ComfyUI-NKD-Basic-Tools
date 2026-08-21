@@ -7,13 +7,19 @@ with no seam showing.
 
 https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 
-```
-Load Image ─┬─▶ 😺NKD Inpaint Crop ─▶ image/mask/latent ─▶ (your sampling pipeline)
-   Mask ────┘         │                                          │
-                      └──── crop_data ──▶ 😺NKD Inpaint Stitch ◀── image
-                                                   │
-                                                   ▼
-                                          full-resolution result
+```mermaid
+flowchart LR
+    LI(["Load Image"]):::input --> CROP
+    MK(["Mask"]):::input --> CROP
+    CROP["**NKD Inpaint Crop**"]:::nkd -- "image / mask / latent" --> PIPE(["your sampling pipeline"]):::external
+    CROP -- crop_data --> STITCH["**NKD Inpaint Stitch**"]:::nkd
+    PIPE -- image --> STITCH
+    STITCH --> OUT(["full-resolution result"]):::output
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef external fill:#2d2d2d,stroke:#888,color:#eee
+    classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
 ## Crop

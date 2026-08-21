@@ -4,15 +4,23 @@ Anchors every guide of a MiniMax H3 shot from one node, instead of a row of **Ad
 Guide for MiniMax H3** nodes each dragging the same four cables in from far
 upstream. Move one and the canvas turns to spaghetti.
 
-```
-positive ──▶ 😺NKD MiniMax Guides ──▶ positive
-video vae ─▶                       ──▶ video vae
-audio vae ─▶                       ──▶ audio vae
-latent ────▶                       ──▶ latent
-image ─────▶  guide 1
-video ─────▶  guide 2
-audio ─────▶  guide 3
-              guide 4  (grows)
+```mermaid
+flowchart LR
+    POS(["positive"]):::input --> MG
+    VV(["video vae"]):::input --> MG
+    AA(["audio vae"]):::input --> MG
+    LAT(["latent"]):::input --> MG
+    IMG(["image"]):::input -- guide 1 --> MG
+    VID(["video"]):::input -- guide 2 --> MG
+    AUD(["audio"]):::input -- guide 3 --> MG
+    MG["**NKD MiniMax Guides**"]:::nkd --> O1(["positive"]):::output
+    MG --> O2(["video vae"]):::output
+    MG --> O3(["audio vae"]):::output
+    MG --> O4(["latent"]):::output
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
 - **The guide list grows as you fill it.** Each slot takes a still, a frame

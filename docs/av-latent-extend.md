@@ -6,12 +6,16 @@ masked as "keep", so the sampler doesn't start a new shot: it carries on the
 motion and the sound that were already there. Chain it once per stage to build a
 long take out of short ones.
 
-```
-(previous stage) KSampler ──▶ previous  ─┐
-                                         ├─▶ 😺NKD AV Latent Extend ──▶ latent ──▶ KSampler
-MiniMax H3 Reference To Video ──▶ new ───┘        │        │
-                                                  │        └─ trim_seconds  ──▶ Trim Audio Duration
-                                                  └─ overlap_frames ─▶ Image Batch Extend With Overlap
+```mermaid
+flowchart LR
+    PREV(["KSampler<br/>(previous stage)"]):::external -- previous --> EXT
+    NEW(["MiniMax H3<br/>Reference To Video"]):::external -- "new (empty)" --> EXT
+    EXT["**NKD AV Latent Extend**"]:::nkd -- latent --> KS(["KSampler"]):::external
+    EXT -- overlap_frames --> IBE(["Image Batch Extend<br/>With Overlap"]):::external
+    EXT -- trim_seconds --> TAD(["Trim Audio Duration"]):::external
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef external fill:#2d2d2d,stroke:#888,color:#eee
 ```
 
 - `previous` is the previous stage's KSampler output, **before decoding**. It

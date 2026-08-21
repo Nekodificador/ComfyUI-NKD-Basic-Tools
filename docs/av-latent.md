@@ -4,13 +4,19 @@ For inpainting a video that carries its own soundtrack (MiniMax H3, LTXV) withou
 wiring the same six nodes every time, and without the sound being regenerated
 behind your back.
 
-```
-images ─────┐
-audio ──────┤
-video vae ──┼──▶ 😺NKD AV Latent ──▶ latent ──▶ KSampler
-audio vae ──┤
-latent mask ┤  (optional)
-audio mask ─┘  (optional)
+```mermaid
+flowchart LR
+    IM(["images"]):::input --> AV
+    AU(["audio"]):::input --> AV
+    VV(["video vae"]):::input --> AV
+    AA(["audio vae"]):::input --> AV
+    LM(["latent mask"]):::input -. optional .-> AV
+    AM(["audio mask"]):::input -. optional .-> AV
+    AV["**NKD AV Latent**"]:::nkd -- latent --> KS(["KSampler"]):::external
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef external fill:#2d2d2d,stroke:#888,color:#eee
 ```
 
 It's the whole AV chain in one node: VAE Encode, VAE Encode Audio, a Set Latent

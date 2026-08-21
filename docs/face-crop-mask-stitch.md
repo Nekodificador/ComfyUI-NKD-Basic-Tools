@@ -5,13 +5,18 @@ framed, then puts the result back at the angle it came from. A head tilted in th
 photo comes out level in the crop, so the detailer or the swapper or the upscaler
 sees the pose it was trained on instead of a diagonal.
 
-```
-Load Image ──▶ 😺NKD Face Crop ──▶ face/mask ──▶ (your sampling pipeline)
-                     │                                     │
-                     └──── face_data ──▶ 😺NKD Face Stitch ◀── image
-                                                 │
-                                                 ▼
-                                    original photo, face replaced
+```mermaid
+flowchart LR
+    LI(["Load Image"]):::input --> FC
+    FC["**NKD Face Crop**"]:::nkd -- "face / mask" --> PIPE(["your sampling pipeline"]):::external
+    FC -- face_data --> FS["**NKD Face Stitch**"]:::nkd
+    PIPE -- image --> FS
+    FS --> OUT(["original photo,<br/>face replaced"]):::output
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef external fill:#2d2d2d,stroke:#888,color:#eee
+    classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
 ## Face Crop

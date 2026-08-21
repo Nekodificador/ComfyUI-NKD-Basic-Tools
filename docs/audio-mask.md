@@ -6,9 +6,15 @@ Noise Mask, latent in and the same latent out with the mask already on it, so it
 replaces both that node and the Solid Mask feeding it, and the audio latent gets
 wired once instead of forked.
 
-```
-VAE Encode Audio ──▶ 😺NKD Audio Mask ──▶ audio_latent ──▶ Concat AV Latent
-Mask ──────────────▶
+```mermaid
+flowchart LR
+    VE(["VAE Encode Audio"]):::external --> AM
+    MK(["Mask"]):::input --> AM
+    AM["**NKD Audio Mask**"]:::nkd -- audio_latent --> CC(["Concat AV Latent"]):::external
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef external fill:#2d2d2d,stroke:#888,color:#eee
 ```
 
 Same retiming as **follow mask**, and it arrives already fitted to the

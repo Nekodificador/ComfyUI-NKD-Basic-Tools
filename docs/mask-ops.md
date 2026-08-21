@@ -6,8 +6,15 @@ comes back processed: a full pipeline on 81 frames of 1080p takes about a third
 of a second, and expanding a mask is around 50× faster than the node you're
 probably using for it.
 
-```
-Mask ──▶ 😺NKD Mask Ops ──▶ mask / mask_inverted
+```mermaid
+flowchart LR
+    M(["Mask"]):::input --> OPS["**NKD Mask Ops**"]:::nkd
+    OPS --> O1(["mask"]):::output
+    OPS --> O2(["mask_inverted"]):::output
+
+    classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
+    classDef input fill:#2d2d2d,stroke:#888,color:#eee
+    classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
 Everything sits in one panel, and anything left at 0 is skipped.
