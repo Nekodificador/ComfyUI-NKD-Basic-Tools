@@ -44,6 +44,7 @@ const ROW_SAFETY = 8;
 function sizeDomWidgetToContent(
   node: any, domWidget: any, container: HTMLElement, minW: number,
   estimate: (width: number) => number,
+  opts?: { growOnly?: boolean },
 ): ResizeObserver {
   let measuredH = 0;
   let raf = 0;         // coalesce: at most one resize scheduled at a time
@@ -103,7 +104,9 @@ function sizeDomWidgetToContent(
     if (!node.size) return;
     clampWidth();  // node may have been resized wider — track it
     const needed = node.computeSize();
-    if (Math.abs(needed[1] - node.size[1]) > 1) {
+    const diff = needed[1] - node.size[1];
+    // growOnly: only auto-resize when content outgrows the node (user controls shrinking)
+    if (Math.abs(diff) > 1 && (!opts?.growOnly || diff > 1)) {
       settling = true;
       node.setSize([node.size[0], needed[1]]);
       node.setDirtyCanvas(true, true);
@@ -254,12 +257,35 @@ comfyApp.registerExtension({
         hideOnZoom: false,
       });
       const promptRo = sizeDomWidgetToContent(this, domWidget, container, MIN_W,
-        () => MIN_EDITOR_H);
+        () => MIN_EDITOR_H, { growOnly: true });
+
+      // Override computeSize so LiteGraph's minimum-drag uses the BASE editor
+      // height (150px), not the current (possibly user-grown) editor height.
+      // growOnly in apply() prevents auto-shrinking; this lets the user drag smaller.
+      const BASE_EDITOR_H = 150;
+      const innerComputeSize = domWidget.computeSize;
+      domWidget.computeSize = (width: number) => {
+        const result = innerComputeSize(width);
+        const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
+        if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
+          result[1] = result[1] - editorEl.offsetHeight + BASE_EDITOR_H;
+        }
+        return result;
+      };
 
       const origResize = this.onResize;
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
+        // Grow/shrink the editor to fill the node when user drags a corner.
+        const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
+        if (!editorEl) return;
+        const computed = this.computeSize();
+        const overhead = computed[1] - BASE_EDITOR_H;
+        const available = Math.max(90, size[1] - overhead);
+        if (Math.abs(available - editorEl.offsetHeight) > 2) {
+          editorEl.style.height = available + "px";
+        }
       };
 
       // First render once widget values exist + keep chips/sockets in sync.

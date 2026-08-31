@@ -5,11 +5,11 @@
       class="nkd-pv-editor"
       contenteditable="true"
       spellcheck="false"
-      data-placeholder="Write your prompt…"
+      data-placeholder="Write your prompt… (type @ to insert a variable)"
       @input="onInput"
       @keydown="onKeydown"
       @paste.prevent="onPaste"
-      @blur="saveSelection"
+      @blur="onBlur"
       @keyup="saveSelection"
       @mouseup="saveSelection"
       @dragover.prevent="onDragOver"
@@ -17,6 +17,23 @@
       @click="onEditorClick"
       @contextmenu.stop
     ></div>
+    <div
+      v-if="acMenu.open"
+      ref="acMenuEl"
+      class="nkd-pv-ac"
+      @mousedown.prevent
+    >
+      <div
+        v-for="(item, i) in acMenu.items"
+        :key="item.name"
+        class="nkd-pv-ac-item"
+        :class="{ active: i === acMenu.idx }"
+        @mousedown.prevent="acPick(item)"
+      >
+        <i class="nkd-pv-dot" :class="{ 'nkd-pv-dot-off': !item.connected }"></i>
+        {{ item.label }}
+      </div>
+    </div>
     <div class="nkd-pv-bar">
       <button
         v-for="v in vars"
@@ -31,7 +48,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { onMounted, reactive, ref, nextTick } from "vue";
 
 export interface VarInfo {
   name: string;      // socket id, e.g. "variable_0"
@@ -44,9 +61,17 @@ const props = defineProps<{
 }>();
 
 const editor = ref<HTMLDivElement | null>(null);
+const acMenuEl = ref<HTMLDivElement | null>(null);
 const vars = ref<VarInfo[]>([]);
 let savedRange: Range | null = null;
 let debounceTimer: number | undefined;
+
+const acMenu = reactive({
+  open: false,
+  items: [] as VarInfo[],
+  idx: 0,
+  anchorRange: null as Range | null,
+});
 
 const TOKEN_RE = /\{(variable_\d+)(:[rc])?\}/g;
 
@@ -178,15 +203,123 @@ function emitChange() {
 
 function onInput() {
   emitChange();
+  checkAutocomplete();
 }
 
 function onKeydown(e: KeyboardEvent) {
   e.stopPropagation(); // keep ComfyUI hotkeys out of the editor
+
+  if (acMenu.open) {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      acMenu.idx = (acMenu.idx + 1) % acMenu.items.length;
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      acMenu.idx = (acMenu.idx - 1 + acMenu.items.length) % acMenu.items.length;
+      return;
+    }
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      acPick(acMenu.items[acMenu.idx]);
+      return;
+    }
+    if (e.key === "Escape") {
+      e.preventDefault();
+      acClose();
+      return;
+    }
+  }
+
   if (e.key === "Enter") {
     e.preventDefault();
     insertAtCursor(document.createTextNode("\n"));
     emitChange();
   }
+}
+
+// --- @ autocomplete --------------------------------------------------------
+
+function getTextBeforeCursor(): { text: string; node: Text; offset: number } | null {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!range.collapsed || range.startContainer.nodeType !== Node.TEXT_NODE) return null;
+  const node = range.startContainer as Text;
+  const offset = range.startOffset;
+  return { text: node.textContent?.slice(0, offset) ?? "", node, offset };
+}
+
+function checkAutocomplete() {
+  const info = getTextBeforeCursor();
+  if (!info) { acClose(); return; }
+  const atIdx = info.text.lastIndexOf("@");
+  if (atIdx === -1) { acClose(); return; }
+  // Only trigger if @ is at start or preceded by whitespace
+  if (atIdx > 0 && !/\s/.test(info.text[atIdx - 1])) { acClose(); return; }
+  const query = info.text.slice(atIdx + 1).toLowerCase();
+  const filtered = vars.value.filter((v) =>
+    v.label.toLowerCase().includes(query) || v.name.toLowerCase().includes(query)
+  );
+  if (filtered.length === 0) { acClose(); return; }
+
+  // Save anchor range at the @ position for later replacement
+  const anchor = document.createRange();
+  anchor.setStart(info.node, atIdx);
+  anchor.setEnd(info.node, info.offset);
+
+  acMenu.items = filtered;
+  acMenu.idx = 0;
+  acMenu.anchorRange = anchor;
+  acMenu.open = true;
+
+  nextTick(positionAcMenu);
+}
+
+function positionAcMenu() {
+  const menu = acMenuEl.value;
+  const el = editor.value;
+  if (!menu || !el) return;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return;
+  const rect = sel.getRangeAt(0).getBoundingClientRect();
+  const editorRect = el.getBoundingClientRect();
+  menu.style.left = `${rect.left - editorRect.left}px`;
+  menu.style.top = `${rect.bottom - editorRect.top + 4}px`;
+}
+
+function acPick(item: VarInfo) {
+  if (acMenu.anchorRange) {
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(acMenu.anchorRange);
+    acMenu.anchorRange.deleteContents();
+    const chip = chipEl(item.name);
+    acMenu.anchorRange.insertNode(chip);
+    const space = document.createTextNode(" ");
+    chip.after(space);
+    const r = document.createRange();
+    r.setStartAfter(space);
+    r.collapse(true);
+    sel?.removeAllRanges();
+    sel?.addRange(r);
+    savedRange = r.cloneRange();
+    emitChange();
+  }
+  acClose();
+}
+
+function acClose() {
+  acMenu.open = false;
+  acMenu.items = [];
+  acMenu.anchorRange = null;
+}
+
+function onBlur() {
+  saveSelection();
+  // Delay close so mousedown on menu items fires first
+  setTimeout(acClose, 150);
 }
 
 function onPaste(e: ClipboardEvent) {
@@ -269,6 +402,7 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
 
 <style scoped>
 .nkd-pv {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -278,15 +412,14 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
 .nkd-pv-editor {
   height: 150px;
   min-height: 90px;
-  resize: vertical;
   overflow-y: auto;
   background: #111318;
   border: 1px solid #3a3d46;
   border-radius: 4px;
-  padding: 8px 10px;
+  padding: 6px 8px;
   color: #c8d0e0;
-  font-size: 13px;
-  line-height: 1.7;
+  font-size: 11.5px;
+  line-height: 1.55;
   white-space: pre-wrap;
   word-break: break-word;
   outline: none;
@@ -321,6 +454,38 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
 .nkd-pv-add.connected {
   color: #4ab4ff;
 }
+.nkd-pv-ac {
+  position: absolute;
+  z-index: 100;
+  background: #1e2028;
+  border: 1px solid #3a3d46;
+  border-radius: 5px;
+  padding: 3px;
+  min-width: 120px;
+  max-height: 160px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+.nkd-pv-ac-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #c8d0e0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nkd-pv-ac-item:hover,
+.nkd-pv-ac-item.active {
+  background: rgba(74, 180, 255, 0.18);
+  color: #fff;
+}
+.nkd-pv-dot-off {
+  background: transparent !important;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);
+}
 </style>
 
 <!-- Chips are created with document.createElement, outside Vue's render tree,
@@ -336,10 +501,10 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
   border-radius: 999px;
   padding: 0 9px 0 7px;
   margin: 0 2px;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.2px;
-  line-height: 17px;
+  line-height: 15px;
   vertical-align: text-bottom;
   user-select: none;
   cursor: grab;
