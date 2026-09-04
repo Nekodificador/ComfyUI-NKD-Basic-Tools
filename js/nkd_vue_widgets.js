@@ -6954,8 +6954,8 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     const PAD2 = { top: 12, right: 16, bottom: 12, left: 16 };
     const IW = CW - PAD2.left - PAD2.right;
     const BAR_Y = PAD2.top;
-    const BAR_H = CH - PAD2.top - PAD2.bottom;
-    const BAR_MID = BAR_Y + BAR_H / 2;
+    const BAR_H2 = CH - PAD2.top - PAD2.bottom;
+    const BAR_MID = BAR_Y + BAR_H2 / 2;
     const C2 = {
       bg: "#111318",
       gridBorder: "rgba(255,255,255,0.16)",
@@ -7036,11 +7036,11 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
       for (const s of expandStops(sorted, interp2.value)) grad.addColorStop(clamp012(s.pos), s.color);
       ctx.fillStyle = grad;
-      roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
+      roundRectPath(PAD2.left, BAR_Y, IW, BAR_H2, 5);
       ctx.fill();
       ctx.strokeStyle = C2.gridBorder;
       ctx.lineWidth = 0.75;
-      roundRectPath(PAD2.left, BAR_Y, IW, BAR_H, 5);
+      roundRectPath(PAD2.left, BAR_Y, IW, BAR_H2, 5);
       ctx.stroke();
       drawMidDiamonds();
       for (const s of stops.value) {
@@ -7188,7 +7188,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
         redraw();
         return;
       }
-      if (y >= BAR_Y - HIT_R$1 && y <= BAR_Y + BAR_H + HIT_R$1) {
+      if (y >= BAR_Y - HIT_R$1 && y <= BAR_Y + BAR_H2 + HIT_R$1) {
         const pos = fromCanvasX(x);
         const newStop = { pos, color: sampleColorAt(pos), mid: 0.5 };
         stops.value.push(newStop);
@@ -12775,7 +12775,7 @@ class FieldPreview {
   }
 }
 const DEFAULT_INFLUENCE = 0.25;
-const C = {
+const C$1 = {
   bg: "#0b0d12",
   add: "#4ab4ff",
   sub: "#ff6b6b",
@@ -12795,7 +12795,7 @@ const C = {
 };
 const HIT = 10;
 const PT_R = { idle: 4.5, hover: 6, active: 7 };
-const HANDLE_HIT = 7;
+const HANDLE_HIT$1 = 7;
 const CLONE_HIT = 8;
 const UNDO_DEPTH$1 = 30;
 const MIN_PTS = { shape: 3, path: 2 };
@@ -13594,7 +13594,7 @@ class SplineEditor {
       if (h) {
         for (const side of [0, 2]) {
           const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
-          if (Math.hypot(px - hx, py - hy) <= HANDLE_HIT) {
+          if (Math.hypot(px - hx, py - hy) <= HANDLE_HIT$1) {
             return { s: this.active, i: this.selPt, handle: side };
           }
         }
@@ -13938,7 +13938,7 @@ class SplineEditor {
     const ctx = this.ctx;
     const { width, height } = this.logicalSize();
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = C.bg;
+    ctx.fillStyle = C$1.bg;
     ctx.fillRect(0, 0, width, height);
     ctx.imageSmoothingEnabled = this.zoom < 4;
     this.drawBackdrop();
@@ -13954,7 +13954,7 @@ class SplineEditor {
       ctx.save();
       ctx.fillStyle = "rgba(74,180,255,0.10)";
       ctx.fillRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
-      ctx.strokeStyle = C.marquee;
+      ctx.strokeStyle = C$1.marquee;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
@@ -13976,8 +13976,8 @@ class SplineEditor {
     if (poly.length < 3 || !off) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C.soft : C.softDim;
-    ctx.fillStyle = si === this.active ? C.soft : C.softDim;
+    ctx.strokeStyle = si === this.active ? C$1.soft : C$1.softDim;
+    ctx.fillStyle = si === this.active ? C$1.soft : C$1.softDim;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     const [x0, y0] = this.toScreen(poly[0][0] + off[0][0], poly[0][1] + off[0][1]);
@@ -14001,12 +14001,12 @@ class SplineEditor {
       ctx.beginPath();
       ctx.arc(gx, gy, hot ? 5.5 : 4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = C.ptStroke;
+      ctx.strokeStyle = C$1.ptStroke;
       ctx.setLineDash([]);
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = si === this.active ? C.soft : C.softDim;
+      ctx.strokeStyle = si === this.active ? C$1.soft : C$1.softDim;
       ctx.lineWidth = 1.2;
     });
     ctx.restore();
@@ -14040,8 +14040,8 @@ class SplineEditor {
     if (poly.length < 2) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C.soft : C.softDim;
-    ctx.fillStyle = si === this.active ? C.soft : C.softDim;
+    ctx.strokeStyle = si === this.active ? C$1.soft : C$1.softDim;
+    ctx.fillStyle = si === this.active ? C$1.soft : C$1.softDim;
     ctx.lineWidth = 1.2;
     s.pts.forEach((p2) => {
       const sp = p2.sp ?? 1;
@@ -14104,14 +14104,14 @@ class SplineEditor {
   drawShape(s, si) {
     const ctx = this.ctx;
     const isActive = si === this.active;
-    const color = this.mode === "shape" ? s.op === "sub" ? C.sub : C.add : C.path;
+    const color = this.mode === "shape" ? s.op === "sub" ? C$1.sub : C$1.add : C$1.path;
     if (s.pts.length >= 2) {
       this.tracePath(ctx, s);
       if (s.closed && this.showFill && s.pts.length >= 3) {
         ctx.fillStyle = s.op === "sub" ? "rgba(255,107,107,0.20)" : "rgba(74,180,255,0.20)";
         ctx.fill();
       }
-      ctx.strokeStyle = isActive ? color : C.idle;
+      ctx.strokeStyle = isActive ? color : C$1.idle;
       ctx.lineWidth = isActive ? 2 : 1.4;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -14123,7 +14123,7 @@ class SplineEditor {
     if (s.type === "bspline" && s.pts.length >= 2) {
       ctx.save();
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = isActive ? C.hull : "rgba(255,255,255,0.12)";
+      ctx.strokeStyle = isActive ? C$1.hull : "rgba(255,255,255,0.12)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       const [x0, y0] = this.toScreen(s.pts[0].x, s.pts[0].y);
@@ -14141,8 +14141,8 @@ class SplineEditor {
       const h = p2 ? this.handlesOf(s, this.selPt) : null;
       if (p2 && h) {
         const [cx, cy] = this.toScreen(p2.x, p2.y);
-        ctx.strokeStyle = C.handle;
-        ctx.fillStyle = C.handle;
+        ctx.strokeStyle = C$1.handle;
+        ctx.fillStyle = C$1.handle;
         ctx.lineWidth = 1;
         for (const side of [0, 2]) {
           const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
@@ -14172,15 +14172,15 @@ class SplineEditor {
       } else {
         ctx.arc(x, y, r, 0, Math.PI * 2);
       }
-      ctx.fillStyle = selected ? C.ptActive : hovered ? C.ptHover : isActive ? C.pt : C.idle;
+      ctx.fillStyle = selected ? C$1.ptActive : hovered ? C$1.ptHover : isActive ? C$1.pt : C$1.idle;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
-      ctx.strokeStyle = C.ptStroke;
+      ctx.strokeStyle = C$1.ptStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
       if (this.sel.has(SplineEditor.key(si, i))) {
-        ctx.strokeStyle = C.marquee;
+        ctx.strokeStyle = C$1.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, r + 3, 0, Math.PI * 2);
@@ -14228,7 +14228,7 @@ class SplineEditor {
       }
       if (p2.r !== DEFAULT_INFLUENCE) {
         ctx.save();
-        ctx.strokeStyle = i === this.selPt ? C.soft : C.softDim;
+        ctx.strokeStyle = i === this.selPt ? C$1.soft : C$1.softDim;
         ctx.setLineDash([6, 5]);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -14236,10 +14236,10 @@ class SplineEditor {
         ctx.stroke();
         ctx.restore();
       }
-      drawRing(ctx, x, y, p2.blur, C.add, i === this.selPt, `${Math.round(radius)} px`);
+      drawRing(ctx, x, y, p2.blur, C$1.add, i === this.selPt, `${Math.round(radius)} px`);
       if (this.sel.has(SplineEditor.key(0, i))) {
         ctx.save();
-        ctx.strokeStyle = C.marquee;
+        ctx.strokeStyle = C$1.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -14713,7 +14713,7 @@ const CONTROLS = [
 ];
 const SIDE_COLOR = { L: "#4a90ff", R: "#ff5c5c", C: "#ffd24a" };
 const ACTIVE_COLOR = "#ffffff";
-const HANDLE_R = 17;
+const HANDLE_R$1 = 17;
 const FINE = 0.1;
 const ROT_MAX = 20;
 const UNDO_DEPTH = 30;
@@ -15079,7 +15079,7 @@ function mountFaceRig(host, opts) {
     } else {
       dy = get(c.yPos) - get(c.yNeg);
     }
-    return [dx * HANDLE_R, dy * HANDLE_R];
+    return [dx * HANDLE_R$1, dy * HANDLE_R$1];
   }
   function handleCenter(c) {
     const a = anchors[c.anchor];
@@ -15183,19 +15183,19 @@ function mountFaceRig(host, opts) {
       if (c.kind === "pad") {
         ctx.globalAlpha = fa * 0.9;
         ctx.beginPath();
-        ctx.arc(ax, ay, HANDLE_R, 0, Math.PI * 2);
+        ctx.arc(ax, ay, HANDLE_R$1, 0, Math.PI * 2);
         ctx.stroke();
       } else {
         ctx.globalAlpha = fa * 0.9;
         ctx.beginPath();
-        ctx.moveTo(ax, ay - HANDLE_R);
-        ctx.lineTo(ax, ay + HANDLE_R);
+        ctx.moveTo(ax, ay - HANDLE_R$1);
+        ctx.lineTo(ax, ay + HANDLE_R$1);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(ax - 4, ay - HANDLE_R);
-        ctx.lineTo(ax + 4, ay - HANDLE_R);
-        ctx.moveTo(ax - 4, ay + HANDLE_R);
-        ctx.lineTo(ax + 4, ay + HANDLE_R);
+        ctx.moveTo(ax - 4, ay - HANDLE_R$1);
+        ctx.lineTo(ax + 4, ay - HANDLE_R$1);
+        ctx.moveTo(ax - 4, ay + HANDLE_R$1);
+        ctx.lineTo(ax + 4, ay + HANDLE_R$1);
         ctx.stroke();
       }
       const [hx, hy] = handleCenter(c);
@@ -15214,7 +15214,7 @@ function mountFaceRig(host, opts) {
         ctx.globalAlpha = fa * 0.8;
         ctx.font = "11px system-ui, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(c.label, ax, ay - HANDLE_R - 6);
+        ctx.fillText(c.label, ax, ay - HANDLE_R$1 - 6);
         ctx.textAlign = "left";
       }
     }
@@ -15338,7 +15338,7 @@ function mountFaceRig(host, opts) {
     const k = zoomScale();
     let prevX = e.clientX, prevY = e.clientY;
     const move = (ev) => {
-      const gain = (ev.shiftKey ? FINE : 1) * k / HANDLE_R;
+      const gain = (ev.shiftKey ? FINE : 1) * k / HANDLE_R$1;
       const dx = (ev.clientX - prevX) * gain;
       const dy = (ev.clientY - prevY) * gain;
       prevX = ev.clientX;
@@ -15519,7 +15519,7 @@ function mountFaceRig(host, opts) {
   };
 }
 const PROP = "nkdSchema";
-const findW = (node, name) => {
+const findW$1 = (node, name) => {
   var _a;
   return (_a = node.widgets) == null ? void 0 : _a.find((w) => w.name === name);
 };
@@ -15538,7 +15538,7 @@ function guardWidgetOrder(nodeType, nodeName, version2) {
     const named = info == null ? void 0 : info.widgets_values_named;
     if (named && typeof named === "object" && !Array.isArray(named)) {
       for (const [name, val] of Object.entries(named)) {
-        const w = findW(this, name);
+        const w = findW$1(this, name);
         if (w && w.value !== val) {
           w.value = val;
           (_a = w.callback) == null ? void 0 : _a.call(w, val);
@@ -15567,6 +15567,778 @@ function guardPackWidgetOrder(extName, versions) {
     }
   });
 }
+function viewUrl$1(ref2) {
+  const q = new URLSearchParams({
+    filename: ref2.filename,
+    type: ref2.type || "input",
+    subfolder: ref2.subfolder || ""
+  });
+  return api.apiURL(`/view?${q}`);
+}
+const FILE_WIDGETS = ["file", "video", "audio", "image", "filename", "path"];
+const looksLikeFile = (v) => typeof v === "string" && v.length > 0 && v !== "none" && /\.[a-z0-9]{2,5}$/i.test(v);
+function resolveSource(node, slotName, maxDepth = 6, depth = 0) {
+  var _a, _b, _c, _d;
+  if (depth > maxDepth) return null;
+  const slot = (_a = node == null ? void 0 : node.inputs) == null ? void 0 : _a.find((i) => {
+    var _a2;
+    return i.name === slotName || ((_a2 = i.name) == null ? void 0 : _a2.endsWith(`.${slotName}`));
+  });
+  if (!slot || slot.link == null) return null;
+  const link = (_b = node.graph) == null ? void 0 : _b.getLink(slot.link);
+  const src = link && ((_c = node.graph) == null ? void 0 : _c.getNodeById(link.origin_id));
+  if (!src) return null;
+  for (const name of FILE_WIDGETS) {
+    const w = (_d = src.widgets) == null ? void 0 : _d.find((x) => x.name === name);
+    if (w && looksLikeFile(w.value)) {
+      const raw = String(w.value);
+      const m = /^(.*?)\s*\[(\w+)\]$/.exec(raw);
+      const clean = m ? m[1] : raw;
+      const cut = clean.lastIndexOf("/");
+      return {
+        filename: cut >= 0 ? clean.slice(cut + 1) : clean,
+        subfolder: cut >= 0 ? clean.slice(0, cut) : "",
+        type: m ? m[2] : "input"
+      };
+    }
+  }
+  for (const inp of src.inputs ?? []) {
+    if (inp.link == null) continue;
+    const up = resolveSource(src, inp.name, maxDepth, depth + 1);
+    if (up) return up;
+  }
+  return null;
+}
+function slotKind(node, slotName) {
+  var _a, _b, _c, _d, _e;
+  const slot = (_a = node == null ? void 0 : node.inputs) == null ? void 0 : _a.find(
+    (i) => {
+      var _a2;
+      return i.name === slotName || ((_a2 = i.name) == null ? void 0 : _a2.endsWith(`.${slotName}`));
+    }
+  );
+  if (!slot || slot.link == null) return null;
+  const link = (_b = node.graph) == null ? void 0 : _b.getLink(slot.link);
+  let type = link == null ? void 0 : link.type;
+  if (!type && link) {
+    const src = (_c = node.graph) == null ? void 0 : _c.getNodeById(link.origin_id);
+    type = (_e = (_d = src == null ? void 0 : src.outputs) == null ? void 0 : _d[link.origin_slot]) == null ? void 0 : _e.type;
+  }
+  const t = String(type ?? "").toUpperCase();
+  if (t.includes("VIDEO")) return "video";
+  if (t.includes("AUDIO")) return "audio";
+  if (t.includes("MASK")) return "mask";
+  if (t.includes("IMAGE")) return "image";
+  return null;
+}
+const ROW_SAFETY$1 = 2;
+const MAX_INSET = 48;
+const findW = (node, name) => {
+  var _a;
+  return (_a = node.widgets) == null ? void 0 : _a.find((w) => w.name === name);
+};
+function hideWidget(w) {
+  var _a;
+  if (!w) return;
+  w.hidden = true;
+  if (w.options) w.options.hidden = true;
+  w.computeSize = () => [0, -4];
+  w.draw = () => {
+  };
+  if ((_a = w.element) == null ? void 0 : _a.style) w.element.style.display = "none";
+}
+function setWidgetVisible(node, name, visible) {
+  const w = findW(node, name);
+  if (!w) return;
+  w.hidden = !visible;
+  if (w.options) w.options.hidden = !visible;
+  if (visible) delete w.computeSize;
+  else w.computeSize = () => [0, -4];
+}
+function keepDomWidgetSized(node, container, minW) {
+  const mw = () => typeof minW === "function" ? minW() : minW;
+  const MAX_MARGIN = 40;
+  let enforcing = false;
+  let goodMargin = 15;
+  const vueMode = () => {
+    var _a;
+    return !!((_a = window.LiteGraph) == null ? void 0 : _a.vueNodesMode);
+  };
+  const clamp2 = () => {
+    var _a, _b;
+    if (enforcing) return;
+    if (vueMode()) {
+      if (container.style.width) container.style.width = "";
+      const el = document.querySelector(`[data-node-id="${node.id}"]`);
+      const want = `${mw()}px`;
+      if (el && el.style.minWidth !== want) el.style.minWidth = want;
+      return;
+    }
+    const nodeW = (_a = node.size) == null ? void 0 : _a[0];
+    if (!nodeW) return;
+    const hostW = ((_b = container.parentElement) == null ? void 0 : _b.clientWidth) ?? 0;
+    const broken = hostW > 0 && (hostW > nodeW * 1.2 || hostW < nodeW * 0.7);
+    if (!broken) {
+      if (container.style.width) {
+        enforcing = true;
+        container.style.width = "";
+        requestAnimationFrame(() => {
+          enforcing = false;
+        });
+      }
+      const cw = container.clientWidth;
+      if (cw > 0 && cw <= nodeW && cw >= nodeW - MAX_MARGIN) goodMargin = nodeW - cw;
+      return;
+    }
+    const ref2 = Math.round(nodeW - goodMargin);
+    if (ref2 > 0 && Math.abs(container.clientWidth - ref2) > 2) {
+      enforcing = true;
+      container.style.boxSizing = "border-box";
+      container.style.width = `${ref2}px`;
+      requestAnimationFrame(() => {
+        enforcing = false;
+      });
+    }
+  };
+  clamp2();
+  const ro = new ResizeObserver(clamp2);
+  ro.observe(container);
+  const origResize = node.onResize;
+  node.onResize = function(...args) {
+    origResize == null ? void 0 : origResize.apply(this, args);
+    clamp2();
+  };
+  const iv = window.setInterval(clamp2, 250);
+  return {
+    release: () => {
+      ro.disconnect();
+      clearInterval(iv);
+    },
+    margin: () => goodMargin
+  };
+}
+function mountDomWidget(node, opts) {
+  const container = document.createElement("div");
+  container.style.width = "100%";
+  const wantWidth = () => {
+    var _a;
+    return Math.max(opts.minWidth, Math.ceil(((_a = opts.minWidthOf) == null ? void 0 : _a.call(opts)) ?? 0));
+  };
+  container.style.minWidth = `${wantWidth()}px`;
+  container.appendChild(opts.root);
+  let measured = 0;
+  let inset = 0;
+  const heightFor = () => (measured > 0 ? measured : opts.estimate()) + ROW_SAFETY$1 + inset;
+  node.addDOMWidget(opts.name, opts.type, container, {
+    getValue: opts.getValue ?? (() => ""),
+    setValue: opts.setValue ?? (() => {
+    }),
+    serialize: false,
+    hideOnZoom: false,
+    getMinHeight: heightFor,
+    getMaxHeight: heightFor,
+    getHeight: heightFor
+  });
+  const widthKeeper = keepDomWidgetSized(node, container, wantWidth);
+  const minNodeWidth = () => wantWidth() + widthKeeper.margin();
+  const resizeToContent = () => {
+    container.style.minWidth = `${wantWidth()}px`;
+    node.setSize([Math.max(node.size[0], minNodeWidth()), node.computeSize()[1]]);
+    node.setDirtyCanvas(true, true);
+  };
+  let settling = false;
+  const calibrate = () => {
+    var _a;
+    const hostH = ((_a = container.parentElement) == null ? void 0 : _a.clientHeight) ?? 0;
+    if (hostH < 1) return false;
+    const gap = Math.min(MAX_INSET, Math.max(0, Math.round(heightFor() - hostH)));
+    if (Math.abs(gap - inset) <= 1) return false;
+    inset = gap;
+    return true;
+  };
+  const ro = new ResizeObserver(() => {
+    var _a;
+    if (settling) return;
+    if ((_a = document.fullscreenElement) == null ? void 0 : _a.contains(opts.root)) return;
+    if (opts.root.ownerDocument !== document) return;
+    const h = opts.root.offsetHeight;
+    if (h < 1) return;
+    const grew = Math.abs(h - measured) > 1;
+    if (grew) measured = h;
+    if (!calibrate() && !grew) return;
+    settling = true;
+    resizeToContent();
+    requestAnimationFrame(() => {
+      settling = false;
+    });
+  });
+  ro.observe(opts.root);
+  const origResize = node.onResize;
+  node.onResize = function(size) {
+    var _a;
+    origResize == null ? void 0 : origResize.apply(this, arguments);
+    const min = minNodeWidth();
+    if (size[0] < min) size[0] = min;
+    size[1] = this.computeSize(size[0])[1];
+    (_a = opts.onResize) == null ? void 0 : _a.call(opts);
+  };
+  const origComputeSize = node.computeSize.bind(node);
+  node.computeSize = function() {
+    const sz = origComputeSize();
+    const needed = heightFor();
+    if (sz[1] < needed) sz[1] = needed;
+    const min = minNodeWidth();
+    if (sz[0] < min) sz[0] = min;
+    return sz;
+  };
+  let tries = 0;
+  const settleInitial = () => {
+    measured = opts.root.offsetHeight || 0;
+    resizeToContent();
+    if (measured < 1 && tries++ < 30) requestAnimationFrame(settleInitial);
+  };
+  requestAnimationFrame(settleInitial);
+  return {
+    container,
+    resizeToContent,
+    minNodeWidth,
+    release: () => {
+      ro.disconnect();
+      widthKeeper.release();
+    }
+  };
+}
+const NODE_NAME$1 = "NKDCrop";
+const EXT_NAME$1 = "NKD.BasicTools.Crop";
+console.log("[NKD Crop] rev 1.0.0");
+const CANVAS_W = 180;
+const MARGIN = 0.5;
+const HANDLE_R = 5;
+const HANDLE_HIT = 10;
+const BAR_H = 30;
+const TRANSPORT_H = 26;
+const ASPECTS = {
+  Free: null,
+  "1:1": 1,
+  "4:5": 4 / 5,
+  "3:4": 3 / 4,
+  "2:3": 2 / 3,
+  "9:16": 9 / 16,
+  "5:4": 5 / 4,
+  "4:3": 4 / 3,
+  "3:2": 3 / 2,
+  "16:9": 16 / 9
+};
+const C = {
+  bg: "#111318",
+  srcBorder: "rgba(255,255,255,0.28)",
+  rect: "#4ab4ff",
+  rectFill: "rgba(74,180,255,0.08)",
+  outpaintHatch: "rgba(255,176,32,0.28)",
+  handle: "#4ab4ff"
+};
+function defaultBox(w, h) {
+  return { x0: 0, y0: 0, x1: w, y1: h };
+}
+function parseRegion(json, w, h) {
+  if (!json) return defaultBox(w, h);
+  try {
+    const d = JSON.parse(json);
+    const x = Number(d.x) || 0, y = Number(d.y) || 0;
+    const bw = Number(d.w) || 1, bh = Number(d.h) || 1;
+    return { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h };
+  } catch {
+    return defaultBox(w, h);
+  }
+}
+function serialiseRegion(box, w, h) {
+  if (w <= 0 || h <= 0) return "";
+  return JSON.stringify({
+    x: box.x0 / w,
+    y: box.y0 / h,
+    w: (box.x1 - box.x0) / w,
+    h: (box.y1 - box.y0) / h
+  });
+}
+function snapBox(b, multiple, clampW2, clampH) {
+  const grow = (a, bb, limit) => {
+    const size = bb - a;
+    const rem = (size % multiple + multiple) % multiple;
+    if (rem === 0) return [a, bb];
+    const extra = multiple - rem;
+    const addBefore = Math.floor(extra / 2);
+    let na = a - addBefore, nb = bb + (extra - addBefore);
+    if (limit != null) {
+      if (na < 0) {
+        nb += -na;
+        na = 0;
+      }
+      if (nb > limit) {
+        na -= nb - limit;
+        nb = limit;
+      }
+      na = Math.max(0, na);
+    }
+    return [na, nb];
+  };
+  const [x0, x1] = grow(b.x0, b.x1, clampW2);
+  const [y0, y1] = grow(b.y0, b.y1, clampH);
+  return { x0, y0, x1, y1 };
+}
+function registerCrop() {
+  app.registerExtension({
+    name: EXT_NAME$1,
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeType.prototype.__nkdCropWrapped) return;
+      nodeType.prototype.__nkdCropWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        setupCropWidget(this);
+        return r;
+      };
+    }
+  });
+}
+function setupCropWidget(node) {
+  var _a;
+  const regionW = (_a = node.widgets) == null ? void 0 : _a.find((w) => w.name === "region");
+  if (!regionW) return;
+  hideWidget(regionW);
+  node.properties.nkdCropAspect = node.properties.nkdCropAspect ?? "Free";
+  let srcW = 512, srcH = 512;
+  let srcEl = null;
+  let box = parseRegion(regionW.value, srcW, srcH);
+  let lastRef = null;
+  let playing = false;
+  let rafId = 0;
+  const root = document.createElement("div");
+  root.className = "nkd-crop-wrap";
+  root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
+  const bar = document.createElement("div");
+  bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
+  const label = document.createElement("span");
+  label.textContent = "Aspect";
+  label.style.opacity = "0.6";
+  const select = document.createElement("select");
+  select.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 4px;";
+  for (const k of Object.keys(ASPECTS)) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = k;
+    select.appendChild(opt);
+  }
+  select.value = node.properties.nkdCropAspect;
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "Reset";
+  resetBtn.style.cssText = "margin-left:auto;background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 8px;cursor:pointer;";
+  bar.append(label, select, resetBtn);
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "display:block;width:100%;cursor:crosshair;";
+  const transport = document.createElement("div");
+  transport.style.cssText = "display:none;align-items:center;gap:6px;height:26px;padding:0 8px;background:#1a1c22;border-top:1px solid #2a2d36;";
+  const playBtn = document.createElement("button");
+  playBtn.textContent = "▶";
+  playBtn.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 6px;cursor:pointer;width:26px;";
+  const scrub = document.createElement("input");
+  scrub.type = "range";
+  scrub.min = "0";
+  scrub.max = "1000";
+  scrub.value = "0";
+  scrub.style.cssText = "flex:1;";
+  transport.append(playBtn, scrub);
+  root.append(bar, canvas, transport);
+  const dpr = () => Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const modeW = findW(node, "mode");
+  const isOutpaint = () => (modeW == null ? void 0 : modeW.value) === "Outpaint";
+  const margin = () => isOutpaint() ? MARGIN : 0;
+  const divisibleByW = findW(node, "divisible_by");
+  const gridMultiple = () => {
+    const v = divisibleByW == null ? void 0 : divisibleByW.value;
+    return v && v !== "disabled" ? parseInt(v, 10) : null;
+  };
+  function canvasSize() {
+    const m = margin();
+    const cw = canvas.clientWidth || CANVAS_W;
+    const ch = cw * (srcH * (1 + 2 * m)) / (srcW * (1 + 2 * m));
+    return [cw, ch];
+  }
+  function scaleAndOrigin() {
+    const m = margin();
+    const [cw] = canvasSize();
+    const scale = cw / (srcW * (1 + 2 * m));
+    return { scale, ox: m * srcW * scale, oy: m * srcH * scale };
+  }
+  const toCanvas2 = (px, py) => {
+    const { scale, ox, oy } = scaleAndOrigin();
+    return [ox + px * scale, oy + py * scale];
+  };
+  const toSource = (cx, cy) => {
+    const { scale, ox, oy } = scaleAndOrigin();
+    return [(cx - ox) / scale, (cy - oy) / scale];
+  };
+  function syncCanvasBuffer() {
+    const [cw, ch] = canvasSize();
+    const d = dpr();
+    const w = Math.max(1, Math.round(cw * d)), h = Math.max(1, Math.round(cw * d * (ch / cw)));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(w / cw, 0, 0, h / ch, 0, 0);
+    return ctx;
+  }
+  function draw() {
+    const [cw, ch] = canvasSize();
+    const ctx = syncCanvasBuffer();
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, cw, ch);
+    const [sx0, sy0] = toCanvas2(0, 0);
+    const [sx1, sy1] = toCanvas2(srcW, srcH);
+    if (srcEl) {
+      try {
+        ctx.drawImage(srcEl, sx0, sy0, sx1 - sx0, sy1 - sy0);
+      } catch {
+      }
+    } else {
+      ctx.fillStyle = "#1a1c22";
+      ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+    }
+    ctx.strokeStyle = C.srcBorder;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
+    const [rx0, ry0] = toCanvas2(box.x0, box.y0);
+    const [rx1, ry1] = toCanvas2(box.x1, box.y1);
+    const rw = rx1 - rx0, rh = ry1 - ry0;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(rx0, ry0, rw, rh);
+    ctx.clip();
+    ctx.fillStyle = C.rectFill;
+    ctx.fillRect(rx0, ry0, rw, rh);
+    if (box.x0 < 0 || box.y0 < 0 || box.x1 > srcW || box.y1 > srcH) {
+      ctx.strokeStyle = C.outpaintHatch;
+      ctx.lineWidth = 1;
+      const step = 8;
+      for (let d2 = -rh; d2 < rw; d2 += step) {
+        ctx.beginPath();
+        ctx.moveTo(rx0 + d2, ry0);
+        ctx.lineTo(rx0 + d2 + rh, ry0 + rh);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    ctx.strokeStyle = C.rect;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rx0, ry0, rw, rh);
+    const locked = ASPECTS[node.properties.nkdCropAspect] != null;
+    const pts = [
+      [rx0, ry0, "nw"],
+      [rx1, ry0, "ne"],
+      [rx0, ry1, "sw"],
+      [rx1, ry1, "se"]
+    ];
+    if (!locked) {
+      pts.push(
+        [(rx0 + rx1) / 2, ry0, "n"],
+        [(rx0 + rx1) / 2, ry1, "s"],
+        [rx0, (ry0 + ry1) / 2, "w"],
+        [rx1, (ry0 + ry1) / 2, "e"]
+      );
+    }
+    ctx.fillStyle = C.handle;
+    for (const [hx, hy] of pts) {
+      ctx.beginPath();
+      ctx.arc(hx, hy, HANDLE_R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  function stopPlayback() {
+    playing = false;
+    playBtn.textContent = "▶";
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    if (srcEl instanceof HTMLVideoElement) srcEl.pause();
+  }
+  function stepPlayback() {
+    if (!playing) return;
+    draw();
+    const v = srcEl;
+    if (v.duration > 0) scrub.value = String(Math.round(v.currentTime / v.duration * 1e3));
+    rafId = requestAnimationFrame(stepPlayback);
+  }
+  function setPlaying(p2) {
+    if (!(srcEl instanceof HTMLVideoElement)) return;
+    if (p2) {
+      playing = true;
+      playBtn.textContent = "⏸";
+      srcEl.play().catch(() => {
+        playing = false;
+        playBtn.textContent = "▶";
+      });
+      rafId = requestAnimationFrame(stepPlayback);
+    } else {
+      stopPlayback();
+    }
+  }
+  playBtn.addEventListener("click", () => setPlaying(!playing));
+  scrub.addEventListener("input", () => {
+    if (!(srcEl instanceof HTMLVideoElement)) return;
+    stopPlayback();
+    if (srcEl.duration > 0) srcEl.currentTime = Number(scrub.value) / 1e3 * srcEl.duration;
+    draw();
+  });
+  function loadThumb(ref2) {
+    const kind = slotKind(node, "image");
+    const url = viewUrl$1(ref2);
+    stopPlayback();
+    if (kind === "video") {
+      const v = document.createElement("video");
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.loop = true;
+      v.src = url;
+      transport.style.display = "flex";
+      scrub.value = "0";
+      v.onloadeddata = () => {
+        srcEl = v;
+        srcW = v.videoWidth || srcW;
+        srcH = v.videoHeight || srcH;
+        draw();
+      };
+      srcEl = null;
+    } else {
+      transport.style.display = "none";
+      const img = new Image();
+      img.onload = () => {
+        srcEl = img;
+        srcW = img.naturalWidth || srcW;
+        srcH = img.naturalHeight || srcH;
+        draw();
+      };
+      img.src = url;
+    }
+  }
+  function refreshSource() {
+    const ref2 = resolveSource(node, "image");
+    if (!ref2 || lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) {
+      return;
+    }
+    lastRef = ref2;
+    srcEl = null;
+    loadThumb(ref2);
+  }
+  function hitTest(cx, cy) {
+    const [rx0, ry0] = toCanvas2(box.x0, box.y0);
+    const [rx1, ry1] = toCanvas2(box.x1, box.y1);
+    const near = (ax, ay) => Math.hypot(cx - ax, cy - ay) <= HANDLE_HIT;
+    const locked = ASPECTS[node.properties.nkdCropAspect] != null;
+    if (near(rx0, ry0)) return "nw";
+    if (near(rx1, ry0)) return "ne";
+    if (near(rx0, ry1)) return "sw";
+    if (near(rx1, ry1)) return "se";
+    if (!locked) {
+      if (near((rx0 + rx1) / 2, ry0)) return "n";
+      if (near((rx0 + rx1) / 2, ry1)) return "s";
+      if (near(rx0, (ry0 + ry1) / 2)) return "w";
+      if (near(rx1, (ry0 + ry1) / 2)) return "e";
+    }
+    if (cx >= rx0 && cx <= rx1 && cy >= ry0 && cy <= ry1) return "move";
+    return null;
+  }
+  function applyAspect(b, ratio) {
+    const r = ratio ?? ASPECTS[node.properties.nkdCropAspect];
+    if (!r) return b;
+    const w = b.x1 - b.x0;
+    const h = w / r;
+    return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y0 + h };
+  }
+  function finalizeBox(b) {
+    let out = b;
+    if (!isOutpaint()) {
+      out = {
+        x0: Math.max(0, out.x0),
+        y0: Math.max(0, out.y0),
+        x1: Math.min(srcW, out.x1),
+        y1: Math.min(srcH, out.y1)
+      };
+    }
+    const grid = gridMultiple();
+    if (grid) out = snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
+    return out;
+  }
+  let drag = null;
+  function eventToSource(e) {
+    const rect = canvas.getBoundingClientRect();
+    const [cw, ch] = canvasSize();
+    const cx = (e.clientX - rect.left) * (cw / rect.width);
+    const cy = (e.clientY - rect.top) * (ch / rect.height);
+    return toSource(cx, cy);
+  }
+  canvas.addEventListener("pointerdown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const [cw, ch] = canvasSize();
+    const cx = (e.clientX - rect.left) * (cw / rect.width);
+    const cy = (e.clientY - rect.top) * (ch / rect.height);
+    const h = hitTest(cx, cy);
+    if (!h) return;
+    canvas.setPointerCapture(e.pointerId);
+    drag = { handle: h, startBox: { ...box }, startSrc: eventToSource(e) };
+    e.stopPropagation();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const [sx, sy] = eventToSource(e);
+    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
+    const b0 = drag.startBox;
+    let next = { ...b0 };
+    const minSize = Math.max(4, Math.min(srcW, srcH) * 0.02);
+    switch (drag.handle) {
+      case "move":
+        next = { x0: b0.x0 + dx, y0: b0.y0 + dy, x1: b0.x1 + dx, y1: b0.y1 + dy };
+        break;
+      case "n":
+        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
+        break;
+      case "s":
+        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
+        break;
+      case "w":
+        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
+        break;
+      case "e":
+        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
+        break;
+      case "nw":
+        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
+        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
+        break;
+      case "ne":
+        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
+        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
+        break;
+      case "sw":
+        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
+        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
+        break;
+      case "se":
+        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
+        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
+        break;
+    }
+    const m = margin();
+    const lo = -m, hi = 1 + m;
+    next.x0 = Math.max(lo * srcW, next.x0);
+    next.y0 = Math.max(lo * srcH, next.y0);
+    next.x1 = Math.min(hi * srcW, next.x1);
+    next.y1 = Math.min(hi * srcH, next.y1);
+    if (drag.handle !== "move") {
+      const locked = ASPECTS[node.properties.nkdCropAspect];
+      const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
+      const shiftRatio = !locked && e.shiftKey && startH > 0 ? startW / startH : null;
+      next = applyAspect(next, locked ?? shiftRatio);
+    }
+    box = finalizeBox(next);
+    draw();
+  });
+  function endDrag() {
+    var _a2;
+    if (!drag) return;
+    drag = null;
+    regionW.value = serialiseRegion(box, srcW, srcH);
+    (_a2 = regionW.callback) == null ? void 0 : _a2.call(regionW, regionW.value);
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  select.addEventListener("change", () => {
+    node.properties.nkdCropAspect = select.value;
+    box = finalizeBox(applyAspect(box));
+    regionW.value = serialiseRegion(box, srcW, srcH);
+    draw();
+  });
+  resetBtn.addEventListener("click", () => {
+    box = finalizeBox(defaultBox(srcW, srcH));
+    regionW.value = serialiseRegion(box, srcW, srcH);
+    draw();
+  });
+  const fillW = findW(node, "fill");
+  function syncFillWidgetsVisible() {
+    const outpaint = isOutpaint();
+    setWidgetVisible(node, "fill", outpaint);
+    setWidgetVisible(node, "fill_color", outpaint && (fillW == null ? void 0 : fillW.value) === "color");
+    if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
+    node.setSize(node.computeSize());
+    node.setDirtyCanvas(true, true);
+  }
+  function wrapCallback(w, flag, handler) {
+    if (!w || w[flag]) return;
+    const orig = w.callback;
+    w.callback = function(...args) {
+      const r = orig == null ? void 0 : orig.apply(this, args);
+      handler();
+      return r;
+    };
+    w[flag] = true;
+  }
+  wrapCallback(fillW, "_nkdCropCb", syncFillWidgetsVisible);
+  function reflowBox() {
+    box = finalizeBox(box);
+    regionW.value = serialiseRegion(box, srcW, srcH);
+    if (mounted == null ? void 0 : mounted.resizeToContent) mounted.resizeToContent();
+    draw();
+  }
+  wrapCallback(modeW, "_nkdCropCb", () => {
+    syncFillWidgetsVisible();
+    reflowBox();
+  });
+  wrapCallback(divisibleByW, "_nkdCropCb", reflowBox);
+  const mounted = mountDomWidget(node, {
+    name: "nkd_crop_editor",
+    type: "NKD_CROP",
+    root,
+    // The real floor is whatever the toolbar needs to not wrap (Aspect label + select +
+    // Reset), not the canvas — the canvas itself is happy at any size, same as an <img>.
+    minWidth: 120,
+    minWidthOf: () => bar.scrollWidth,
+    estimate: () => BAR_H + Math.round(CANVAS_W * srcH / srcW) + (transport.style.display === "flex" ? TRANSPORT_H : 0),
+    getValue: () => regionW.value,
+    setValue: (v) => {
+      regionW.value = v;
+      box = parseRegion(v, srcW, srcH);
+      draw();
+    },
+    onResize: () => draw()
+  });
+  const origConfigure = node.onConfigure;
+  node.onConfigure = function(data) {
+    origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+    select.value = node.properties.nkdCropAspect ?? "Free";
+    box = parseRegion(regionW.value, srcW, srcH);
+    refreshSource();
+    syncFillWidgetsVisible();
+    if (mounted.resizeToContent) mounted.resizeToContent();
+    draw();
+  };
+  const origConnChange = node.onConnectionsChange;
+  node.onConnectionsChange = function(...args) {
+    origConnChange == null ? void 0 : origConnChange.apply(this, args);
+    refreshSource();
+  };
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function(...args) {
+    stopPlayback();
+    origRemoved == null ? void 0 : origRemoved.apply(this, args);
+  };
+  syncFillWidgetsVisible();
+  requestAnimationFrame(() => {
+    refreshSource();
+    draw();
+  });
+}
 guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDInpaintCrop: 1,
   NKDInpaintStitch: 1,
@@ -15587,8 +16359,10 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDVectorMask: 1,
   NKDFieldBlur: 1,
   NKDPathBlur: 1,
-  NKDFaceRig: 1
+  NKDFaceRig: 1,
+  NKDCrop: 1
 });
+registerCrop();
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;

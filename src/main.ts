@@ -15,6 +15,7 @@ import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
+import { registerCrop } from "./crop";
 
 // Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
 // skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
@@ -25,8 +26,10 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDFrequencySeparate: 1, NKDFrequencyCombine: 1, NKDColorWarp: 1,
   NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
-  NKDFaceRig: 1,
+  NKDFaceRig: 1, NKDCrop: 1,
 });
+
+registerCrop();
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
