@@ -2,7 +2,7 @@ import logging
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 
-from .nkd_crop import NKDCrop
+from .nkd_crop import NKDCrop, NKDCropStitch
 from .nkd_crop_stitch import NKDInpaintCrop, NKDInpaintStitch
 from .nkd_string_split import NKDStringSplit
 from .nkd_prompt_variables import NKDPromptVariables
@@ -44,6 +44,7 @@ class NKDBasicToolsExtension(ComfyExtension):
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
         nodes = [
             NKDCrop,
+            NKDCropStitch,
             NKDInpaintCrop,
             NKDInpaintStitch,
             NKDStringSplit,
@@ -80,6 +81,7 @@ async def comfy_entrypoint() -> NKDBasicToolsExtension:
 # Legacy mappings required for custom_nodes/ discovery
 NODE_CLASS_MAPPINGS = {
     "NKDCrop": NKDCrop,
+    "NKDCropStitch": NKDCropStitch,
     "NKDInpaintCrop": NKDInpaintCrop,
     "NKDInpaintStitch": NKDInpaintStitch,
     "NKDStringSplit": NKDStringSplit,
@@ -105,6 +107,7 @@ NODE_CLASS_MAPPINGS = {
 
 NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDCrop": "😺NKD Crop / Outpaint",
+    "NKDCropStitch": "😺NKD Crop / Outpaint Stitch",
     "NKDInpaintCrop": "😺NKD Inpaint Crop",
     "NKDInpaintStitch": "😺NKD Inpaint Stitch",
     "NKDStringSplit": "😺NKD String Split",

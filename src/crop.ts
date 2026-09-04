@@ -12,6 +12,12 @@
  * outpaint headroom to drag into, box stays clamped to the source. `divisible_by` snaps the
  * box to a pixel grid live (`snapBox`, mirrors `_snap_bbox` server-side) — the same idea as
  * KJ's Transform node, important for models that quantise the canvas (MiniMax).
+ *
+ * Rotation: the box carries an `angle` (degrees) around its own center, dragged from the
+ * handle above it. Hit-testing and the resize math never learned a second, rotated code
+ * path — a pointer position is inverse-rotated into the box's own frame FIRST, so everything
+ * downstream (`hitTest`'s corner/edge tests, the resize `switch` in `pointermove`) stays the
+ * exact axis-aligned code it always was. Only `draw()` forward-rotates, for rendering.
  */
 import { app as comfyApp } from "../../scripts/app.js";
 import { resolveSource, slotKind, viewUrl, type MediaRef } from "./mediaProbe";
@@ -31,6 +37,8 @@ const HANDLE_R = 5;
 const HANDLE_HIT = 10;
 const BAR_H = 30;
 const TRANSPORT_H = 26;
+const ROTATE_OFFSET = 22;   // px above the box's (unrotated) top edge, canvas space
+const ROTATE_BASE_DEG = -90; // atan2 angle of "straight up" — angle 0 points the handle here
 
 const ASPECTS: Record<string, number | null> = {
   Free: null, "1:1": 1, "4:5": 4 / 5, "3:4": 3 / 4, "2:3": 2 / 3, "9:16": 9 / 16,
@@ -51,23 +59,36 @@ function defaultBox(w: number, h: number): Box {
   return { x0: 0, y0: 0, x1: w, y1: h };
 }
 
-function parseRegion(json: string, w: number, h: number): Box {
-  if (!json) return defaultBox(w, h);
+function parseRegion(json: string, w: number, h: number): { box: Box; angle: number } {
+  if (!json) return { box: defaultBox(w, h), angle: 0 };
   try {
     const d = JSON.parse(json);
     const x = Number(d.x) || 0, y = Number(d.y) || 0;
     const bw = Number(d.w) || 1, bh = Number(d.h) || 1;
-    return { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h };
+    const angle = Number(d.angle) || 0;
+    return { box: { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h }, angle };
   } catch {
-    return defaultBox(w, h);
+    return { box: defaultBox(w, h), angle: 0 };
   }
 }
 
-function serialiseRegion(box: Box, w: number, h: number): string {
+function serialiseRegion(box: Box, angle: number, w: number, h: number): string {
   if (w <= 0 || h <= 0) return "";
   return JSON.stringify({
-    x: box.x0 / w, y: box.y0 / h, w: (box.x1 - box.x0) / w, h: (box.y1 - box.y0) / h,
+    x: box.x0 / w, y: box.y0 / h, w: (box.x1 - box.x0) / w, h: (box.y1 - box.y0) / h, angle,
   });
+}
+
+const boxCenter = (b: Box): [number, number] => [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
+
+/** Rotate `(px,py)` by `deg` around `(cx,cy)` — screen convention (Y down), used both to
+ *  forward-rotate the box for drawing and to inverse-rotate a pointer position (negate `deg`)
+ *  back into the box's own unrotated frame. */
+function rotatePoint(px: number, py: number, cx: number, cy: number, deg: number): [number, number] {
+  const t = (deg * Math.PI) / 180;
+  const cos = Math.cos(t), sin = Math.sin(t);
+  const dx = px - cx, dy = py - cy;
+  return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
 }
 
 /**
@@ -97,7 +118,56 @@ function snapBox(b: Box, multiple: number, clampW: number | null, clampH: number
   return { x0, y0, x1, y1 };
 }
 
-type Handle = "move" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" | null;
+/** Grid snap for a ROTATED box: grow the box's own width/height, centered — no edge to
+ *  clamp against once it's rotated (its footprint in source space isn't the axis-aligned
+ *  `[x0,x1]` range any more). Mirrors `_snap_bbox_rotated` in `nkd_crop.py`. */
+function snapBoxRotated(b: Box, multiple: number): Box {
+  const [cx, cy] = boxCenter(b);
+  const grow = (v: number): number => {
+    const rem = ((v % multiple) + multiple) % multiple;
+    return rem === 0 ? v : v + (multiple - rem);
+  };
+  const w = grow(b.x1 - b.x0), h = grow(b.y1 - b.y0);
+  return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
+}
+
+/** Crop mode's hard guarantee: the box's ROTATED footprint never leaves `[0,w]x[0,h]` —
+ *  translate it back in first (cheap, keeps the size the user picked), and only shrink it
+ *  (around its own center, so rotating in place doesn't also recenter it) if translating
+ *  alone can't make it fit — a box already close to the full source, rotated. A few
+ *  iterations because shrinking changes the footprint, which can re-open room to translate. */
+function containRotatedBox(b: Box, deg: number, w: number, h: number): Box {
+  let out = b;
+  for (let i = 0; i < 6; i++) {
+    const [cx, cy] = boxCenter(out);
+    const corners: [number, number][] = [
+      [out.x0, out.y0], [out.x1, out.y0], [out.x1, out.y1], [out.x0, out.y1],
+    ];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [rx, ry] = rotatePoint(px, py, cx, cy, deg);
+      minX = Math.min(minX, rx); maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry); maxY = Math.max(maxY, ry);
+    }
+    const bw = maxX - minX, bh = maxY - minY;
+    if (bw > w + 1e-6 || bh > h + 1e-6) {
+      const scale = Math.min(w / bw, h / bh) * 0.999;
+      out = {
+        x0: cx + (out.x0 - cx) * scale, y0: cy + (out.y0 - cy) * scale,
+        x1: cx + (out.x1 - cx) * scale, y1: cy + (out.y1 - cy) * scale,
+      };
+      continue;
+    }
+    let dx = 0, dy = 0;
+    if (minX < 0) dx = -minX; else if (maxX > w) dx = w - maxX;
+    if (minY < 0) dy = -minY; else if (maxY > h) dy = h - maxY;
+    if (dx === 0 && dy === 0) break;
+    out = { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
+  }
+  return out;
+}
+
+type Handle = "move" | "rotate" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" | null;
 
 export function registerCrop(): void {
   comfyApp.registerExtension({
@@ -128,7 +198,7 @@ function setupCropWidget(node: any): void {
 
   let srcW = 512, srcH = 512;                 // placeholder until a source resolves
   let srcEl: HTMLImageElement | HTMLVideoElement | null = null;
-  let box: Box = parseRegion(regionW.value, srcW, srcH);
+  let { box, angle } = parseRegion(regionW.value, srcW, srcH);
   let lastRef: MediaRef | null = null;
   let playing = false;
   let rafId = 0;
@@ -184,10 +254,77 @@ function setupCropWidget(node: any): void {
   const dpr = () => Math.max(1, Math.min(2, window.devicePixelRatio || 1));
 
   // Crop mode has no reason to spend canvas space on outpaint headroom — "el marco externo
-  // no siempre hace falta" — so the margin band only exists in Outpaint mode.
+  // no siempre hace falta" — so the margin band only exists in Outpaint mode, or while a
+  // rotated box actually needs the room.
   const modeW = findW(node, "mode");
   const isOutpaint = () => modeW?.value === "Outpaint";
-  const margin = () => (isOutpaint() ? MARGIN : 0);
+  const isRotated = () => Math.abs(angle) > 0.01;
+
+  /** The box's ROTATED bounding extent, in source pixels. */
+  function rotatedBounds(): { minX: number; maxX: number; minY: number; maxY: number } {
+    const [cx, cy] = boxCenter(box);
+    const corners: [number, number][] = [
+      [box.x0, box.y0], [box.x1, box.y0], [box.x1, box.y1], [box.x0, box.y1],
+    ];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [rx, ry] = rotatePoint(px, py, cx, cy, angle);
+      minX = Math.min(minX, rx); maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry); maxY = Math.max(maxY, ry);
+    }
+    return { minX, maxX, minY, maxY };
+  }
+
+  /** How far the box's rotated bounding extent currently reaches past the source, as a
+   *  fraction of the smaller source dimension. A 2° nudge and a full outpaint both set
+   *  `isRotated()`/`isOutpaint()`, but they don't need the same amount of canvas headroom —
+   *  this is what the amber "generate" hatch keys off (it must track the REAL overflow,
+   *  never earlier — that band means "this will be generated"). `margin()` below uses a
+   *  look-ahead version instead, so the canvas has room BEFORE the box gets there. */
+  function overflowFraction(): number {
+    const { minX, maxX, minY, maxY } = rotatedBounds();
+    const overflow = Math.max(0, -minX, maxX - srcW, -minY, maxY - srcH);
+    return overflow / Math.max(1, Math.min(srcW, srcH));
+  }
+
+  // Fraction of the source size the box's bounding extent has to still be from an edge
+  // before the margin band starts growing to meet it — Neko: "que muestre el margen antes
+  // de necesitarlo", so a drag toward the edge never hits a hard wall of canvas suddenly
+  // needing to expand out from under the cursor.
+  const EDGE_LOOKAHEAD = 0.12;
+
+  function marginNeedFraction(): number {
+    const { minX, maxX, minY, maxY } = rotatedBounds();
+    const buffer = EDGE_LOOKAHEAD * Math.max(1, Math.min(srcW, srcH));
+    const need = Math.max(0, buffer - minX, maxX - (srcW - buffer),
+                          buffer - minY, maxY - (srcH - buffer));
+    return need / Math.max(1, Math.min(srcW, srcH));
+  }
+
+  // Two growth regimes, not one long ramp: below TIER1_MAX the margin tracks the overflow
+  // 1:1 (Neko: "un pequeño salto solo hasta donde necesito" — the precise, small-jump feel
+  // from before raising the ceiling). A single 1:1 ramp all the way to a high ceiling made
+  // that SAME precision brutal once past ~1.0: because canvas width is `srcW*(1+2*margin)`,
+  // each extra unit of margin buys proportionally less image, so the picture collapsed fast
+  // right when the box was hardest to place. Past TIER1_MAX, extra overflow only adds
+  // TIER2_RATE margin per unit instead of 1:1 — still grows for genuinely extreme cases, just
+  // gently enough to stay controllable — up to TIER2_MAX.
+  const TIER1_MAX = 0.6;
+  const TIER2_MAX = 2.5;
+  const TIER2_RATE = 0.35;
+  const MARGIN_SLACK = 1.25; // reserve a bit more than the CURRENT overflow, so the next
+                             // small drag doesn't clip before the following redraw catches up
+  const marginFor = (want: number): number =>
+    want <= TIER1_MAX ? want : Math.min(TIER2_MAX, TIER1_MAX + (want - TIER1_MAX) * TIER2_RATE);
+  // Crop mode is now geometrically GUARANTEED to stay inside the source (`finalizeBox`'s
+  // `containRotatedBox`, rotated or not) — so it never needs headroom, full stop. Only
+  // Outpaint mode can ever have anything past the edge, and keeps its resting headroom (the
+  // "grab a handle and drag past the edge" affordance) plus the look-ahead/tiered growth.
+  const margin = () => {
+    if (!isOutpaint()) return 0;
+    const need = marginNeedFraction() * MARGIN_SLACK;
+    return marginFor(Math.max(MARGIN, need));
+  };
 
   const divisibleByW = findW(node, "divisible_by");
   const gridMultiple = () => {
@@ -266,19 +403,37 @@ function setupCropWidget(node: any): void {
     ctx.lineWidth = 1;
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
 
-    // The crop/outpaint rectangle.
+    // The crop/outpaint rectangle — rotated around its own (canvas-space) center. Hit-testing
+    // undoes this same rotation on the POINTER instead (see hitTest), so this is the only
+    // place `angle` is applied forward.
     const [rx0, ry0] = toCanvas(box.x0, box.y0);
     const [rx1, ry1] = toCanvas(box.x1, box.y1);
+    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
     const rw = rx1 - rx0, rh = ry1 - ry0;
+    const corners: [number, number][] = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]]
+      .map(([x, y]) => rotatePoint(x, y, ccx, ccy, angle));
+    const strokeQuad = () => {
+      ctx.beginPath();
+      ctx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+      ctx.closePath();
+    };
+
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(rx0, ry0, rw, rh);
+    strokeQuad();
     ctx.clip();
     ctx.fillStyle = C.rectFill;
-    ctx.fillRect(rx0, ry0, rw, rh);
-    // Amber hatch over the part of the rect outside the source — same "generate here"
-    // visual language as NKD Timeline's gap band.
-    if (box.x0 < 0 || box.y0 < 0 || box.x1 > srcW || box.y1 > srcH) {
+    ctx.fill();
+    // Amber hatch over the part of the rect outside the source — same "generate here" visual
+    // language as NKD Timeline's gap band. Keyed off the box's ROTATED extent actually
+    // reaching past the source (not "is rotated at all" — a 2° nudge that never leaves the
+    // source has nothing to generate, and shouldn't look like it does). Drawn in the box's
+    // OWN frame (rotate the canvas instead of each line) since the clip is already the
+    // rotated quad.
+    if (overflowFraction() > 1e-4) {
+      ctx.translate(ccx, ccy);
+      ctx.rotate((angle * Math.PI) / 180);
+      ctx.translate(-ccx, -ccy);
       ctx.strokeStyle = C.outpaintHatch;
       ctx.lineWidth = 1;
       const step = 8;
@@ -292,23 +447,39 @@ function setupCropWidget(node: any): void {
     ctx.restore();
     ctx.strokeStyle = C.rect;
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(rx0, ry0, rw, rh);
+    strokeQuad();
+    ctx.stroke();
 
-    // Handles: corners always, edges only when aspect is unlocked.
+    // Handles: corners always, edges only when aspect is unlocked — all rotated with the box.
     const locked = ASPECTS[node.properties.nkdCropAspect] != null;
-    const pts: [number, number, Handle][] = [
+    const localPts: [number, number, Handle][] = [
       [rx0, ry0, "nw"], [rx1, ry0, "ne"], [rx0, ry1, "sw"], [rx1, ry1, "se"],
     ];
     if (!locked) {
-      pts.push([(rx0 + rx1) / 2, ry0, "n"], [(rx0 + rx1) / 2, ry1, "s"],
-               [rx0, (ry0 + ry1) / 2, "w"], [rx1, (ry0 + ry1) / 2, "e"]);
+      localPts.push([(rx0 + rx1) / 2, ry0, "n"], [(rx0 + rx1) / 2, ry1, "s"],
+                    [rx0, (ry0 + ry1) / 2, "w"], [rx1, (ry0 + ry1) / 2, "e"]);
     }
     ctx.fillStyle = C.handle;
-    for (const [hx, hy] of pts) {
+    for (const [lx, ly] of localPts) {
+      const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
       ctx.beginPath();
       ctx.arc(hx, hy, HANDLE_R, 0, Math.PI * 2);
       ctx.fill();
     }
+
+    // Rotation handle, above the (rotated) top edge, joined by a thin line.
+    const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
+    ctx.strokeStyle = C.rect;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(topX, topY);
+    ctx.lineTo(hubX, hubY);
+    ctx.stroke();
+    ctx.fillStyle = C.handle;
+    ctx.beginPath();
+    ctx.arc(hubX, hubY, HANDLE_R, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   // ── Video transport (play/pause + scrub) ────────────────────────────────────
@@ -391,7 +562,16 @@ function setupCropWidget(node: any): void {
   function hitTest(cx: number, cy: number): Handle {
     const [rx0, ry0] = toCanvas(box.x0, box.y0);
     const [rx1, ry1] = toCanvas(box.x1, box.y1);
-    const near = (ax: number, ay: number) => Math.hypot(cx - ax, cy - ay) <= HANDLE_HIT;
+    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
+
+    // Rotation handle lives OUTSIDE the box, in FORWARD-rotated space — check it first.
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
+    if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT) return "rotate";
+
+    // Everything else: undo the rotation on the POINTER, so the rest of this function (and
+    // the resize math in pointermove) stays exactly the axis-aligned code it always was.
+    const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
+    const near = (ax: number, ay: number) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
     const locked = ASPECTS[node.properties.nkdCropAspect] != null;
     if (near(rx0, ry0)) return "nw";
     if (near(rx1, ry0)) return "ne";
@@ -403,7 +583,7 @@ function setupCropWidget(node: any): void {
       if (near(rx0, (ry0 + ry1) / 2)) return "w";
       if (near(rx1, (ry0 + ry1) / 2)) return "e";
     }
-    if (cx >= rx0 && cx <= rx1 && cy >= ry0 && cy <= ry1) return "move";
+    if (lx >= rx0 && lx <= rx1 && ly >= ry0 && ly <= ry1) return "move";
     return null;
   }
 
@@ -417,22 +597,28 @@ function setupCropWidget(node: any): void {
     return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y0 + h };
   }
 
-  /** Mode clamp (Crop mode can't leave the source) then grid snap — the same order and the
-   *  same math `_region_box` uses server-side, so the widget shows exactly what gets rendered. */
+  /** Grid snap first (best effort — `snapBoxRotated`'s centered grow has no edge to redirect
+   *  against once rotated), THEN Crop mode's containment as the final, absolute guarantee:
+   *  translate/shrink the box so its rotated footprint never leaves the source (Neko:
+   *  "debería contenerse dentro del marco" — rotating in Crop mode was drifting past the
+   *  edge instead, same as an unrotated resize always used to be blocked from doing).
+   *  Containment running LAST can undo a little of the grid alignment in a corner-wedged
+   *  rotated case — accepted trade: "never leaves the source" outranks "exactly on the grid"
+   *  in Crop mode. Outpaint mode never runs this at all. */
   function finalizeBox(b: Box): Box {
     let out = b;
-    if (!isOutpaint()) {
-      out = {
-        x0: Math.max(0, out.x0), y0: Math.max(0, out.y0),
-        x1: Math.min(srcW, out.x1), y1: Math.min(srcH, out.y1),
-      };
-    }
     const grid = gridMultiple();
-    if (grid) out = snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
+    if (grid) {
+      out = isRotated()
+        ? snapBoxRotated(out, grid)
+        : snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
+    }
+    if (!isOutpaint()) out = containRotatedBox(out, angle, srcW, srcH);
     return out;
   }
 
-  let drag: { handle: Handle; startBox: Box; startSrc: [number, number] } | null = null;
+  let drag: { handle: Handle; startBox: Box; startSrc: [number, number]; startAngle: number }
+    | null = null;
 
   function eventToSource(e: PointerEvent): [number, number] {
     const rect = canvas.getBoundingClientRect();
@@ -450,15 +636,39 @@ function setupCropWidget(node: any): void {
     const h = hitTest(cx, cy);
     if (!h) return;
     canvas.setPointerCapture(e.pointerId);
-    drag = { handle: h, startBox: { ...box }, startSrc: eventToSource(e) };
+    const [sxRaw, syRaw] = eventToSource(e);
+    // Resize handles want the pointer in the box's own LOCAL (de-rotated) frame — see the
+    // file header. Move/rotate read the global source position directly.
+    const startSrc: [number, number] = h === "move" || h === "rotate"
+      ? [sxRaw, syRaw]
+      : rotatePoint(sxRaw, syRaw, ...boxCenter(box), -angle);
+    drag = { handle: h, startBox: { ...box }, startSrc, startAngle: angle };
     e.stopPropagation();
   });
 
   canvas.addEventListener("pointermove", (e) => {
     if (!drag) return;
-    const [sx, sy] = eventToSource(e);
-    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
     const b0 = drag.startBox;
+
+    if (drag.handle === "rotate") {
+      const [sx, sy] = eventToSource(e);
+      const [cx, cy] = boxCenter(b0);
+      const rawDeg = (Math.atan2(sy - cy, sx - cx) * 180) / Math.PI;
+      let next = rawDeg - ROTATE_BASE_DEG;
+      // Shift snaps to 15° steps — a rotate handle has no continuous "fine" concept, so a
+      // discrete snap stands in for the pack's usual ×0.1 fine-drag convention.
+      if (e.shiftKey) next = Math.round(next / 15) * 15;
+      angle = ((next % 360) + 360) % 360;
+      box = finalizeBox(box);   // re-snap to the grid at the new orientation
+      draw();
+      return;
+    }
+
+    const [sxRaw, syRaw] = eventToSource(e);
+    const [sx, sy] = drag.handle === "move"
+      ? [sxRaw, syRaw]
+      : rotatePoint(sxRaw, syRaw, ...boxCenter(b0), -drag.startAngle);
+    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
     let next: Box = { ...b0 };
     const minSize = Math.max(4, Math.min(srcW, srcH) * 0.02);
     switch (drag.handle) {
@@ -475,11 +685,14 @@ function setupCropWidget(node: any): void {
       case "se": next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx); next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy); break;
     }
     // Clamp the box to the visible margin band so it stays reachable by drag (no band at
-    // all in Crop mode — margin() is 0 there).
-    const m = margin();
-    const lo = -m, hi = 1 + m;
-    next.x0 = Math.max(lo * srcW, next.x0); next.y0 = Math.max(lo * srcH, next.y0);
-    next.x1 = Math.min(hi * srcW, next.x1); next.y1 = Math.min(hi * srcH, next.y1);
+    // all in Crop mode, unless rotated — margin() is 0 there). Skipped once rotated: the
+    // band is in GLOBAL source axes and `next` here is in the box's own LOCAL frame.
+    if (!isRotated()) {
+      const m = margin();
+      const lo = -m, hi = 1 + m;
+      next.x0 = Math.max(lo * srcW, next.x0); next.y0 = Math.max(lo * srcH, next.y0);
+      next.x1 = Math.min(hi * srcW, next.x1); next.y1 = Math.min(hi * srcH, next.y1);
+    }
     if (drag.handle !== "move") {
       // Shift in Free mode locks to the CURRENT bbox ratio (from the drag's start box), not
       // a preset — the same "hold Shift to keep proportions" as any resize handle elsewhere.
@@ -495,7 +708,7 @@ function setupCropWidget(node: any): void {
   function endDrag() {
     if (!drag) return;
     drag = null;
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     regionW.callback?.(regionW.value);
   }
   canvas.addEventListener("pointerup", endDrag);
@@ -504,12 +717,13 @@ function setupCropWidget(node: any): void {
   select.addEventListener("change", () => {
     node.properties.nkdCropAspect = select.value;
     box = finalizeBox(applyAspect(box));
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     draw();
   });
   resetBtn.addEventListener("click", () => {
+    angle = 0;
     box = finalizeBox(defaultBox(srcW, srcH));
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     draw();
   });
 
@@ -541,7 +755,7 @@ function setupCropWidget(node: any): void {
   // outpainting back inside the source. Grid changes just re-snap the box where it stands.
   function reflowBox(): void {
     box = finalizeBox(box);
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     if (mounted?.resizeToContent) mounted.resizeToContent();
     draw();
   }
@@ -557,7 +771,11 @@ function setupCropWidget(node: any): void {
     estimate: () => BAR_H + Math.round(CANVAS_W * srcH / srcW)
       + (transport.style.display === "flex" ? TRANSPORT_H : 0),
     getValue: () => regionW.value,
-    setValue: (v: string) => { regionW.value = v; box = parseRegion(v, srcW, srcH); draw(); },
+    setValue: (v: string) => {
+      regionW.value = v;
+      ({ box, angle } = parseRegion(v, srcW, srcH));
+      draw();
+    },
     onResize: () => draw(),
   });
 
@@ -565,7 +783,7 @@ function setupCropWidget(node: any): void {
   node.onConfigure = function (this: any, data: any) {
     origConfigure?.apply(this, arguments);
     select.value = node.properties.nkdCropAspect ?? "Free";
-    box = parseRegion(regionW.value, srcW, srcH);
+    ({ box, angle } = parseRegion(regionW.value, srcW, srcH));
     refreshSource();
     syncFillWidgetsVisible();
     if (mounted.resizeToContent) mounted.resizeToContent();

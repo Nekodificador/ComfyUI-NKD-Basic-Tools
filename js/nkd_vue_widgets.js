@@ -15817,6 +15817,8 @@ const HANDLE_R = 5;
 const HANDLE_HIT = 10;
 const BAR_H = 30;
 const TRANSPORT_H = 26;
+const ROTATE_OFFSET = 22;
+const ROTATE_BASE_DEG = -90;
 const ASPECTS = {
   Free: null,
   "1:1": 1,
@@ -15841,24 +15843,33 @@ function defaultBox(w, h) {
   return { x0: 0, y0: 0, x1: w, y1: h };
 }
 function parseRegion(json, w, h) {
-  if (!json) return defaultBox(w, h);
+  if (!json) return { box: defaultBox(w, h), angle: 0 };
   try {
     const d = JSON.parse(json);
     const x = Number(d.x) || 0, y = Number(d.y) || 0;
     const bw = Number(d.w) || 1, bh = Number(d.h) || 1;
-    return { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h };
+    const angle = Number(d.angle) || 0;
+    return { box: { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h }, angle };
   } catch {
-    return defaultBox(w, h);
+    return { box: defaultBox(w, h), angle: 0 };
   }
 }
-function serialiseRegion(box, w, h) {
+function serialiseRegion(box, angle, w, h) {
   if (w <= 0 || h <= 0) return "";
   return JSON.stringify({
     x: box.x0 / w,
     y: box.y0 / h,
     w: (box.x1 - box.x0) / w,
-    h: (box.y1 - box.y0) / h
+    h: (box.y1 - box.y0) / h,
+    angle
   });
+}
+const boxCenter = (b) => [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
+function rotatePoint(px, py, cx, cy, deg) {
+  const t = deg * Math.PI / 180;
+  const cos = Math.cos(t), sin = Math.sin(t);
+  const dx = px - cx, dy = py - cy;
+  return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
 }
 function snapBox(b, multiple, clampW2, clampH) {
   const grow = (a, bb, limit) => {
@@ -15885,6 +15896,54 @@ function snapBox(b, multiple, clampW2, clampH) {
   const [y0, y1] = grow(b.y0, b.y1, clampH);
   return { x0, y0, x1, y1 };
 }
+function snapBoxRotated(b, multiple) {
+  const [cx, cy] = boxCenter(b);
+  const grow = (v) => {
+    const rem = (v % multiple + multiple) % multiple;
+    return rem === 0 ? v : v + (multiple - rem);
+  };
+  const w = grow(b.x1 - b.x0), h = grow(b.y1 - b.y0);
+  return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
+}
+function containRotatedBox(b, deg, w, h) {
+  let out = b;
+  for (let i = 0; i < 6; i++) {
+    const [cx, cy] = boxCenter(out);
+    const corners = [
+      [out.x0, out.y0],
+      [out.x1, out.y0],
+      [out.x1, out.y1],
+      [out.x0, out.y1]
+    ];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [rx, ry] = rotatePoint(px, py, cx, cy, deg);
+      minX = Math.min(minX, rx);
+      maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry);
+      maxY = Math.max(maxY, ry);
+    }
+    const bw = maxX - minX, bh = maxY - minY;
+    if (bw > w + 1e-6 || bh > h + 1e-6) {
+      const scale = Math.min(w / bw, h / bh) * 0.999;
+      out = {
+        x0: cx + (out.x0 - cx) * scale,
+        y0: cy + (out.y0 - cy) * scale,
+        x1: cx + (out.x1 - cx) * scale,
+        y1: cy + (out.y1 - cy) * scale
+      };
+      continue;
+    }
+    let dx = 0, dy = 0;
+    if (minX < 0) dx = -minX;
+    else if (maxX > w) dx = w - maxX;
+    if (minY < 0) dy = -minY;
+    else if (maxY > h) dy = h - maxY;
+    if (dx === 0 && dy === 0) break;
+    out = { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
+  }
+  return out;
+}
 function registerCrop() {
   app.registerExtension({
     name: EXT_NAME$1,
@@ -15909,7 +15968,7 @@ function setupCropWidget(node) {
   node.properties.nkdCropAspect = node.properties.nkdCropAspect ?? "Free";
   let srcW = 512, srcH = 512;
   let srcEl = null;
-  let box = parseRegion(regionW.value, srcW, srcH);
+  let { box, angle } = parseRegion(regionW.value, srcW, srcH);
   let lastRef = null;
   let playing = false;
   let rafId = 0;
@@ -15952,7 +16011,53 @@ function setupCropWidget(node) {
   const dpr = () => Math.max(1, Math.min(2, window.devicePixelRatio || 1));
   const modeW = findW(node, "mode");
   const isOutpaint = () => (modeW == null ? void 0 : modeW.value) === "Outpaint";
-  const margin = () => isOutpaint() ? MARGIN : 0;
+  const isRotated = () => Math.abs(angle) > 0.01;
+  function rotatedBounds() {
+    const [cx, cy] = boxCenter(box);
+    const corners = [
+      [box.x0, box.y0],
+      [box.x1, box.y0],
+      [box.x1, box.y1],
+      [box.x0, box.y1]
+    ];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [rx, ry] = rotatePoint(px, py, cx, cy, angle);
+      minX = Math.min(minX, rx);
+      maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry);
+      maxY = Math.max(maxY, ry);
+    }
+    return { minX, maxX, minY, maxY };
+  }
+  function overflowFraction() {
+    const { minX, maxX, minY, maxY } = rotatedBounds();
+    const overflow = Math.max(0, -minX, maxX - srcW, -minY, maxY - srcH);
+    return overflow / Math.max(1, Math.min(srcW, srcH));
+  }
+  const EDGE_LOOKAHEAD = 0.12;
+  function marginNeedFraction() {
+    const { minX, maxX, minY, maxY } = rotatedBounds();
+    const buffer = EDGE_LOOKAHEAD * Math.max(1, Math.min(srcW, srcH));
+    const need = Math.max(
+      0,
+      buffer - minX,
+      maxX - (srcW - buffer),
+      buffer - minY,
+      maxY - (srcH - buffer)
+    );
+    return need / Math.max(1, Math.min(srcW, srcH));
+  }
+  const TIER1_MAX = 0.6;
+  const TIER2_MAX = 2.5;
+  const TIER2_RATE = 0.35;
+  const MARGIN_SLACK = 1.25;
+  const marginFor = (want) => want <= TIER1_MAX ? want : Math.min(TIER2_MAX, TIER1_MAX + (want - TIER1_MAX) * TIER2_RATE);
+  const margin = () => {
+    if (!isOutpaint()) return 0;
+    const need = marginNeedFraction() * MARGIN_SLACK;
+    return marginFor(Math.max(MARGIN, need));
+  };
   const divisibleByW = findW(node, "divisible_by");
   const gridMultiple = () => {
     const v = divisibleByW == null ? void 0 : divisibleByW.value;
@@ -16012,14 +16117,24 @@ function setupCropWidget(node) {
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
     const [rx0, ry0] = toCanvas2(box.x0, box.y0);
     const [rx1, ry1] = toCanvas2(box.x1, box.y1);
+    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
     const rw = rx1 - rx0, rh = ry1 - ry0;
+    const corners = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]].map(([x, y]) => rotatePoint(x, y, ccx, ccy, angle));
+    const strokeQuad = () => {
+      ctx.beginPath();
+      ctx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+      ctx.closePath();
+    };
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(rx0, ry0, rw, rh);
+    strokeQuad();
     ctx.clip();
     ctx.fillStyle = C.rectFill;
-    ctx.fillRect(rx0, ry0, rw, rh);
-    if (box.x0 < 0 || box.y0 < 0 || box.x1 > srcW || box.y1 > srcH) {
+    ctx.fill();
+    if (overflowFraction() > 1e-4) {
+      ctx.translate(ccx, ccy);
+      ctx.rotate(angle * Math.PI / 180);
+      ctx.translate(-ccx, -ccy);
       ctx.strokeStyle = C.outpaintHatch;
       ctx.lineWidth = 1;
       const step = 8;
@@ -16033,16 +16148,17 @@ function setupCropWidget(node) {
     ctx.restore();
     ctx.strokeStyle = C.rect;
     ctx.lineWidth = 1.5;
-    ctx.strokeRect(rx0, ry0, rw, rh);
+    strokeQuad();
+    ctx.stroke();
     const locked = ASPECTS[node.properties.nkdCropAspect] != null;
-    const pts = [
+    const localPts = [
       [rx0, ry0, "nw"],
       [rx1, ry0, "ne"],
       [rx0, ry1, "sw"],
       [rx1, ry1, "se"]
     ];
     if (!locked) {
-      pts.push(
+      localPts.push(
         [(rx0 + rx1) / 2, ry0, "n"],
         [(rx0 + rx1) / 2, ry1, "s"],
         [rx0, (ry0 + ry1) / 2, "w"],
@@ -16050,11 +16166,24 @@ function setupCropWidget(node) {
       );
     }
     ctx.fillStyle = C.handle;
-    for (const [hx, hy] of pts) {
+    for (const [lx, ly] of localPts) {
+      const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
       ctx.beginPath();
       ctx.arc(hx, hy, HANDLE_R, 0, Math.PI * 2);
       ctx.fill();
     }
+    const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
+    ctx.strokeStyle = C.rect;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(topX, topY);
+    ctx.lineTo(hubX, hubY);
+    ctx.stroke();
+    ctx.fillStyle = C.handle;
+    ctx.beginPath();
+    ctx.arc(hubX, hubY, HANDLE_R, 0, Math.PI * 2);
+    ctx.fill();
   }
   function stopPlayback() {
     playing = false;
@@ -16135,7 +16264,11 @@ function setupCropWidget(node) {
   function hitTest(cx, cy) {
     const [rx0, ry0] = toCanvas2(box.x0, box.y0);
     const [rx1, ry1] = toCanvas2(box.x1, box.y1);
-    const near = (ax, ay) => Math.hypot(cx - ax, cy - ay) <= HANDLE_HIT;
+    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
+    if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT) return "rotate";
+    const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
+    const near = (ax, ay) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
     const locked = ASPECTS[node.properties.nkdCropAspect] != null;
     if (near(rx0, ry0)) return "nw";
     if (near(rx1, ry0)) return "ne";
@@ -16147,7 +16280,7 @@ function setupCropWidget(node) {
       if (near(rx0, (ry0 + ry1) / 2)) return "w";
       if (near(rx1, (ry0 + ry1) / 2)) return "e";
     }
-    if (cx >= rx0 && cx <= rx1 && cy >= ry0 && cy <= ry1) return "move";
+    if (lx >= rx0 && lx <= rx1 && ly >= ry0 && ly <= ry1) return "move";
     return null;
   }
   function applyAspect(b, ratio) {
@@ -16159,16 +16292,11 @@ function setupCropWidget(node) {
   }
   function finalizeBox(b) {
     let out = b;
-    if (!isOutpaint()) {
-      out = {
-        x0: Math.max(0, out.x0),
-        y0: Math.max(0, out.y0),
-        x1: Math.min(srcW, out.x1),
-        y1: Math.min(srcH, out.y1)
-      };
-    }
     const grid = gridMultiple();
-    if (grid) out = snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
+    if (grid) {
+      out = isRotated() ? snapBoxRotated(out, grid) : snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
+    }
+    if (!isOutpaint()) out = containRotatedBox(out, angle, srcW, srcH);
     return out;
   }
   let drag = null;
@@ -16187,14 +16315,28 @@ function setupCropWidget(node) {
     const h = hitTest(cx, cy);
     if (!h) return;
     canvas.setPointerCapture(e.pointerId);
-    drag = { handle: h, startBox: { ...box }, startSrc: eventToSource(e) };
+    const [sxRaw, syRaw] = eventToSource(e);
+    const startSrc = h === "move" || h === "rotate" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(box), -angle);
+    drag = { handle: h, startBox: { ...box }, startSrc, startAngle: angle };
     e.stopPropagation();
   });
   canvas.addEventListener("pointermove", (e) => {
     if (!drag) return;
-    const [sx, sy] = eventToSource(e);
-    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
     const b0 = drag.startBox;
+    if (drag.handle === "rotate") {
+      const [sx2, sy2] = eventToSource(e);
+      const [cx, cy] = boxCenter(b0);
+      const rawDeg = Math.atan2(sy2 - cy, sx2 - cx) * 180 / Math.PI;
+      let next2 = rawDeg - ROTATE_BASE_DEG;
+      if (e.shiftKey) next2 = Math.round(next2 / 15) * 15;
+      angle = (next2 % 360 + 360) % 360;
+      box = finalizeBox(box);
+      draw();
+      return;
+    }
+    const [sxRaw, syRaw] = eventToSource(e);
+    const [sx, sy] = drag.handle === "move" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(b0), -drag.startAngle);
+    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
     let next = { ...b0 };
     const minSize = Math.max(4, Math.min(srcW, srcH) * 0.02);
     switch (drag.handle) {
@@ -16230,12 +16372,14 @@ function setupCropWidget(node) {
         next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
         break;
     }
-    const m = margin();
-    const lo = -m, hi = 1 + m;
-    next.x0 = Math.max(lo * srcW, next.x0);
-    next.y0 = Math.max(lo * srcH, next.y0);
-    next.x1 = Math.min(hi * srcW, next.x1);
-    next.y1 = Math.min(hi * srcH, next.y1);
+    if (!isRotated()) {
+      const m = margin();
+      const lo = -m, hi = 1 + m;
+      next.x0 = Math.max(lo * srcW, next.x0);
+      next.y0 = Math.max(lo * srcH, next.y0);
+      next.x1 = Math.min(hi * srcW, next.x1);
+      next.y1 = Math.min(hi * srcH, next.y1);
+    }
     if (drag.handle !== "move") {
       const locked = ASPECTS[node.properties.nkdCropAspect];
       const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
@@ -16249,7 +16393,7 @@ function setupCropWidget(node) {
     var _a2;
     if (!drag) return;
     drag = null;
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     (_a2 = regionW.callback) == null ? void 0 : _a2.call(regionW, regionW.value);
   }
   canvas.addEventListener("pointerup", endDrag);
@@ -16257,12 +16401,13 @@ function setupCropWidget(node) {
   select.addEventListener("change", () => {
     node.properties.nkdCropAspect = select.value;
     box = finalizeBox(applyAspect(box));
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     draw();
   });
   resetBtn.addEventListener("click", () => {
+    angle = 0;
     box = finalizeBox(defaultBox(srcW, srcH));
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     draw();
   });
   const fillW = findW(node, "fill");
@@ -16287,7 +16432,7 @@ function setupCropWidget(node) {
   wrapCallback(fillW, "_nkdCropCb", syncFillWidgetsVisible);
   function reflowBox() {
     box = finalizeBox(box);
-    regionW.value = serialiseRegion(box, srcW, srcH);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
     if (mounted == null ? void 0 : mounted.resizeToContent) mounted.resizeToContent();
     draw();
   }
@@ -16308,7 +16453,7 @@ function setupCropWidget(node) {
     getValue: () => regionW.value,
     setValue: (v) => {
       regionW.value = v;
-      box = parseRegion(v, srcW, srcH);
+      ({ box, angle } = parseRegion(v, srcW, srcH));
       draw();
     },
     onResize: () => draw()
@@ -16317,7 +16462,7 @@ function setupCropWidget(node) {
   node.onConfigure = function(data) {
     origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
     select.value = node.properties.nkdCropAspect ?? "Free";
-    box = parseRegion(regionW.value, srcW, srcH);
+    ({ box, angle } = parseRegion(regionW.value, srcW, srcH));
     refreshSource();
     syncFillWidgetsVisible();
     if (mounted.resizeToContent) mounted.resizeToContent();
