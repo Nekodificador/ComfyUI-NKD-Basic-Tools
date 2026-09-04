@@ -51,7 +51,11 @@ const C = {
   rect: "#4ab4ff", rectFill: "rgba(74,180,255,0.08)",
   outpaintHatch: "rgba(255,176,32,0.28)",
   handle: "#4ab4ff", handleHover: "#ffd166",
+  outsideDim: "rgba(0,0,0,0.55)", grid: "rgba(255,255,255,0.35)",
 };
+
+const DRAW_MIN_PX_FRAC = 0.02; // below this fraction of the source's shorter side, a
+                               // freehand draw counts as an accidental click, not a box
 
 type Box = { x0: number; y0: number; x1: number; y1: number }; // source-pixel space
 
@@ -167,7 +171,7 @@ function containRotatedBox(b: Box, deg: number, w: number, h: number): Box {
   return out;
 }
 
-type Handle = "move" | "rotate" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw" | null;
+type Handle = "move" | "rotate" | "draw" | "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
 
 export function registerCrop(): void {
   comfyApp.registerExtension({
@@ -199,6 +203,10 @@ function setupCropWidget(node: any): void {
   let srcW = 512, srcH = 512;                 // placeholder until a source resolves
   let srcEl: HTMLImageElement | HTMLVideoElement | null = null;
   let { box, angle } = parseRegion(regionW.value, srcW, srcH);
+  // Inactive (no box drawn yet) shows the plain image and nothing else — Neko: "el recuadro
+  // no esté activo hasta pintarlo". A loaded workflow with a real saved region starts active;
+  // a brand-new node starts empty and the first drag anywhere draws the box (see hitTest).
+  let boxActive = !!regionW.value;
   let lastRef: MediaRef | null = null;
   let playing = false;
   let rafId = 0;
@@ -212,12 +220,15 @@ function setupCropWidget(node: any): void {
   bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;` +
     "padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;" +
     "font:11px sans-serif;color:#c8d0e0;";
+  // `flex:0 0 auto` on every bar child is load-bearing, not cosmetic: `barMinWidth()` below
+  // sums their offsetWidths to get the toolbar's INTRINSIC width, and a shrinking flex item
+  // would report whatever it was squeezed to instead of what it needs.
   const label = document.createElement("span");
   label.textContent = "Aspect";
-  label.style.opacity = "0.6";
+  label.style.cssText = "opacity:0.6;flex:0 0 auto;";
   const select = document.createElement("select");
   select.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;" +
-    "border-radius:4px;font:11px sans-serif;padding:2px 4px;";
+    "border-radius:4px;font:11px sans-serif;padding:2px 4px;flex:0 0 auto;";
   for (const k of Object.keys(ASPECTS)) {
     const opt = document.createElement("option");
     opt.value = k; opt.textContent = k;
@@ -228,8 +239,26 @@ function setupCropWidget(node: any): void {
   resetBtn.textContent = "Reset";
   resetBtn.style.cssText = "margin-left:auto;background:#252830;color:#c8d0e0;" +
     "border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 8px;" +
-    "cursor:pointer;";
+    "cursor:pointer;flex:0 0 auto;";
   bar.append(label, select, resetBtn);
+
+  const BAR_PAD_X = 16, BAR_GAP = 6;
+  /**
+   * The toolbar's INTRINSIC width — what it needs, not what it currently is.
+   *
+   * This used to be `bar.scrollWidth`, and that was the bug behind "no puedo encoger el
+   * nodo": for an element whose content fits, `scrollWidth` is the element's own LAYOUT
+   * width, and the bar is `width:100%` of the node. So the reported minimum was always the
+   * node's current width — `mountDomWidget` fed it into `minNodeWidth()`, `onResize`
+   * clamped the node to it, and the node could never get smaller than it already was (only
+   * creeping down a few px per event, by the gutter arithmetic). Summing the children is
+   * independent of how wide the bar happens to be laid out.
+   */
+  const barMinWidth = () => {
+    const kids = Array.from(bar.children) as HTMLElement[];
+    const content = kids.reduce((sum, k) => sum + k.offsetWidth, 0);
+    return content + BAR_PAD_X + BAR_GAP * Math.max(0, kids.length - 1);
+  };
 
   const canvas = document.createElement("canvas");
   canvas.style.cssText = "display:block;width:100%;cursor:crosshair;";
@@ -383,6 +412,15 @@ function setupCropWidget(node: any): void {
     return ctx;
   }
 
+  // Coalesces to one draw per animation frame: a resize drag or a fast pointermove can fire
+  // far more often than the browser paints, so extra calls in the same frame are pure waste.
+  let drawScheduled = false;
+  function scheduleDraw(): void {
+    if (drawScheduled) return;
+    drawScheduled = true;
+    requestAnimationFrame(() => { drawScheduled = false; draw(); });
+  }
+
   function draw() {
     const [cw, ch] = canvasSize();
     const ctx = syncCanvasBuffer();
@@ -403,6 +441,10 @@ function setupCropWidget(node: any): void {
     ctx.lineWidth = 1;
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
 
+    // Nothing drawn yet: plain image, no box, no handles — Neko: "el recuadro no esté
+    // activo hasta pintarlo". `hitTest` already routes every click here into drawing one.
+    if (!boxActive) return;
+
     // The crop/outpaint rectangle — rotated around its own (canvas-space) center. Hit-testing
     // undoes this same rotation on the POINTER instead (see hitTest), so this is the only
     // place `angle` is applied forward.
@@ -412,12 +454,31 @@ function setupCropWidget(node: any): void {
     const rw = rx1 - rx0, rh = ry1 - ry0;
     const corners: [number, number][] = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]]
       .map(([x, y]) => rotatePoint(x, y, ccx, ccy, angle));
-    const strokeQuad = () => {
-      ctx.beginPath();
+    // Traces the quad as a SUBPATH — no beginPath of its own, so it can be combined with
+    // another subpath (the dim overlay below needs the quad AND the full canvas rect in one
+    // path for evenodd to punch a hole). `strokeQuad` wraps this with its own beginPath for
+    // every other use (clip, stroke), where a single subpath is exactly what's wanted.
+    const addQuadSubpath = () => {
       ctx.moveTo(corners[0][0], corners[0][1]);
       for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
       ctx.closePath();
     };
+    const strokeQuad = () => { ctx.beginPath(); addQuadSubpath(); };
+
+    // Dim everything OUTSIDE the box first, so the kept area reads clearly against the
+    // discarded one — the box's own fill/stroke/handles draw on top of this, undimmed.
+    // BUG FIXED HERE (Neko: "la parte oscura debería ser la de fuera del recuadro, no
+    // dentro"): this used to call `strokeQuad()`, whose OWN `beginPath()` wiped the
+    // `ctx.rect(...)` added a line above — leaving only the quad as a single subpath, which
+    // evenodd just fills normally (the INSIDE). `addQuadSubpath` never resets the path, so
+    // both subpaths survive into the one `fill("evenodd")` call.
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, cw, ch);
+    addQuadSubpath();
+    ctx.fillStyle = C.outsideDim;
+    ctx.fill("evenodd");
+    ctx.restore();
 
     ctx.save();
     strokeQuad();
@@ -445,20 +506,35 @@ function setupCropWidget(node: any): void {
       }
     }
     ctx.restore();
+
+    // Rule-of-thirds grid, for composition — rotated with the box (same canvas-rotate trick
+    // as the hatch above, so the lines are just drawn in the box's own unrotated coords).
+    ctx.save();
+    ctx.translate(ccx, ccy);
+    ctx.rotate((angle * Math.PI) / 180);
+    ctx.translate(-ccx, -ccy);
+    ctx.strokeStyle = C.grid;
+    ctx.lineWidth = 1;
+    for (let k = 1; k <= 2; k++) {
+      const gx = rx0 + (rw * k) / 3;
+      ctx.beginPath(); ctx.moveTo(gx, ry0); ctx.lineTo(gx, ry1); ctx.stroke();
+      const gy = ry0 + (rh * k) / 3;
+      ctx.beginPath(); ctx.moveTo(rx0, gy); ctx.lineTo(rx1, gy); ctx.stroke();
+    }
+    ctx.restore();
+
     ctx.strokeStyle = C.rect;
     ctx.lineWidth = 1.5;
     strokeQuad();
     ctx.stroke();
 
-    // Handles: corners always, edges only when aspect is unlocked — all rotated with the box.
-    const locked = ASPECTS[node.properties.nkdCropAspect] != null;
+    // Handles — all 8 plus rotate, always: an aspect-locked edge handle now scales the OTHER
+    // axis through it (see applyAspect) instead of being hidden, so there's no dead handle.
     const localPts: [number, number, Handle][] = [
       [rx0, ry0, "nw"], [rx1, ry0, "ne"], [rx0, ry1, "sw"], [rx1, ry1, "se"],
+      [(rx0 + rx1) / 2, ry0, "n"], [(rx0 + rx1) / 2, ry1, "s"],
+      [rx0, (ry0 + ry1) / 2, "w"], [rx1, (ry0 + ry1) / 2, "e"],
     ];
-    if (!locked) {
-      localPts.push([(rx0 + rx1) / 2, ry0, "n"], [(rx0 + rx1) / 2, ry1, "s"],
-                    [rx0, (ry0 + ry1) / 2, "w"], [rx1, (ry0 + ry1) / 2, "e"]);
-    }
     ctx.fillStyle = C.handle;
     for (const [lx, ly] of localPts) {
       const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
@@ -560,6 +636,11 @@ function setupCropWidget(node: any): void {
   // ── Interaction ───────────────────────────────────────────────────────────
 
   function hitTest(cx: number, cy: number): Handle {
+    // Nothing to hit yet — every click anywhere draws a fresh box (see the "draw" case in
+    // pointerdown/pointermove). Neko: "al arrastrar sobre una zona vacía... pueda dibujar
+    // directamente el recuadro".
+    if (!boxActive) return "draw";
+
     const [rx0, ry0] = toCanvas(box.x0, box.y0);
     const [rx1, ry1] = toCanvas(box.x1, box.y1);
     const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
@@ -572,26 +653,34 @@ function setupCropWidget(node: any): void {
     // the resize math in pointermove) stays exactly the axis-aligned code it always was.
     const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
     const near = (ax: number, ay: number) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
-    const locked = ASPECTS[node.properties.nkdCropAspect] != null;
     if (near(rx0, ry0)) return "nw";
     if (near(rx1, ry0)) return "ne";
     if (near(rx0, ry1)) return "sw";
     if (near(rx1, ry1)) return "se";
-    if (!locked) {
-      if (near((rx0 + rx1) / 2, ry0)) return "n";
-      if (near((rx0 + rx1) / 2, ry1)) return "s";
-      if (near(rx0, (ry0 + ry1) / 2)) return "w";
-      if (near(rx1, (ry0 + ry1) / 2)) return "e";
-    }
+    if (near((rx0 + rx1) / 2, ry0)) return "n";
+    if (near((rx0 + rx1) / 2, ry1)) return "s";
+    if (near(rx0, (ry0 + ry1) / 2)) return "w";
+    if (near(rx1, (ry0 + ry1) / 2)) return "e";
     if (lx >= rx0 && lx <= rx1 && ly >= ry0 && ly <= ry1) return "move";
-    return null;
+    // Empty area with a box already active: start drawing a NEW one, same as when inactive.
+    return "draw";
   }
 
   /** `ratio` overrides the Aspect combo — used for Shift-drag in Free mode, which locks to
-   *  whatever ratio the box already had at the start of THIS drag, not a preset. */
-  function applyAspect(b: Box, ratio?: number | null): Box {
+   *  whatever ratio the box already had at the start of THIS drag, not a preset. `handle`
+   *  decides which axis DRIVES the other: n/s edge handles now work under a locked aspect
+   *  too (they used to just be hidden) by deriving width from the height they actually
+   *  changed, scaled around the box's horizontal center — everything else stays width-drives-
+   *  height, anchored at (x0,y0), as it always was. */
+  function applyAspect(b: Box, ratio?: number | null, handle?: Handle): Box {
     const r = ratio ?? ASPECTS[node.properties.nkdCropAspect];
     if (!r) return b;
+    if (handle === "n" || handle === "s") {
+      const h = b.y1 - b.y0;
+      const w = h * r;
+      const cx = (b.x0 + b.x1) / 2;
+      return { x0: cx - w / 2, y0: b.y0, x1: cx + w / 2, y1: b.y1 };
+    }
     const w = b.x1 - b.x0;
     const h = w / r;
     return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y0 + h };
@@ -617,8 +706,11 @@ function setupCropWidget(node: any): void {
     return out;
   }
 
-  let drag: { handle: Handle; startBox: Box; startSrc: [number, number]; startAngle: number }
-    | null = null;
+  let drag: {
+    handle: Handle; startBox: Box; startSrc: [number, number]; startAngle: number;
+    // Only set for "draw" — what to restore if the drag turns out too small to count.
+    preBox?: Box; preAngle?: number; preActive?: boolean;
+  } | null = null;
 
   function eventToSource(e: PointerEvent): [number, number] {
     const rect = canvas.getBoundingClientRect();
@@ -634,9 +726,22 @@ function setupCropWidget(node: any): void {
     const cx = (e.clientX - rect.left) * (cw / rect.width);
     const cy = (e.clientY - rect.top) * (ch / rect.height);
     const h = hitTest(cx, cy);
-    if (!h) return;
     canvas.setPointerCapture(e.pointerId);
     const [sxRaw, syRaw] = eventToSource(e);
+    if (h === "draw") {
+      // Start a brand new box, axis-aligned, anchored at this point — a freehand marquee,
+      // like any crop tool. Optimistically active already, so draw() shows it live;
+      // endDrag reverts everything below if the result is too small to count.
+      const preBox = { ...box }, preAngle = angle, preActive = boxActive;
+      angle = 0;
+      boxActive = true;
+      box = { x0: sxRaw, y0: syRaw, x1: sxRaw, y1: syRaw };
+      drag = { handle: h, startBox: box, startSrc: [sxRaw, syRaw], startAngle: 0,
+               preBox, preAngle, preActive };
+      draw();
+      e.stopPropagation();
+      return;
+    }
     // Resize handles want the pointer in the box's own LOCAL (de-rotated) frame — see the
     // file header. Move/rotate read the global source position directly.
     const startSrc: [number, number] = h === "move" || h === "rotate"
@@ -650,6 +755,22 @@ function setupCropWidget(node: any): void {
     if (!drag) return;
     const b0 = drag.startBox;
 
+    if (drag.handle === "draw") {
+      const [sx, sy] = eventToSource(e);
+      const [ax, ay] = drag.startSrc;
+      let next: Box = { x0: Math.min(ax, sx), y0: Math.min(ay, sy),
+                        x1: Math.max(ax, sx), y1: Math.max(ay, sy) };
+      const m = margin();
+      const lo = -m, hi = 1 + m;
+      next.x0 = Math.max(lo * srcW, next.x0); next.y0 = Math.max(lo * srcH, next.y0);
+      next.x1 = Math.min(hi * srcW, next.x1); next.y1 = Math.min(hi * srcH, next.y1);
+      const locked = ASPECTS[node.properties.nkdCropAspect];
+      if (locked) next = applyAspect(next, locked);
+      box = finalizeBox(next);
+      scheduleDraw();
+      return;
+    }
+
     if (drag.handle === "rotate") {
       const [sx, sy] = eventToSource(e);
       const [cx, cy] = boxCenter(b0);
@@ -660,7 +781,7 @@ function setupCropWidget(node: any): void {
       if (e.shiftKey) next = Math.round(next / 15) * 15;
       angle = ((next % 360) + 360) % 360;
       box = finalizeBox(box);   // re-snap to the grid at the new orientation
-      draw();
+      scheduleDraw();
       return;
     }
 
@@ -699,14 +820,25 @@ function setupCropWidget(node: any): void {
       const locked = ASPECTS[node.properties.nkdCropAspect];
       const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
       const shiftRatio = !locked && e.shiftKey && startH > 0 ? startW / startH : null;
-      next = applyAspect(next, locked ?? shiftRatio);
+      next = applyAspect(next, locked ?? shiftRatio, drag.handle);
     }
     box = finalizeBox(next);
-    draw();
+    scheduleDraw();
   });
 
   function endDrag() {
     if (!drag) return;
+    if (drag.handle === "draw") {
+      const tooSmall = (box.x1 - box.x0) < srcW * DRAW_MIN_PX_FRAC
+        || (box.y1 - box.y0) < srcH * DRAW_MIN_PX_FRAC;
+      if (tooSmall) {
+        // An accidental click, not a drag — put everything back exactly as it was.
+        box = drag.preBox!; angle = drag.preAngle!; boxActive = drag.preActive!;
+        drag = null;
+        draw();
+        return;
+      }
+    }
     drag = null;
     regionW.value = serialiseRegion(box, angle, srcW, srcH);
     regionW.callback?.(regionW.value);
@@ -722,6 +854,7 @@ function setupCropWidget(node: any): void {
   });
   resetBtn.addEventListener("click", () => {
     angle = 0;
+    boxActive = true;
     box = finalizeBox(defaultBox(srcW, srcH));
     regionW.value = serialiseRegion(box, angle, srcW, srcH);
     draw();
@@ -767,16 +900,17 @@ function setupCropWidget(node: any): void {
     // The real floor is whatever the toolbar needs to not wrap (Aspect label + select +
     // Reset), not the canvas — the canvas itself is happy at any size, same as an <img>.
     minWidth: 120,
-    minWidthOf: () => bar.scrollWidth,
+    minWidthOf: barMinWidth,
     estimate: () => BAR_H + Math.round(CANVAS_W * srcH / srcW)
       + (transport.style.display === "flex" ? TRANSPORT_H : 0),
     getValue: () => regionW.value,
     setValue: (v: string) => {
       regionW.value = v;
       ({ box, angle } = parseRegion(v, srcW, srcH));
+      boxActive = !!v;
       draw();
     },
-    onResize: () => draw(),
+    onResize: () => scheduleDraw(),
   });
 
   const origConfigure = node.onConfigure;
@@ -784,6 +918,7 @@ function setupCropWidget(node: any): void {
     origConfigure?.apply(this, arguments);
     select.value = node.properties.nkdCropAspect ?? "Free";
     ({ box, angle } = parseRegion(regionW.value, srcW, srcH));
+    boxActive = !!regionW.value;
     refreshSource();
     syncFillWidgetsVisible();
     if (mounted.resizeToContent) mounted.resizeToContent();
@@ -796,9 +931,17 @@ function setupCropWidget(node: any): void {
     refreshSource();
   };
 
+  // Picking a DIFFERENT file in the upstream Load Image/Video's own widget touches no link,
+  // so `onConnectionsChange` never fires for it — Neko: "si cambio el input... el nodo no se
+  // actualiza". `refreshSource` already short-circuits to a no-op when the resolved file
+  // hasn't changed, so polling it is cheap; matches the same "material bajo los pies" fix
+  // NKD Timeline already has for the identical problem.
+  const refreshPoll = window.setInterval(refreshSource, 500);
+
   const origRemoved = node.onRemoved;
   node.onRemoved = function (this: any, ...args: any[]) {
     stopPlayback();          // cancels the rAF loop, or a deleted node keeps redrawing forever
+    clearInterval(refreshPoll);
     origRemoved?.apply(this, args);
   };
 

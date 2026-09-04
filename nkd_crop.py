@@ -333,19 +333,25 @@ def _crop_pad_mask(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int,
     return rgb[..., 0]
 
 
-# ── Downstream downscale (megapixels + grid snap) ─────────────────────────────
+# ── Downstream resize to a megapixel budget + grid snap ───────────────────────
 # Same shape as `LoadImageCrop` in sthao42/Comfyui-reference-loader: crop first, THEN scale
 # to a pixel budget and snap to a model's grid. Kept as a separate pass so the crop/pad math
 # above stays about placement, not resampling.
 
-def _downscale(t: torch.Tensor, max_megapixels: float, divisible_by: str) -> torch.Tensor:
+def _resize_to_budget(t: torch.Tensor, max_megapixels: float, divisible_by: str,
+                      method: str = "lanczos") -> torch.Tensor:
+    """Resize `t` toward `max_megapixels` — UP or down, not just a downscale cap: a small
+    crop with a megapixel target set should reach it too (Neko: "el crop debería también
+    escalar hacia arriba"), same as any resize-to-budget node. 0 disables entirely, and
+    `divisible_by`'s own grid snap (independent of a megapixel target) still applies after.
+    """
     height, width = t.shape[1], t.shape[2]
     new_w, new_h = width, height
 
     if max_megapixels > 0:
         target = max_megapixels * 1024 * 1024
         current = width * height
-        if current > target:
+        if current != target:
             scale = (target / current) ** 0.5
             new_w = max(1, round(width * scale))
             new_h = max(1, round(height * scale))
@@ -360,7 +366,7 @@ def _downscale(t: torch.Tensor, max_megapixels: float, divisible_by: str) -> tor
     import comfy.utils
     is_mask = t.ndim == 3
     samples = (t.unsqueeze(1) if is_mask else t.movedim(-1, 1))
-    mode = "bilinear" if is_mask else "lanczos"
+    mode = "bilinear" if is_mask else method
     samples = comfy.utils.common_upscale(samples, new_w, new_h, mode, "disabled")
     return (samples.squeeze(1) if is_mask else samples.movedim(1, -1)).clamp(0.0, 1.0)
 
@@ -448,6 +454,7 @@ def _uncrop_manual(patch: torch.Tensor, background: torch.Tensor,
 FILL_MODES = ["edge", "reflect", "black", "white", "gray", "color"]
 DIVISIBLE_BY = ["disabled", "8", "16", "32", "64"]
 MODES = ["Crop", "Outpaint"]
+RESIZE_METHODS = ["lanczos", "bicubic", "bilinear", "area", "nearest-exact"]
 
 
 class NKDCrop(io.ComfyNode):
@@ -482,17 +489,22 @@ class NKDCrop(io.ComfyNode):
                     tooltip="Colour used when fill = color."),
                 io.Float.Input(
                     "max_megapixels", default=0.0, min=0.0, max=128.0, step=0.01,
-                    tooltip="Downscale the result to this many megapixels if larger. "
-                            "0 disables."),
+                    tooltip="Resize the result to this many megapixels — up as well as down, "
+                            "so a small crop reaches the target too, not just a big one "
+                            "getting capped. 0 disables."),
                 io.Combo.Input(
                     "divisible_by", options=DIVISIBLE_BY, default="disabled",
                     tooltip="Align the crop rectangle itself to a multiple of 8/16/32/64 "
                             "(grown, not resized) — the pixel grid models like MiniMax need. "
-                            "Also snaps the final size after a megapixel downscale."),
+                            "Also snaps the final size after a megapixel resize."),
                 io.Combo.Input(
                     "mode", options=MODES, default="Crop",
                     tooltip="Crop: the rectangle stays inside the source. Outpaint: it can "
                             "extend past the edge to grow the canvas."),
+                io.Combo.Input(
+                    "resize_method", options=RESIZE_METHODS, default="lanczos",
+                    tooltip="Filter used when max_megapixels or divisible_by actually "
+                            "resizes the result. Masks always use bilinear regardless."),
             ],
             outputs=[
                 io.Image.Output(display_name="image",
@@ -514,7 +526,7 @@ class NKDCrop(io.ComfyNode):
     @classmethod
     def execute(cls, image, region: str = "", fill: str = "edge", fill_color: str = "#000000",
                max_megapixels: float = 0.0, divisible_by: str = "disabled",
-               mode: str = "Crop") -> io.NodeOutput:
+               mode: str = "Crop", resize_method: str = "lanczos") -> io.NodeOutput:
         if isinstance(image, torch.Tensor):
             if image.ndim == 3:                       # MASK [B,H,W]
                 B, H, W = image.shape
@@ -524,7 +536,7 @@ class NKDCrop(io.ComfyNode):
                 effective_fill = fill if mode == "Outpaint" else "edge"
                 out_mask = _crop_pad_mask(image, x0, y0, x1, y1, effective_fill, fill_color,
                                           angle)
-                out_mask = _downscale(out_mask, max_megapixels, divisible_by)
+                out_mask = _resize_to_budget(out_mask, max_megapixels, divisible_by, resize_method)
                 h, w = out_mask.shape[1], out_mask.shape[2]
                 return io.NodeOutput(None, out_mask, w, h, None)
             frames = image                              # IMAGE [B,H,W,C]
@@ -544,8 +556,8 @@ class NKDCrop(io.ComfyNode):
                                       angle=angle)
         out_image, gen_mask = _crop_pad(frames, x0, y0, x1, y1, effective_fill, fill_color,
                                         angle)
-        out_image = _downscale(out_image, max_megapixels, divisible_by)
-        gen_mask = _downscale(gen_mask, max_megapixels, divisible_by)
+        out_image = _resize_to_budget(out_image, max_megapixels, divisible_by, resize_method)
+        gen_mask = _resize_to_budget(gen_mask, max_megapixels, divisible_by, resize_method)
         h, w = out_image.shape[1], out_image.shape[2]
         return io.NodeOutput(out_image, gen_mask, w, h, crop_data)
 

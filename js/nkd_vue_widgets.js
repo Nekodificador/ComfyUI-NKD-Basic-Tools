@@ -15837,8 +15837,11 @@ const C = {
   rect: "#4ab4ff",
   rectFill: "rgba(74,180,255,0.08)",
   outpaintHatch: "rgba(255,176,32,0.28)",
-  handle: "#4ab4ff"
+  handle: "#4ab4ff",
+  outsideDim: "rgba(0,0,0,0.55)",
+  grid: "rgba(255,255,255,0.35)"
 };
+const DRAW_MIN_PX_FRAC = 0.02;
 function defaultBox(w, h) {
   return { x0: 0, y0: 0, x1: w, y1: h };
 }
@@ -15969,6 +15972,7 @@ function setupCropWidget(node) {
   let srcW = 512, srcH = 512;
   let srcEl = null;
   let { box, angle } = parseRegion(regionW.value, srcW, srcH);
+  let boxActive = !!regionW.value;
   let lastRef = null;
   let playing = false;
   let rafId = 0;
@@ -15979,9 +15983,9 @@ function setupCropWidget(node) {
   bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
   const label = document.createElement("span");
   label.textContent = "Aspect";
-  label.style.opacity = "0.6";
+  label.style.cssText = "opacity:0.6;flex:0 0 auto;";
   const select = document.createElement("select");
-  select.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 4px;";
+  select.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 4px;flex:0 0 auto;";
   for (const k of Object.keys(ASPECTS)) {
     const opt = document.createElement("option");
     opt.value = k;
@@ -15991,8 +15995,14 @@ function setupCropWidget(node) {
   select.value = node.properties.nkdCropAspect;
   const resetBtn = document.createElement("button");
   resetBtn.textContent = "Reset";
-  resetBtn.style.cssText = "margin-left:auto;background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 8px;cursor:pointer;";
+  resetBtn.style.cssText = "margin-left:auto;background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 8px;cursor:pointer;flex:0 0 auto;";
   bar.append(label, select, resetBtn);
+  const BAR_PAD_X = 16, BAR_GAP = 6;
+  const barMinWidth = () => {
+    const kids = Array.from(bar.children);
+    const content = kids.reduce((sum, k) => sum + k.offsetWidth, 0);
+    return content + BAR_PAD_X + BAR_GAP * Math.max(0, kids.length - 1);
+  };
   const canvas = document.createElement("canvas");
   canvas.style.cssText = "display:block;width:100%;cursor:crosshair;";
   const transport = document.createElement("div");
@@ -16095,6 +16105,15 @@ function setupCropWidget(node) {
     ctx.setTransform(w / cw, 0, 0, h / ch, 0, 0);
     return ctx;
   }
+  let drawScheduled = false;
+  function scheduleDraw() {
+    if (drawScheduled) return;
+    drawScheduled = true;
+    requestAnimationFrame(() => {
+      drawScheduled = false;
+      draw();
+    });
+  }
   function draw() {
     const [cw, ch] = canvasSize();
     const ctx = syncCanvasBuffer();
@@ -16115,17 +16134,28 @@ function setupCropWidget(node) {
     ctx.strokeStyle = C.srcBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
+    if (!boxActive) return;
     const [rx0, ry0] = toCanvas2(box.x0, box.y0);
     const [rx1, ry1] = toCanvas2(box.x1, box.y1);
     const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
     const rw = rx1 - rx0, rh = ry1 - ry0;
     const corners = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]].map(([x, y]) => rotatePoint(x, y, ccx, ccy, angle));
-    const strokeQuad = () => {
-      ctx.beginPath();
+    const addQuadSubpath = () => {
       ctx.moveTo(corners[0][0], corners[0][1]);
       for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
       ctx.closePath();
     };
+    const strokeQuad = () => {
+      ctx.beginPath();
+      addQuadSubpath();
+    };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, cw, ch);
+    addQuadSubpath();
+    ctx.fillStyle = C.outsideDim;
+    ctx.fill("evenodd");
+    ctx.restore();
     ctx.save();
     strokeQuad();
     ctx.clip();
@@ -16146,25 +16176,39 @@ function setupCropWidget(node) {
       }
     }
     ctx.restore();
+    ctx.save();
+    ctx.translate(ccx, ccy);
+    ctx.rotate(angle * Math.PI / 180);
+    ctx.translate(-ccx, -ccy);
+    ctx.strokeStyle = C.grid;
+    ctx.lineWidth = 1;
+    for (let k = 1; k <= 2; k++) {
+      const gx = rx0 + rw * k / 3;
+      ctx.beginPath();
+      ctx.moveTo(gx, ry0);
+      ctx.lineTo(gx, ry1);
+      ctx.stroke();
+      const gy = ry0 + rh * k / 3;
+      ctx.beginPath();
+      ctx.moveTo(rx0, gy);
+      ctx.lineTo(rx1, gy);
+      ctx.stroke();
+    }
+    ctx.restore();
     ctx.strokeStyle = C.rect;
     ctx.lineWidth = 1.5;
     strokeQuad();
     ctx.stroke();
-    const locked = ASPECTS[node.properties.nkdCropAspect] != null;
     const localPts = [
       [rx0, ry0, "nw"],
       [rx1, ry0, "ne"],
       [rx0, ry1, "sw"],
-      [rx1, ry1, "se"]
+      [rx1, ry1, "se"],
+      [(rx0 + rx1) / 2, ry0, "n"],
+      [(rx0 + rx1) / 2, ry1, "s"],
+      [rx0, (ry0 + ry1) / 2, "w"],
+      [rx1, (ry0 + ry1) / 2, "e"]
     ];
-    if (!locked) {
-      localPts.push(
-        [(rx0 + rx1) / 2, ry0, "n"],
-        [(rx0 + rx1) / 2, ry1, "s"],
-        [rx0, (ry0 + ry1) / 2, "w"],
-        [rx1, (ry0 + ry1) / 2, "e"]
-      );
-    }
     ctx.fillStyle = C.handle;
     for (const [lx, ly] of localPts) {
       const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
@@ -16262,6 +16306,7 @@ function setupCropWidget(node) {
     loadThumb(ref2);
   }
   function hitTest(cx, cy) {
+    if (!boxActive) return "draw";
     const [rx0, ry0] = toCanvas2(box.x0, box.y0);
     const [rx1, ry1] = toCanvas2(box.x1, box.y1);
     const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
@@ -16269,23 +16314,26 @@ function setupCropWidget(node) {
     if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT) return "rotate";
     const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
     const near = (ax, ay) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
-    const locked = ASPECTS[node.properties.nkdCropAspect] != null;
     if (near(rx0, ry0)) return "nw";
     if (near(rx1, ry0)) return "ne";
     if (near(rx0, ry1)) return "sw";
     if (near(rx1, ry1)) return "se";
-    if (!locked) {
-      if (near((rx0 + rx1) / 2, ry0)) return "n";
-      if (near((rx0 + rx1) / 2, ry1)) return "s";
-      if (near(rx0, (ry0 + ry1) / 2)) return "w";
-      if (near(rx1, (ry0 + ry1) / 2)) return "e";
-    }
+    if (near((rx0 + rx1) / 2, ry0)) return "n";
+    if (near((rx0 + rx1) / 2, ry1)) return "s";
+    if (near(rx0, (ry0 + ry1) / 2)) return "w";
+    if (near(rx1, (ry0 + ry1) / 2)) return "e";
     if (lx >= rx0 && lx <= rx1 && ly >= ry0 && ly <= ry1) return "move";
-    return null;
+    return "draw";
   }
-  function applyAspect(b, ratio) {
+  function applyAspect(b, ratio, handle) {
     const r = ratio ?? ASPECTS[node.properties.nkdCropAspect];
     if (!r) return b;
+    if (handle === "n" || handle === "s") {
+      const h2 = b.y1 - b.y0;
+      const w2 = h2 * r;
+      const cx = (b.x0 + b.x1) / 2;
+      return { x0: cx - w2 / 2, y0: b.y0, x1: cx + w2 / 2, y1: b.y1 };
+    }
     const w = b.x1 - b.x0;
     const h = w / r;
     return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y0 + h };
@@ -16313,9 +16361,26 @@ function setupCropWidget(node) {
     const cx = (e.clientX - rect.left) * (cw / rect.width);
     const cy = (e.clientY - rect.top) * (ch / rect.height);
     const h = hitTest(cx, cy);
-    if (!h) return;
     canvas.setPointerCapture(e.pointerId);
     const [sxRaw, syRaw] = eventToSource(e);
+    if (h === "draw") {
+      const preBox = { ...box }, preAngle = angle, preActive = boxActive;
+      angle = 0;
+      boxActive = true;
+      box = { x0: sxRaw, y0: syRaw, x1: sxRaw, y1: syRaw };
+      drag = {
+        handle: h,
+        startBox: box,
+        startSrc: [sxRaw, syRaw],
+        startAngle: 0,
+        preBox,
+        preAngle,
+        preActive
+      };
+      draw();
+      e.stopPropagation();
+      return;
+    }
     const startSrc = h === "move" || h === "rotate" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(box), -angle);
     drag = { handle: h, startBox: { ...box }, startSrc, startAngle: angle };
     e.stopPropagation();
@@ -16323,6 +16388,27 @@ function setupCropWidget(node) {
   canvas.addEventListener("pointermove", (e) => {
     if (!drag) return;
     const b0 = drag.startBox;
+    if (drag.handle === "draw") {
+      const [sx2, sy2] = eventToSource(e);
+      const [ax, ay] = drag.startSrc;
+      let next2 = {
+        x0: Math.min(ax, sx2),
+        y0: Math.min(ay, sy2),
+        x1: Math.max(ax, sx2),
+        y1: Math.max(ay, sy2)
+      };
+      const m = margin();
+      const lo = -m, hi = 1 + m;
+      next2.x0 = Math.max(lo * srcW, next2.x0);
+      next2.y0 = Math.max(lo * srcH, next2.y0);
+      next2.x1 = Math.min(hi * srcW, next2.x1);
+      next2.y1 = Math.min(hi * srcH, next2.y1);
+      const locked = ASPECTS[node.properties.nkdCropAspect];
+      if (locked) next2 = applyAspect(next2, locked);
+      box = finalizeBox(next2);
+      scheduleDraw();
+      return;
+    }
     if (drag.handle === "rotate") {
       const [sx2, sy2] = eventToSource(e);
       const [cx, cy] = boxCenter(b0);
@@ -16331,7 +16417,7 @@ function setupCropWidget(node) {
       if (e.shiftKey) next2 = Math.round(next2 / 15) * 15;
       angle = (next2 % 360 + 360) % 360;
       box = finalizeBox(box);
-      draw();
+      scheduleDraw();
       return;
     }
     const [sxRaw, syRaw] = eventToSource(e);
@@ -16384,14 +16470,25 @@ function setupCropWidget(node) {
       const locked = ASPECTS[node.properties.nkdCropAspect];
       const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
       const shiftRatio = !locked && e.shiftKey && startH > 0 ? startW / startH : null;
-      next = applyAspect(next, locked ?? shiftRatio);
+      next = applyAspect(next, locked ?? shiftRatio, drag.handle);
     }
     box = finalizeBox(next);
-    draw();
+    scheduleDraw();
   });
   function endDrag() {
     var _a2;
     if (!drag) return;
+    if (drag.handle === "draw") {
+      const tooSmall = box.x1 - box.x0 < srcW * DRAW_MIN_PX_FRAC || box.y1 - box.y0 < srcH * DRAW_MIN_PX_FRAC;
+      if (tooSmall) {
+        box = drag.preBox;
+        angle = drag.preAngle;
+        boxActive = drag.preActive;
+        drag = null;
+        draw();
+        return;
+      }
+    }
     drag = null;
     regionW.value = serialiseRegion(box, angle, srcW, srcH);
     (_a2 = regionW.callback) == null ? void 0 : _a2.call(regionW, regionW.value);
@@ -16406,6 +16503,7 @@ function setupCropWidget(node) {
   });
   resetBtn.addEventListener("click", () => {
     angle = 0;
+    boxActive = true;
     box = finalizeBox(defaultBox(srcW, srcH));
     regionW.value = serialiseRegion(box, angle, srcW, srcH);
     draw();
@@ -16448,21 +16546,23 @@ function setupCropWidget(node) {
     // The real floor is whatever the toolbar needs to not wrap (Aspect label + select +
     // Reset), not the canvas — the canvas itself is happy at any size, same as an <img>.
     minWidth: 120,
-    minWidthOf: () => bar.scrollWidth,
+    minWidthOf: barMinWidth,
     estimate: () => BAR_H + Math.round(CANVAS_W * srcH / srcW) + (transport.style.display === "flex" ? TRANSPORT_H : 0),
     getValue: () => regionW.value,
     setValue: (v) => {
       regionW.value = v;
       ({ box, angle } = parseRegion(v, srcW, srcH));
+      boxActive = !!v;
       draw();
     },
-    onResize: () => draw()
+    onResize: () => scheduleDraw()
   });
   const origConfigure = node.onConfigure;
   node.onConfigure = function(data) {
     origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
     select.value = node.properties.nkdCropAspect ?? "Free";
     ({ box, angle } = parseRegion(regionW.value, srcW, srcH));
+    boxActive = !!regionW.value;
     refreshSource();
     syncFillWidgetsVisible();
     if (mounted.resizeToContent) mounted.resizeToContent();
@@ -16473,9 +16573,11 @@ function setupCropWidget(node) {
     origConnChange == null ? void 0 : origConnChange.apply(this, args);
     refreshSource();
   };
+  const refreshPoll = window.setInterval(refreshSource, 500);
   const origRemoved = node.onRemoved;
   node.onRemoved = function(...args) {
     stopPlayback();
+    clearInterval(refreshPoll);
     origRemoved == null ? void 0 : origRemoved.apply(this, args);
   };
   syncFillWidgetsVisible();

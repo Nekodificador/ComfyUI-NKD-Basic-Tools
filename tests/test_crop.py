@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(_PACK)))
 
 import math
 
+import comfy.utils as comfy_utils  # noqa: E402
 import torch  # noqa: E402
 
 from nkd_crop import (  # noqa: E402
@@ -158,13 +159,40 @@ def test_execute_default_mode_is_crop_and_clamps():
 
 
 def test_execute_grid_aligned_crop_is_exact_pixels_not_resampled():
-    """When the crop already lands on the grid, `_downscale` should be a no-op — the output
-    must be the untouched source slice, not a resample of it."""
+    """When the crop already lands on the grid, `_resize_to_budget` should be a no-op — the
+    output must be the untouched source slice, not a resample of it."""
     img = torch.rand(1, 32, 32, 3)
     out = NKDCrop.execute(img, region=region(0.0, 0.0, 0.5, 0.5), mode="Crop",
                           divisible_by="8")
     assert out.args[0].shape == (1, 16, 16, 3)
     assert torch.equal(out.args[0], img[:, :16, :16, :])
+
+
+def test_execute_max_megapixels_scales_a_small_crop_up_too():
+    """Not just a downscale cap — a crop smaller than the target has to reach it too."""
+    img = torch.rand(1, 16, 16, 3)
+    out = NKDCrop.execute(img, region="", max_megapixels=1.0)   # 16x16 -> ~1024x1024
+    h, w = out.args[0].shape[1], out.args[0].shape[2]
+    assert h * w > 16 * 16 * 4          # genuinely upscaled, not left alone
+    assert abs(h * w - 1024 * 1024) < 1024 * 32   # lands close to the 1MP target
+
+
+def test_execute_resize_method_is_honoured_for_the_image_but_masks_stay_bilinear():
+    real = comfy_utils.common_upscale
+    calls = []
+
+    def spy(samples, w, h, mode, crop):
+        calls.append(mode)
+        return real(samples, w, h, mode, crop)
+
+    comfy_utils.common_upscale = spy
+    try:
+        img = torch.rand(1, 16, 16, 3)
+        NKDCrop.execute(img, region="", max_megapixels=1.0, resize_method="nearest-exact")
+    finally:
+        comfy_utils.common_upscale = real
+    assert "nearest-exact" in calls   # the image resize used the requested filter
+    assert "bilinear" in calls        # the mask resize never does, regardless of the setting
 
 
 # ── Rotation ─────────────────────────────────────────────────────────────────
