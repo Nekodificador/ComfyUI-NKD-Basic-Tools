@@ -41,7 +41,7 @@ class NKDPaint(io.ComfyNode):
             # Output node, like Mask Painter: Run refreshes the backdrop even with nothing downstream.
             is_output_node=True,
             description="Paint or scribble straight on the node, over an image or a blank canvas. "
-                        "Outputs the blend, the strokes alone, their exact mask and the untouched source.",
+                        "Outputs the untouched image, the painted one, the strokes alone and their exact mask.",
             inputs=[
                 io.Image.Input("image", optional=True,
                                tooltip="Optional base image. Sets the canvas size and shows behind the strokes."),
@@ -56,10 +56,10 @@ class NKDPaint(io.ComfyNode):
                                  tooltip="Scribble mode: the brush is always white and strokes is white on black."),
             ],
             outputs=[
-                io.Image.Output("image", display_name="image", tooltip="Strokes blended over the base."),
+                io.Image.Output("image", display_name="image", tooltip="The base image untouched, so the graph can continue from it."),
+                io.Image.Output("painted", display_name="painted", tooltip="Strokes blended over the base."),
                 io.Image.Output("strokes", display_name="strokes", tooltip="Strokes alone over bg_color (white on black in controlnet mode)."),
                 io.Mask.Output("mask", display_name="mask", tooltip="Alpha of the strokes."),
-                io.Image.Output("source", display_name="source", tooltip="The base image untouched, so the graph can continue from it."),
             ],
             hidden=[io.Hidden.unique_id],
         )
@@ -81,7 +81,7 @@ class NKDPaint(io.ComfyNode):
 
         layer = (layer or "").strip()
         if not layer:
-            return io.NodeOutput(base, stroke_bg, torch.zeros((1, h, w), dtype=torch.float32), base)
+            return io.NodeOutput(base, base, stroke_bg, torch.zeros((1, h, w), dtype=torch.float32))
 
         png = node_helpers.pillow(Image.open, folder_paths.get_annotated_filepath(layer)).convert("RGBA")
         if png.size != (w, h):
@@ -93,7 +93,7 @@ class NKDPaint(io.ComfyNode):
 
         blended = rgb * a + base * (1.0 - a)
         strokes = rgb * a + stroke_bg * (1.0 - a)
-        return io.NodeOutput(blended, strokes, a[..., 0], base)
+        return io.NodeOutput(base, blended, strokes, a[..., 0])
 
 
 class NKDPaintExtension(ComfyExtension):

@@ -34,7 +34,7 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD MiniMax Guides](docs/minimax-guides.md) | Every guide of a MiniMax H3 shot from one node, instead of a row of them each dragging the same four cables across the canvas. |
 | [😺NKD Mask Painter](docs/mask-painter.md) | Paints a mask onto an image your graph just made, and stacks masks from anywhere while the result stays paintable. |
 | [😺NKD Vector Mask](docs/vector-mask.md) | Roto by hand with a pen tool. What gets saved is control points, so it's still editable next week. |
-| [😺NKD Paint](docs/paint.md) | Scribble straight on the node, over the image or on a blank canvas. The blend, the strokes alone and their exact mask come out separately; one switch turns it into a ControlNet Scribble source. |
+| [😺NKD Paint](docs/paint.md) | Scribble straight on the node, over the image or on a blank canvas. The untouched image, the painted one, the strokes alone and their exact mask come out separately; one switch turns it into a ControlNet Scribble source. |
 
 ## Faces
 

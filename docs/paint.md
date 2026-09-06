@@ -3,17 +3,17 @@
 A brush on the node itself. Connect an image and it shows up behind the canvas at
 its own resolution; connect nothing and you get a blank canvas of the size you set.
 Paint, scribble, block in a contrast, erase, and the result comes out four ways at
-once: blended over the image, as the strokes alone, as a mask of exactly what you
-touched, and the source image untouched. The node exists so a quick scribble for ControlNet doesn't need a
+once: the image untouched, the image with the strokes on it, the strokes alone, and
+a mask of exactly what you touched. The node exists so a quick scribble for ControlNet doesn't need a
 trip to an external editor.
 
 ```mermaid
 flowchart LR
     LI(["Load Image / VAE Decode"]):::input -. "image (optional)" .-> PAINT
-    PAINT["**NKD Paint**"]:::nkd -- image --> BLEND(["blended result"]):::output
+    PAINT["**NKD Paint**"]:::nkd -- image --> SRC(["the image, untouched"]):::output
+    PAINT -- painted --> BLEND(["painted result"]):::output
     PAINT -- strokes --> CN(["ControlNet Scribble"]):::external
     PAINT -- mask --> MO(["NKD Mask Ops / inpaint"]):::external
-    PAINT -- source --> SRC(["the image, untouched"]):::output
 
     classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
     classDef input fill:#2d2d2d,stroke:#888,color:#eee
@@ -36,12 +36,12 @@ flowchart LR
 
 ## Outputs
 
-- `image`: the strokes blended over the base, at the base's resolution.
+- `image`: the base image exactly as it came in. Wire Paint into a chain and nothing
+  changes until you decide to use the strokes.
+- `painted`: the strokes blended over the base, at the base's resolution.
 - `strokes`: the strokes alone over `bg_color`. In `controlnet` mode, white on
   black, ready for a Scribble ControlNet.
 - `mask`: the alpha of the strokes. Partial opacity stays partial.
-- `source`: the base image exactly as it came in, so the rest of the graph can keep
-  working from it without a second cable from upstream.
 
 ## Painting
 
