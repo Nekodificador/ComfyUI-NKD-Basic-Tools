@@ -365,14 +365,29 @@ function setupPaintWidget(node: any): void {
   let panDrag: { x0: number; y0: number; px: number; py: number } | null = null;
   let spaceHeld = false;
 
+  /**
+   * One stamp. Two things keep a soft brush soft:
+   *   - the falloff is an S-curve, not a straight ramp, so the fringe fades out instead of
+   *     ending in a visible rim;
+   *   - the stamp's peak alpha drops with softness ("flow"). Stamps overlap ~12× along a
+   *     stroke, and 1 − (1 − a)^12 saturates anything: with a = 1 a hardness-0 brush came out
+   *     nearly as hard as hardness-1 (Neko: "la dureza baja no es lo suficientemente
+   *     difusa"). At a = 0.4 the centre still saturates through the overlap while the fringe
+   *     keeps its ramp (measured: hardness 0 at a = 0.3 peaked at 224/255, 0.4 saturates). Hard brushes keep a = 1 so a single tap is a solid disc.
+   */
   function dab(x: number, y: number, r: number) {
     const sctx = strokeCv.getContext("2d")!;
     r = Math.max(0.5, r);
     const hard = Math.min(0.99, P.nkdPaintHardness);
     const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
+    const flow = hard >= 0.99 ? 1 : 0.4 + 0.6 * hard;
     const g = sctx.createRadialGradient(x, y, r * hard, x, y, r);
-    g.addColorStop(0, `rgba(${cr},${cg},${cb},1)`);
-    g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    const STOPS = 8;
+    for (let k = 0; k <= STOPS; k++) {
+      const u = k / STOPS;
+      const fall = 1 - u * u * (3 - 2 * u);           // smoothstep, 1 → 0
+      g.addColorStop(u, `rgba(${cr},${cg},${cb},${(flow * fall).toFixed(4)})`);
+    }
     sctx.fillStyle = g;
     sctx.beginPath(); sctx.arc(x, y, r, 0, Math.PI * 2); sctx.fill();
   }
@@ -385,7 +400,9 @@ function setupPaintWidget(node: any): void {
     if (!last) { dab(x, y, r); last = [x, y]; carry = 0; return; }
     const dx = x - last[0], dy = y - last[1];
     const d = Math.hypot(dx, dy);
-    const spacing = Math.max(0.75, r * 0.3);
+    // 8 % of the diameter. 15 % scalloped visibly on a big hard brush (Neko: "va dando
+    // saltos"); below ~5 % the stamps cost more than they show.
+    const spacing = Math.max(0.75, r * 0.16);
     let t = spacing - carry;
     while (t <= d) { dab(last[0] + dx * (t / d), last[1] + dy * (t / d), r); t += spacing; }
     carry = d - (t - spacing);

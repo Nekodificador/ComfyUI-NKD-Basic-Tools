@@ -17035,9 +17035,14 @@ function setupPaintWidget(node) {
     r = Math.max(0.5, r);
     const hard = Math.min(0.99, P.nkdPaintHardness);
     const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
+    const flow = hard >= 0.99 ? 1 : 0.4 + 0.6 * hard;
     const g = sctx.createRadialGradient(x, y, r * hard, x, y, r);
-    g.addColorStop(0, `rgba(${cr},${cg},${cb},1)`);
-    g.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+    const STOPS = 8;
+    for (let k = 0; k <= STOPS; k++) {
+      const u = k / STOPS;
+      const fall = 1 - u * u * (3 - 2 * u);
+      g.addColorStop(u, `rgba(${cr},${cg},${cb},${(flow * fall).toFixed(4)})`);
+    }
     sctx.fillStyle = g;
     sctx.beginPath();
     sctx.arc(x, y, r, 0, Math.PI * 2);
@@ -17057,7 +17062,7 @@ function setupPaintWidget(node) {
     }
     const dx = x - last[0], dy = y - last[1];
     const d = Math.hypot(dx, dy);
-    const spacing = Math.max(0.75, r * 0.3);
+    const spacing = Math.max(0.75, r * 0.16);
     let t = spacing - carry;
     while (t <= d) {
       dab(last[0] + dx * (t / d), last[1] + dy * (t / d), r);

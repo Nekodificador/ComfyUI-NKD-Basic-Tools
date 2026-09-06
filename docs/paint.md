@@ -58,7 +58,7 @@ flowchart LR
   and `]` step the size down and up.
 - `Size`, `Opacity` and `Hard` sliders. Opacity applies to the whole stroke when
   you release, so a stroke never builds up on itself. Hardness goes from a soft
-  airbrush to a solid edge.
+  airbrush, whose fringe fades out over half the brush, to a solid edge.
 - `Base` dims the image behind the canvas, so a dark scribble reads over a dark
   photo. It's only for looking; the outputs ignore it.
 - `Shift` while dragging any slider moves it at a tenth of the speed.
