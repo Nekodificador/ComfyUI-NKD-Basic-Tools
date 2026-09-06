@@ -2,17 +2,18 @@
 
 A brush on the node itself. Connect an image and it shows up behind the canvas at
 its own resolution; connect nothing and you get a blank canvas of the size you set.
-Paint, scribble, block in a contrast, erase, and the result comes out three ways at
-once: blended over the image, as the strokes alone, and as a mask of exactly what
-you touched. The node exists so a quick scribble for ControlNet doesn't need a
+Paint, scribble, block in a contrast, erase, and the result comes out four ways at
+once: blended over the image, as the strokes alone, as a mask of exactly what you
+touched, and the source image untouched. The node exists so a quick scribble for ControlNet doesn't need a
 trip to an external editor.
 
 ```mermaid
 flowchart LR
     LI(["Load Image / VAE Decode"]):::input -. "image (optional)" .-> PAINT
-    PAINT["**NKD Paint**"]:::nkd -- IMAGE --> BLEND(["blended result"]):::output
-    PAINT -- STROKES --> CN(["ControlNet Scribble"]):::external
-    PAINT -- MASK --> MO(["NKD Mask Ops / inpaint"]):::external
+    PAINT["**NKD Paint**"]:::nkd -- image --> BLEND(["blended result"]):::output
+    PAINT -- strokes --> CN(["ControlNet Scribble"]):::external
+    PAINT -- mask --> MO(["NKD Mask Ops / inpaint"]):::external
+    PAINT -- source --> SRC(["the image, untouched"]):::output
 
     classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
     classDef input fill:#2d2d2d,stroke:#888,color:#eee
@@ -28,17 +29,19 @@ flowchart LR
   its own when you press Run, with nothing connected downstream.
 - `width`, `height`: canvas size when no image is connected. Hidden while one is.
   Default 1024 × 1024, 64 to 4096 in steps of 8.
-- `bg_color`: the background under the strokes in the STROKES output, and of the
+- `bg_color`: the background under the strokes in the `strokes` output, and of the
   blank canvas when there's no image. Default black.
-- `controlnet`: scribble mode. The brush is always white and STROKES is white on
+- `controlnet`: scribble mode. The brush is always white and `strokes` is white on
   black, whatever colour the layer was painted in. Off by default.
 
 ## Outputs
 
-- `IMAGE`: the strokes blended over the base, at the base's resolution.
-- `STROKES`: the strokes alone over `bg_color`. In `controlnet` mode, white on
+- `image`: the strokes blended over the base, at the base's resolution.
+- `strokes`: the strokes alone over `bg_color`. In `controlnet` mode, white on
   black, ready for a Scribble ControlNet.
-- `MASK`: the alpha of the strokes. Partial opacity stays partial.
+- `mask`: the alpha of the strokes. Partial opacity stays partial.
+- `source`: the base image exactly as it came in, so the rest of the graph can keep
+  working from it without a second cable from upstream.
 
 ## Painting
 
