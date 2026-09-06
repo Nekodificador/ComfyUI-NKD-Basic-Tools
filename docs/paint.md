@@ -23,8 +23,9 @@ flowchart LR
 ## Inputs
 
 - `image` (optional). Sets the canvas size and shows behind the strokes. A Load
-  Image appears straight away; a source with no file behind it, like a VAE Decode,
-  appears after the first run.
+  Image wired straight in appears at once. Anything else, a crop, a resize or a VAE
+  Decode, shows what it really produces after the first run, so the node runs on
+  its own when you press Run, with nothing connected downstream.
 - `width`, `height`: canvas size when no image is connected. Hidden while one is.
   Default 1024 × 1024, 64 to 4096 in steps of 8.
 - `bg_color`: the background under the strokes in the STROKES output, and of the

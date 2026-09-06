@@ -17382,6 +17382,20 @@ function setupPaintWidget(node) {
     syncToolbar();
     scheduleDraw();
   }
+  const directRef = () => resolveSource(node, "image", 0);
+  function loadFile(ref2) {
+    if (lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) return;
+    lastRef = ref2;
+    const img = new Image();
+    img.onload = () => setBase({
+      el: img,
+      w: img.naturalWidth,
+      h: img.naturalHeight,
+      fullW: img.naturalWidth,
+      fullH: img.naturalHeight
+    });
+    img.src = viewUrl$1(ref2);
+  }
   function refreshSource() {
     if (!imageLinked()) {
       if (base) {
@@ -17390,27 +17404,25 @@ function setupPaintWidget(node) {
       }
       return;
     }
-    const ref2 = resolveSource(node, "image");
-    if (ref2) {
-      if (lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) return;
-      lastRef = ref2;
-      const img = new Image();
-      img.onload = () => setBase({
-        el: img,
-        w: img.naturalWidth,
-        h: img.naturalHeight,
-        fullW: img.naturalWidth,
-        fullH: img.naturalHeight
-      });
-      img.src = viewUrl$1(ref2);
+    const direct = directRef();
+    if (direct) {
+      loadFile(direct);
       return;
     }
-    lastRef = null;
     const f = frames.get(String(node.id));
-    if (f && base !== f) setBase(f);
+    if (f) {
+      lastRef = null;
+      if (base !== f) setBase(f);
+      return;
+    }
+    const far = resolveSource(node, "image");
+    if (far) loadFile(far);
   }
   live.set(String(node.id), (b) => {
-    if (!lastRef) setBase(b);
+    if (imageLinked() && !directRef()) {
+      lastRef = null;
+      setBase(b);
+    }
   });
   function syncDims() {
     const linked = imageLinked();

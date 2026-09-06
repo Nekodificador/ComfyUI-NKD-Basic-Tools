@@ -38,6 +38,8 @@ class NKDPaint(io.ComfyNode):
             node_id="NKDPaint",
             display_name="😺NKD Paint",
             category="😺NKD Nodes/Utils",
+            # Output node, like Mask Painter: Run refreshes the backdrop even with nothing downstream.
+            is_output_node=True,
             description="Paint or scribble straight on the node, over an image or a blank canvas. "
                         "Outputs the blend, the strokes alone and their exact mask.",
             inputs=[

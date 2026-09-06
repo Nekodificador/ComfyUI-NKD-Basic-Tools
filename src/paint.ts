@@ -620,28 +620,36 @@ function setupPaintWidget(node: any): void {
     syncToolbar();
     scheduleDraw();
   }
+  /**
+   * Which backdrop is the truth depends on what sits upstream:
+   *   - a Load Image wired DIRECTLY into `image`: its file, instantly, and it tracks edits.
+   *   - anything in between (Crop, a resize, a VAE Decode): the file two hops up is NOT what
+   *     this node receives — Neko saw the original 1024² behind a 1486² outpaint. So the frame
+   *     pushed on execute wins, and the far file is only the stand-in until the first run.
+   */
+  const directRef = () => resolveSource(node, "image", 0);
+  function loadFile(ref: MediaRef) {
+    if (lastRef && ref.filename === lastRef.filename && ref.subfolder === lastRef.subfolder
+        && ref.type === lastRef.type) return;
+    lastRef = ref;
+    const img = new Image();
+    img.onload = () => setBase({ el: img, w: img.naturalWidth, h: img.naturalHeight,
+                                 fullW: img.naturalWidth, fullH: img.naturalHeight });
+    img.src = viewUrl(ref);
+  }
   function refreshSource() {
     if (!imageLinked()) {
       if (base) { lastRef = null; setBase(null); }
       return;
     }
-    const ref = resolveSource(node, "image");
-    if (ref) {
-      if (lastRef && ref.filename === lastRef.filename && ref.subfolder === lastRef.subfolder
-          && ref.type === lastRef.type) return;
-      lastRef = ref;
-      const img = new Image();
-      img.onload = () => setBase({ el: img, w: img.naturalWidth, h: img.naturalHeight,
-                                   fullW: img.naturalWidth, fullH: img.naturalHeight });
-      img.src = viewUrl(ref);
-      return;
-    }
-    // No file upstream (VAE Decode etc.): the frame pushed on execute, if any.
-    lastRef = null;
+    const direct = directRef();
+    if (direct) { loadFile(direct); return; }
     const f = frames.get(String(node.id));
-    if (f && base !== f) setBase(f);
+    if (f) { lastRef = null; if (base !== f) setBase(f); return; }
+    const far = resolveSource(node, "image");
+    if (far) loadFile(far);
   }
-  live.set(String(node.id), (b) => { if (!lastRef) setBase(b); });
+  live.set(String(node.id), (b) => { if (imageLinked() && !directRef()) { lastRef = null; setBase(b); } });
 
   function syncDims() {
     const linked = imageLinked();
