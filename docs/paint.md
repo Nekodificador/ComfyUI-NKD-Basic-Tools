@@ -29,7 +29,7 @@ flowchart LR
   its own when you press Run, with nothing connected downstream.
 - `width`, `height`: canvas size when no image is connected. Hidden while one is.
   Default 1024 × 1024, 64 to 4096 in steps of 8.
-- `bg_color`: the background under the strokes in the `strokes` output, and of the
+- `bg_color`: what `strokes` shows where nothing is painted, and the colour of the
   blank canvas when there's no image. Default black.
 - `controlnet`: scribble mode. The brush is always white and `strokes` is white on
   black, whatever colour the layer was painted in. Off by default.
@@ -39,8 +39,11 @@ flowchart LR
 - `image`: the base image exactly as it came in. Wire Paint into a chain and nothing
   changes until you decide to use the strokes.
 - `painted`: the strokes blended over the base, at the base's resolution.
-- `strokes`: the strokes alone over `bg_color`. In `controlnet` mode, white on
-  black, ready for a Scribble ControlNet.
+- `strokes`: the strokes alone, in their own colour, with `bg_color` wherever nothing
+  is painted. The colour is not premultiplied, so `strokes` plus `mask` through the
+  core "Join Image with Alpha" node gives a clean RGBA with soft edges intact. In
+  `controlnet` mode it's white on black instead, with soft edges as grey, ready for a
+  Scribble ControlNet.
 - `mask`: the alpha of the strokes. Partial opacity stays partial.
 
 ## Painting

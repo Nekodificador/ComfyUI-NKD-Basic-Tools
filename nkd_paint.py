@@ -51,14 +51,14 @@ class NKDPaint(io.ComfyNode):
                 io.Int.Input("height", default=1024, min=64, max=4096, step=8,
                              tooltip="Canvas height when no image is connected."),
                 io.Color.Input("bg_color", default="#000000",
-                               tooltip="Background of the strokes output (and of the canvas when no image is connected)."),
+                               tooltip="What the strokes output shows where nothing is painted (and the canvas colour when no image is connected)."),
                 io.Boolean.Input("controlnet", default=False,
                                  tooltip="Scribble mode: the brush is always white and strokes is white on black."),
             ],
             outputs=[
                 io.Image.Output("image", display_name="image", tooltip="The base image untouched, so the graph can continue from it."),
                 io.Image.Output("painted", display_name="painted", tooltip="Strokes blended over the base."),
-                io.Image.Output("strokes", display_name="strokes", tooltip="Strokes alone over bg_color (white on black in controlnet mode)."),
+                io.Image.Output("strokes", display_name="strokes", tooltip="Strokes alone, straight colour with bg_color where there is nothing (white on black in controlnet mode)."),
                 io.Mask.Output("mask", display_name="mask", tooltip="Alpha of the strokes."),
             ],
             hidden=[io.Hidden.unique_id],
@@ -92,7 +92,13 @@ class NKDPaint(io.ComfyNode):
             rgb = torch.ones_like(rgb)
 
         blended = rgb * a + base * (1.0 - a)
-        strokes = rgb * a + stroke_bg * (1.0 - a)
+        if controlnet:
+            # Soft edges become grey: that IS the line's intensity for a scribble ControlNet.
+            strokes = rgb * a + stroke_bg * (1.0 - a)
+        else:
+            # Straight (unpremultiplied) colour: pair with `mask` in Join Image with Alpha and
+            # the soft edges come out clean instead of darkened by bg_color.
+            strokes = torch.where(a > 0, rgb, stroke_bg)
         return io.NodeOutput(base, blended, strokes, a[..., 0])
 
 
