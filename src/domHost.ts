@@ -196,6 +196,13 @@ export function mountDomWidget(node: any, opts: MountOpts): Mounted {
     // Keep the container floor in step with the live measurement so the DOM never wraps
     // even while the node width is catching up.
     container.style.minWidth = `${wantWidth()}px`;
+    // Re-measure HERE, not only in the observer. A caller that just changed the content's
+    // shape (Paint's canvas adopting the base image's aspect on load) would otherwise size
+    // the node from the stale height, and the observer tick that change provokes lands
+    // inside the `settling` window below and is dropped - so the stale number stuck and the
+    // DOM hung out of the bottom of the node after every reload.
+    const h = opts.root.offsetHeight;
+    if (h > 0) measured = h;
     node.setSize([Math.max(node.size[0], minNodeWidth()), node.computeSize()[1]]);
     node.setDirtyCanvas(true, true);
   };
@@ -218,7 +225,7 @@ export function mountDomWidget(node: any, opts: MountOpts): Mounted {
     return true;
   };
 
-  const ro = new ResizeObserver(() => {
+  const check = () => {
     if (settling) return;
     // Two ways the content stops representing the node's size, and adopting either would
     // blow the node up and LEAVE it there - coming back only shrinks the content, it does
@@ -236,9 +243,18 @@ export function mountDomWidget(node: any, opts: MountOpts): Mounted {
     if (!calibrate() && !grew) return;
     settling = true;
     resizeToContent();
-    requestAnimationFrame(() => { settling = false; });
-  });
+    // A timer, not requestAnimationFrame: rAF stops in a background tab, and a `settling`
+    // that never clears silences the observer AND the poll for good.
+    window.setTimeout(() => { settling = false; }, 100);
+  };
+  const ro = new ResizeObserver(check);
   ro.observe(opts.root);
+  // The observer only fires when the CONTENT changes size. An inset calibrated against a
+  // host mid-layout (a workflow load: the node is restored at its saved size, the widget
+  // widens to its bar, the canvas grows with it) can therefore stick, and it showed as a
+  // dead strip under the content after every reload. The same 250 ms backstop the width
+  // keeper already needs catches it.
+  const iv = window.setInterval(check, 250);
 
   const origResize = node.onResize;
   node.onResize = function (this: any, size: [number, number]) {
@@ -283,6 +299,6 @@ export function mountDomWidget(node: any, opts: MountOpts): Mounted {
     container,
     resizeToContent,
     minNodeWidth,
-    release: () => { ro.disconnect(); widthKeeper.release(); },
+    release: () => { ro.disconnect(); clearInterval(iv); widthKeeper.release(); },
   };
 }

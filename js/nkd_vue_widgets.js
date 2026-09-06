@@ -15743,6 +15743,8 @@ function mountDomWidget(node, opts) {
   const minNodeWidth = () => wantWidth() + widthKeeper.margin();
   const resizeToContent = () => {
     container.style.minWidth = `${wantWidth()}px`;
+    const h = opts.root.offsetHeight;
+    if (h > 0) measured = h;
     node.setSize([Math.max(node.size[0], minNodeWidth()), node.computeSize()[1]]);
     node.setDirtyCanvas(true, true);
   };
@@ -15756,7 +15758,7 @@ function mountDomWidget(node, opts) {
     inset = gap;
     return true;
   };
-  const ro = new ResizeObserver(() => {
+  const check = () => {
     var _a;
     if (settling) return;
     if ((_a = document.fullscreenElement) == null ? void 0 : _a.contains(opts.root)) return;
@@ -15768,11 +15770,13 @@ function mountDomWidget(node, opts) {
     if (!calibrate() && !grew) return;
     settling = true;
     resizeToContent();
-    requestAnimationFrame(() => {
+    window.setTimeout(() => {
       settling = false;
-    });
-  });
+    }, 100);
+  };
+  const ro = new ResizeObserver(check);
   ro.observe(opts.root);
+  const iv = window.setInterval(check, 250);
   const origResize = node.onResize;
   node.onResize = function(size) {
     var _a;
@@ -15804,6 +15808,7 @@ function mountDomWidget(node, opts) {
     minNodeWidth,
     release: () => {
       ro.disconnect();
+      clearInterval(iv);
       widthKeeper.release();
     }
   };
