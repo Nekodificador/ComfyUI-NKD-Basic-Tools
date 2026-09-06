@@ -16964,7 +16964,10 @@ function setupPaintWidget(node) {
     target.drawImage(layerCv, 0, 0);
     target.globalAlpha = P.nkdPaintOpacity;
     target.globalCompositeOperation = tool() === "eraser" ? "destination-out" : "source-over";
+    const blur = fringeBlur(strokeR);
+    target.filter = blur >= 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
     target.drawImage(strokeCv, 0, 0);
+    target.filter = "none";
     target.globalCompositeOperation = "source-over";
     target.globalAlpha = 1;
   }
@@ -17026,49 +17029,35 @@ function setupPaintWidget(node) {
   }
   let stroking = false, panning = false, picking = false;
   let last = null;
-  let carry = 0;
   let sizeDrag = null;
   let panDrag = null;
   let spaceHeld = false;
-  function dab(x, y, r) {
-    const sctx = strokeCv.getContext("2d");
-    r = Math.max(0.5, r);
-    const hard = Math.min(0.99, P.nkdPaintHardness);
-    const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
-    const flow = hard >= 0.99 ? 1 : 0.4 + 0.6 * hard;
-    const g = sctx.createRadialGradient(x, y, r * hard, x, y, r);
-    const STOPS = 8;
-    for (let k = 0; k <= STOPS; k++) {
-      const u = k / STOPS;
-      const fall = 1 - u * u * (3 - 2 * u);
-      g.addColorStop(u, `rgba(${cr},${cg},${cb},${(flow * fall).toFixed(4)})`);
-    }
-    sctx.fillStyle = g;
-    sctx.beginPath();
-    sctx.arc(x, y, r, 0, Math.PI * 2);
-    sctx.fill();
-  }
+  const coreRadius = (r) => r * (0.5 + 0.5 * P.nkdPaintHardness);
+  const fringeBlur = (r) => r * (1 - P.nkdPaintHardness) * 0.3;
+  let strokeR = 0;
   function radiusFor(e) {
     let size = P.nkdPaintSize;
     if (e.pointerType === "pen" && e.pressure > 0) size *= 0.25 + 0.75 * e.pressure;
     return size / 2;
   }
   function strokeTo(x, y, r) {
+    const sctx = strokeCv.getContext("2d");
+    const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
+    sctx.strokeStyle = sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+    sctx.lineCap = sctx.lineJoin = "round";
+    const rc = Math.max(0.5, coreRadius(r));
+    strokeR = Math.max(strokeR, r);
     if (!last) {
-      dab(x, y, r);
-      last = [x, y];
-      carry = 0;
-      return;
+      sctx.beginPath();
+      sctx.arc(x, y, rc, 0, Math.PI * 2);
+      sctx.fill();
+    } else {
+      sctx.lineWidth = rc * 2;
+      sctx.beginPath();
+      sctx.moveTo(last[0], last[1]);
+      sctx.lineTo(x, y);
+      sctx.stroke();
     }
-    const dx = x - last[0], dy = y - last[1];
-    const d = Math.hypot(dx, dy);
-    const spacing = Math.max(0.75, r * 0.16);
-    let t = spacing - carry;
-    while (t <= d) {
-      dab(last[0] + dx * (t / d), last[1] + dy * (t / d), r);
-      t += spacing;
-    }
-    carry = d - (t - spacing);
     last = [x, y];
   }
   function snapshot() {
@@ -17155,6 +17144,7 @@ function setupPaintWidget(node) {
     if (e.button !== 0) return;
     stroking = true;
     last = null;
+    strokeR = 0;
     const [lx, ly] = dispToLayer(px, py);
     strokeTo(lx, ly, radiusFor(e));
     scheduleDraw();

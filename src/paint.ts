@@ -315,7 +315,10 @@ function setupPaintWidget(node: any): void {
     if (!withStroke) return;
     target.globalAlpha = P.nkdPaintOpacity;
     target.globalCompositeOperation = tool() === "eraser" ? "destination-out" : "source-over";
+    const blur = fringeBlur(strokeR);
+    target.filter = blur >= 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
     target.drawImage(strokeCv, 0, 0);
+    target.filter = "none";
     target.globalCompositeOperation = "source-over";
     target.globalAlpha = 1;
   }
@@ -360,52 +363,47 @@ function setupPaintWidget(node: any): void {
   // ── brush engine ──
   let stroking = false, panning = false, picking = false;
   let last: [number, number] | null = null;
-  let carry = 0;
   let sizeDrag: { x0: number; y0: number; size0: number; hard0: number } | null = null;
   let panDrag: { x0: number; y0: number; px: number; py: number } | null = null;
   let spaceHeld = false;
 
   /**
-   * One stamp. Two things keep a soft brush soft:
-   *   - the falloff is an S-curve, not a straight ramp, so the fringe fades out instead of
-   *     ending in a visible rim;
-   *   - the stamp's peak alpha drops with softness ("flow"). Stamps overlap ~12× along a
-   *     stroke, and 1 − (1 − a)^12 saturates anything: with a = 1 a hardness-0 brush came out
-   *     nearly as hard as hardness-1 (Neko: "la dureza baja no es lo suficientemente
-   *     difusa"). At a = 0.4 the centre still saturates through the overlap while the fringe
-   *     keeps its ramp (measured: hardness 0 at a = 0.3 peaked at 224/255, 0.4 saturates). Hard brushes keep a = 1 so a single tap is a solid disc.
+   * Strokes are OPAQUE PATHS, and softness is a blur applied when the stroke is composited.
+   *
+   * The stamp engine before this (radial-gradient dabs every few px) left a lattice: every
+   * dab adds partial alpha, the sum is quantised to 8 bits, and where strokes cross the
+   * residue lines up into a grid you can see through a flat colour (Neko: "patrón de puntos
+   * rarísimo"). A path has no dabs, so nothing to line up; round caps and joins keep it
+   * continuous at any speed; and a blur of the finished shape is exactly the soft edge a
+   * radial falloff was approximating, without the accumulation problem.
+   *
+   * Hardness splits the radius into a solid core and a blurred fringe. A blurred disc has
+   * alpha 0.5 at the core's edge and fades to ~0.05 at 1.65σ past it, so the numbers come
+   * from Photoshop's soft round brush: at hardness 0 the 50 % point sits at half the radius
+   * and the fringe ends at the radius (core = r/2, σ = 0.3 r); at hardness 1 the core is the
+   * whole brush and there is no blur.
    */
-  function dab(x: number, y: number, r: number) {
-    const sctx = strokeCv.getContext("2d")!;
-    r = Math.max(0.5, r);
-    const hard = Math.min(0.99, P.nkdPaintHardness);
-    const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
-    const flow = hard >= 0.99 ? 1 : 0.4 + 0.6 * hard;
-    const g = sctx.createRadialGradient(x, y, r * hard, x, y, r);
-    const STOPS = 8;
-    for (let k = 0; k <= STOPS; k++) {
-      const u = k / STOPS;
-      const fall = 1 - u * u * (3 - 2 * u);           // smoothstep, 1 → 0
-      g.addColorStop(u, `rgba(${cr},${cg},${cb},${(flow * fall).toFixed(4)})`);
-    }
-    sctx.fillStyle = g;
-    sctx.beginPath(); sctx.arc(x, y, r, 0, Math.PI * 2); sctx.fill();
-  }
+  const coreRadius = (r: number) => r * (0.5 + 0.5 * P.nkdPaintHardness);
+  const fringeBlur = (r: number) => r * (1 - P.nkdPaintHardness) * 0.3;
+  let strokeR = 0;   // brush radius of the stroke in progress, for the blur at composite time
   function radiusFor(e: PointerEvent): number {
     let size = P.nkdPaintSize;
     if (e.pointerType === "pen" && e.pressure > 0) size *= 0.25 + 0.75 * e.pressure;
     return size / 2;
   }
   function strokeTo(x: number, y: number, r: number) {
-    if (!last) { dab(x, y, r); last = [x, y]; carry = 0; return; }
-    const dx = x - last[0], dy = y - last[1];
-    const d = Math.hypot(dx, dy);
-    // 8 % of the diameter. 15 % scalloped visibly on a big hard brush (Neko: "va dando
-    // saltos"); below ~5 % the stamps cost more than they show.
-    const spacing = Math.max(0.75, r * 0.16);
-    let t = spacing - carry;
-    while (t <= d) { dab(last[0] + dx * (t / d), last[1] + dy * (t / d), r); t += spacing; }
-    carry = d - (t - spacing);
+    const sctx = strokeCv.getContext("2d")!;
+    const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
+    sctx.strokeStyle = sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+    sctx.lineCap = sctx.lineJoin = "round";
+    const rc = Math.max(0.5, coreRadius(r));
+    strokeR = Math.max(strokeR, r);
+    if (!last) {
+      sctx.beginPath(); sctx.arc(x, y, rc, 0, Math.PI * 2); sctx.fill();
+    } else {
+      sctx.lineWidth = rc * 2;
+      sctx.beginPath(); sctx.moveTo(last[0], last[1]); sctx.lineTo(x, y); sctx.stroke();
+    }
     last = [x, y];
   }
 
@@ -470,7 +468,7 @@ function setupPaintWidget(node: any): void {
     }
     if (e.altKey && e.button === 0) { picking = true; pick(px, py); return; }
     if (e.button !== 0) return;
-    stroking = true; last = null;
+    stroking = true; last = null; strokeR = 0;
     const [lx, ly] = dispToLayer(px, py);
     strokeTo(lx, ly, radiusFor(e));
     scheduleDraw();
