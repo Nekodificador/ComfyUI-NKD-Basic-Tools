@@ -16,6 +16,7 @@ import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
 import { registerCrop } from "./crop";
+import { registerPaint, paintSource } from "./paint";
 
 // Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
 // skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
@@ -26,10 +27,11 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDFrequencySeparate: 1, NKDFrequencyCombine: 1, NKDColorWarp: 1,
   NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
-  NKDFaceRig: 1, NKDCrop: 1,
+  NKDFaceRig: 1, NKDCrop: 1, NKDPaint: 1,
 });
 
 registerCrop();
+registerPaint();
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
@@ -1057,6 +1059,18 @@ comfyApp.registerExtension({
 
 const splineFrames = new Map<string, { canvas: HTMLCanvasElement; w: number; h: number }>();
 let openSpline: { nodeId: string; handle: SplineOverlayHandle } | null = null;
+
+// 😺NKD Paint's backdrop for sources with no upstream file (VAE Decode): the node pushes
+// its base on execute; the widget draws the (≤1024) frame but sizes its layer to the full
+// dimensions that travel with it.
+api.addEventListener("nkd-paint-source", (e: any) => {
+  const d = e?.detail;
+  if (!d?.data) return;
+  try {
+    paintSource(String(d.node), rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
+                d.full_width, d.full_height);
+  } catch { /* ignore malformed */ }
+});
 
 api.addEventListener("nkd-source", (e: any) => {
   const d = e?.detail;

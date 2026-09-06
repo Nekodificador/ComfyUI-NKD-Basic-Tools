@@ -1080,6 +1080,7 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
         PromptServer.instance.send_sync(event, {
             "node": str(unique_id),
             "width": w, "height": h,
+            "full_width": full_w, "full_height": full_h,
             "data": base64.b64encode(buf).decode("ascii"),
         })
     except Exception:

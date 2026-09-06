@@ -2,7 +2,8 @@
 
 A grab-bag of everyday ComfyUI nodes that take the wiring and the busywork out of
 the way: detail an inpaint at the right resolution, roto a mask by hand with a
-pen tool, fake a shallow depth of field or a motion blur that curves, put skin
+pen tool, scribble a ControlNet guide straight on the node, fake a shallow depth of
+field or a motion blur that curves, put skin
 texture back after a relight, recolor by brightness, make procedural noise or
 film grain, turn one text box into a whole batch of prompts.
 
@@ -33,6 +34,7 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD MiniMax Guides](docs/minimax-guides.md) | Every guide of a MiniMax H3 shot from one node, instead of a row of them each dragging the same four cables across the canvas. |
 | [😺NKD Mask Painter](docs/mask-painter.md) | Paints a mask onto an image your graph just made, and stacks masks from anywhere while the result stays paintable. |
 | [😺NKD Vector Mask](docs/vector-mask.md) | Roto by hand with a pen tool. What gets saved is control points, so it's still editable next week. |
+| [😺NKD Paint](docs/paint.md) | Scribble straight on the node, over the image or on a blank canvas. The blend, the strokes alone and their exact mask come out separately; one switch turns it into a ControlNet Scribble source. |
 
 ## Faces
 
