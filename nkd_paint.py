@@ -41,7 +41,7 @@ class NKDPaint(io.ComfyNode):
             # Output node, like Mask Painter: Run refreshes the backdrop even with nothing downstream.
             is_output_node=True,
             description="Paint or scribble straight on the node, over an image or a blank canvas. "
-                        "Outputs the untouched image, the painted one, the strokes alone and their exact mask.",
+                        "Outputs the untouched image, the painted one, the strokes alone, their exact mask and its inverse.",
             inputs=[
                 io.Image.Input("image", optional=True,
                                tooltip="Optional base image. Sets the canvas size and shows behind the strokes."),
@@ -60,6 +60,7 @@ class NKDPaint(io.ComfyNode):
                 io.Image.Output("painted", display_name="painted", tooltip="Strokes blended over the base."),
                 io.Image.Output("strokes", display_name="strokes", tooltip="Strokes alone, straight colour with bg_color where there is nothing (white on black in controlnet mode)."),
                 io.Mask.Output("mask", display_name="mask", tooltip="Alpha of the strokes."),
+                io.Mask.Output("inverted_mask", display_name="inverted mask", tooltip="1 - mask. This is what Join Image with Alpha wants to make strokes transparent."),
             ],
             hidden=[io.Hidden.unique_id],
         )
@@ -81,7 +82,8 @@ class NKDPaint(io.ComfyNode):
 
         layer = (layer or "").strip()
         if not layer:
-            return io.NodeOutput(base, base, stroke_bg, torch.zeros((1, h, w), dtype=torch.float32))
+            empty = torch.zeros((1, h, w), dtype=torch.float32)
+            return io.NodeOutput(base, base, stroke_bg, empty, 1.0 - empty)
 
         png = node_helpers.pillow(Image.open, folder_paths.get_annotated_filepath(layer)).convert("RGBA")
         if png.size != (w, h):
@@ -99,7 +101,7 @@ class NKDPaint(io.ComfyNode):
             # Straight (unpremultiplied) colour: pair with `mask` in Join Image with Alpha and
             # the soft edges come out clean instead of darkened by bg_color.
             strokes = torch.where(a > 0, rgb, stroke_bg)
-        return io.NodeOutput(base, blended, strokes, a[..., 0])
+        return io.NodeOutput(base, blended, strokes, a[..., 0], 1.0 - a[..., 0])
 
 
 class NKDPaintExtension(ComfyExtension):

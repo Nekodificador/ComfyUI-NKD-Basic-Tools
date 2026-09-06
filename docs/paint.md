@@ -2,9 +2,9 @@
 
 A brush on the node itself. Connect an image and it shows up behind the canvas at
 its own resolution; connect nothing and you get a blank canvas of the size you set.
-Paint, scribble, block in a contrast, erase, and the result comes out four ways at
+Paint, scribble, block in a contrast, erase, and the result comes out five ways at
 once: the image untouched, the image with the strokes on it, the strokes alone, and
-a mask of exactly what you touched. The node exists so a quick scribble for ControlNet doesn't need a
+a mask of exactly what you touched, plus its inverse for transparent exports. The node exists so a quick scribble for ControlNet doesn't need a
 trip to an external editor.
 
 ```mermaid
@@ -14,6 +14,7 @@ flowchart LR
     PAINT -- painted --> BLEND(["painted result"]):::output
     PAINT -- strokes --> CN(["ControlNet Scribble"]):::external
     PAINT -- mask --> MO(["NKD Mask Ops / inpaint"]):::external
+    PAINT -- "strokes + inverted mask" --> JA(["Join Image with Alpha"]):::external
 
     classDef nkd fill:#3b3b6b,stroke:#8ab4ff,stroke-width:2px,color:#fff
     classDef input fill:#2d2d2d,stroke:#888,color:#eee
@@ -41,10 +42,14 @@ flowchart LR
 - `painted`: the strokes blended over the base, at the base's resolution.
 - `strokes`: the strokes alone, in their own colour, with `bg_color` wherever nothing
   is painted. The colour is not premultiplied, so `strokes` plus `mask` through the
-  core "Join Image with Alpha" node gives a clean RGBA with soft edges intact. In
+  core "Join Image with Alpha" node gives a clean RGBA with soft edges intact (use
+  `inverted mask` there, see below). In
   `controlnet` mode it's white on black instead, with soft edges as grey, ready for a
   Scribble ControlNet.
 - `mask`: the alpha of the strokes. Partial opacity stays partial.
+- `inverted mask`: the same, inverted. Join Image with Alpha treats mask as "what to
+  hide", so this is the one to wire there with `strokes` to get a transparent PNG of
+  the strokes.
 
 ## Painting
 
