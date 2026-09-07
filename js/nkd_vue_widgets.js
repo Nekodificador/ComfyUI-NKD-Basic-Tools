@@ -15916,22 +15916,23 @@ function snapBoxRotated(b, multiple) {
 }
 function snapToSourceEdges(b, tol, w, h, edges, move) {
   const out = { ...b };
-  const nearest = (v, targets) => {
+  const nearest = (v, lim) => {
+    if (v < 0 || v > lim) return null;
     let best = null;
-    for (const t of targets) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
+    for (const t of [0, lim]) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
     return best;
   };
   if (move) {
-    const sx = nearest(out.x0, [0, w]), ex = nearest(out.x1, [0, w]);
+    const sx = nearest(out.x0, w), ex = nearest(out.x1, w);
     const dx = sx != null ? sx - out.x0 : ex != null ? ex - out.x1 : 0;
-    const sy = nearest(out.y0, [0, h]), ey = nearest(out.y1, [0, h]);
+    const sy = nearest(out.y0, h), ey = nearest(out.y1, h);
     const dy = sy != null ? sy - out.y0 : ey != null ? ey - out.y1 : 0;
     return { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
   }
-  if (edges.includes("w")) out.x0 = nearest(out.x0, [0, w]) ?? out.x0;
-  if (edges.includes("e")) out.x1 = nearest(out.x1, [0, w]) ?? out.x1;
-  if (edges.includes("n")) out.y0 = nearest(out.y0, [0, h]) ?? out.y0;
-  if (edges.includes("s")) out.y1 = nearest(out.y1, [0, h]) ?? out.y1;
+  if (edges.includes("w")) out.x0 = nearest(out.x0, w) ?? out.x0;
+  if (edges.includes("e")) out.x1 = nearest(out.x1, w) ?? out.x1;
+  if (edges.includes("n")) out.y0 = nearest(out.y0, h) ?? out.y0;
+  if (edges.includes("s")) out.y1 = nearest(out.y1, h) ?? out.y1;
   return out;
 }
 function containRotatedBox(b, deg, w, h) {

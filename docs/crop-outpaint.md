@@ -42,9 +42,11 @@ sits inside for composition.
 - The knob above the top edge rotates. Hold `Shift` while rotating to snap to 15°.
 - `Shift` while resizing in Free mode keeps whatever ratio the box had when the
   drag started.
-- Edges stick to the edges of the source image when they get close, while moving,
-  resizing or drawing. Lock an aspect and glue the box to two opposite edges to
-  outpaint a 2:3 image into a 1:1, exactly. Hold `Alt` to drag past without snapping.
+- Edges stick to the edges of the source image when they get close from inside,
+  while moving, resizing or drawing. Dragging outward never sticks; to land an edge
+  exactly on the frame from outside, cross slightly in and it snaps back. Lock an
+  aspect and glue the box to two opposite edges to outpaint a 2:3 image into a 1:1,
+  exactly. Hold `Alt` to disable the snap.
 - `Aspect` in the toolbar locks the shape to a preset: 1:1, 4:5, 3:4, 2:3, 9:16
   and the four landscape counterparts. `Reset` clears the rectangle.
 

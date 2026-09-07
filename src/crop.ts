@@ -136,30 +136,34 @@ function snapBoxRotated(b: Box, multiple: number): Box {
   return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
 }
 
-/** Stick box edges to the SOURCE edges (0 / w / h) when they come within `tol` source px.
- *  `edges` limits which sides may snap (a resize handle only moves its own sides); for a
- *  move all four are candidates but the box must shift as a whole, so per axis the closest
- *  candidate wins and both sides move together. Neko: outpaint a 2:3 to 1:1 by locking
- *  the ratio and gluing the box to the top and bottom edges — reachable by hand before,
- *  never exact. */
+/** Stick box edges to the SOURCE edges (0 / w / h) when they come within `tol` source px
+ *  FROM INSIDE the source only. Outside there is no pull at all, so dragging a box out
+ *  into the outpaint band never sticks (Neko: "no puedo expandir igual que antes" when it
+ *  snapped from both sides) — to land an edge exactly on the frame from outside, cross
+ *  slightly in and it snaps back out. `edges` limits which sides may snap (a resize
+ *  handle only moves its own sides); for a move all four are candidates but the box must
+ *  shift as a whole, so per axis the closest candidate wins and both sides move together.
+ *  Neko: outpaint a 2:3 to 1:1 by locking the ratio and gluing the box to the top and
+ *  bottom edges — reachable by hand before, never exact. */
 function snapToSourceEdges(b: Box, tol: number, w: number, h: number, edges: string, move: boolean): Box {
   const out = { ...b };
-  const nearest = (v: number, targets: number[]): number | null => {
+  const nearest = (v: number, lim: number): number | null => {
+    if (v < 0 || v > lim) return null;
     let best: number | null = null;
-    for (const t of targets) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
+    for (const t of [0, lim]) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
     return best;
   };
   if (move) {
-    const sx = nearest(out.x0, [0, w]), ex = nearest(out.x1, [0, w]);
+    const sx = nearest(out.x0, w), ex = nearest(out.x1, w);
     const dx = sx != null ? sx - out.x0 : ex != null ? ex - out.x1 : 0;
-    const sy = nearest(out.y0, [0, h]), ey = nearest(out.y1, [0, h]);
+    const sy = nearest(out.y0, h), ey = nearest(out.y1, h);
     const dy = sy != null ? sy - out.y0 : ey != null ? ey - out.y1 : 0;
     return { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
   }
-  if (edges.includes("w")) out.x0 = nearest(out.x0, [0, w]) ?? out.x0;
-  if (edges.includes("e")) out.x1 = nearest(out.x1, [0, w]) ?? out.x1;
-  if (edges.includes("n")) out.y0 = nearest(out.y0, [0, h]) ?? out.y0;
-  if (edges.includes("s")) out.y1 = nearest(out.y1, [0, h]) ?? out.y1;
+  if (edges.includes("w")) out.x0 = nearest(out.x0, w) ?? out.x0;
+  if (edges.includes("e")) out.x1 = nearest(out.x1, w) ?? out.x1;
+  if (edges.includes("n")) out.y0 = nearest(out.y0, h) ?? out.y0;
+  if (edges.includes("s")) out.y1 = nearest(out.y1, h) ?? out.y1;
   return out;
 }
 
