@@ -39,6 +39,7 @@ const BAR_H = 30;
 const TRANSPORT_H = 26;
 const ROTATE_OFFSET = 22;   // px above the box's (unrotated) top edge, canvas space
 const ROTATE_BASE_DEG = -90; // atan2 angle of "straight up" — angle 0 points the handle here
+const EDGE_SNAP_PX = 8;      // canvas px within which a box edge sticks to a source edge
 
 const ASPECTS: Record<string, number | null> = {
   Free: null, "1:1": 1, "4:5": 4 / 5, "3:4": 3 / 4, "2:3": 2 / 3, "9:16": 9 / 16,
@@ -133,6 +134,33 @@ function snapBoxRotated(b: Box, multiple: number): Box {
   };
   const w = grow(b.x1 - b.x0), h = grow(b.y1 - b.y0);
   return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
+}
+
+/** Stick box edges to the SOURCE edges (0 / w / h) when they come within `tol` source px.
+ *  `edges` limits which sides may snap (a resize handle only moves its own sides); for a
+ *  move all four are candidates but the box must shift as a whole, so per axis the closest
+ *  candidate wins and both sides move together. Neko: outpaint a 2:3 to 1:1 by locking
+ *  the ratio and gluing the box to the top and bottom edges — reachable by hand before,
+ *  never exact. */
+function snapToSourceEdges(b: Box, tol: number, w: number, h: number, edges: string, move: boolean): Box {
+  const out = { ...b };
+  const nearest = (v: number, targets: number[]): number | null => {
+    let best: number | null = null;
+    for (const t of targets) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
+    return best;
+  };
+  if (move) {
+    const sx = nearest(out.x0, [0, w]), ex = nearest(out.x1, [0, w]);
+    const dx = sx != null ? sx - out.x0 : ex != null ? ex - out.x1 : 0;
+    const sy = nearest(out.y0, [0, h]), ey = nearest(out.y1, [0, h]);
+    const dy = sy != null ? sy - out.y0 : ey != null ? ey - out.y1 : 0;
+    return { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
+  }
+  if (edges.includes("w")) out.x0 = nearest(out.x0, [0, w]) ?? out.x0;
+  if (edges.includes("e")) out.x1 = nearest(out.x1, [0, w]) ?? out.x1;
+  if (edges.includes("n")) out.y0 = nearest(out.y0, [0, h]) ?? out.y0;
+  if (edges.includes("s")) out.y1 = nearest(out.y1, [0, h]) ?? out.y1;
+  return out;
 }
 
 /** Crop mode's hard guarantee: the box's ROTATED footprint never leaves `[0,w]x[0,h]` —
@@ -389,6 +417,10 @@ function setupCropWidget(node: any): void {
     const { scale, ox, oy } = scaleAndOrigin();
     return [(cx - ox) / scale, (cy - oy) / scale];
   };
+  // Alt disables the edge snap, as in any layout tool. Rotated boxes never snap: `next`
+  // lives in the box's LOCAL frame there, the source edges in the global one.
+  const edgeSnapTol = (e: PointerEvent): number =>
+    e.altKey || isRotated() ? 0 : EDGE_SNAP_PX / scaleAndOrigin().scale;
 
   /**
    * NO explicit `canvas.style.height` — that was the bug (Neko: "al estirar el nodo se
@@ -764,6 +796,7 @@ function setupCropWidget(node: any): void {
       const lo = -m, hi = 1 + m;
       next.x0 = Math.max(lo * srcW, next.x0); next.y0 = Math.max(lo * srcH, next.y0);
       next.x1 = Math.min(hi * srcW, next.x1); next.y1 = Math.min(hi * srcH, next.y1);
+      next = snapToSourceEdges(next, edgeSnapTol(e), srcW, srcH, "nsew", false);
       const locked = ASPECTS[node.properties.nkdCropAspect];
       if (locked) next = applyAspect(next, locked);
       box = finalizeBox(next);
@@ -814,6 +847,7 @@ function setupCropWidget(node: any): void {
       next.x0 = Math.max(lo * srcW, next.x0); next.y0 = Math.max(lo * srcH, next.y0);
       next.x1 = Math.min(hi * srcW, next.x1); next.y1 = Math.min(hi * srcH, next.y1);
     }
+    next = snapToSourceEdges(next, edgeSnapTol(e), srcW, srcH, drag.handle, drag.handle === "move");
     if (drag.handle !== "move") {
       // Shift in Free mode locks to the CURRENT bbox ratio (from the drag's start box), not
       // a preset — the same "hold Shift to keep proportions" as any resize handle elsewhere.

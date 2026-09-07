@@ -15824,6 +15824,7 @@ const BAR_H = 30;
 const TRANSPORT_H = 26;
 const ROTATE_OFFSET = 22;
 const ROTATE_BASE_DEG = -90;
+const EDGE_SNAP_PX = 8;
 const ASPECTS = {
   Free: null,
   "1:1": 1,
@@ -15912,6 +15913,26 @@ function snapBoxRotated(b, multiple) {
   };
   const w = grow(b.x1 - b.x0), h = grow(b.y1 - b.y0);
   return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
+}
+function snapToSourceEdges(b, tol, w, h, edges, move) {
+  const out = { ...b };
+  const nearest = (v, targets) => {
+    let best = null;
+    for (const t of targets) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
+    return best;
+  };
+  if (move) {
+    const sx = nearest(out.x0, [0, w]), ex = nearest(out.x1, [0, w]);
+    const dx = sx != null ? sx - out.x0 : ex != null ? ex - out.x1 : 0;
+    const sy = nearest(out.y0, [0, h]), ey = nearest(out.y1, [0, h]);
+    const dy = sy != null ? sy - out.y0 : ey != null ? ey - out.y1 : 0;
+    return { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
+  }
+  if (edges.includes("w")) out.x0 = nearest(out.x0, [0, w]) ?? out.x0;
+  if (edges.includes("e")) out.x1 = nearest(out.x1, [0, w]) ?? out.x1;
+  if (edges.includes("n")) out.y0 = nearest(out.y0, [0, h]) ?? out.y0;
+  if (edges.includes("s")) out.y1 = nearest(out.y1, [0, h]) ?? out.y1;
+  return out;
 }
 function containRotatedBox(b, deg, w, h) {
   let out = b;
@@ -16098,6 +16119,7 @@ function setupCropWidget(node) {
     const { scale, ox, oy } = scaleAndOrigin();
     return [(cx - ox) / scale, (cy - oy) / scale];
   };
+  const edgeSnapTol = (e) => e.altKey || isRotated() ? 0 : EDGE_SNAP_PX / scaleAndOrigin().scale;
   function syncCanvasBuffer() {
     const [cw, ch] = canvasSize();
     const d = dpr();
@@ -16408,6 +16430,7 @@ function setupCropWidget(node) {
       next2.y0 = Math.max(lo * srcH, next2.y0);
       next2.x1 = Math.min(hi * srcW, next2.x1);
       next2.y1 = Math.min(hi * srcH, next2.y1);
+      next2 = snapToSourceEdges(next2, edgeSnapTol(e), srcW, srcH, "nsew", false);
       const locked = ASPECTS[node.properties.nkdCropAspect];
       if (locked) next2 = applyAspect(next2, locked);
       box = finalizeBox(next2);
@@ -16471,6 +16494,7 @@ function setupCropWidget(node) {
       next.x1 = Math.min(hi * srcW, next.x1);
       next.y1 = Math.min(hi * srcH, next.y1);
     }
+    next = snapToSourceEdges(next, edgeSnapTol(e), srcW, srcH, drag.handle, drag.handle === "move");
     if (drag.handle !== "move") {
       const locked = ASPECTS[node.properties.nkdCropAspect];
       const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
