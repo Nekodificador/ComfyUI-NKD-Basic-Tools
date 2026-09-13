@@ -26,6 +26,7 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD Inpaint Crop / Stitch](docs/inpaint-crop-stitch.md) | Fixes one part of an image without re-rendering the rest. Crops the masked area at your sampler's resolution and puts it back at full size, no seam. |
 | [😺NKD Crop / Outpaint / Stitch](docs/crop-outpaint.md) | Draw the crop on the image itself, rotate it, snap it to the model's pixel grid, or push it past the edge to outpaint. Stitch puts the patch back. |
 | [😺NKD Frequency Separate / Combine](docs/frequency-separate-combine.md) | Splits an image into a soft base and a detail layer. The usual job is putting skin and fabric texture back after a relight. |
+| [😺NKD Normal Detail](docs/normal-detail.md) | Puts the pores, stubble and hair back into a model's normal map, read from the photo and blended the way normals should be. |
 | [😺NKD Mask Ops](docs/mask-ops.md) | A whole mask pipeline in one node: levels, specks, holes, expand, feather, blockify, temporal steps. Whole batch, one trip to the GPU. |
 | [😺NKD Mask Ops Lean](docs/mask-ops-lean.md) | The three a composite actually needs, fill holes, expand/contract and feather, at the same speed. |
 | [😺NKD AV Latent](docs/av-latent.md) | Inpaints a video that carries its own soundtrack (MiniMax H3, LTXV) without the sound being regenerated behind your back. |

@@ -102,6 +102,20 @@ const RULES = {
       refreshNode(node);
     },
   },
+  // A band with radius 0 is off, so its strength has nothing to say.
+  NKDNormalDetail: {
+    watch: ["fine_radius", "medium_radius"],
+    apply(node) {
+      for (const band of ["fine", "medium"]) {
+        const radius = node.widgets?.find((w) => w.name === `${band}_radius`)?.value;
+        const strength = node.widgets?.find((w) => w.name === `${band}_strength`);
+        if (!strength) continue;
+        if (radius > 0) showWidget(strength);
+        else hideWidget(strength);
+      }
+      refreshNode(node);
+    },
+  },
   // The guide sockets grow on their own (autogrow); the position widget of a slot
   // only means something once something is plugged into that slot, so it rides along.
   NKDMiniMaxGuides: {

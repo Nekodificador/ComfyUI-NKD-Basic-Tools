@@ -20,6 +20,7 @@ from .nkd_field_blur import NKDFieldBlur
 from .nkd_path_blur import NKDPathBlur
 from .nkd_minimax_guides import NKDMiniMaxGuides
 from .nkd_paint import NKDPaint
+from .nkd_normal_detail import NKDNormalDetail
 from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
 try:
@@ -68,6 +69,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDPathBlur,
             NKDMiniMaxGuides,
             NKDPaint,
+            NKDNormalDetail,
         ]
         if NKDFaceCrop is not None:
             nodes += [NKDFaceCrop, NKDFaceMask, NKDFaceStitch]
@@ -106,6 +108,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDPathBlur": NKDPathBlur,
     "NKDMiniMaxGuides": NKDMiniMaxGuides,
     "NKDPaint": NKDPaint,
+    "NKDNormalDetail": NKDNormalDetail,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -133,6 +136,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDPathBlur": "😺NKD Path Blur",
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
     "NKDPaint": "😺NKD Paint",
+    "NKDNormalDetail": "😺NKD Normal Detail",
 }
 
 if NKDFaceCrop is not None:
