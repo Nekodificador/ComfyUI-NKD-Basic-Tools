@@ -5,8 +5,10 @@ import numpy as np
 
 try:
     from .color_core import mesh as _mesh, lut as _lut, cube as _cube, ryb as _ryb  # ComfyUI (package)
+    from .helpers import _safe_join, _safe_name
 except ImportError:
     from color_core import mesh as _mesh, lut as _lut, cube as _cube, ryb as _ryb   # standalone tests (sys.path)
+    from helpers import _safe_join, _safe_name
 
 _LUT_SIZE = 33
 # Default mesh: columns anchored on the RYB wheel layout (engine OKLCh hues of
@@ -68,7 +70,7 @@ try:
             out = apply_mesh_to_batch(np_img, mesh, size=_LUT_SIZE)
             if save_lut:
                 out_dir = folder_paths.get_output_directory()
-                path = os.path.join(out_dir, f"{lut_name}.cube")
+                path = _safe_join(out_dir, _safe_name(lut_name, "nkd_color_warp") + ".cube")
                 bake_cube(mesh, path, size=_LUT_SIZE)
             _push_source(node_id(cls, unique_id), np_img)
             out_t = torch.from_numpy(out).to(image.device).to(image.dtype)

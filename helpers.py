@@ -1106,3 +1106,22 @@ def preview_frames(x: torch.Tensor, count: int = _PREVIEW_FRAMES) -> torch.Tenso
         return x
     idx = torch.linspace(0, x.shape[0] - 1, count).round().long()
     return x[idx]
+
+
+# ---------------------------------------------------------------------------
+# File paths that come from a request or a widget
+# ---------------------------------------------------------------------------
+def _safe_join(base: str, *parts: str):
+    """Join `parts` under `base` and return the real path, or None when the
+    result would land outside `base` (`..`, absolute parts, symlinks out)."""
+    import os
+    root = os.path.realpath(base)
+    p = os.path.realpath(os.path.join(root, *[str(x) for x in parts if x]))
+    return p if p == root or p.startswith(root + os.sep) else None
+
+
+def _safe_name(name: str, default: str) -> str:
+    """A bare file name from user text: no directories, only plain characters."""
+    import os
+    cleaned = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.basename(str(name or ""))).strip("._")
+    return cleaned or default

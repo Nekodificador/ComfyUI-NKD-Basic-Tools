@@ -12,6 +12,8 @@ folder are all unchanged, so saved workflows resolve and masks already painted
 survive the move.
 """
 import os
+from .helpers import _safe_join
+import re
 
 import folder_paths
 import numpy as np
@@ -73,6 +75,14 @@ def _backup_dir() -> str:
     d = os.path.join(folder_paths.get_input_directory(), _MASKS_BACKUP_SUBDIR)
     os.makedirs(d, exist_ok=True)
     return d
+
+_NODE_ID_RE = re.compile(r"^[0-9A-Za-z_:.-]{1,128}$")  # ints, and "uuid:int" inside subgraphs
+
+
+def _valid_node_id(node_id: str) -> bool:
+    return bool(node_id) and not node_id.startswith("-") and ".." not in node_id \
+        and _NODE_ID_RE.match(node_id) is not None
+
 
 def _backup_path(node_id: str) -> str:
     return os.path.join(_backup_dir(), f"{node_id}_mask.png")
@@ -208,8 +218,8 @@ def _resolve_clipspace_path(filename: str, ftype: str, subfolder: str) -> str | 
     }.get(ftype)
     if not base:
         return None
-    p = os.path.join(base, subfolder, filename) if subfolder else os.path.join(base, filename)
-    return p if os.path.exists(p) else None
+    p = _safe_join(base, subfolder, filename)
+    return p if p and os.path.isfile(p) else None
 
 # ── REST endpoints ────────────────────────────────────────────────────────────
 
@@ -226,7 +236,7 @@ async def _nkd_bridge_set(request: web.Request) -> web.Response:
     ftype     = q.get("type", "input")
     subfolder = q.get("subfolder", "")
 
-    if not node_id or node_id.startswith("-") or "/" in node_id or ".." in node_id:
+    if not _valid_node_id(node_id):
         return web.Response(status=400, text="Invalid node_id")
 
     abs_path = _resolve_clipspace_path(filename, ftype, subfolder)
@@ -266,7 +276,7 @@ async def _nkd_bridge_reset_seed(request: web.Request) -> web.Response:
     execute() treats the incoming `mask` as if it had just changed and
     applies the seed/add/subtract operation again."""
     node_id = request.rel_url.query.get("node_id", "")
-    if not node_id or node_id.startswith("-"):
+    if not _valid_node_id(node_id):
         return web.Response(status=400, text="Invalid node_id")
     _incoming_mask_fp.pop(node_id, None)
     return web.Response(status=200)
@@ -278,7 +288,7 @@ async def _nkd_bridge_clear(request: web.Request) -> web.Response:
     so the client can refresh the node preview in place — no requeue needed.
     """
     node_id = request.rel_url.query.get("node_id", "")
-    if not node_id or node_id.startswith("-"):
+    if not _valid_node_id(node_id):
         return web.Response(status=400, text="Invalid node_id")
 
     # Find the most recent clean thumbnail before invalidating registrations.
