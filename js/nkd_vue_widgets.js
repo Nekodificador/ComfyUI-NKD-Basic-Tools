@@ -17801,7 +17801,50 @@ function setup(node) {
       window.alert(`Delete failed: ${err}`);
     }
   };
-  presetRow.append(presetLabel, dial, saveBtn, delBtn);
+  const bakeBtn = document.createElement("button");
+  bakeBtn.className = "nkd-btn nkd-btn--preset";
+  bakeBtn.textContent = "Save LoRA";
+  bakeBtn.title = "Write these blocks out as a new LoRA file";
+  bakeBtn.onclick = async (e) => {
+    e.stopPropagation();
+    if (!rows.length) return;
+    const src = String((loraW == null ? void 0 : loraW.value) ?? "");
+    const leaf = src.split("\\").pop().split("/").pop() || "lora";
+    const suggested = leaf.replace(/\.safetensors$/i, "") + "_shaped";
+    const raw = window.prompt("Save as (name only, goes in loras/NKD):", suggested);
+    if (raw === null) return;
+    const name = raw.trim();
+    if (!name) return;
+    const post = (overwrite) => api.fetchApi("/nkd/lora/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lora_name: src, rules: serialise(rows, threshold), name, overwrite })
+    });
+    const was = bakeBtn.textContent;
+    bakeBtn.textContent = "Saving…";
+    bakeBtn.disabled = true;
+    try {
+      let res = await post(false);
+      if (res.status === 409) {
+        const d = await res.json();
+        if (!window.confirm(`"${d.path}" already exists. Overwrite?`)) return;
+        res = await post(true);
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        window.alert(`Save failed: ${data.error ?? res.statusText}`);
+        return;
+      }
+      note = `saved ${data.path}  (${data.tensors} of ${data.of} tensors)`;
+      commit();
+    } catch (err) {
+      window.alert(`Save failed: ${err}`);
+    } finally {
+      bakeBtn.textContent = was;
+      bakeBtn.disabled = false;
+    }
+  };
+  presetRow.append(presetLabel, dial, saveBtn, delBtn, bakeBtn);
   async function loadPresets() {
     try {
       const res = await api.fetchApi("/nkd/lora/presets");

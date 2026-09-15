@@ -93,6 +93,19 @@ Scheduling doesn't work on GGUF or fp8 models. The node detects those, applies
 the LoRA at a flat strength instead of failing mid-render, and says so on a
 line under the panel.
 
+## Saving a shaped LoRA
+
+`Save LoRA` writes the current block setup out as a normal `.safetensors` under
+`models/loras/NKD/`. Any loader can then use it at strength 1.0 and this node
+stops being part of the workflow. Muted blocks aren't written at all, so the
+file comes out smaller than the original.
+
+You pick a name, not a path. The file records which LoRA it came from and the
+rules that shaped it, so one you find months later still says what it is.
+
+The curve can't be baked in. It varies across the sampling run and a weights
+file has nowhere to put that, so a saved file carries the block shape only.
+
 ## Inputs
 
 - `model`: the model to patch.

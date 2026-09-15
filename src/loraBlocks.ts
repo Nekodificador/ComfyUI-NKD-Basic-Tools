@@ -197,7 +197,56 @@ function setup(node: any): void {
     }
   };
 
-  presetRow.append(presetLabel, dial, saveBtn, delBtn);
+  // Write the shaped LoRA out as a normal .safetensors, so it can be used with
+  // any loader at strength 1.0. The curve cannot come along: it varies over the
+  // sampling run and a weights file has nowhere to put that.
+  const bakeBtn = document.createElement("button");
+  bakeBtn.className = "nkd-btn nkd-btn--preset";
+  bakeBtn.textContent = "Save LoRA";
+  bakeBtn.title = "Write these blocks out as a new LoRA file";
+  bakeBtn.onclick = async (e) => {
+    e.stopPropagation();
+    if (!rows.length) return;
+    const src = String(loraW?.value ?? "");
+    // LoRA names carry their subfolder, with a separator that depends on the OS.
+    const leaf = src.split("\\").pop()!.split("/").pop() || "lora";
+    const suggested = leaf.replace(/\.safetensors$/i, "") + "_shaped";
+    const raw = window.prompt("Save as (name only, goes in loras/NKD):", suggested);
+    if (raw === null) return;
+    const name = raw.trim();
+    if (!name) return;
+
+    const post = (overwrite: boolean) => api.fetchApi("/nkd/lora/save", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ lora_name: src, rules: serialise(rows, threshold), name, overwrite }),
+    });
+
+    const was = bakeBtn.textContent;
+    bakeBtn.textContent = "Saving…";
+    bakeBtn.disabled = true;
+    try {
+      let res = await post(false);
+      if (res.status === 409) {
+        const d = await res.json();
+        if (!window.confirm(`"${d.path}" already exists. Overwrite?`)) return;
+        res = await post(true);
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        window.alert(`Save failed: ${data.error ?? res.statusText}`);
+        return;
+      }
+      note = `saved ${data.path}  (${data.tensors} of ${data.of} tensors)`;
+      commit();
+    } catch (err) {
+      window.alert(`Save failed: ${err}`);
+    } finally {
+      bakeBtn.textContent = was;
+      bakeBtn.disabled = false;
+    }
+  };
+
+  presetRow.append(presetLabel, dial, saveBtn, delBtn, bakeBtn);
 
   async function loadPresets() {
     try {

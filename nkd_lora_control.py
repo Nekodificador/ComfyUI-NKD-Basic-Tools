@@ -16,11 +16,13 @@ import re
 
 import comfy.hooks
 import comfy.sd
+import comfy.utils
 import folder_paths
 from comfy.utils import load_torch_file
 from comfy_api.latest import io
 
 from . import lora_control_core as core
+from .helpers import _safe_join, _safe_name
 
 
 def _resolve(lora_name: str) -> str:
@@ -267,6 +269,75 @@ def _register_preset_routes() -> None:
         return web.json_response({"ok": True})
 
 
+# ---------------------------------------------------------------------------
+# Writing a shaped LoRA out
+#
+# The panel's setup is applied to a copy of the tensors and written as a normal
+# .safetensors, so any loader can use it at strength 1.0 and the node stops being
+# needed. Muted blocks are not written at all, so the file comes out smaller.
+#
+# The user picks a NAME, never a path. The destination is fixed under the loras
+# folder and every component goes through _safe_name/_safe_join: a directory
+# widget that takes whatever you type is exactly what got this pack flagged by
+# the registry once already.
+# ---------------------------------------------------------------------------
+
+_SAVE_SUBFOLDER = "NKD"
+
+
+def _source_metadata(path: str) -> dict:
+    """The original file's metadata, or {} for anything that isn't safetensors."""
+    try:
+        from safetensors import safe_open
+        with safe_open(path, framework="pt", device="cpu") as f:
+            return dict(f.metadata() or {})
+    except Exception:
+        return {}
+
+
+def save_shaped(lora_name: str, rules: str, name: str, overwrite: bool = False) -> dict:
+    """Write the shaped LoRA. Returns {"path": <relative>} or {"error": ...}."""
+    src = _resolve(lora_name)
+
+    roots = folder_paths.get_folder_paths("loras")
+    if not roots:
+        return {"error": "no loras folder configured"}
+    out_dir = _safe_join(roots[0], _SAVE_SUBFOLDER)
+    if out_dir is None:
+        return {"error": "bad destination"}
+    os.makedirs(out_dir, exist_ok=True)
+
+    stem = _safe_name(name, "")
+    if not stem:
+        return {"error": "invalid name"}
+    if stem.lower().endswith(".safetensors"):
+        stem = stem[: -len(".safetensors")]
+    dest = _safe_join(out_dir, stem + ".safetensors")
+    if dest is None:
+        return {"error": "invalid name"}
+    if os.path.exists(dest) and not overwrite:
+        return {"exists": True, "path": f"{_SAVE_SUBFOLDER}/{stem}.safetensors"}
+
+    state_dict = load_torch_file(src, safe_load=True)
+    analysis = analyse_path(src)
+    weights = core.parse_blocks(rules, analysis["order"])
+    shaped = core.filter_state_dict(state_dict, weights)
+    if not shaped:
+        return {"error": "every block is muted, nothing to save"}
+
+    # safetensors metadata is str -> str. Carry the provenance so a file found in
+    # six months still says where it came from and what was done to it.
+    meta = {k: str(v) for k, v in _source_metadata(src).items()
+            if k.startswith(("ss_", "modelspec."))}
+    meta["nkd_source_lora"] = os.path.basename(src)
+    meta["nkd_block_rules"] = rules or "(none)"
+
+    comfy.utils.save_torch_file(shaped, dest, metadata=meta)
+    kept = len(shaped)
+    return {"path": f"{_SAVE_SUBFOLDER}/{stem}.safetensors",
+            "tensors": kept, "of": len(state_dict)}
+
+
 def _register_routes() -> None:
     """GET /nkd/lora/blocks?name=<lora> -> the analysis for the block panel.
 
@@ -277,6 +348,24 @@ def _register_routes() -> None:
     """
     from aiohttp import web
     from server import PromptServer
+
+    @PromptServer.instance.routes.post("/nkd/lora/save")
+    async def _save_shaped(request):
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "invalid json"}, status=400)
+        try:
+            result = save_shaped(str(body.get("lora_name", "")), str(body.get("rules", "")),
+                                 str(body.get("name", "")), bool(body.get("overwrite")))
+        except FileNotFoundError:
+            return web.json_response({"error": "LoRA not found"}, status=404)
+        except Exception as exc:
+            logging.exception("[NKD LoRA Control] save failed")
+            return web.json_response({"error": str(exc)[:200]}, status=200)
+        if result.get("exists"):
+            return web.json_response(result, status=409)
+        return web.json_response(result, status=200 if "path" in result else 400)
 
     @PromptServer.instance.routes.get("/nkd/lora/blocks")
     async def _blocks(request):
