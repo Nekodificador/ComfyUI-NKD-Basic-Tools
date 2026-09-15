@@ -164,6 +164,38 @@ def test_filter_state_dict_scales_once():
             assert f"{b}.lora_up.weight" in out and f"{b}.lora_down.weight" in out, b
 
 
+def test_strength_folds_in_once():
+    # Baking the strength dial must multiply the delta ONCE, combined with the
+    # block weight. Applying it as a second pass over the tensors would square it,
+    # which is exactly the bug this node exists to avoid.
+    torch.manual_seed(0)
+    base = "lora_unet_double_blocks_0_img_attn_proj"
+    sd = {
+        f"{base}.lora_down.weight": torch.randn(4, 16),
+        f"{base}.lora_up.weight": torch.randn(16, 4),
+        "lora_unet_double_blocks_1_img_attn_proj.lora_down.weight": torch.randn(4, 16),
+        "lora_unet_double_blocks_1_img_attn_proj.lora_up.weight": torch.randn(16, 4),
+    }
+    names = analyze(sd)["order"]
+    full = analyze(sd)["blocks"]
+
+    for block_w, strength in ((1.0, 0.5), (0.5, 0.5), (0.25, 2.0), (1.0, -1.0)):
+        weights = parse_blocks(f"double_blocks_0: {block_w}", names)
+        weights = {b: w * strength for b, w in weights.items()}
+        got = analyze(filter_state_dict(sd, weights))["blocks"]
+        want = abs(block_w * strength)
+        ratio = got["double_blocks_0"]["norm"] / full["double_blocks_0"]["norm"]
+        assert abs(ratio - want) < 1e-3, (block_w, strength, ratio, want)
+        # the untouched block still carries the strength, nothing else
+        other = got["double_blocks_1"]["norm"] / full["double_blocks_1"]["norm"]
+        assert abs(other - abs(strength)) < 1e-3, (strength, other)
+
+    # strength 0 mutes everything, which the caller reports rather than writing
+    # an empty file
+    weights = {b: w * 0.0 for b, w in parse_blocks("", names).items()}
+    assert filter_state_dict(sd, weights) == {}
+
+
 if __name__ == "__main__":
     test_block_of()
     test_split_base()
@@ -172,4 +204,5 @@ if __name__ == "__main__":
     test_select()
     test_parse_blocks()
     test_filter_state_dict_scales_once()
+    test_strength_folds_in_once()
     print("ok")

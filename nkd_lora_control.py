@@ -295,7 +295,8 @@ def _source_metadata(path: str) -> dict:
         return {}
 
 
-def save_shaped(lora_name: str, rules: str, name: str, overwrite: bool = False) -> dict:
+def save_shaped(lora_name: str, rules: str, name: str, overwrite: bool = False,
+                strength: float = 1.0) -> dict:
     """Write the shaped LoRA. Returns {"path": <relative>} or {"error": ...}."""
     src = _resolve(lora_name)
 
@@ -321,9 +322,13 @@ def save_shaped(lora_name: str, rules: str, name: str, overwrite: bool = False) 
     state_dict = load_torch_file(src, safe_load=True)
     analysis = analyse_path(src)
     weights = core.parse_blocks(rules, analysis["order"])
+    if strength != 1.0:
+        # Folded into the per-block multipliers, never applied as a second pass:
+        # scaling the tensors twice would square it. A muted block stays muted.
+        weights = {b: w * strength for b, w in weights.items()}
     shaped = core.filter_state_dict(state_dict, weights)
     if not shaped:
-        return {"error": "every block is muted, nothing to save"}
+        return {"error": "nothing left to save at this strength"}
 
     # safetensors metadata is str -> str. Carry the provenance so a file found in
     # six months still says where it came from and what was done to it.
@@ -331,6 +336,8 @@ def save_shaped(lora_name: str, rules: str, name: str, overwrite: bool = False) 
             if k.startswith(("ss_", "modelspec."))}
     meta["nkd_source_lora"] = os.path.basename(src)
     meta["nkd_block_rules"] = rules or "(none)"
+    if strength != 1.0:
+        meta["nkd_baked_strength"] = str(strength)
 
     comfy.utils.save_torch_file(shaped, dest, metadata=meta)
     kept = len(shaped)
@@ -357,7 +364,8 @@ def _register_routes() -> None:
             return web.json_response({"error": "invalid json"}, status=400)
         try:
             result = save_shaped(str(body.get("lora_name", "")), str(body.get("rules", "")),
-                                 str(body.get("name", "")), bool(body.get("overwrite")))
+                                 str(body.get("name", "")), bool(body.get("overwrite")),
+                                 float(body.get("strength", 1.0)))
         except FileNotFoundError:
             return web.json_response({"error": "LoRA not found"}, status=404)
         except Exception as exc:

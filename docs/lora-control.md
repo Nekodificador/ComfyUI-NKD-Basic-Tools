@@ -103,6 +103,12 @@ file comes out smaller than the original.
 You pick a name, not a path. The file records which LoRA it came from and the
 rules that shaped it, so one you find months later still says what it is.
 
+`strength` isn't included by default, so the saved file matches what you were
+seeing at a strength of 1.0. When the dial is set to anything else, saving asks
+whether to fold it in as well: say yes and the file is ready to use at 1.0, say
+no and you set the strength on the loader like any other LoRA. Either way the
+proportions between blocks stay exactly as you left them.
+
 The curve can't be baked in. It varies across the sampling run and a weights
 file has nowhere to put that, so a saved file carries the block shape only.
 

@@ -54,6 +54,7 @@ const C = {
 function setup(node: any): void {
   const blocksW = findW(node, "blocks");
   const loraW = findW(node, "lora_name");
+  const strengthW = findW(node, "strength");
   if (blocksW) hideWidget(blocksW);
 
   const root = document.createElement("div");
@@ -226,9 +227,22 @@ function setup(node: any): void {
     const name = raw.trim();
     if (!name) return;
 
+    // Offer to fold the strength dial in, but only when it would change
+    // anything: asking about a strength of 1.0 is a question with one answer.
+    const current = Number(strengthW?.value ?? 1);
+    const bake = current !== 1 && window.confirm(
+      `Bake the strength of ${current} into the file too?
+
+` +
+      `Yes: the file is ready to use at 1.0.
+` +
+      `No: only the block shape is saved, and you set the strength on the loader.`);
+    const strength = bake ? current : 1;
+
     const post = (overwrite: boolean) => api.fetchApi("/nkd/lora/save", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lora_name: src, rules: serialise(rows, threshold), name, overwrite }),
+      body: JSON.stringify({ lora_name: src, rules: serialise(rows, threshold),
+                             name, overwrite, strength }),
     });
 
     const was = bakeBtn.textContent;
@@ -246,7 +260,8 @@ function setup(node: any): void {
         window.alert(`Save failed: ${data.error ?? res.statusText}`);
         return;
       }
-      note = `saved ${data.path}  (${data.tensors} of ${data.of} tensors)`;
+      note = `saved ${data.path}  (${data.tensors} of ${data.of} tensors`
+           + (bake ? `, strength ${current} baked in)` : ")");
       commit();
     } catch (err) {
       window.alert(`Save failed: ${err}`);
