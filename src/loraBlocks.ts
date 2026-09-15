@@ -17,6 +17,12 @@ import { findW, hideWidget, mountDomWidget } from "./domHost";
 import { applyRules, impactColor, readThreshold, rowsFrom, serialise, type Row } from "./loraRules";
 import { attachFineRange } from "./fine_drag";
 
+// Every open panel's preset reloader. The list lives on disk and is shared by
+// every node, so a save in one has to reach the others: they each fetched it
+// once when they were created and would otherwise show a stale menu forever.
+const openPanels = new Set<() => Promise<void>>();
+const refreshAllPresets = () => Promise.all([...openPanels].map((f) => f()));
+
 const NODE_NAME = "NKDLoraControl";
 const EXT_NAME = "NKD.BasicTools.LoraControl";
 
@@ -114,6 +120,10 @@ function setup(node: any): void {
   let presets: { name: string; rules: string }[] = [];
   let picked = "";
 
+  // Opening the menu refetches too, for a change made outside this page. The
+  // list is tiny and local, so this costs nothing worth measuring.
+  dial.addEventListener("pointerdown", () => { void loadPresets(); });
+
   const saveBtn = document.createElement("button");
   const delBtn = document.createElement("button");
 
@@ -168,10 +178,10 @@ function setup(node: any): void {
         window.alert(`Save failed: ${err.error ?? res.statusText}`);
         return;
       }
-      // Before loadPresets, not after: it is rebuildDial that reads `picked`
+      // Before the reload, not after: it is rebuildDial that reads `picked`
       // to select the row and enable Delete.
       picked = name;
-      await loadPresets();
+      await refreshAllPresets();
       commit();
     } catch (err) {
       window.alert(`Save failed: ${err}`);
@@ -190,7 +200,7 @@ function setup(node: any): void {
         return;
       }
       picked = "";
-      await loadPresets();
+      await refreshAllPresets();
       commit();
     } catch (err) {
       window.alert(`Delete failed: ${err}`);
@@ -697,12 +707,14 @@ function setup(node: any): void {
 
   const origRemoved = node.onRemoved;
   node.onRemoved = function (this: any, ...args: any[]) {
+    openPanels.delete(loadPresets);
     api.removeEventListener("executed", onExecuted);
     detachFine();
     mounted?.release();
     return origRemoved?.apply(this, args);
   };
 
+  openPanels.add(loadPresets);
   loadPresets();
   requestAnimationFrame(() => { syncCurveSockets(); refresh(); commit(); });
 }

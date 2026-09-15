@@ -17634,6 +17634,8 @@ function rowsFrom(analysis) {
     };
   });
 }
+const openPanels = /* @__PURE__ */ new Set();
+const refreshAllPresets = () => Promise.all([...openPanels].map((f) => f()));
 const NODE_NAME$1 = "NKDLoraControl";
 const EXT_NAME$1 = "NKD.BasicTools.LoraControl";
 const ROW_H = 17;
@@ -17725,6 +17727,9 @@ function setup(node) {
   dial.className = "nkd-select nkd-select--preset";
   let presets = [];
   let picked = "";
+  dial.addEventListener("pointerdown", () => {
+    void loadPresets();
+  });
   const saveBtn = document.createElement("button");
   const delBtn = document.createElement("button");
   dial.onchange = () => {
@@ -17775,7 +17780,7 @@ function setup(node) {
         return;
       }
       picked = name;
-      await loadPresets();
+      await refreshAllPresets();
       commit();
     } catch (err) {
       window.alert(`Save failed: ${err}`);
@@ -17795,7 +17800,7 @@ function setup(node) {
         return;
       }
       picked = "";
-      await loadPresets();
+      await refreshAllPresets();
       commit();
     } catch (err) {
       window.alert(`Delete failed: ${err}`);
@@ -18252,11 +18257,13 @@ function setup(node) {
   const detachFine = attachFineRange(root);
   const origRemoved = node.onRemoved;
   node.onRemoved = function(...args) {
+    openPanels.delete(loadPresets);
     api.removeEventListener("executed", onExecuted);
     detachFine();
     mounted == null ? void 0 : mounted.release();
     return origRemoved == null ? void 0 : origRemoved.apply(this, args);
   };
+  openPanels.add(loadPresets);
   loadPresets();
   requestAnimationFrame(() => {
     syncCurveSockets();
