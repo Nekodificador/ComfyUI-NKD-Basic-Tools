@@ -96,6 +96,18 @@ https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 
 ---
 
+## LoRAs
+
+See which blocks of a LoRA actually do the work, then shape it block by block.
+
+<!-- hero video goes here -->
+
+| Node | What it does |
+|---|---|
+| [😺NKD LoRA Control](docs/lora-control.md) | Reads a LoRA's blocks straight from the file, scores how much each one carries, and lets you mute, boost or schedule them. Works on any architecture with no preset to pick. |
+
+---
+
 ## Credits
 
 ### Shipped with the pack
@@ -122,6 +134,9 @@ https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 - **Ablejones** — 😺NKD AV Latent Extend is their masked-extension workflow
   collapsed into one node, and their `MiniMaxH3_BasicMaskedExtension` is the
   fixture its tests are checked against.
+- [comfyUI-Realtime-Lora](https://github.com/ShootTheSound/comfyUI-Realtime-Lora) —
+  per-block LoRA analysis and selective loading as a ComfyUI node started there,
+  and the check that spots GGUF and fp8 models is ported from it (MIT).
 
 ### Inspiration
 

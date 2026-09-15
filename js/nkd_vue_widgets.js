@@ -5765,13 +5765,13 @@ function setupStatefulComponent(instance, isSSR) {
   const Component = instance.type;
   instance.accessCache = /* @__PURE__ */ Object.create(null);
   instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers);
-  const { setup } = Component;
-  if (setup) {
+  const { setup: setup2 } = Component;
+  if (setup2) {
     pauseTracking();
-    const setupContext = instance.setupContext = setup.length > 1 ? createSetupContext(instance) : null;
+    const setupContext = instance.setupContext = setup2.length > 1 ? createSetupContext(instance) : null;
     const reset = setCurrentInstance(instance);
     const setupResult = callWithErrorHandling(
-      setup,
+      setup2,
       instance,
       0,
       [
@@ -7479,7 +7479,7 @@ const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["__scopeId", 
 const _hoisted_1$3 = { class: "nkd-bar" };
 const _hoisted_2$3 = { class: "nkd-row nkd-row--controls" };
 const _hoisted_3$3 = { class: "nkd-hint" };
-const BOX_W = 320, BOX_H = 210, PAD = 14;
+const BOX_W = 320, BOX_H = 210, PAD$1 = 14;
 const HIT_R = 11;
 const MIN_RENDER_SCALE$3 = 2;
 const MID_MIN = 0.05, MID_MAX = 0.95;
@@ -7535,7 +7535,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     let lastShape = null;
     let dragging = null;
     let hover = null;
-    let fitX = PAD, fitY = PAD, fitW = BOX_W - PAD * 2, fitH = BOX_H - PAD * 2;
+    let fitX = PAD$1, fitY = PAD$1, fitW = BOX_W - PAD$1 * 2, fitH = BOX_H - PAD$1 * 2;
     function toPx(pt) {
       return [fitX + pt[0] * fitW, fitY + pt[1] * fitH];
     }
@@ -7586,14 +7586,14 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     function computeFitRect() {
       const [w, h] = props.getSize();
       const aspect = w > 0 && h > 0 ? w / h : 1;
-      const maxW = BOX_W - PAD * 2, maxH = BOX_H - PAD * 2;
+      const maxW = BOX_W - PAD$1 * 2, maxH = BOX_H - PAD$1 * 2;
       let fw = maxW, fh = maxW / aspect;
       if (fh > maxH) {
         fh = maxH;
         fw = maxH * aspect;
       }
-      fitX = PAD + (maxW - fw) / 2;
-      fitY = PAD + (maxH - fh) / 2;
+      fitX = PAD$1 + (maxW - fw) / 2;
+      fitY = PAD$1 + (maxH - fh) / 2;
       fitW = fw;
       fitH = fh;
     }
@@ -11906,7 +11906,7 @@ function mkPane() {
   return p2;
 }
 const STYLE_ID = "nkd-modal-styles";
-const CSS = `
+const CSS$1 = `
 .nkd-modal-overlay {
   position: fixed; inset: 0; z-index: 100000;
   display: flex; align-items: center; justify-content: center;
@@ -11971,7 +11971,7 @@ function ensureNkdModalStyles() {
   if (document.getElementById(STYLE_ID)) return;
   const el = document.createElement("style");
   el.id = STYLE_ID;
-  el.textContent = CSS;
+  el.textContent = CSS$1;
   document.head.appendChild(el);
 }
 function div(cls) {
@@ -12157,12 +12157,12 @@ function nkdSlider(label, cfg, onInput, title) {
   return wrap;
 }
 const FLATTEN_TOL = 1 / 24576;
-const MIN_W$1 = 1;
+const MIN_W$2 = 1;
 const MAX_W = 10;
 const MIN_SPLITS = 3;
 const MAX_DEPTH = 14;
 const OFFSET_MAX_DEPTH = 7;
-const clampW = (v) => Math.max(MIN_W$1, Math.min(MAX_W, Number.isFinite(v) ? v : MIN_W$1));
+const clampW = (v) => Math.max(MIN_W$2, Math.min(MAX_W, Number.isFinite(v) ? v : MIN_W$2));
 function segDist(p2, a, b) {
   const dx = b[0] - a[0], dy = b[1] - a[1];
   const len2 = dx * dx + dy * dy;
@@ -12775,7 +12775,7 @@ class FieldPreview {
   }
 }
 const DEFAULT_INFLUENCE = 0.25;
-const C$1 = {
+const C$2 = {
   bg: "#0b0d12",
   add: "#4ab4ff",
   sub: "#ff6b6b",
@@ -13511,7 +13511,7 @@ class SplineEditor {
           y: num$1(p2 == null ? void 0 : p2.y, 0),
           h: Array.isArray(p2 == null ? void 0 : p2.h) && p2.h.length === 4 ? p2.h.map((v) => num$1(v, 0)) : null,
           corner: !!(p2 == null ? void 0 : p2.corner),
-          w: Math.max(MIN_W$1, Math.min(MAX_W, num$1(p2 == null ? void 0 : p2.w, MIN_W$1))),
+          w: Math.max(MIN_W$2, Math.min(MAX_W, num$1(p2 == null ? void 0 : p2.w, MIN_W$2))),
           fo: Array.isArray(p2 == null ? void 0 : p2.fo) && p2.fo.length === 2 ? [num$1(p2.fo[0], 0), num$1(p2.fo[1], 0)] : null,
           sp: Math.max(0, num$1(p2 == null ? void 0 : p2.sp, 1))
         }))
@@ -13938,7 +13938,7 @@ class SplineEditor {
     const ctx = this.ctx;
     const { width, height } = this.logicalSize();
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = C$1.bg;
+    ctx.fillStyle = C$2.bg;
     ctx.fillRect(0, 0, width, height);
     ctx.imageSmoothingEnabled = this.zoom < 4;
     this.drawBackdrop();
@@ -13954,7 +13954,7 @@ class SplineEditor {
       ctx.save();
       ctx.fillStyle = "rgba(74,180,255,0.10)";
       ctx.fillRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
-      ctx.strokeStyle = C$1.marquee;
+      ctx.strokeStyle = C$2.marquee;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
@@ -13976,8 +13976,8 @@ class SplineEditor {
     if (poly.length < 3 || !off) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C$1.soft : C$1.softDim;
-    ctx.fillStyle = si === this.active ? C$1.soft : C$1.softDim;
+    ctx.strokeStyle = si === this.active ? C$2.soft : C$2.softDim;
+    ctx.fillStyle = si === this.active ? C$2.soft : C$2.softDim;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     const [x0, y0] = this.toScreen(poly[0][0] + off[0][0], poly[0][1] + off[0][1]);
@@ -14001,12 +14001,12 @@ class SplineEditor {
       ctx.beginPath();
       ctx.arc(gx, gy, hot ? 5.5 : 4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = C$1.ptStroke;
+      ctx.strokeStyle = C$2.ptStroke;
       ctx.setLineDash([]);
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = si === this.active ? C$1.soft : C$1.softDim;
+      ctx.strokeStyle = si === this.active ? C$2.soft : C$2.softDim;
       ctx.lineWidth = 1.2;
     });
     ctx.restore();
@@ -14040,8 +14040,8 @@ class SplineEditor {
     if (poly.length < 2) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C$1.soft : C$1.softDim;
-    ctx.fillStyle = si === this.active ? C$1.soft : C$1.softDim;
+    ctx.strokeStyle = si === this.active ? C$2.soft : C$2.softDim;
+    ctx.fillStyle = si === this.active ? C$2.soft : C$2.softDim;
     ctx.lineWidth = 1.2;
     s.pts.forEach((p2) => {
       const sp = p2.sp ?? 1;
@@ -14104,14 +14104,14 @@ class SplineEditor {
   drawShape(s, si) {
     const ctx = this.ctx;
     const isActive = si === this.active;
-    const color = this.mode === "shape" ? s.op === "sub" ? C$1.sub : C$1.add : C$1.path;
+    const color = this.mode === "shape" ? s.op === "sub" ? C$2.sub : C$2.add : C$2.path;
     if (s.pts.length >= 2) {
       this.tracePath(ctx, s);
       if (s.closed && this.showFill && s.pts.length >= 3) {
         ctx.fillStyle = s.op === "sub" ? "rgba(255,107,107,0.20)" : "rgba(74,180,255,0.20)";
         ctx.fill();
       }
-      ctx.strokeStyle = isActive ? color : C$1.idle;
+      ctx.strokeStyle = isActive ? color : C$2.idle;
       ctx.lineWidth = isActive ? 2 : 1.4;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -14123,7 +14123,7 @@ class SplineEditor {
     if (s.type === "bspline" && s.pts.length >= 2) {
       ctx.save();
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = isActive ? C$1.hull : "rgba(255,255,255,0.12)";
+      ctx.strokeStyle = isActive ? C$2.hull : "rgba(255,255,255,0.12)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       const [x0, y0] = this.toScreen(s.pts[0].x, s.pts[0].y);
@@ -14141,8 +14141,8 @@ class SplineEditor {
       const h = p2 ? this.handlesOf(s, this.selPt) : null;
       if (p2 && h) {
         const [cx, cy] = this.toScreen(p2.x, p2.y);
-        ctx.strokeStyle = C$1.handle;
-        ctx.fillStyle = C$1.handle;
+        ctx.strokeStyle = C$2.handle;
+        ctx.fillStyle = C$2.handle;
         ctx.lineWidth = 1;
         for (const side of [0, 2]) {
           const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
@@ -14172,15 +14172,15 @@ class SplineEditor {
       } else {
         ctx.arc(x, y, r, 0, Math.PI * 2);
       }
-      ctx.fillStyle = selected ? C$1.ptActive : hovered ? C$1.ptHover : isActive ? C$1.pt : C$1.idle;
+      ctx.fillStyle = selected ? C$2.ptActive : hovered ? C$2.ptHover : isActive ? C$2.pt : C$2.idle;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
-      ctx.strokeStyle = C$1.ptStroke;
+      ctx.strokeStyle = C$2.ptStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
       if (this.sel.has(SplineEditor.key(si, i))) {
-        ctx.strokeStyle = C$1.marquee;
+        ctx.strokeStyle = C$2.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, r + 3, 0, Math.PI * 2);
@@ -14228,7 +14228,7 @@ class SplineEditor {
       }
       if (p2.r !== DEFAULT_INFLUENCE) {
         ctx.save();
-        ctx.strokeStyle = i === this.selPt ? C$1.soft : C$1.softDim;
+        ctx.strokeStyle = i === this.selPt ? C$2.soft : C$2.softDim;
         ctx.setLineDash([6, 5]);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -14236,10 +14236,10 @@ class SplineEditor {
         ctx.stroke();
         ctx.restore();
       }
-      drawRing(ctx, x, y, p2.blur, C$1.add, i === this.selPt, `${Math.round(radius)} px`);
+      drawRing(ctx, x, y, p2.blur, C$2.add, i === this.selPt, `${Math.round(radius)} px`);
       if (this.sel.has(SplineEditor.key(0, i))) {
         ctx.save();
-        ctx.strokeStyle = C$1.marquee;
+        ctx.strokeStyle = C$2.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -14613,7 +14613,7 @@ function deserialise(text) {
   return state;
 }
 const r5 = (v) => Math.round(v * 1e5) / 1e5;
-function serialise(s) {
+function serialise$1(s) {
   const out = { v: 1, w: {} };
   for (const [k, v] of Object.entries(s.w)) if (v) out.w[k] = r5(v);
   const p2 = {};
@@ -14792,7 +14792,7 @@ function mountFaceRig(host, opts) {
   const undoStack = [];
   const redoStack = [];
   function pushUndo() {
-    undoStack.push(serialise(state));
+    undoStack.push(serialise$1(state));
     if (undoStack.length > UNDO_DEPTH) undoStack.shift();
     redoStack.length = 0;
   }
@@ -14811,11 +14811,11 @@ function mountFaceRig(host, opts) {
     e.stopPropagation();
     if (e.shiftKey) {
       if (redoStack.length) {
-        undoStack.push(serialise(state));
+        undoStack.push(serialise$1(state));
         restore(redoStack.pop());
       }
     } else if (undoStack.length) {
-      redoStack.push(serialise(state));
+      redoStack.push(serialise$1(state));
       restore(undoStack.pop());
     }
   }
@@ -14832,7 +14832,7 @@ function mountFaceRig(host, opts) {
   }
   function commit() {
     var _a;
-    (_a = opts.onChange) == null ? void 0 : _a.call(opts, serialise(state));
+    (_a = opts.onChange) == null ? void 0 : _a.call(opts, serialise$1(state));
     requestRender("final");
   }
   function requestRender(quality) {
@@ -14862,7 +14862,7 @@ function mountFaceRig(host, opts) {
         const crop = opts.cropFactor();
         const body = {
           node: opts.nodeId(),
-          rig: serialise(state),
+          rig: serialise$1(state),
           quality,
           crop_factor: crop,
           src_ratio: opts.srcRatio()
@@ -15490,11 +15490,11 @@ function mountFaceRig(host, opts) {
     },
     canvas,
     handleXY: (id) => handleCenter(CONTROLS.find((c) => c.id === id)),
-    serialise: () => serialise(state)
+    serialise: () => serialise$1(state)
   };
   return {
     root,
-    serialise: () => serialise(state),
+    serialise: () => serialise$1(state),
     retry: () => requestRender("final"),
     refreshSource() {
       sentCrop = null;
@@ -15813,8 +15813,8 @@ function mountDomWidget(node, opts) {
     }
   };
 }
-const NODE_NAME$2 = "NKDCrop";
-const EXT_NAME$2 = "NKD.BasicTools.Crop";
+const NODE_NAME$3 = "NKDCrop";
+const EXT_NAME$3 = "NKD.BasicTools.Crop";
 console.log("[NKD Crop] rev 1.0.0");
 const CANVAS_W$1 = 180;
 const MARGIN = 0.5;
@@ -15837,7 +15837,7 @@ const ASPECTS = {
   "3:2": 3 / 2,
   "16:9": 16 / 9
 };
-const C = {
+const C$1 = {
   bg: "#111318",
   srcBorder: "rgba(255,255,255,0.28)",
   rect: "#4ab4ff",
@@ -15976,9 +15976,9 @@ function containRotatedBox(b, deg, w, h) {
 }
 function registerCrop() {
   app.registerExtension({
-    name: EXT_NAME$2,
+    name: EXT_NAME$3,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeData.name !== NODE_NAME$3) return;
       if (nodeType.prototype.__nkdCropWrapped) return;
       nodeType.prototype.__nkdCropWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -16146,7 +16146,7 @@ function setupCropWidget(node) {
     const [cw, ch] = canvasSize();
     const ctx = syncCanvasBuffer();
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = C.bg;
+    ctx.fillStyle = C$1.bg;
     ctx.fillRect(0, 0, cw, ch);
     const [sx0, sy0] = toCanvas2(0, 0);
     const [sx1, sy1] = toCanvas2(srcW, srcH);
@@ -16159,7 +16159,7 @@ function setupCropWidget(node) {
       ctx.fillStyle = "#1a1c22";
       ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
     }
-    ctx.strokeStyle = C.srcBorder;
+    ctx.strokeStyle = C$1.srcBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
     if (!boxActive) return;
@@ -16181,19 +16181,19 @@ function setupCropWidget(node) {
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
     addQuadSubpath();
-    ctx.fillStyle = C.outsideDim;
+    ctx.fillStyle = C$1.outsideDim;
     ctx.fill("evenodd");
     ctx.restore();
     ctx.save();
     strokeQuad();
     ctx.clip();
-    ctx.fillStyle = C.rectFill;
+    ctx.fillStyle = C$1.rectFill;
     ctx.fill();
     if (overflowFraction() > 1e-4) {
       ctx.translate(ccx, ccy);
       ctx.rotate(angle * Math.PI / 180);
       ctx.translate(-ccx, -ccy);
-      ctx.strokeStyle = C.outpaintHatch;
+      ctx.strokeStyle = C$1.outpaintHatch;
       ctx.lineWidth = 1;
       const step = 8;
       for (let d2 = -rh; d2 < rw; d2 += step) {
@@ -16208,7 +16208,7 @@ function setupCropWidget(node) {
     ctx.translate(ccx, ccy);
     ctx.rotate(angle * Math.PI / 180);
     ctx.translate(-ccx, -ccy);
-    ctx.strokeStyle = C.grid;
+    ctx.strokeStyle = C$1.grid;
     ctx.lineWidth = 1;
     for (let k = 1; k <= 2; k++) {
       const gx = rx0 + rw * k / 3;
@@ -16223,7 +16223,7 @@ function setupCropWidget(node) {
       ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = C.rect;
+    ctx.strokeStyle = C$1.rect;
     ctx.lineWidth = 1.5;
     strokeQuad();
     ctx.stroke();
@@ -16237,7 +16237,7 @@ function setupCropWidget(node) {
       [rx0, (ry0 + ry1) / 2, "w"],
       [rx1, (ry0 + ry1) / 2, "e"]
     ];
-    ctx.fillStyle = C.handle;
+    ctx.fillStyle = C$1.handle;
     for (const [lx, ly] of localPts) {
       const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
       ctx.beginPath();
@@ -16246,13 +16246,13 @@ function setupCropWidget(node) {
     }
     const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
     const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
-    ctx.strokeStyle = C.rect;
+    ctx.strokeStyle = C$1.rect;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(topX, topY);
     ctx.lineTo(hubX, hubY);
     ctx.stroke();
-    ctx.fillStyle = C.handle;
+    ctx.fillStyle = C$1.handle;
     ctx.beginPath();
     ctx.arc(hubX, hubY, HANDLE_R, 0, Math.PI * 2);
     ctx.fill();
@@ -16705,8 +16705,8 @@ function attachFineRange(root) {
     root.removeEventListener("dblclick", onDblClick, true);
   };
 }
-const NODE_NAME$1 = "NKDPaint";
-const EXT_NAME$1 = "NKD.BasicTools.Paint";
+const NODE_NAME$2 = "NKDPaint";
+const EXT_NAME$2 = "NKD.BasicTools.Paint";
 console.log("[NKD Paint] rev 1");
 const CANVAS_W = 240;
 const MAX_SIDE = 2048;
@@ -16729,9 +16729,9 @@ function paintSource(nodeId, canvas, fullW, fullH) {
 }
 function registerPaint() {
   app.registerExtension({
-    name: EXT_NAME$1,
+    name: EXT_NAME$2,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeData.name !== NODE_NAME$2) return;
       if (nodeType.prototype.__nkdPaintWrapped) return;
       nodeType.prototype.__nkdPaintWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -17526,6 +17526,831 @@ function setupPaintWidget(node) {
     draw();
   });
 }
+function impactColor(score, alpha = 1) {
+  const stops = [
+    [46, 104, 196],
+    [40, 150, 190],
+    [56, 170, 130],
+    [190, 180, 70],
+    [214, 128, 54],
+    [206, 74, 62]
+  ];
+  const t = Math.max(0, Math.min(1, score / 100)) * (stops.length - 1);
+  const i = Math.min(stops.length - 2, Math.floor(t));
+  const f = t - i;
+  const c = stops[i].map((v, k) => Math.round(v + (stops[i + 1][k] - v) * f));
+  return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+}
+const stateOf = (r) => !r.on ? "off" : Math.abs(r.weight - 1) < 1e-6 ? null : String(+r.weight.toFixed(3));
+const THRESHOLD_RE = /^#\s*impact\s*>=\s*(\d+(?:\.\d+)?)\s*$/;
+function readThreshold(text) {
+  for (const raw of (text || "").split("\n")) {
+    const m = THRESHOLD_RE.exec(raw.trim());
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+function serialise(rows, threshold = null) {
+  const lines = [];
+  if (threshold !== null) lines.push(`# impact >= ${threshold}`);
+  let i = 0;
+  while (i < rows.length) {
+    const state = stateOf(rows[i]);
+    if (state === null) {
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j + 1 < rows.length && stateOf(rows[j + 1]) === state && rows[j + 1].group === rows[i].group && rows[j + 1].index !== null && rows[j].index !== null && rows[j + 1].index === rows[j].index + 1) j++;
+    const run = rows.slice(i, j + 1);
+    const whole = rows.filter((r) => r.group === rows[i].group);
+    if (run.length > 1 && run.length === whole.length) lines.push(`${rows[i].group}_*: ${state}`);
+    else if (run.length > 1) lines.push(`${rows[i].group}_${rows[i].index}-${rows[j].index}: ${state}`);
+    else lines.push(`${rows[i].name}: ${state}`);
+    i = j + 1;
+  }
+  return lines.join("\n");
+}
+function applyRules(text, rows) {
+  for (const r of rows) {
+    r.on = true;
+    r.weight = 1;
+  }
+  if (!text) return;
+  const byName = new Map(rows.map((r) => [r.name, r]));
+  for (const raw of text.split("\n")) {
+    const line = raw.split("#")[0].trim();
+    const at2 = line.indexOf(":");
+    if (at2 < 0) continue;
+    let sel = line.slice(0, at2).trim();
+    const value = line.slice(at2 + 1).trim().toLowerCase();
+    let on = true, weight = 1;
+    if (value === "off" || value === "no" || value === "false") on = false;
+    else if (value !== "on" && value !== "yes" && value !== "true") {
+      const n = parseFloat(value);
+      if (!isFinite(n)) continue;
+      weight = n;
+      if (n === 0) on = false;
+    }
+    let hit;
+    if (sel === "*" || sel === "all") hit = rows;
+    else if (byName.has(sel)) hit = [byName.get(sel)];
+    else {
+      if (sel.endsWith("_*")) sel = sel.slice(0, -2);
+      const cut = sel.lastIndexOf("_");
+      const span = cut < 0 ? "" : sel.slice(cut + 1);
+      const group = cut < 0 ? sel : sel.slice(0, cut);
+      const dash = span.indexOf("-");
+      if (dash > 0 && /^\d+-\d+$/.test(span)) {
+        const lo = parseInt(span.slice(0, dash), 10), hi = parseInt(span.slice(dash + 1), 10);
+        hit = rows.filter((r) => r.group === group && r.index !== null && r.index >= lo && r.index <= hi);
+      } else {
+        hit = rows.filter((r) => r.group === sel);
+      }
+    }
+    for (const r of hit) {
+      r.on = on;
+      r.weight = on ? weight : r.weight;
+    }
+  }
+}
+function rowsFrom(analysis) {
+  const order = (analysis == null ? void 0 : analysis.order) ?? [];
+  return order.map((name) => {
+    var _a;
+    const d = ((_a = analysis.blocks) == null ? void 0 : _a[name]) ?? {};
+    const cut = name.lastIndexOf("_");
+    const tail = cut < 0 ? "" : name.slice(cut + 1);
+    const numeric = /^\d+$/.test(tail);
+    return {
+      name,
+      group: numeric ? name.slice(0, cut) : name,
+      index: numeric ? parseInt(tail, 10) : null,
+      score: d.score ?? 0,
+      share: d.share ?? 0,
+      layers: d.layers ?? 0,
+      on: true,
+      weight: 1
+    };
+  });
+}
+const NODE_NAME$1 = "NKDLoraControl";
+const EXT_NAME$1 = "NKD.BasicTools.LoraControl";
+const ROW_H = 17;
+const PAD = 6;
+const CB = 11;
+const LABEL_W = 116;
+const VALUE_W = 38;
+const MIN_W$1 = 340;
+const W_MIN = -1, W_MAX = 2;
+const C = {
+  bg: "#111318",
+  row: "rgba(255,255,255,0.03)",
+  track: "rgba(255,255,255,0.09)",
+  zero: "rgba(255,255,255,0.20)",
+  label: "#c8d0e0",
+  labelOff: "rgba(255,255,255,0.28)",
+  sel: "rgba(74,180,255,0.16)",
+  selEdge: "#4ab4ff",
+  handle: "#e8edf5",
+  hint: "rgba(255,255,255,0.35)"
+};
+function setup(node) {
+  const blocksW = findW(node, "blocks");
+  const loraW = findW(node, "lora_name");
+  if (blocksW) hideWidget(blocksW);
+  const root = document.createElement("div");
+  root.className = "nkd-lorablocks";
+  const bar = document.createElement("div");
+  bar.className = "nkd-bar";
+  const controls = document.createElement("div");
+  controls.className = "nkd-row nkd-row--controls";
+  bar.appendChild(controls);
+  const canvas = document.createElement("canvas");
+  canvas.className = "nkd-canvas";
+  root.append(bar, canvas);
+  let rows = [];
+  let selection = /* @__PURE__ */ new Set();
+  let anchor = -1;
+  let status = "pick a LoRA";
+  let hover = -1;
+  let threshold = null;
+  let note = "";
+  const ctx = canvas.getContext("2d");
+  const listH = () => Math.max(ROW_H, rows.length * ROW_H);
+  const mkBtn2 = (label, fn) => {
+    const b = document.createElement("button");
+    b.className = "nkd-btn";
+    b.textContent = label;
+    b.onclick = (e) => {
+      e.stopPropagation();
+      fn();
+    };
+    controls.appendChild(b);
+    return b;
+  };
+  const info = document.createElement("span");
+  info.className = "nkd-info";
+  const targets = () => selection.size ? [...selection].map((i) => rows[i]) : rows;
+  mkBtn2("All on", () => {
+    threshold = null;
+    for (const r of targets()) r.on = true;
+    commit();
+  });
+  mkBtn2("All off", () => {
+    threshold = null;
+    for (const r of targets()) r.on = false;
+    commit();
+  });
+  mkBtn2("Invert", () => {
+    threshold = null;
+    for (const r of targets()) r.on = !r.on;
+    commit();
+  });
+  mkBtn2("Reset", () => {
+    threshold = null;
+    for (const r of targets()) {
+      r.on = true;
+      r.weight = 1;
+    }
+    selection.clear();
+    commit();
+  });
+  const presetRow = document.createElement("div");
+  presetRow.className = "nkd-row nkd-row--presets";
+  const presetLabel = document.createElement("span");
+  presetLabel.className = "nkd-label";
+  presetLabel.textContent = "Preset";
+  const dial = document.createElement("select");
+  dial.className = "nkd-select nkd-select--preset";
+  let presets = [];
+  let picked = "";
+  const saveBtn = document.createElement("button");
+  const delBtn = document.createElement("button");
+  dial.onchange = () => {
+    const value = dial.value;
+    picked = value.startsWith("p:") ? value.slice(2) : "";
+    if (value.startsWith("g:")) {
+      const group = value.slice(2);
+      threshold = null;
+      for (const r of rows) r.on = r.group === group;
+      dial.value = "";
+    } else if (picked) {
+      const preset = presets.find((x) => x.name === picked);
+      if (preset) {
+        applyRules(preset.rules, rows);
+        threshold = readThreshold(preset.rules);
+      }
+    }
+    selection.clear();
+    delBtn.disabled = !picked;
+    commit();
+  };
+  saveBtn.className = "nkd-btn nkd-btn--preset";
+  saveBtn.textContent = "Save";
+  saveBtn.title = "Save the current block setup as a preset";
+  delBtn.className = "nkd-btn nkd-btn--preset";
+  delBtn.textContent = "Delete";
+  delBtn.title = "Delete the selected preset";
+  saveBtn.onclick = async (e) => {
+    e.stopPropagation();
+    const raw = window.prompt("Preset name (1-64 chars: letters, numbers, spaces, -_().):", picked);
+    if (raw === null) return;
+    const name = raw.trim();
+    if (!name) return;
+    if (!/^[\w \-().]{1,64}$/.test(name)) {
+      window.alert("Invalid name. Use letters, numbers, spaces, or - _ ( ) .");
+      return;
+    }
+    if (presets.some((p2) => p2.name.toLowerCase() === name.toLowerCase()) && !window.confirm(`Overwrite existing preset "${name}"?`)) return;
+    try {
+      const res = await api.fetchApi("/nkd/lora/presets", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, rules: serialise(rows, threshold) })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        window.alert(`Save failed: ${err.error ?? res.statusText}`);
+        return;
+      }
+      picked = name;
+      await loadPresets();
+      commit();
+    } catch (err) {
+      window.alert(`Save failed: ${err}`);
+    }
+  };
+  delBtn.onclick = async (e) => {
+    e.stopPropagation();
+    if (!picked || !window.confirm(`Delete preset "${picked}"?`)) return;
+    try {
+      const res = await api.fetchApi(
+        `/nkd/lora/presets/${encodeURIComponent(picked)}`,
+        { method: "DELETE" }
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        window.alert(`Delete failed: ${err.error ?? res.statusText}`);
+        return;
+      }
+      picked = "";
+      await loadPresets();
+      commit();
+    } catch (err) {
+      window.alert(`Delete failed: ${err}`);
+    }
+  };
+  presetRow.append(presetLabel, dial, saveBtn, delBtn);
+  async function loadPresets() {
+    try {
+      const res = await api.fetchApi("/nkd/lora/presets");
+      const data = await res.json();
+      presets = Array.isArray(data == null ? void 0 : data.user) ? data.user : [];
+    } catch {
+      presets = [];
+    }
+    rebuildDial();
+  }
+  function rebuildDial() {
+    const groups = [...new Set(rows.map((r) => r.group))];
+    dial.innerHTML = "";
+    const head = document.createElement("option");
+    head.value = "";
+    head.textContent = "— Select —";
+    dial.appendChild(head);
+    if (groups.length > 1) {
+      const g = document.createElement("optgroup");
+      g.label = "Only this group";
+      for (const name of groups) {
+        const o = document.createElement("option");
+        o.value = `g:${name}`;
+        o.textContent = name;
+        g.appendChild(o);
+      }
+      dial.appendChild(g);
+    }
+    if (presets.length) {
+      const g = document.createElement("optgroup");
+      g.label = "Saved";
+      for (const p2 of presets) {
+        const o = document.createElement("option");
+        o.value = `p:${p2.name}`;
+        o.textContent = p2.name;
+        g.appendChild(o);
+      }
+      dial.appendChild(g);
+    }
+    dial.value = picked ? `p:${picked}` : "";
+    delBtn.disabled = !picked;
+  }
+  controls.appendChild(info);
+  const noteRow = document.createElement("div");
+  noteRow.className = "nkd-row nkd-row--note";
+  const noteEl = document.createElement("span");
+  noteEl.className = "nkd-info nkd-lb-note";
+  noteEl.hidden = true;
+  noteRow.appendChild(noteEl);
+  const filterRow = document.createElement("div");
+  filterRow.className = "nkd-row nkd-row--filter";
+  const filterLabel = document.createElement("span");
+  filterLabel.className = "nkd-label";
+  filterLabel.textContent = "Impact ≥";
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "nkd-slider";
+  slider.min = "0";
+  slider.max = "100";
+  slider.step = "1";
+  slider.value = "0";
+  const filterOut = document.createElement("span");
+  filterOut.className = "nkd-info nkd-lb-thr";
+  slider.addEventListener("input", () => {
+    threshold = Number(slider.value);
+    for (const r of rows) r.on = r.score >= threshold;
+    selection.clear();
+    commit();
+  });
+  filterRow.append(filterLabel, slider, filterOut);
+  bar.appendChild(presetRow);
+  bar.appendChild(filterRow);
+  bar.appendChild(noteRow);
+  let drawnW = MIN_W$1, drawnH = ROW_H;
+  function draw() {
+    const w = canvas.clientWidth || MIN_W$1;
+    const h = listH();
+    drawnW = w;
+    drawnH = h;
+    canvas.style.height = `${h}px`;
+    const dpr = Math.max(window.devicePixelRatio || 1, 2);
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, w, h);
+    if (!rows.length) {
+      ctx.fillStyle = C.hint;
+      ctx.font = "11px sans-serif";
+      ctx.textBaseline = "middle";
+      ctx.fillText(status, PAD, ROW_H / 2);
+      return;
+    }
+    const sx = PAD + CB + PAD + LABEL_W + PAD;
+    const sw = Math.max(40, w - sx - VALUE_W - PAD);
+    const zeroX = sx + (0 - W_MIN) / (W_MAX - W_MIN) * sw;
+    ctx.textBaseline = "middle";
+    rows.forEach((r, i) => {
+      const y = i * ROW_H;
+      const mid = y + ROW_H / 2;
+      const picked2 = selection.has(i);
+      if (picked2) {
+        ctx.fillStyle = C.sel;
+        ctx.fillRect(0, y, w, ROW_H);
+      } else if (i % 2) {
+        ctx.fillStyle = C.row;
+        ctx.fillRect(0, y, w, ROW_H);
+      }
+      if (hover === i) {
+        ctx.fillStyle = "rgba(255,255,255,0.04)";
+        ctx.fillRect(0, y, w, ROW_H);
+      }
+      const cy = mid - CB / 2;
+      ctx.strokeStyle = r.on ? impactColor(r.score) : "rgba(255,255,255,0.22)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(PAD + 0.5, cy + 0.5, CB - 1, CB - 1);
+      if (r.on) {
+        ctx.fillStyle = impactColor(r.score, 0.85);
+        ctx.fillRect(PAD + 2, cy + 2, CB - 4, CB - 4);
+      }
+      const lx = PAD + CB + PAD;
+      ctx.fillStyle = impactColor(r.score, r.on ? 0.22 : 0.08);
+      ctx.fillRect(lx - 2, y + 2, (LABEL_W + 2) * (r.score / 100), ROW_H - 4);
+      ctx.fillStyle = r.on ? C.label : C.labelOff;
+      ctx.font = "10px sans-serif";
+      let text = r.name;
+      while (ctx.measureText(text).width > LABEL_W - 2 && text.length > 4) text = text.slice(0, -1);
+      ctx.fillText(text, lx, mid);
+      ctx.fillStyle = C.track;
+      ctx.fillRect(sx, mid - 2, sw, 4);
+      ctx.fillStyle = C.zero;
+      ctx.fillRect(zeroX - 0.5, mid - 5, 1, 10);
+      const hx = sx + (Math.max(W_MIN, Math.min(W_MAX, r.weight)) - W_MIN) / (W_MAX - W_MIN) * sw;
+      ctx.fillStyle = r.on ? impactColor(r.score) : "rgba(255,255,255,0.25)";
+      ctx.fillRect(Math.min(zeroX, hx), mid - 2, Math.abs(hx - zeroX), 4);
+      ctx.beginPath();
+      ctx.arc(hx, mid, 4, 0, Math.PI * 2);
+      ctx.fillStyle = r.on ? C.handle : "rgba(255,255,255,0.3)";
+      ctx.fill();
+      ctx.fillStyle = r.on ? C.label : C.labelOff;
+      ctx.font = "10px sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText(r.weight.toFixed(2), w - PAD, mid);
+      ctx.textAlign = "left";
+      if (picked2) {
+        ctx.strokeStyle = C.selEdge;
+        ctx.globalAlpha = 0.5;
+        ctx.strokeRect(0.5, y + 0.5, w - 1, ROW_H - 1);
+        ctx.globalAlpha = 1;
+      }
+    });
+  }
+  let mounted = null;
+  function commit() {
+    if (blocksW && rows.length) blocksW.value = serialise(rows, threshold);
+    const on = rows.filter((r) => r.on).length;
+    info.textContent = rows.length ? `${on}/${rows.length} on` + (selection.size ? ` · ${selection.size} selected` : "") : "";
+    noteEl.textContent = note;
+    noteEl.hidden = !note;
+    slider.value = String(threshold ?? 0);
+    slider.style.setProperty("--nkd-fill", `${threshold ?? 0}%`);
+    filterOut.textContent = threshold === null ? "off" : String(threshold);
+    filterRow.classList.toggle("nkd-lb-idle", threshold === null);
+    draw();
+    node.setDirtyCanvas(true, true);
+  }
+  const rowAt = (y) => {
+    const i = Math.floor(y / ROW_H);
+    return i >= 0 && i < rows.length ? i : -1;
+  };
+  const zoneAt = (x) => {
+    if (x < PAD + CB + PAD / 2) return "check";
+    if (x < PAD + CB + PAD + LABEL_W) return "label";
+    return "slider";
+  };
+  const local = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const kx = r.width > 0 ? drawnW / r.width : 1;
+    const ky = r.height > 0 ? drawnH / r.height : 1;
+    return { x: (e.clientX - r.left) * kx, y: (e.clientY - r.top) * ky, w: drawnW };
+  };
+  let drag = null;
+  const clamp2 = (v) => Math.max(W_MIN, Math.min(W_MAX, v));
+  const quantise = (v, e) => {
+    const step = e.ctrlKey || e.metaKey ? 0.25 : e.shiftKey ? 0.01 : 0.05;
+    return clamp2(Math.round(v / step) * step);
+  };
+  canvas.addEventListener("pointerdown", (e) => {
+    const { x, y, w } = local(e);
+    const i = rowAt(y);
+    if (i < 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      canvas.setPointerCapture(e.pointerId);
+    } catch {
+    }
+    const zone = zoneAt(x);
+    if (zone === "check") {
+      threshold = null;
+      const to = !rows[i].on;
+      const scope2 = selection.has(i) ? [...selection] : [i];
+      for (const k of scope2) rows[k].on = to;
+      drag = { kind: "paint", to, seen: new Set(scope2) };
+      commit();
+      return;
+    }
+    if (zone === "label") {
+      if (e.shiftKey && anchor >= 0) {
+        const [a, b] = anchor < i ? [anchor, i] : [i, anchor];
+        for (let k = a; k <= b; k++) selection.add(k);
+      } else if (e.ctrlKey || e.metaKey) {
+        selection.has(i) ? selection.delete(i) : selection.add(i);
+        anchor = i;
+      } else {
+        const only = selection.size === 1 && selection.has(i);
+        selection.clear();
+        if (!only) {
+          selection.add(i);
+          anchor = i;
+        } else anchor = -1;
+      }
+      commit();
+      return;
+    }
+    const scope = selection.has(i) ? [...selection].map((k) => rows[k]) : [rows[i]];
+    const sx = PAD + CB + PAD + LABEL_W + PAD;
+    const sw = Math.max(40, w - sx - VALUE_W - PAD);
+    const value = quantise(W_MIN + (x - sx) / sw * (W_MAX - W_MIN), e);
+    for (const r of scope) {
+      r.weight = value;
+      if (value !== 0) r.on = true;
+    }
+    drag = { kind: "slide", rows: scope, lastX: x, raw: value };
+    commit();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    const { x, y, w } = local(e);
+    if (!drag) {
+      const i = rowAt(y);
+      if (i !== hover) {
+        hover = i;
+        draw();
+      }
+      return;
+    }
+    e.preventDefault();
+    if (drag.kind === "paint") {
+      const i = rowAt(y);
+      if (i >= 0 && !drag.seen.has(i)) {
+        drag.seen.add(i);
+        threshold = null;
+        rows[i].on = drag.to;
+        commit();
+      }
+      return;
+    }
+    const sx = PAD + CB + PAD + LABEL_W + PAD;
+    const sw = Math.max(40, w - sx - VALUE_W - PAD);
+    const gain = e.shiftKey ? 0.1 : 1;
+    drag.raw = clamp2(drag.raw + (x - drag.lastX) / sw * (W_MAX - W_MIN) * gain);
+    drag.lastX = x;
+    const value = quantise(drag.raw, e);
+    for (const r of drag.rows) {
+      r.weight = value;
+      if (value !== 0) r.on = true;
+    }
+    commit();
+  });
+  const endDrag = (e) => {
+    if (!drag) return;
+    drag = null;
+    try {
+      canvas.releasePointerCapture(e.pointerId);
+    } catch {
+    }
+  };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("pointerleave", () => {
+    if (!drag && hover !== -1) {
+      hover = -1;
+      draw();
+    }
+  });
+  canvas.addEventListener("dblclick", (e) => {
+    const i = rowAt(local(e).y);
+    if (i < 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const scope = selection.has(i) ? [...selection].map((k) => rows[k]) : [rows[i]];
+    for (const row of scope) {
+      row.weight = 1;
+      row.on = true;
+    }
+    commit();
+  });
+  canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+  let loaded = "";
+  async function refresh(force = false) {
+    var _a;
+    const name = String((loraW == null ? void 0 : loraW.value) ?? "");
+    if (!name) {
+      rows = [];
+      status = "pick a LoRA";
+      commit();
+      return;
+    }
+    if (name === loaded && !force) return;
+    loaded = name;
+    status = "reading blocks...";
+    const rules = String((blocksW == null ? void 0 : blocksW.value) ?? "");
+    rows = [];
+    selection.clear();
+    commit();
+    try {
+      const res = await api.fetchApi(`/nkd/lora/blocks?name=${encodeURIComponent(name)}`);
+      const data = await res.json();
+      if (String((loraW == null ? void 0 : loraW.value) ?? "") !== name) return;
+      if (!res.ok || data.error || !((_a = data.order) == null ? void 0 : _a.length)) {
+        rows = [];
+        status = data.error ? `error: ${data.error}` : "no blocks found";
+      } else {
+        rows = rowsFrom(data);
+        applyRules(rules, rows);
+        threshold = readThreshold(rules);
+        rebuildDial();
+        status = "";
+      }
+    } catch (err) {
+      rows = [];
+      status = `error: ${(err == null ? void 0 : err.message) ?? err}`;
+    }
+    selection.clear();
+    commit();
+    mounted == null ? void 0 : mounted.resizeToContent();
+  }
+  if (loraW) {
+    const orig = loraW.callback;
+    loraW.callback = function(...args) {
+      const r = orig == null ? void 0 : orig.apply(this, args);
+      refresh();
+      return r;
+    };
+  }
+  mounted = mountDomWidget(node, {
+    name: "nkd_lora_blocks",
+    type: "NKD_LORA_BLOCKS",
+    root,
+    minWidth: MIN_W$1,
+    estimate: () => (bar.offsetHeight || 48) + listH(),
+    // No getValue/setValue on purpose. `serialize: false` is not honoured here —
+    // the widget still lands in widgets_values — so anything it returned would be
+    // saved a SECOND time next to `blocks`, and a later schema change would then
+    // have two positional slots to keep in step. The rules live in `blocks`, and
+    // onConfigure is what restores them.
+    onResize: draw
+  });
+  const origConfigure = node.onConfigure;
+  node.onConfigure = function(...args) {
+    const r = origConfigure == null ? void 0 : origConfigure.apply(this, args);
+    loaded = "";
+    refresh();
+    syncCurveSockets();
+    return r;
+  };
+  const findSlot = (list, name) => (list == null ? void 0 : list.findIndex((s) => s.name === name)) ?? -1;
+  const wired = (s) => !!(s && (s.link != null || s.links && s.links.length));
+  function syncCurveSockets() {
+    var _a, _b;
+    const curve = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === "curve");
+    const want = !!(curve && curve.link != null);
+    for (const name of ["positive", "negative"]) {
+      const inIdx = findSlot(node.inputs, name);
+      const outIdx = findSlot(node.outputs, name);
+      if (want) {
+        if (inIdx < 0) node.addInput(name, "CONDITIONING");
+        if (outIdx < 0) node.addOutput(name, "CONDITIONING");
+      } else {
+        if (inIdx >= 0 && !wired(node.inputs[inIdx])) node.removeInput(inIdx);
+        if (outIdx >= 0 && !wired(node.outputs[outIdx])) node.removeOutput(outIdx);
+      }
+    }
+    node.setSize([Math.max(node.size[0], ((_b = mounted == null ? void 0 : mounted.minNodeWidth) == null ? void 0 : _b.call(mounted)) ?? 0), node.computeSize()[1]]);
+    node.setDirtyCanvas(true, true);
+  }
+  const origConn = node.onConnectionsChange;
+  node.onConnectionsChange = function(...args) {
+    const r = origConn == null ? void 0 : origConn.apply(this, args);
+    syncCurveSockets();
+    return r;
+  };
+  const onExecuted = (e) => {
+    var _a, _b;
+    const detail = e.detail;
+    const id = String((detail == null ? void 0 : detail.node) ?? ""), self2 = String(node.id);
+    if (id !== self2 && !id.endsWith(`:${self2}`)) return;
+    note = String(((_b = (_a = detail == null ? void 0 : detail.output) == null ? void 0 : _a.nkd_note) == null ? void 0 : _b[0]) ?? "");
+    commit();
+  };
+  api.addEventListener("executed", onExecuted);
+  const detachFine = attachFineRange(root);
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function(...args) {
+    api.removeEventListener("executed", onExecuted);
+    detachFine();
+    mounted == null ? void 0 : mounted.release();
+    return origRemoved == null ? void 0 : origRemoved.apply(this, args);
+  };
+  loadPresets();
+  requestAnimationFrame(() => {
+    syncCurveSockets();
+    refresh();
+    commit();
+  });
+}
+const CSS = `
+.nkd-lorablocks {
+  display: flex; flex-direction: column; width: 100%;
+  background: var(--comfy-menu-bg, #111318);
+  border-radius: 8px; overflow: hidden;
+  font-family: var(--font-family, "Inter", sans-serif);
+  font-size: 11px; color: var(--fg-color, #c8d0e0); user-select: none;
+}
+.nkd-lorablocks, .nkd-lorablocks *, .nkd-lorablocks *::before, .nkd-lorablocks *::after {
+  box-sizing: border-box;
+}
+
+.nkd-lorablocks .nkd-bar {
+  display: flex; flex-direction: column;
+  background: var(--comfy-menu-bg, #1a1c22);
+  border-bottom: 1px solid var(--border-color, #2a2d36);
+  min-width: 0;
+}
+.nkd-lorablocks .nkd-row { display: flex; align-items: center; gap: 4px; min-width: 0; }
+.nkd-lorablocks .nkd-row--controls { padding: 5px 8px 3px; flex-wrap: wrap; }
+.nkd-lorablocks .nkd-row--filter {
+  padding: 3px 8px 5px; gap: 6px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));
+}
+
+.nkd-lorablocks .nkd-btn, .nkd-lorablocks .nkd-select {
+  font-size: 11px; font-family: var(--font-family, sans-serif);
+  background: var(--comfy-input-bg, #252830);
+  border: 1px solid var(--border-color, #3a3d46);
+  color: var(--input-text, rgba(255,255,255,0.65));
+  border-radius: 5px; padding: 2px 8px; cursor: pointer;
+  line-height: 1.5; white-space: nowrap; flex-shrink: 0; outline: none;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.nkd-lorablocks .nkd-btn:hover:not(:disabled),
+.nkd-lorablocks .nkd-select:hover, .nkd-lorablocks .nkd-select:focus {
+  border-color: var(--p-primary-color, #4ab4ff);
+  color: var(--fg-color, rgba(255,255,255,0.95));
+}
+.nkd-lorablocks .nkd-btn:disabled, .nkd-lorablocks .nkd-select:disabled {
+  opacity: 0.35; cursor: not-allowed;
+}
+.nkd-lorablocks .nkd-select--preset { flex: 1 1 auto; min-width: 0; max-width: 240px; }
+.nkd-lorablocks .nkd-btn--preset { padding: 2px 8px; }
+.nkd-lorablocks .nkd-row--presets {
+  padding: 3px 8px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));
+}
+
+.nkd-lorablocks .nkd-label {
+  font-size: 10px; color: var(--descrip-text, rgba(255,255,255,0.45));
+  white-space: nowrap; flex-shrink: 0;
+}
+.nkd-lorablocks .nkd-info {
+  font-size: 10px; font-family: monospace;
+  color: var(--descrip-text, rgba(180,210,255,0.65));
+  white-space: nowrap; font-variant-numeric: tabular-nums; margin-left: auto;
+}
+
+/* Slider: the pack paints its own track so the fill reads the same in every
+   browser — accent-color alone renders differently per engine. */
+.nkd-lorablocks .nkd-slider {
+  flex: 1; min-width: 60px; height: 14px; margin: 0;
+  background: transparent; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+}
+.nkd-lorablocks .nkd-slider::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 3px;
+  background: linear-gradient(to right,
+    var(--p-primary-color, #4ab4ff) 0 var(--nkd-fill, 0%),
+    var(--comfy-input-bg, #252830) var(--nkd-fill, 0%) 100%);
+}
+.nkd-lorablocks .nkd-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; margin-top: -4px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--fg-color, #e5e7eb);
+  border: 1px solid var(--border-color, #1f2937);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+.nkd-lorablocks .nkd-slider::-moz-range-track {
+  height: 5px; border-radius: 3px; background: var(--comfy-input-bg, #252830);
+}
+.nkd-lorablocks .nkd-slider::-moz-range-progress {
+  height: 5px; border-radius: 3px; background: var(--p-primary-color, #4ab4ff);
+}
+.nkd-lorablocks .nkd-slider::-moz-range-thumb {
+  width: 13px; height: 13px; border-radius: 50%;
+  background: var(--fg-color, #e5e7eb);
+  border: 1px solid var(--border-color, #1f2937);
+}
+
+.nkd-lorablocks .nkd-lb-thr {
+  margin-left: 0; min-width: 22px; text-align: right;
+  color: var(--p-primary-color, #4ab4ff);
+}
+/* No threshold in force: the dial reads 0 but nothing is filtered by it. */
+.nkd-lorablocks .nkd-row--filter.nkd-lb-idle .nkd-lb-thr { color: rgba(255,255,255,0.3); }
+.nkd-lorablocks .nkd-row--filter.nkd-lb-idle .nkd-slider::-webkit-slider-thumb {
+  background: rgba(255,255,255,0.35);
+}
+
+.nkd-lorablocks .nkd-row--note {
+  padding: 2px 8px 4px;
+  border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));
+}
+.nkd-lorablocks .nkd-lb-note { margin-left: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.nkd-lorablocks .nkd-canvas {
+  display: block; width: 100%; cursor: default; touch-action: none;
+}
+`;
+function registerLoraControl() {
+  const style = document.createElement("style");
+  style.textContent = CSS;
+  document.head.appendChild(style);
+  app.registerExtension({
+    name: EXT_NAME$1,
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeType.prototype.__nkdLoraWrapped) return;
+      nodeType.prototype.__nkdLoraWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function(...args) {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, args);
+        setup(this);
+        return r;
+      };
+    }
+  });
+}
 guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDInpaintCrop: 1,
   NKDInpaintStitch: 1,
@@ -17548,10 +18373,12 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDPathBlur: 1,
   NKDFaceRig: 1,
   NKDCrop: 1,
-  NKDPaint: 1
+  NKDPaint: 1,
+  NKDLoraControl: 1
 });
 registerCrop();
 registerPaint();
+registerLoraControl();
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
