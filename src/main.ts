@@ -29,6 +29,7 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
   NKDFaceRig: 1, NKDCrop: 1, NKDPaint: 1, NKDLoraControl: 1,
+  NKDResolutionSelector: 1,
 });
 
 registerCrop();

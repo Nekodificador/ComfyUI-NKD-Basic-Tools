@@ -18439,7 +18439,8 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDFaceRig: 1,
   NKDCrop: 1,
   NKDPaint: 1,
-  NKDLoraControl: 1
+  NKDLoraControl: 1,
+  NKDResolutionSelector: 1
 });
 registerCrop();
 registerPaint();

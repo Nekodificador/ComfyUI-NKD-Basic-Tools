@@ -21,6 +21,7 @@ from .nkd_path_blur import NKDPathBlur
 from .nkd_minimax_guides import NKDMiniMaxGuides
 from .nkd_paint import NKDPaint
 from .nkd_lora_control import NKDLoraControl
+from .nkd_resolution import NKDResolutionSelector
 from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
 try:
@@ -70,6 +71,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDMiniMaxGuides,
             NKDPaint,
             NKDLoraControl,
+            NKDResolutionSelector,
         ]
         if NKDFaceCrop is not None:
             nodes += [NKDFaceCrop, NKDFaceMask, NKDFaceStitch]
@@ -109,6 +111,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDMiniMaxGuides": NKDMiniMaxGuides,
     "NKDPaint": NKDPaint,
     "NKDLoraControl": NKDLoraControl,
+    "NKDResolutionSelector": NKDResolutionSelector,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -137,6 +140,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
     "NKDPaint": "😺NKD Paint",
     "NKDLoraControl": "😺NKD LoRA Control",
+    "NKDResolutionSelector": "😺NKD Resolution Selector",
 }
 
 if NKDFaceCrop is not None:

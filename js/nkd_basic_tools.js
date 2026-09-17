@@ -58,6 +58,20 @@ const RULES = {
       if (found) refreshNode(node);
     },
   },
+  // Custom Width/Height only mean something under 'Custom'.
+  NKDResolutionSelector: {
+    watch: ["aspect_ratio"],
+    apply(node) {
+      const custom = node.widgets?.find((w) => w.name === "aspect_ratio")?.value === "Custom";
+      for (const name of ["custom_width", "custom_height"]) {
+        const w = node.widgets?.find((x) => x.name === name);
+        if (!w) continue;
+        if (custom) showWidget(w);
+        else hideWidget(w);
+      }
+      refreshNode(node);
+    },
+  },
   NKDStringSplit: {
     watch: ["delimiter"],
     apply(node) {

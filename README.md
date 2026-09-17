@@ -93,6 +93,7 @@ https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 |---|---|
 | [😺NKD String Split](docs/string-split.md) | Turns one block of text into a batch. A list of prompts becomes N generations with no extra wiring. |
 | [😺NKD Prompt Variables](docs/prompt-variables.md) | Drop variable chips into your prompt and feed each one from a socket or a list. |
+| [😺NKD Resolution Selector](docs/resolution-selector.md) | Width and height from an aspect ratio and a megapixel budget, with the full Klein ratio list, an image as reference, or a custom size. |
 
 ---
 
