@@ -15815,7 +15815,15 @@ function mountDomWidget(node, opts) {
 }
 const NODE_NAME$3 = "NKDCrop";
 const EXT_NAME$3 = "NKD.BasicTools.Crop";
-console.log("[NKD Crop] rev 1.0.0");
+console.log("[NKD Crop] rev 1.1.0");
+const frames$1 = /* @__PURE__ */ new Map();
+const live$1 = /* @__PURE__ */ new Map();
+function cropSource(nodeId, canvas, fullW, fullH) {
+  var _a;
+  const f = { canvas, fullW: fullW || canvas.width, fullH: fullH || canvas.height };
+  frames$1.set(nodeId, f);
+  (_a = live$1.get(nodeId)) == null ? void 0 : _a(f);
+}
 const CANVAS_W$1 = 180;
 const MARGIN = 0.5;
 const HANDLE_R = 5;
@@ -16324,15 +16332,33 @@ function setupCropWidget(node) {
       img.src = url;
     }
   }
+  function useFrame(f) {
+    stopPlayback();
+    transport.style.display = "none";
+    lastRef = null;
+    srcEl = f.canvas;
+    srcW = f.fullW;
+    srcH = f.fullH;
+    draw();
+  }
   function refreshSource() {
-    const ref2 = resolveSource(node, "image");
-    if (!ref2 || lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) {
+    const direct = resolveSource(node, "image", 0);
+    const pushed = frames$1.get(String(node.id));
+    const ref2 = direct ?? (pushed ? null : resolveSource(node, "image"));
+    if (!ref2) {
+      if (pushed && srcEl !== pushed.canvas) useFrame(pushed);
+      return;
+    }
+    if (lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) {
       return;
     }
     lastRef = ref2;
     srcEl = null;
     loadThumb(ref2);
   }
+  live$1.set(String(node.id), (f) => {
+    if (!resolveSource(node, "image", 0)) useFrame(f);
+  });
   function hitTest(cx, cy) {
     if (!boxActive) return "draw";
     const [rx0, ry0] = toCanvas2(box.x0, box.y0);
@@ -16608,6 +16634,7 @@ function setupCropWidget(node) {
   node.onRemoved = function(...args) {
     stopPlayback();
     clearInterval(refreshPoll);
+    live$1.delete(String(node.id));
     origRemoved == null ? void 0 : origRemoved.apply(this, args);
   };
   syncFillWidgetsVisible();
@@ -19399,6 +19426,19 @@ api.addEventListener("nkd-paint-source", (e) => {
   if (!(d == null ? void 0 : d.data)) return;
   try {
     paintSource(
+      String(d.node),
+      rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
+      d.full_width,
+      d.full_height
+    );
+  } catch {
+  }
+});
+api.addEventListener("nkd-crop-source", (e) => {
+  const d = e == null ? void 0 : e.detail;
+  if (!(d == null ? void 0 : d.data)) return;
+  try {
+    cropSource(
       String(d.node),
       rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
       d.full_width,

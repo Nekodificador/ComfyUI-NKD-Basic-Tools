@@ -15,7 +15,7 @@ import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
-import { registerCrop } from "./crop";
+import { registerCrop, cropSource } from "./crop";
 import { registerPaint, paintSource } from "./paint";
 import { registerLoraControl } from "./loraBlocks";
 
@@ -1072,6 +1072,15 @@ api.addEventListener("nkd-paint-source", (e: any) => {
   try {
     paintSource(String(d.node), rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
                 d.full_width, d.full_height);
+  } catch { /* ignore malformed */ }
+});
+
+api.addEventListener("nkd-crop-source", (e: any) => {
+  const d = e?.detail;
+  if (!d?.data) return;
+  try {
+    cropSource(String(d.node), rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
+               d.full_width, d.full_height);
   } catch { /* ignore malformed */ }
 });
 

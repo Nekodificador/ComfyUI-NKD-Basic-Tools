@@ -26,7 +26,22 @@ import { findW, hideWidget, mountDomWidget, setWidgetVisible } from "./domHost";
 const NODE_NAME = "NKDCrop";
 const EXT_NAME = "NKD.BasicTools.Crop";
 
-console.log("[NKD Crop] rev 1.0.0");
+console.log("[NKD Crop] rev 1.1.0");
+
+// Frames pushed by execute() (`nkd-crop-source`), keyed by node id, and the live widgets
+// that want them. A Load Image right upstream is still read directly (instant, no run);
+// anything else — a KSampler, a VAE Decode — only has pixels once it has run.
+type Frame = { canvas: HTMLCanvasElement; fullW: number; fullH: number };
+const frames = new Map<string, Frame>();
+const live = new Map<string, (f: Frame) => void>();
+
+/** Called by main.ts when an `nkd-crop-source` frame arrives. */
+export function cropSource(nodeId: string, canvas: HTMLCanvasElement,
+                           fullW?: number, fullH?: number): void {
+  const f: Frame = { canvas, fullW: fullW || canvas.width, fullH: fullH || canvas.height };
+  frames.set(nodeId, f);
+  live.get(nodeId)?.(f);
+}
 
 // ── Layout constants ──────────────────────────────────────────────────────────
 
@@ -233,7 +248,7 @@ function setupCropWidget(node: any): void {
   node.properties.nkdCropAspect = node.properties.nkdCropAspect ?? "Free";
 
   let srcW = 512, srcH = 512;                 // placeholder until a source resolves
-  let srcEl: HTMLImageElement | HTMLVideoElement | null = null;
+  let srcEl: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement | null = null;
   let { box, angle } = parseRegion(regionW.value, srcW, srcH);
   // Inactive (no box drawn yet) shows the plain image and nothing else — Neko: "el recuadro
   // no esté activo hasta pintarlo". A loaded workflow with a real saved region starts active;
@@ -658,16 +673,32 @@ function setupCropWidget(node: any): void {
     }
   }
 
+  function useFrame(f: Frame) {
+    stopPlayback();
+    transport.style.display = "none";
+    lastRef = null;
+    srcEl = f.canvas; srcW = f.fullW; srcH = f.fullH;
+    draw();
+  }
+
   function refreshSource() {
-    const ref = resolveSource(node, "image");
-    if (!ref || (lastRef && ref.filename === lastRef.filename
-                 && ref.subfolder === lastRef.subfolder && ref.type === lastRef.type)) {
+    // Priority: a file right upstream → the frame the last run pushed → a file further up.
+    const direct = resolveSource(node, "image", 0);
+    const pushed = frames.get(String(node.id));
+    const ref = direct ?? (pushed ? null : resolveSource(node, "image"));
+    if (!ref) {
+      if (pushed && srcEl !== pushed.canvas) useFrame(pushed);
+      return;
+    }
+    if (lastRef && ref.filename === lastRef.filename
+        && ref.subfolder === lastRef.subfolder && ref.type === lastRef.type) {
       return;
     }
     lastRef = ref;
     srcEl = null;
     loadThumb(ref);
   }
+  live.set(String(node.id), (f) => { if (!resolveSource(node, "image", 0)) useFrame(f); });
 
   // ── Interaction ───────────────────────────────────────────────────────────
 
@@ -980,6 +1011,7 @@ function setupCropWidget(node: any): void {
   node.onRemoved = function (this: any, ...args: any[]) {
     stopPlayback();          // cancels the rAF loop, or a deleted node keeps redrawing forever
     clearInterval(refreshPoll);
+    live.delete(String(node.id));
     origRemoved?.apply(this, args);
   };
 

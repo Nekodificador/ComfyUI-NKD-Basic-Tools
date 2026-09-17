@@ -22,6 +22,8 @@ from comfy_api.latest import ComfyExtension, io
 from comfy_api.latest._io import ComfyTypeIO, comfytype
 from typing_extensions import override
 
+from .helpers import node_id, push_source
+
 try:
     from .helpers import _alpha_hardness, _mask_grow, _resize_auto  # ComfyUI (package)
 except ImportError:
@@ -464,6 +466,11 @@ class NKDCrop(io.ComfyNode):
             node_id="NKDCrop",
             display_name="😺NKD Crop / Outpaint",
             category="😺NKD Nodes/Basic",
+            # Output node: Run refreshes the backdrop from whatever feeds it (a KSampler,
+            # a VAE Decode...), not only from a Load Image the widget can read by itself.
+            is_output_node=True,
+            not_idempotent=True,
+            hidden=[io.Hidden.unique_id],
             description=(
                 "Interactive crop on the node itself — drag a rectangle over the connected "
                 "image, mask or video, or rotate it with the handle above it. Crop mode "
@@ -530,6 +537,8 @@ class NKDCrop(io.ComfyNode):
         if isinstance(image, torch.Tensor):
             if image.ndim == 3:                       # MASK [B,H,W]
                 B, H, W = image.shape
+                push_source(node_id(cls), image[:1].unsqueeze(-1).expand(-1, -1, -1, 3),
+                            event="nkd-crop-source")
                 x0, y0, x1, y1, angle = _region_box(region, mode, W, H, divisible_by)
                 # Crop mode never shows the fill widgets — any sliver rotation exposes gets
                 # a silent, sane default rather than a stale value from a past Outpaint run.
@@ -550,6 +559,7 @@ class NKDCrop(io.ComfyNode):
             frames = image.get_components().images
 
         B, H, W, C = frames.shape
+        push_source(node_id(cls), frames, event="nkd-crop-source")
         x0, y0, x1, y1, angle = _region_box(region, mode, W, H, divisible_by)
         effective_fill = fill if mode == "Outpaint" else "edge"
         crop_data = NKDManualCropData(background=frames.cpu(), crop_box=(x0, y0, x1, y1),
