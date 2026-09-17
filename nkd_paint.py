@@ -1,4 +1,4 @@
-"""😺NKD Paint — quick strokes over an optional base image, straight on the node.
+"""😺NKD Painter Node — quick strokes over an optional base image, straight on the node.
 
 Transport mirrors ComfyUI core's Painter (comfy_extras/nodes_painter.py): the
 frontend paints an RGBA layer, uploads it as a PNG to `input/nkd_paint/` and only
@@ -36,7 +36,7 @@ class NKDPaint(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="NKDPaint",
-            display_name="😺NKD Paint",
+            display_name="😺NKD Painter Node",
             category="😺NKD Nodes/Utils",
             # Output node, like Mask Painter: Run refreshes the backdrop even with nothing downstream.
             is_output_node=True,
@@ -115,4 +115,4 @@ async def comfy_entrypoint() -> NKDPaintExtension:
 
 
 NODE_CLASS_MAPPINGS = {"NKDPaint": NKDPaint}
-NODE_DISPLAY_NAME_MAPPINGS = {"NKDPaint": "😺NKD Paint"}
+NODE_DISPLAY_NAME_MAPPINGS = {"NKDPaint": "😺NKD Painter Node"}

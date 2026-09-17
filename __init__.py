@@ -138,7 +138,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDFieldBlur": "😺NKD Field Blur",
     "NKDPathBlur": "😺NKD Path Blur",
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
-    "NKDPaint": "😺NKD Paint",
+    "NKDPaint": "😺NKD Painter Node",
     "NKDLoraControl": "😺NKD LoRA Control",
     "NKDResolutionSelector": "😺NKD Resolution Selector",
 }

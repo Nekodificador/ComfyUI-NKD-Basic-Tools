@@ -1,4 +1,4 @@
-# 😺NKD Paint
+# 😺NKD Painter Node
 
 A brush on the node itself. Connect an image and it shows up behind the canvas at
 its own resolution; connect nothing and you get a blank canvas of the size you set.
