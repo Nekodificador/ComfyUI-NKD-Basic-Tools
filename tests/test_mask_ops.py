@@ -6,6 +6,7 @@ import sys
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import mask_core  # noqa: E402
 from mask_core import (audio_ramp, latent_grid, process, to_audio_latent, to_latent,  # noqa: E402
                        token_patch)
 
@@ -148,6 +149,23 @@ def demo():
     # Shape, dtype and device survive the round trip; a no-op is a no-op.
     assert process(m).shape == m.shape
     assert torch.equal(process(m), m)
+
+    # Large clips use a bounded-memory frame pipeline. Chunk boundaries, including
+    # the overlap needed by temporal operations, must not change the result.
+    video = torch.rand(7, 13, 11)
+    groups = torch.tensor([0, 0, 1, 1, 1, 2, 2])
+    kwargs = dict(despeckle_px=1, temporal_expand_frames=1,
+                  temporal_smooth_frames=1, expand_px=2, blockify_px=4,
+                  blockify_threshold=0.25, time_groups=groups, feather_px=3)
+    original_chunk_pixels = mask_core._CHUNK_PIXELS
+    try:
+        mask_core._CHUNK_PIXELS = video.numel() + 1
+        reference = process(video, **kwargs)
+        mask_core._CHUNK_PIXELS = 64
+        streamed = process(video, **kwargs)
+    finally:
+        mask_core._CHUNK_PIXELS = original_chunk_pixels
+    assert torch.allclose(streamed, reference, atol=1e-6), (streamed - reference).abs().max()
 
     # Audio: 124 frames at 24 fps against MiniMax H3's 207 audio latents.
     frames, audio_t = 124, 207
