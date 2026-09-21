@@ -19,6 +19,28 @@ from comfy_api.latest import ComfyExtension, io
 MAX_GUIDES = 12
 _SLOT_NAMES = [f"guide_{i}" for i in range(1, MAX_GUIDES + 1)]
 
+# H3's time axis is not uniform. A video token covers 1, 4, 4, 4, 4 pixel frames in
+# turn, so token starts land on frames 17m, 17m+1, 17m+5, 17m+9, 17m+13 — and a
+# guide's own latent is always tokenised from the start of that cycle (1, 4, 4, 4, 4).
+# The two grids therefore line up only when the guide starts at a multiple of 17;
+# anywhere else its rows sit between the target's tokens, which is the seam that
+# surfaces as a flash on the anchored frame. `snap positions` puts every guide on
+# that grid; it is on by default because off-grid is almost never what was meant,
+# and off for the cases the grid cannot express — H3's own token layout is the only
+# reason it exists, so it is a switch, not a law.
+#
+# The last frame is the exception the model was trained on: fl2va anchors its
+# closing keyframe there, off-grid on purpose, and it is the one that shuts a loop.
+# Snapping leaves it alone, so position -1 still means what it always meant.
+FRAME_STEP = 17
+
+
+def _snap(frame_idx: int, frame_count: int) -> int:
+    if frame_idx == frame_count - 1:      # fl2va's own end anchor
+        return frame_idx
+    return max(0, min(round(frame_idx / FRAME_STEP) * FRAME_STEP,
+                      (frame_count - 1) // FRAME_STEP * FRAME_STEP))
+
 
 def _slot_index(name: str) -> int:
     return int(name.rsplit("_", 1)[-1])
@@ -68,6 +90,14 @@ class NKDMiniMaxGuides(io.ComfyNode):
                 io.Vae.Input("audio_vae", display_name="audio vae",
                              tooltip="Audio VAE, for the slots that carry sound."),
                 io.Latent.Input("latent"),
+                io.Boolean.Input("snap_positions", default=True,
+                                 tooltip="Move every guide onto the nearest frame H3 starts a "
+                                         "video token on, a multiple of 17. Off-grid guides sit "
+                                         "between the video's tokens and that frame flashes like "
+                                         "a cut in the wrong place, so leave this on unless you "
+                                         "are placing a guide by hand for a reason. The last "
+                                         "frame is never moved: off-grid is where fl2va's own "
+                                         "closing keyframe lives."),
                 io.Autogrow.Input(
                     "guides",
                     template=io.Autogrow.TemplateNames(
@@ -78,9 +108,12 @@ class NKDMiniMaxGuides(io.ComfyNode):
             ] + [
                 io.Int.Input(f"position_{i}", display_name=f"position {i}", default=0,
                              min=-9999, max=9999, optional=True, socketless=True,
-                             tooltip="Frame index this guide is anchored at. Negative counts from "
-                                     "the end. Two slots sharing a position (a clip and its sound) "
-                                     "become one guide.")
+                             tooltip="Frame this guide is anchored at. Negative counts from the "
+                                     "end, so -1 is the last frame — the anchor that closes a "
+                                     "loop on the opening image. H3 only starts a video token "
+                                     "every 17 frames (0, 17, 34, 51...), which is where snap "
+                                     "positions puts this. Two slots sharing a position (a clip "
+                                     "and its sound) become one guide.")
                 for i in range(1, MAX_GUIDES + 1)
             ],
             outputs=[
@@ -92,9 +125,15 @@ class NKDMiniMaxGuides(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, positive, latent, vae=None, audio_vae=None,
+    def execute(cls, positive, latent, vae=None, audio_vae=None, snap_positions=True,
                 guides: io.Autogrow.Type = None, **positions) -> io.NodeOutput:
+        from comfy.ldm.minimax.model import FRAME_PER_TOKEN
         from comfy_extras.nodes_minimax_h3 import MiniMaxH3AddGuide
+
+        # Same count the core node derives, needed here to resolve negative positions
+        # and to keep a snapped one inside the video.
+        video_tokens = latent["samples"].tensors[0].shape[2]
+        frame_count = sum(FRAME_PER_TOKEN[k % 5] for k in range(video_tokens))
 
         # Slots that share a frame index are one guide with two halves — a clip and
         # its soundtrack anchored together, which is what the core node's single
@@ -105,6 +144,8 @@ class NKDMiniMaxGuides(io.ComfyNode):
             if image is None and audio is None:
                 continue
             frame_idx = positions.get(f"position_{_slot_index(name)}", 0)
+            if frame_idx < 0:
+                frame_idx += frame_count
             guide = merged.setdefault(frame_idx, {"image": None, "audio": None})
             for key, value in (("image", image), ("audio", audio)):
                 if value is None:
@@ -114,6 +155,19 @@ class NKDMiniMaxGuides(io.ComfyNode):
                         "two guides carry {} at frame {} — give them different positions".format(
                             key, frame_idx))
                 guide[key] = value
+
+        # After the merge, so a clip and its soundtrack move together as one guide.
+        if snap_positions:
+            snapped: dict[int, dict] = {}
+            for frame_idx, guide in merged.items():
+                target = _snap(frame_idx, frame_count)
+                if target in snapped:
+                    raise ValueError(
+                        "two guides land on frame {} once snapped to H3's token grid — "
+                        "space them at least {} frames apart, or turn snap positions "
+                        "off".format(target, FRAME_STEP))
+                snapped[target] = guide
+            merged = snapped
 
         for frame_idx, guide in merged.items():
             positive = MiniMaxH3AddGuide.execute(

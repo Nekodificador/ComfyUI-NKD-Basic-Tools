@@ -59,21 +59,23 @@ def demo():
         return out[0][0][1]["minimax_keyframes"]
 
     # One keyframe per slot, at the position widget that belongs to that slot.
-    out = run([image, image], position_1=0, position_2=22)
+    out = run([image, image], position_1=0, position_2=34)
     kf = keyframes(out)
-    assert [k["resolved_frame_index"] for k in kf] == [0, 22], kf
+    assert [k["resolved_frame_index"] for k in kf] == [0, 34], kf
     assert all("latent" in k and "audio_latent" not in k for k in kf)
 
-    # Negative positions still count from the end — the core node's own rule.
+    # Negative positions count from the end, and -1 — the last frame, where fl2va
+    # puts its own closing keyframe — survives snapping, so a loop still shuts.
     assert keyframes(run([image], position_1=-1))[0]["resolved_frame_index"] == 123
 
     # Picture and sound on the same frame are ONE guide, not two: that is what a
     # clip with its soundtrack is, and what the core node builds from both inputs.
-    kf = keyframes(run([image, audio], position_1=10, position_2=10))
+    kf = keyframes(run([image, audio], position_1=34, position_2=34))
     assert len(kf) == 1 and "latent" in kf[0] and "audio_latent" in kf[0], kf
 
     # A VIDEO slot carries both halves on its own.
     kf = keyframes(run([_Video()], position_1=17))
+    assert kf[0]["resolved_frame_index"] == 17
     assert len(kf) == 1 and "latent" in kf[0] and "audio_latent" in kf[0], kf
 
     # Sound alone is a guide too, and needs no video vae.
@@ -85,9 +87,21 @@ def demo():
     # there is nothing to anchor.
     assert "minimax_keyframes" not in run([None, None])[0][0][1]
 
+    # Snap pulls a guide onto the grid and into the video; off leaves it exactly
+    # where it was put.
+    assert keyframes(run([image], position_1=22))[0]["resolved_frame_index"] == 17
+    assert keyframes(run([image], position_1=9999))[0]["resolved_frame_index"] == 119
+    assert keyframes(run([image], position_1=22, snap_positions=False))[0][
+        "resolved_frame_index"] == 22
+
+    # A clip and its soundtrack are one guide before any snapping, so an off-grid
+    # pair moves together instead of drifting apart.
+    kf = keyframes(run([image, audio], position_1=10, position_2=10))
+    assert len(kf) == 1 and kf[0]["resolved_frame_index"] == 17, kf
+
     # Two pictures on one frame would silently drop one of them.
     try:
-        run([image, image], position_1=4, position_2=4)
+        run([image, image], position_1=0, position_2=0)
         raise AssertionError("two images at one position should not be accepted")
     except ValueError as e:
         assert "different positions" in str(e), e

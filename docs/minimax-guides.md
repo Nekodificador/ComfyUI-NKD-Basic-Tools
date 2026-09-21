@@ -28,6 +28,17 @@ flowchart LR
 - **A `position` widget** appears next to each filled slot, for the frame it
   lands on. Negative positions count from the end.
 - **Two slots on the same position**, a clip and its sound, become one guide.
+- **`snap positions` keeps every guide on a multiple of 17.** H3's time axis is not
+  uniform: a video token covers 1, 4, 4, 4, 4 pixel frames in turn, so token starts
+  fall on frames 17m, 17m+1, 17m+5, 17m+9, 17m+13 — while a guide's own latent is
+  always cut from the start of that cycle. The two line up only on a **multiple of
+  17** (0, 17, 34, 51, 68, 85, 102, 119…). Anywhere else the guide's rows land
+  between the video's tokens, and that frame flashes like a cut in the wrong place.
+  On by default; turn it off to place a guide by hand and own the result.
+- **`position -1` is the end anchor**, the video's very last frame — where `fl2va`
+  puts its own closing keyframe, and the one place off the grid the model was
+  trained on, so snapping never moves it. Drop the opening image there and the shot
+  loops. Any negative counts back from the end the same way.
 - **`latent`, `video vae` and `audio vae` come straight back out**, so the
   sampler and whatever comes next hang off this node instead of reaching back
   across the graph. Both VAEs are required inputs rather than optional ones,
