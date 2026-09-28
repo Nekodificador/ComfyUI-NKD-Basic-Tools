@@ -18,8 +18,9 @@ from typing import Optional, Tuple
 import torch
 import torch.nn.functional as F
 
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import ComfyExtension, InputImpl, io
 from comfy_api.latest._io import ComfyTypeIO, comfytype
+from comfy_api.latest._util import normalize_crop_rect
 from typing_extensions import override
 
 from .helpers import node_id, push_source
@@ -411,7 +412,9 @@ def _resize_to_budget(t: torch.Tensor, max_megapixels: float, divisible_by: str,
 
 @dataclass
 class NKDManualCropData:
-    background: torch.Tensor              # [B, H, W, C] original image, pre-crop (CPU)
+    background: object                    # [B, H, W, C] original image, pre-crop (CPU),
+                                          # or the source VIDEO when only a window of
+                                          # it was decoded
     crop_box: Tuple[int, int, int, int]   # (x0, y0, x1, y1) in ORIGINAL pixels; may be
                                           # outside [0, W]x[0, H] (Outpaint) or rotated
     angle: float                          # degrees, clockwise, around the box's own center
@@ -482,6 +485,61 @@ def _uncrop_manual(patch: torch.Tensor, background: torch.Tensor,
 
     alpha = valid.unsqueeze(-1)
     return (warped * alpha + background * (1.0 - alpha)).clamp(0.0, 1.0)
+
+
+# ── Video: decode only the part of each frame the crop reads ────────────────
+# A 4K clip is ~100 MB a frame as float, so decoding it whole just to keep a corner ran
+# out of memory. ComfyUI's own `as_cropped` cuts every frame while decoding.
+
+def _first_frame(video) -> Optional[torch.Tensor]:
+    """The first frame `[1, H, W, C]`, decoded alone. Its size is the real, rotation-applied
+    frame size, which `get_dimensions()` doesn't give for a phone clip. Streams often start
+    a frame or so after 0 (a 50 fps clip at 0.02 s), so a one-frame trim can come back
+    empty: try two frames, then half a second, then give up (None)."""
+    rate = float(video.get_frame_rate() or 0)
+    for duration in ((2.0 / rate if rate > 0 else 0.1), 0.5):
+        clip = video.as_trimmed(0, duration, strict_duration=False)
+        images = clip.get_components().images if clip is not None else None
+        if images is not None and images.shape[0]:
+            return images[:1]
+    return None
+
+
+def _source_window(x0: int, y0: int, x1: int, y1: int, angle: float, fill: str,
+                   width: int, height: int) -> Optional[tuple[int, int, int, int]]:
+    """The pixels of the source the crop actually reads, `(sx0, sy0, sx1, sy1)`. None when
+    that's the whole frame: a rotated reflect fill can mirror from anywhere, and a box that
+    misses the source reads nothing but still needs the frame count."""
+    if abs(angle) > 1e-6:
+        if fill == "reflect":
+            return None
+        cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
+        theta = math.radians(angle)
+        cos_a, sin_a = math.cos(theta), math.sin(theta)
+        corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
+        xs = [cx + (px - cx) * cos_a - (py - cy) * sin_a for px, py in corners]
+        ys = [cy + (px - cx) * sin_a + (py - cy) * cos_a for px, py in corners]
+        # +1 on every side for the bilinear taps.
+        x0, x1 = math.floor(min(xs)) - 1, math.ceil(max(xs)) + 1
+        y0, y1 = math.floor(min(ys)) - 1, math.ceil(max(ys)) + 1
+    sx0, sy0, sx1, sy1 = max(0, x0), max(0, y0), min(width, x1), min(height, y1)
+    if sx1 <= sx0 or sy1 <= sy0:
+        return None
+    return sx0, sy0, sx1, sy1
+
+
+def _decode_window(video, window: Optional[tuple[int, int, int, int]], width: int,
+                   height: int) -> tuple[torch.Tensor, int, int]:
+    """`(frames, ox, oy)`: every frame cut to `window` while decoding, with the window's
+    origin. `as_cropped` aligns to even pixels (origin down, size down), so ask for one
+    extra pixel and fall back to the whole clip if the far edge still comes up short."""
+    if window is not None:
+        sx0, sy0, sx1, sy1 = window
+        ex0, ey0 = sx0 - sx0 % 2, sy0 - sy0 % 2
+        rect = normalize_crop_rect(ex0, ey0, sx1 - ex0 + 1, sy1 - ey0 + 1, width, height)
+        if rect is not None and rect[0] + rect[2] >= sx1 and rect[1] + rect[3] >= sy1:
+            return video.as_cropped(*rect).get_components().images, rect[0], rect[1]
+    return video.get_components().images, 0, 0
 
 
 # ── The node ───────────────────────────────────────────────────────────────
@@ -582,32 +640,42 @@ class NKDCrop(io.ComfyNode):
                 out_mask = _resize_to_budget(out_mask, max_megapixels, divisible_by, resize_method)
                 h, w = out_mask.shape[1], out_mask.shape[2]
                 return io.NodeOutput(None, out_mask, w, h, None)
-            frames = image                              # IMAGE [B,H,W,C]
+            frames = first = image                      # IMAGE [B,H,W,C]
         else:
-            # VIDEO, duck-typed like `classify()` in nkd_timeline.py. Decoded whole in one
-            # shot rather than Timeline's windowed `decode_fitted` — this node runs once per
-            # crop, not per-frame-of-a-multi-clip-render, so the simpler path is the lazy one.
-            # ponytail: no windowed decode; revisit if someone crops a very long clip.
+            # VIDEO, duck-typed like `classify()` in nkd_timeline.py.
             if not (hasattr(image, "get_components") and hasattr(image, "save_to")):
                 raise ValueError("😺NKD Crop got something that is not an image, mask or video.")
-            frames = image.get_components().images
+            # A file decodes lazily, window by window; anything else is in memory already.
+            first = _first_frame(image) if isinstance(image, InputImpl.VideoFromFile) else None
+            frames = None if first is not None else image.get_components().images
+            if first is None:
+                first = frames
 
-        B, H, W, C = frames.shape
-        push_source(node_id(cls), frames, event="nkd-crop-source", alpha=True)
+        H, W = first.shape[1], first.shape[2]
+        push_source(node_id(cls), first, event="nkd-crop-source", alpha=True)
         x0, y0, x1, y1, angle = _region_box(region, mode, W, H, divisible_by)
         effective_fill = fill if mode == "Outpaint" else "edge"
-        crop_data = NKDManualCropData(background=frames.cpu(), crop_box=(x0, y0, x1, y1),
-                                      angle=angle)
+        ox = oy = 0
+        if frames is None:
+            window = _source_window(x0, y0, x1, y1, angle, effective_fill, W, H)
+            frames, ox, oy = _decode_window(image, window, W, H)
+        C = frames.shape[-1]
+        # A windowed video leaves the full frames undecoded: Stitch decodes them itself.
+        whole = frames.shape[1] == H and frames.shape[2] == W
+        crop_data = NKDManualCropData(background=frames.cpu() if whole else image,
+                                      crop_box=(x0, y0, x1, y1), angle=angle)
+        bx0, by0, bx1, by1 = x0 - ox, y0 - oy, x1 - ox, y1 - oy
         src = frames
         if effective_fill == "transparent" and C == 3:
             src = F.pad(frames, (0, 1), value=1.0)
         elif mode == "Outpaint" and C == 4 and effective_fill != "transparent":
             src = _fill_alpha(frames, effective_fill, fill_color)
-        out_image, gen_mask = _crop_pad(src, x0, y0, x1, y1, effective_fill, fill_color,
+        out_image, gen_mask = _crop_pad(src, bx0, by0, bx1, by1, effective_fill, fill_color,
                                         angle)
         if mode == "Outpaint" and C == 4:
             # The source's own see-through areas are just as empty as the outpainted margin.
-            alpha = _crop_pad_mask(frames[..., 3], x0, y0, x1, y1, "black", fill_color, angle)
+            alpha = _crop_pad_mask(frames[..., 3], bx0, by0, bx1, by1, "black", fill_color,
+                                   angle)
             gen_mask = torch.maximum(gen_mask, 1.0 - alpha)
         out_image = _resize_to_budget(out_image, max_megapixels, divisible_by, resize_method)
         gen_mask = _resize_to_budget(gen_mask, max_megapixels, divisible_by, resize_method)
@@ -646,7 +714,11 @@ class NKDCropStitch(io.ComfyNode):
     @classmethod
     def execute(cls, image, crop_data: NKDManualCropData, feather: int,
                edge_hardness: float) -> io.NodeOutput:
-        bg = crop_data.background.to(image.device)
+        bg = crop_data.background
+        if not isinstance(bg, torch.Tensor):
+            # A video Crop only decoded a window of: the result is the whole clip anyway.
+            bg = bg.get_components().images
+        bg = bg.to(image.device)
         if bg.shape[0] == 1 and image.shape[0] > 1:
             bg = bg.repeat(image.shape[0], 1, 1, 1)
         out = _uncrop_manual(image, bg, crop_data.crop_box, crop_data.angle,

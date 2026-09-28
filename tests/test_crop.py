@@ -401,6 +401,60 @@ def test_execute_crop_mode_rotated_with_grid_snap_never_pastes_a_fill_border():
     assert (stitched - img).abs().mean().item() < 0.01
 
 
+def test_video_window_decode_matches_whole_decode():
+    """A video decodes only the window the crop reads, and must match decoding it whole.
+    Odd offsets, because ComfyUI's per-frame crop aligns to even pixels."""
+    import tempfile
+
+    import av
+    import numpy as np
+    from comfy_api.latest import InputImpl
+
+    from nkdbt import nkd_crop
+    from nkdbt.nkd_crop import NKDCropStitch
+
+    path = os.path.join(tempfile.mkdtemp(), "clip.mkv")
+    rng = np.random.default_rng(0)
+    with av.open(path, "w") as out:
+        st = out.add_stream("ffv1", rate=10)
+        st.width, st.height, st.pix_fmt = 98, 62, "bgr0"
+        for _ in range(6):
+            px = rng.integers(0, 256, (62, 98, 3), dtype=np.uint8)
+            for p in st.encode(av.VideoFrame.from_ndarray(px, format="rgb24")):
+                out.mux(p)
+        for p in st.encode():
+            out.mux(p)
+    video = InputImpl.VideoFromFile(path)
+
+    def run(reg, mode, fill, whole):
+        saved = nkd_crop._source_window
+        if whole:
+            nkd_crop._source_window = lambda *a: None
+        try:
+            return NKDCrop.execute(video, reg, fill, "#ff0000", 0.0, "disabled", mode,
+                                   "lanczos").result
+        finally:
+            nkd_crop._source_window = saved
+
+    cases = [
+        (region(0.13, 0.29, 0.41, 0.37), "Crop", "edge"),
+        (region(0.61, -0.2, 0.6, 0.7), "Outpaint", "edge"),
+        (region(-0.3, 0.1, 0.8, 0.5), "Outpaint", "color"),
+        (json.dumps({"x": 0.2, "y": 0.2, "w": 0.5, "h": 0.5, "angle": 17}), "Outpaint", "edge"),
+        (json.dumps({"x": 0.2, "y": 0.2, "w": 0.5, "h": 0.5, "angle": 17}), "Outpaint", "reflect"),
+    ]
+    for reg, mode, fill in cases:
+        win, ref = run(reg, mode, fill, False), run(reg, mode, fill, True)
+        assert win[0].shape == ref[0].shape and win[0].shape[0] == 6, (reg, win[0].shape)
+        assert torch.allclose(win[0], ref[0], atol=1e-5), (reg, mode, fill)
+        assert torch.equal(win[1], ref[1])
+        # Only the rotated reflect fill needs the whole frame.
+        assert isinstance(win[4].background, torch.Tensor) == (fill == "reflect"), reg
+        a = NKDCropStitch.execute(win[0], win[4], 4, 0.0).result[0]
+        b = NKDCropStitch.execute(ref[0], ref[4], 4, 0.0).result[0]
+        assert a.shape == (6, 62, 98, 3) and torch.allclose(a, b, atol=1e-5), reg
+
+
 if __name__ == "__main__":
     fns = [v for k, v in list(globals().items()) if k.startswith("test_")]
     for fn in fns:
