@@ -243,6 +243,30 @@ function renderText(text: string) {
     last = m.index! + m[0].length;
   }
   if (last < text.length) el.appendChild(document.createTextNode(text.slice(last)));
+  if (text.endsWith("\n")) addTail();
+}
+
+// A newline that ends a pre-wrap editor opens no visible line, so the browser snaps the
+// caret back before it and the next word lands on the wrong side. A trailing <br> gives
+// that line a body; serialise() skips it.
+function isTail(node: Node | null): boolean {
+  return node instanceof HTMLBRElement && node.classList.contains("nkd-pv-tail");
+}
+
+function addTail() {
+  const el = editor.value;
+  if (!el || isTail(el.lastChild)) return;
+  const br = document.createElement("br");
+  br.className = "nkd-pv-tail";
+  el.appendChild(br);
+}
+
+function isLast(node: Node): boolean {
+  let next = node.nextSibling;
+  while (next && ((next.nodeType === Node.TEXT_NODE && !next.textContent) || isTail(next))) {
+    next = next.nextSibling;
+  }
+  return !next;
 }
 
 function serialise(): string {
@@ -256,6 +280,8 @@ function serialise(): string {
       } else if (child instanceof HTMLElement && child.dataset.var) {
         const mode = child.dataset.mode ?? "";
         out += `{${child.dataset.var}${mode ? `:${mode}` : ""}}`;
+      } else if (isTail(child)) {
+        continue;
       } else if (child instanceof HTMLBRElement) {
         out += "\n";
       } else if (child instanceof HTMLElement) {
@@ -306,6 +332,10 @@ function onPanelKeydown(e: KeyboardEvent) {
 }
 
 function onInput() {
+  // Emptied by hand: drop any leftover <br> so the placeholder shows again.
+  const el = editor.value;
+  if (el && !el.textContent && !el.querySelector(".nkd-pv-chip")) el.textContent = "";
+  saveSelection();
   emitChange();
   checkAutocomplete();
 }
@@ -343,7 +373,10 @@ function onKeydown(e: KeyboardEvent) {
 
   if (e.key === "Enter") {
     e.preventDefault();
-    insertAtCursor(document.createTextNode("\n"));
+    saveSelection(); // the live caret, not wherever the last keyup/mouseup left it
+    const nl = document.createTextNode("\n");
+    insertAtCursor(nl);
+    if (isLast(nl)) addTail();
     emitChange();
   }
 }
@@ -466,6 +499,7 @@ function insertAtCursor(node: Node) {
     range = document.createRange();
     range.selectNodeContents(el);
     range.collapse(false); // fall back to the end
+    if (isTail(el.lastChild)) range.setStartBefore(el.lastChild!);
   }
   range.deleteContents();
   range.insertNode(node);
