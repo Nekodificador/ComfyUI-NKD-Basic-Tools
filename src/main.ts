@@ -881,17 +881,17 @@ type CachedFrame = {
 };
 const colorWarpFrames = new Map<string, CachedFrame>();
 
-// Build a canvas from the pushed RGB (uint8, 3 bytes/px) frame.
-function rgbBytesToCanvas(bytes: Uint8Array, w: number, h: number): HTMLCanvasElement {
+// Build a canvas from the pushed RGB (uint8, 3 bytes/px) or RGBA (4 bytes/px) frame.
+function rgbBytesToCanvas(bytes: Uint8Array, w: number, h: number, channels = 3): HTMLCanvasElement {
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
   const ctx = c.getContext("2d")!;
   const img = ctx.createImageData(w, h);
-  for (let i = 0, j = 0, k = 0; i < w * h; i++, j += 3, k += 4) {
+  for (let i = 0, j = 0, k = 0; i < w * h; i++, j += channels, k += 4) {
     img.data[k] = bytes[j];
     img.data[k + 1] = bytes[j + 1];
     img.data[k + 2] = bytes[j + 2];
-    img.data[k + 3] = 255;
+    img.data[k + 3] = channels === 4 ? bytes[j + 3] : 255;
   }
   ctx.putImageData(img, 0, 0);
   return c;
@@ -1079,7 +1079,7 @@ api.addEventListener("nkd-crop-source", (e: any) => {
   const d = e?.detail;
   if (!d?.data) return;
   try {
-    cropSource(String(d.node), rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
+    cropSource(String(d.node), rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height, d.channels),
                d.full_width, d.full_height);
   } catch { /* ignore malformed */ }
 });

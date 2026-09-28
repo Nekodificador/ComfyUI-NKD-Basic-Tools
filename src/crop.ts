@@ -22,6 +22,7 @@
 import { app as comfyApp } from "../../scripts/app.js";
 import { resolveSource, slotKind, viewUrl, type MediaRef } from "./mediaProbe";
 import { findW, hideWidget, mountDomWidget, setWidgetVisible } from "./domHost";
+import { checker } from "./paint";
 
 const NODE_NAME = "NKDCrop";
 const EXT_NAME = "NKD.BasicTools.Crop";
@@ -476,13 +477,16 @@ function setupCropWidget(node: any): void {
     const [cw, ch] = canvasSize();
     const ctx = syncCanvasBuffer();
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = C.bg;
+    // fill = transparent: the outpainted area comes out empty, so show it as such.
+    ctx.fillStyle = isOutpaint() && findW(node, "fill")?.value === "transparent" ? checker(ctx) : C.bg;
     ctx.fillRect(0, 0, cw, ch);
 
     // The source rect and its margin band.
     const [sx0, sy0] = toCanvas(0, 0);
     const [sx1, sy1] = toCanvas(srcW, srcH);
     if (srcEl) {
+      ctx.fillStyle = checker(ctx);   // under the source's own alpha
+      ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
       try { ctx.drawImage(srcEl as any, sx0, sy0, sx1 - sx0, sy1 - sy0); } catch { /* not ready */ }
     } else {
       ctx.fillStyle = "#1a1c22";
@@ -937,6 +941,7 @@ function setupCropWidget(node: any): void {
     const outpaint = isOutpaint();
     setWidgetVisible(node, "fill", outpaint);
     setWidgetVisible(node, "fill_color", outpaint && fillW?.value === "color");
+    draw();
     if (Array.isArray(node.widgets)) node.widgets = [...node.widgets]; // invalidate 2.0 snapshot
     node.setSize(node.computeSize());
     node.setDirtyCanvas(true, true);

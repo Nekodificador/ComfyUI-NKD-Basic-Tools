@@ -1029,7 +1029,7 @@ def node_id(cls, supplied=None):
 
 
 def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 1024,
-                mask=None) -> None:
+                mask=None, alpha: bool = False) -> None:
     """Push the first frame of `image` to the frontend as raw base64 RGB.
 
     The editors that draw over an image need a backdrop, and walking the graph
@@ -1040,7 +1040,9 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
 
     Raw RGB bytes rather than a PNG: no encoder on the way out, no decoder on
     the way in, and the frontend already has width/height to lay them out.
-    Never raises — a missing backdrop must not fail a render.
+    Never raises — a missing backdrop must not fail a render. `alpha=True` sends
+    RGBA instead when the frame has an alpha channel (`channels` says which);
+    the cache stays RGB either way.
     """
     if unique_id is None:
         return
@@ -1051,7 +1053,7 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
         frame = image[0] if hasattr(image, "shape") and len(image.shape) == 4 else image
         if hasattr(frame, "detach"):
             frame = frame.detach().cpu().numpy()
-        frame = np.clip(np.asarray(frame, dtype=np.float32), 0.0, 1.0)[:, :, :3]
+        frame = np.clip(np.asarray(frame, dtype=np.float32), 0.0, 1.0)
         full_h, full_w = frame.shape[:2]
 
         longest = max(frame.shape[:2])
@@ -1059,7 +1061,10 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
             step = int(np.ceil(longest / max_side))
             frame = frame[::step, ::step]
         h, w = frame.shape[:2]
-        buf = (frame * 255.0 + 0.5).astype(np.uint8).tobytes()
+        px = (frame * 255.0 + 0.5).astype(np.uint8)
+        buf = px[:, :, :3].tobytes()
+        channels = 4 if alpha and px.shape[2] >= 4 else 3
+        sent = px[:, :, :4].tobytes() if channels == 4 else buf
 
         if len(_SOURCE_CACHE) >= _SOURCE_CACHE_MAX:
             drop = next(iter(_SOURCE_CACHE))
@@ -1081,7 +1086,8 @@ def push_source(unique_id, image, event: str = "nkd-source", max_side: int = 102
             "node": str(unique_id),
             "width": w, "height": h,
             "full_width": full_w, "full_height": full_h,
-            "data": base64.b64encode(buf).decode("ascii"),
+            "channels": channels,
+            "data": base64.b64encode(sent).decode("ascii"),
         })
     except Exception:
         pass

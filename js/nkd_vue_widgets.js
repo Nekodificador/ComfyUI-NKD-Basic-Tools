@@ -15813,836 +15813,6 @@ function mountDomWidget(node, opts) {
     }
   };
 }
-const NODE_NAME$3 = "NKDCrop";
-const EXT_NAME$3 = "NKD.BasicTools.Crop";
-console.log("[NKD Crop] rev 1.1.0");
-const frames$1 = /* @__PURE__ */ new Map();
-const live$1 = /* @__PURE__ */ new Map();
-function cropSource(nodeId, canvas, fullW, fullH) {
-  var _a;
-  const f = { canvas, fullW: fullW || canvas.width, fullH: fullH || canvas.height };
-  frames$1.set(nodeId, f);
-  (_a = live$1.get(nodeId)) == null ? void 0 : _a(f);
-}
-const CANVAS_W$1 = 180;
-const MARGIN = 0.5;
-const HANDLE_R = 5;
-const HANDLE_HIT = 10;
-const BAR_H = 30;
-const TRANSPORT_H = 26;
-const ROTATE_OFFSET = 22;
-const ROTATE_BASE_DEG = -90;
-const EDGE_SNAP_PX = 8;
-const ASPECTS = {
-  Free: null,
-  "1:1": 1,
-  "4:5": 4 / 5,
-  "3:4": 3 / 4,
-  "2:3": 2 / 3,
-  "9:16": 9 / 16,
-  "5:4": 5 / 4,
-  "4:3": 4 / 3,
-  "3:2": 3 / 2,
-  "16:9": 16 / 9
-};
-const C$1 = {
-  bg: "#111318",
-  srcBorder: "rgba(255,255,255,0.28)",
-  rect: "#4ab4ff",
-  rectFill: "rgba(74,180,255,0.08)",
-  outpaintHatch: "rgba(255,176,32,0.28)",
-  handle: "#4ab4ff",
-  outsideDim: "rgba(0,0,0,0.55)",
-  grid: "rgba(255,255,255,0.35)"
-};
-const DRAW_MIN_PX_FRAC = 0.02;
-function defaultBox(w, h) {
-  return { x0: 0, y0: 0, x1: w, y1: h };
-}
-function parseRegion(json, w, h) {
-  if (!json) return { box: defaultBox(w, h), angle: 0 };
-  try {
-    const d = JSON.parse(json);
-    const x = Number(d.x) || 0, y = Number(d.y) || 0;
-    const bw = Number(d.w) || 1, bh = Number(d.h) || 1;
-    const angle = Number(d.angle) || 0;
-    return { box: { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h }, angle };
-  } catch {
-    return { box: defaultBox(w, h), angle: 0 };
-  }
-}
-function serialiseRegion(box, angle, w, h) {
-  if (w <= 0 || h <= 0) return "";
-  return JSON.stringify({
-    x: box.x0 / w,
-    y: box.y0 / h,
-    w: (box.x1 - box.x0) / w,
-    h: (box.y1 - box.y0) / h,
-    angle
-  });
-}
-const boxCenter = (b) => [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
-function rotatePoint(px, py, cx, cy, deg) {
-  const t = deg * Math.PI / 180;
-  const cos = Math.cos(t), sin = Math.sin(t);
-  const dx = px - cx, dy = py - cy;
-  return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
-}
-function snapBox(b, multiple, clampW2, clampH) {
-  const grow = (a, bb, limit) => {
-    const size = bb - a;
-    const rem = (size % multiple + multiple) % multiple;
-    if (rem === 0) return [a, bb];
-    const extra = multiple - rem;
-    const addBefore = Math.floor(extra / 2);
-    let na = a - addBefore, nb = bb + (extra - addBefore);
-    if (limit != null) {
-      if (na < 0) {
-        nb += -na;
-        na = 0;
-      }
-      if (nb > limit) {
-        na -= nb - limit;
-        nb = limit;
-      }
-      na = Math.max(0, na);
-    }
-    return [na, nb];
-  };
-  const [x0, x1] = grow(b.x0, b.x1, clampW2);
-  const [y0, y1] = grow(b.y0, b.y1, clampH);
-  return { x0, y0, x1, y1 };
-}
-function snapBoxRotated(b, multiple) {
-  const [cx, cy] = boxCenter(b);
-  const grow = (v) => {
-    const rem = (v % multiple + multiple) % multiple;
-    return rem === 0 ? v : v + (multiple - rem);
-  };
-  const w = grow(b.x1 - b.x0), h = grow(b.y1 - b.y0);
-  return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
-}
-function snapToSourceEdges(b, tol, w, h, edges, move) {
-  const out = { ...b };
-  const nearest = (v, lim) => {
-    if (v < 0 || v > lim) return null;
-    let best = null;
-    for (const t of [0, lim]) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
-    return best;
-  };
-  if (move) {
-    const sx = nearest(out.x0, w), ex = nearest(out.x1, w);
-    const dx = sx != null ? sx - out.x0 : ex != null ? ex - out.x1 : 0;
-    const sy = nearest(out.y0, h), ey = nearest(out.y1, h);
-    const dy = sy != null ? sy - out.y0 : ey != null ? ey - out.y1 : 0;
-    return { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
-  }
-  if (edges.includes("w")) out.x0 = nearest(out.x0, w) ?? out.x0;
-  if (edges.includes("e")) out.x1 = nearest(out.x1, w) ?? out.x1;
-  if (edges.includes("n")) out.y0 = nearest(out.y0, h) ?? out.y0;
-  if (edges.includes("s")) out.y1 = nearest(out.y1, h) ?? out.y1;
-  return out;
-}
-function containRotatedBox(b, deg, w, h) {
-  let out = b;
-  for (let i = 0; i < 6; i++) {
-    const [cx, cy] = boxCenter(out);
-    const corners = [
-      [out.x0, out.y0],
-      [out.x1, out.y0],
-      [out.x1, out.y1],
-      [out.x0, out.y1]
-    ];
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const [px, py] of corners) {
-      const [rx, ry] = rotatePoint(px, py, cx, cy, deg);
-      minX = Math.min(minX, rx);
-      maxX = Math.max(maxX, rx);
-      minY = Math.min(minY, ry);
-      maxY = Math.max(maxY, ry);
-    }
-    const bw = maxX - minX, bh = maxY - minY;
-    if (bw > w + 1e-6 || bh > h + 1e-6) {
-      const scale = Math.min(w / bw, h / bh) * 0.999;
-      out = {
-        x0: cx + (out.x0 - cx) * scale,
-        y0: cy + (out.y0 - cy) * scale,
-        x1: cx + (out.x1 - cx) * scale,
-        y1: cy + (out.y1 - cy) * scale
-      };
-      continue;
-    }
-    let dx = 0, dy = 0;
-    if (minX < 0) dx = -minX;
-    else if (maxX > w) dx = w - maxX;
-    if (minY < 0) dy = -minY;
-    else if (maxY > h) dy = h - maxY;
-    if (dx === 0 && dy === 0) break;
-    out = { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
-  }
-  return out;
-}
-function registerCrop() {
-  app.registerExtension({
-    name: EXT_NAME$3,
-    async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$3) return;
-      if (nodeType.prototype.__nkdCropWrapped) return;
-      nodeType.prototype.__nkdCropWrapped = true;
-      const origCreated = nodeType.prototype.onNodeCreated;
-      nodeType.prototype.onNodeCreated = function() {
-        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
-        setupCropWidget(this);
-        return r;
-      };
-    }
-  });
-}
-function setupCropWidget(node) {
-  var _a;
-  const regionW = (_a = node.widgets) == null ? void 0 : _a.find((w) => w.name === "region");
-  if (!regionW) return;
-  hideWidget(regionW);
-  node.properties.nkdCropAspect = node.properties.nkdCropAspect ?? "Free";
-  let srcW = 512, srcH = 512;
-  let srcEl = null;
-  let { box, angle } = parseRegion(regionW.value, srcW, srcH);
-  let boxActive = !!regionW.value;
-  let lastRef = null;
-  let playing = false;
-  let rafId = 0;
-  const root = document.createElement("div");
-  root.className = "nkd-crop-wrap";
-  root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
-  const bar = document.createElement("div");
-  bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
-  const label = document.createElement("span");
-  label.textContent = "Aspect";
-  label.style.cssText = "opacity:0.6;flex:0 0 auto;";
-  const select = document.createElement("select");
-  select.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 4px;flex:0 0 auto;";
-  for (const k of Object.keys(ASPECTS)) {
-    const opt = document.createElement("option");
-    opt.value = k;
-    opt.textContent = k;
-    select.appendChild(opt);
-  }
-  select.value = node.properties.nkdCropAspect;
-  const resetBtn = document.createElement("button");
-  resetBtn.textContent = "Reset";
-  resetBtn.style.cssText = "margin-left:auto;background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 8px;cursor:pointer;flex:0 0 auto;";
-  bar.append(label, select, resetBtn);
-  const BAR_PAD_X = 16, BAR_GAP = 6;
-  const barMinWidth = () => {
-    const kids = Array.from(bar.children);
-    const content = kids.reduce((sum, k) => sum + k.offsetWidth, 0);
-    return content + BAR_PAD_X + BAR_GAP * Math.max(0, kids.length - 1);
-  };
-  const canvas = document.createElement("canvas");
-  canvas.style.cssText = "display:block;width:100%;cursor:crosshair;";
-  const transport = document.createElement("div");
-  transport.style.cssText = "display:none;align-items:center;gap:6px;height:26px;padding:0 8px;background:#1a1c22;border-top:1px solid #2a2d36;";
-  const playBtn = document.createElement("button");
-  playBtn.textContent = "▶";
-  playBtn.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 6px;cursor:pointer;width:26px;";
-  const scrub = document.createElement("input");
-  scrub.type = "range";
-  scrub.min = "0";
-  scrub.max = "1000";
-  scrub.value = "0";
-  scrub.style.cssText = "flex:1;";
-  transport.append(playBtn, scrub);
-  root.append(bar, canvas, transport);
-  const dpr = () => Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-  const modeW = findW(node, "mode");
-  const isOutpaint = () => (modeW == null ? void 0 : modeW.value) === "Outpaint";
-  const isRotated = () => Math.abs(angle) > 0.01;
-  function rotatedBounds() {
-    const [cx, cy] = boxCenter(box);
-    const corners = [
-      [box.x0, box.y0],
-      [box.x1, box.y0],
-      [box.x1, box.y1],
-      [box.x0, box.y1]
-    ];
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const [px, py] of corners) {
-      const [rx, ry] = rotatePoint(px, py, cx, cy, angle);
-      minX = Math.min(minX, rx);
-      maxX = Math.max(maxX, rx);
-      minY = Math.min(minY, ry);
-      maxY = Math.max(maxY, ry);
-    }
-    return { minX, maxX, minY, maxY };
-  }
-  function overflowFraction() {
-    const { minX, maxX, minY, maxY } = rotatedBounds();
-    const overflow = Math.max(0, -minX, maxX - srcW, -minY, maxY - srcH);
-    return overflow / Math.max(1, Math.min(srcW, srcH));
-  }
-  const EDGE_LOOKAHEAD = 0.12;
-  function marginNeedFraction() {
-    const { minX, maxX, minY, maxY } = rotatedBounds();
-    const buffer = EDGE_LOOKAHEAD * Math.max(1, Math.min(srcW, srcH));
-    const need = Math.max(
-      0,
-      buffer - minX,
-      maxX - (srcW - buffer),
-      buffer - minY,
-      maxY - (srcH - buffer)
-    );
-    return need / Math.max(1, Math.min(srcW, srcH));
-  }
-  const TIER1_MAX = 0.6;
-  const TIER2_MAX = 2.5;
-  const TIER2_RATE = 0.35;
-  const MARGIN_SLACK = 1.25;
-  const marginFor = (want) => want <= TIER1_MAX ? want : Math.min(TIER2_MAX, TIER1_MAX + (want - TIER1_MAX) * TIER2_RATE);
-  const margin = () => {
-    if (!isOutpaint()) return 0;
-    const need = marginNeedFraction() * MARGIN_SLACK;
-    return marginFor(Math.max(MARGIN, need));
-  };
-  const divisibleByW = findW(node, "divisible_by");
-  const gridMultiple = () => {
-    const v = divisibleByW == null ? void 0 : divisibleByW.value;
-    return v && v !== "disabled" ? parseInt(v, 10) : null;
-  };
-  function canvasSize() {
-    const m = margin();
-    const cw = canvas.clientWidth || CANVAS_W$1;
-    const ch = cw * (srcH * (1 + 2 * m)) / (srcW * (1 + 2 * m));
-    return [cw, ch];
-  }
-  function scaleAndOrigin() {
-    const m = margin();
-    const [cw] = canvasSize();
-    const scale = cw / (srcW * (1 + 2 * m));
-    return { scale, ox: m * srcW * scale, oy: m * srcH * scale };
-  }
-  const toCanvas2 = (px, py) => {
-    const { scale, ox, oy } = scaleAndOrigin();
-    return [ox + px * scale, oy + py * scale];
-  };
-  const toSource = (cx, cy) => {
-    const { scale, ox, oy } = scaleAndOrigin();
-    return [(cx - ox) / scale, (cy - oy) / scale];
-  };
-  const edgeSnapTol = (e) => e.altKey || isRotated() ? 0 : EDGE_SNAP_PX / scaleAndOrigin().scale;
-  function syncCanvasBuffer() {
-    const [cw, ch] = canvasSize();
-    const d = dpr();
-    const w = Math.max(1, Math.round(cw * d)), h = Math.max(1, Math.round(cw * d * (ch / cw)));
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-    const ctx = canvas.getContext("2d");
-    ctx.setTransform(w / cw, 0, 0, h / ch, 0, 0);
-    return ctx;
-  }
-  let drawScheduled = false;
-  function scheduleDraw() {
-    if (drawScheduled) return;
-    drawScheduled = true;
-    requestAnimationFrame(() => {
-      drawScheduled = false;
-      draw();
-    });
-  }
-  function draw() {
-    const [cw, ch] = canvasSize();
-    const ctx = syncCanvasBuffer();
-    ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = C$1.bg;
-    ctx.fillRect(0, 0, cw, ch);
-    const [sx0, sy0] = toCanvas2(0, 0);
-    const [sx1, sy1] = toCanvas2(srcW, srcH);
-    if (srcEl) {
-      try {
-        ctx.drawImage(srcEl, sx0, sy0, sx1 - sx0, sy1 - sy0);
-      } catch {
-      }
-    } else {
-      ctx.fillStyle = "#1a1c22";
-      ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
-    }
-    ctx.strokeStyle = C$1.srcBorder;
-    ctx.lineWidth = 1;
-    ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
-    if (!boxActive) return;
-    const [rx0, ry0] = toCanvas2(box.x0, box.y0);
-    const [rx1, ry1] = toCanvas2(box.x1, box.y1);
-    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
-    const rw = rx1 - rx0, rh = ry1 - ry0;
-    const corners = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]].map(([x, y]) => rotatePoint(x, y, ccx, ccy, angle));
-    const addQuadSubpath = () => {
-      ctx.moveTo(corners[0][0], corners[0][1]);
-      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
-      ctx.closePath();
-    };
-    const strokeQuad = () => {
-      ctx.beginPath();
-      addQuadSubpath();
-    };
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, cw, ch);
-    addQuadSubpath();
-    ctx.fillStyle = C$1.outsideDim;
-    ctx.fill("evenodd");
-    ctx.restore();
-    ctx.save();
-    strokeQuad();
-    ctx.clip();
-    ctx.fillStyle = C$1.rectFill;
-    ctx.fill();
-    if (overflowFraction() > 1e-4) {
-      ctx.translate(ccx, ccy);
-      ctx.rotate(angle * Math.PI / 180);
-      ctx.translate(-ccx, -ccy);
-      ctx.strokeStyle = C$1.outpaintHatch;
-      ctx.lineWidth = 1;
-      const step = 8;
-      for (let d2 = -rh; d2 < rw; d2 += step) {
-        ctx.beginPath();
-        ctx.moveTo(rx0 + d2, ry0);
-        ctx.lineTo(rx0 + d2 + rh, ry0 + rh);
-        ctx.stroke();
-      }
-    }
-    ctx.restore();
-    ctx.save();
-    ctx.translate(ccx, ccy);
-    ctx.rotate(angle * Math.PI / 180);
-    ctx.translate(-ccx, -ccy);
-    ctx.strokeStyle = C$1.grid;
-    ctx.lineWidth = 1;
-    for (let k = 1; k <= 2; k++) {
-      const gx = rx0 + rw * k / 3;
-      ctx.beginPath();
-      ctx.moveTo(gx, ry0);
-      ctx.lineTo(gx, ry1);
-      ctx.stroke();
-      const gy = ry0 + rh * k / 3;
-      ctx.beginPath();
-      ctx.moveTo(rx0, gy);
-      ctx.lineTo(rx1, gy);
-      ctx.stroke();
-    }
-    ctx.restore();
-    ctx.strokeStyle = C$1.rect;
-    ctx.lineWidth = 1.5;
-    strokeQuad();
-    ctx.stroke();
-    const localPts = [
-      [rx0, ry0, "nw"],
-      [rx1, ry0, "ne"],
-      [rx0, ry1, "sw"],
-      [rx1, ry1, "se"],
-      [(rx0 + rx1) / 2, ry0, "n"],
-      [(rx0 + rx1) / 2, ry1, "s"],
-      [rx0, (ry0 + ry1) / 2, "w"],
-      [rx1, (ry0 + ry1) / 2, "e"]
-    ];
-    ctx.fillStyle = C$1.handle;
-    for (const [lx, ly] of localPts) {
-      const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
-      ctx.beginPath();
-      ctx.arc(hx, hy, HANDLE_R, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
-    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
-    ctx.strokeStyle = C$1.rect;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(topX, topY);
-    ctx.lineTo(hubX, hubY);
-    ctx.stroke();
-    ctx.fillStyle = C$1.handle;
-    ctx.beginPath();
-    ctx.arc(hubX, hubY, HANDLE_R, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  function stopPlayback() {
-    playing = false;
-    playBtn.textContent = "▶";
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = 0;
-    if (srcEl instanceof HTMLVideoElement) srcEl.pause();
-  }
-  function stepPlayback() {
-    if (!playing) return;
-    draw();
-    const v = srcEl;
-    if (v.duration > 0) scrub.value = String(Math.round(v.currentTime / v.duration * 1e3));
-    rafId = requestAnimationFrame(stepPlayback);
-  }
-  function setPlaying(p2) {
-    if (!(srcEl instanceof HTMLVideoElement)) return;
-    if (p2) {
-      playing = true;
-      playBtn.textContent = "⏸";
-      srcEl.play().catch(() => {
-        playing = false;
-        playBtn.textContent = "▶";
-      });
-      rafId = requestAnimationFrame(stepPlayback);
-    } else {
-      stopPlayback();
-    }
-  }
-  playBtn.addEventListener("click", () => setPlaying(!playing));
-  scrub.addEventListener("input", () => {
-    if (!(srcEl instanceof HTMLVideoElement)) return;
-    stopPlayback();
-    if (srcEl.duration > 0) srcEl.currentTime = Number(scrub.value) / 1e3 * srcEl.duration;
-    draw();
-  });
-  function loadThumb(ref2) {
-    const kind = slotKind(node, "image");
-    const url = viewUrl$1(ref2);
-    stopPlayback();
-    if (kind === "video") {
-      const v = document.createElement("video");
-      v.muted = true;
-      v.playsInline = true;
-      v.preload = "metadata";
-      v.loop = true;
-      v.src = url;
-      transport.style.display = "flex";
-      scrub.value = "0";
-      v.onloadeddata = () => {
-        srcEl = v;
-        srcW = v.videoWidth || srcW;
-        srcH = v.videoHeight || srcH;
-        draw();
-      };
-      srcEl = null;
-    } else {
-      transport.style.display = "none";
-      const img = new Image();
-      img.onload = () => {
-        srcEl = img;
-        srcW = img.naturalWidth || srcW;
-        srcH = img.naturalHeight || srcH;
-        draw();
-      };
-      img.src = url;
-    }
-  }
-  function useFrame(f) {
-    stopPlayback();
-    transport.style.display = "none";
-    lastRef = null;
-    srcEl = f.canvas;
-    srcW = f.fullW;
-    srcH = f.fullH;
-    draw();
-  }
-  function refreshSource() {
-    const direct = resolveSource(node, "image", 0);
-    const pushed = frames$1.get(String(node.id));
-    const ref2 = direct ?? (pushed ? null : resolveSource(node, "image"));
-    if (!ref2) {
-      if (pushed && srcEl !== pushed.canvas) useFrame(pushed);
-      return;
-    }
-    if (lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) {
-      return;
-    }
-    lastRef = ref2;
-    srcEl = null;
-    loadThumb(ref2);
-  }
-  live$1.set(String(node.id), (f) => {
-    if (!resolveSource(node, "image", 0)) useFrame(f);
-  });
-  function hitTest(cx, cy) {
-    if (!boxActive) return "draw";
-    const [rx0, ry0] = toCanvas2(box.x0, box.y0);
-    const [rx1, ry1] = toCanvas2(box.x1, box.y1);
-    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
-    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
-    if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT) return "rotate";
-    const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
-    const near = (ax, ay) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
-    if (near(rx0, ry0)) return "nw";
-    if (near(rx1, ry0)) return "ne";
-    if (near(rx0, ry1)) return "sw";
-    if (near(rx1, ry1)) return "se";
-    if (near((rx0 + rx1) / 2, ry0)) return "n";
-    if (near((rx0 + rx1) / 2, ry1)) return "s";
-    if (near(rx0, (ry0 + ry1) / 2)) return "w";
-    if (near(rx1, (ry0 + ry1) / 2)) return "e";
-    if (lx >= rx0 && lx <= rx1 && ly >= ry0 && ly <= ry1) return "move";
-    return "draw";
-  }
-  function applyAspect(b, ratio, handle) {
-    const r = ratio ?? ASPECTS[node.properties.nkdCropAspect];
-    if (!r) return b;
-    if (handle === "n" || handle === "s") {
-      const h2 = b.y1 - b.y0;
-      const w2 = h2 * r;
-      const cx = (b.x0 + b.x1) / 2;
-      return { x0: cx - w2 / 2, y0: b.y0, x1: cx + w2 / 2, y1: b.y1 };
-    }
-    const w = b.x1 - b.x0;
-    const h = w / r;
-    return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y0 + h };
-  }
-  function finalizeBox(b) {
-    let out = b;
-    const grid = gridMultiple();
-    if (grid) {
-      out = isRotated() ? snapBoxRotated(out, grid) : snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
-    }
-    if (!isOutpaint()) out = containRotatedBox(out, angle, srcW, srcH);
-    return out;
-  }
-  let drag = null;
-  function eventToSource(e) {
-    const rect = canvas.getBoundingClientRect();
-    const [cw, ch] = canvasSize();
-    const cx = (e.clientX - rect.left) * (cw / rect.width);
-    const cy = (e.clientY - rect.top) * (ch / rect.height);
-    return toSource(cx, cy);
-  }
-  canvas.addEventListener("pointerdown", (e) => {
-    const rect = canvas.getBoundingClientRect();
-    const [cw, ch] = canvasSize();
-    const cx = (e.clientX - rect.left) * (cw / rect.width);
-    const cy = (e.clientY - rect.top) * (ch / rect.height);
-    const h = hitTest(cx, cy);
-    canvas.setPointerCapture(e.pointerId);
-    const [sxRaw, syRaw] = eventToSource(e);
-    if (h === "draw") {
-      const preBox = { ...box }, preAngle = angle, preActive = boxActive;
-      angle = 0;
-      boxActive = true;
-      box = { x0: sxRaw, y0: syRaw, x1: sxRaw, y1: syRaw };
-      drag = {
-        handle: h,
-        startBox: box,
-        startSrc: [sxRaw, syRaw],
-        startAngle: 0,
-        preBox,
-        preAngle,
-        preActive
-      };
-      draw();
-      e.stopPropagation();
-      return;
-    }
-    const startSrc = h === "move" || h === "rotate" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(box), -angle);
-    drag = { handle: h, startBox: { ...box }, startSrc, startAngle: angle };
-    e.stopPropagation();
-  });
-  canvas.addEventListener("pointermove", (e) => {
-    if (!drag) return;
-    const b0 = drag.startBox;
-    if (drag.handle === "draw") {
-      const [sx2, sy2] = eventToSource(e);
-      const [ax, ay] = drag.startSrc;
-      let next2 = {
-        x0: Math.min(ax, sx2),
-        y0: Math.min(ay, sy2),
-        x1: Math.max(ax, sx2),
-        y1: Math.max(ay, sy2)
-      };
-      const m = margin();
-      const lo = -m, hi = 1 + m;
-      next2.x0 = Math.max(lo * srcW, next2.x0);
-      next2.y0 = Math.max(lo * srcH, next2.y0);
-      next2.x1 = Math.min(hi * srcW, next2.x1);
-      next2.y1 = Math.min(hi * srcH, next2.y1);
-      next2 = snapToSourceEdges(next2, edgeSnapTol(e), srcW, srcH, "nsew", false);
-      const locked = ASPECTS[node.properties.nkdCropAspect];
-      if (locked) next2 = applyAspect(next2, locked);
-      box = finalizeBox(next2);
-      scheduleDraw();
-      return;
-    }
-    if (drag.handle === "rotate") {
-      const [sx2, sy2] = eventToSource(e);
-      const [cx, cy] = boxCenter(b0);
-      const rawDeg = Math.atan2(sy2 - cy, sx2 - cx) * 180 / Math.PI;
-      let next2 = rawDeg - ROTATE_BASE_DEG;
-      if (e.shiftKey) next2 = Math.round(next2 / 15) * 15;
-      angle = (next2 % 360 + 360) % 360;
-      box = finalizeBox(box);
-      scheduleDraw();
-      return;
-    }
-    const [sxRaw, syRaw] = eventToSource(e);
-    const [sx, sy] = drag.handle === "move" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(b0), -drag.startAngle);
-    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
-    let next = { ...b0 };
-    const minSize = Math.max(4, Math.min(srcW, srcH) * 0.02);
-    switch (drag.handle) {
-      case "move":
-        next = { x0: b0.x0 + dx, y0: b0.y0 + dy, x1: b0.x1 + dx, y1: b0.y1 + dy };
-        break;
-      case "n":
-        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
-        break;
-      case "s":
-        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
-        break;
-      case "w":
-        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
-        break;
-      case "e":
-        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
-        break;
-      case "nw":
-        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
-        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
-        break;
-      case "ne":
-        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
-        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
-        break;
-      case "sw":
-        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
-        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
-        break;
-      case "se":
-        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
-        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
-        break;
-    }
-    if (!isRotated()) {
-      const m = margin();
-      const lo = -m, hi = 1 + m;
-      next.x0 = Math.max(lo * srcW, next.x0);
-      next.y0 = Math.max(lo * srcH, next.y0);
-      next.x1 = Math.min(hi * srcW, next.x1);
-      next.y1 = Math.min(hi * srcH, next.y1);
-    }
-    next = snapToSourceEdges(next, edgeSnapTol(e), srcW, srcH, drag.handle, drag.handle === "move");
-    if (drag.handle !== "move") {
-      const locked = ASPECTS[node.properties.nkdCropAspect];
-      const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
-      const shiftRatio = !locked && e.shiftKey && startH > 0 ? startW / startH : null;
-      next = applyAspect(next, locked ?? shiftRatio, drag.handle);
-    }
-    box = finalizeBox(next);
-    scheduleDraw();
-  });
-  function endDrag() {
-    var _a2;
-    if (!drag) return;
-    if (drag.handle === "draw") {
-      const tooSmall = box.x1 - box.x0 < srcW * DRAW_MIN_PX_FRAC || box.y1 - box.y0 < srcH * DRAW_MIN_PX_FRAC;
-      if (tooSmall) {
-        box = drag.preBox;
-        angle = drag.preAngle;
-        boxActive = drag.preActive;
-        drag = null;
-        draw();
-        return;
-      }
-    }
-    drag = null;
-    regionW.value = serialiseRegion(box, angle, srcW, srcH);
-    (_a2 = regionW.callback) == null ? void 0 : _a2.call(regionW, regionW.value);
-  }
-  canvas.addEventListener("pointerup", endDrag);
-  canvas.addEventListener("pointercancel", endDrag);
-  select.addEventListener("change", () => {
-    node.properties.nkdCropAspect = select.value;
-    box = finalizeBox(applyAspect(box));
-    regionW.value = serialiseRegion(box, angle, srcW, srcH);
-    draw();
-  });
-  resetBtn.addEventListener("click", () => {
-    angle = 0;
-    boxActive = true;
-    box = finalizeBox(defaultBox(srcW, srcH));
-    regionW.value = serialiseRegion(box, angle, srcW, srcH);
-    draw();
-  });
-  const fillW = findW(node, "fill");
-  function syncFillWidgetsVisible() {
-    const outpaint = isOutpaint();
-    setWidgetVisible(node, "fill", outpaint);
-    setWidgetVisible(node, "fill_color", outpaint && (fillW == null ? void 0 : fillW.value) === "color");
-    if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
-    node.setSize(node.computeSize());
-    node.setDirtyCanvas(true, true);
-  }
-  function wrapCallback(w, flag, handler) {
-    if (!w || w[flag]) return;
-    const orig = w.callback;
-    w.callback = function(...args) {
-      const r = orig == null ? void 0 : orig.apply(this, args);
-      handler();
-      return r;
-    };
-    w[flag] = true;
-  }
-  wrapCallback(fillW, "_nkdCropCb", syncFillWidgetsVisible);
-  function reflowBox() {
-    box = finalizeBox(box);
-    regionW.value = serialiseRegion(box, angle, srcW, srcH);
-    if (mounted == null ? void 0 : mounted.resizeToContent) mounted.resizeToContent();
-    draw();
-  }
-  wrapCallback(modeW, "_nkdCropCb", () => {
-    syncFillWidgetsVisible();
-    reflowBox();
-  });
-  wrapCallback(divisibleByW, "_nkdCropCb", reflowBox);
-  const mounted = mountDomWidget(node, {
-    name: "nkd_crop_editor",
-    type: "NKD_CROP",
-    root,
-    // The real floor is whatever the toolbar needs to not wrap (Aspect label + select +
-    // Reset), not the canvas — the canvas itself is happy at any size, same as an <img>.
-    minWidth: 120,
-    minWidthOf: barMinWidth,
-    estimate: () => BAR_H + Math.round(CANVAS_W$1 * srcH / srcW) + (transport.style.display === "flex" ? TRANSPORT_H : 0),
-    getValue: () => regionW.value,
-    setValue: (v) => {
-      regionW.value = v;
-      ({ box, angle } = parseRegion(v, srcW, srcH));
-      boxActive = !!v;
-      draw();
-    },
-    onResize: () => scheduleDraw()
-  });
-  const origConfigure = node.onConfigure;
-  node.onConfigure = function(data) {
-    origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
-    select.value = node.properties.nkdCropAspect ?? "Free";
-    ({ box, angle } = parseRegion(regionW.value, srcW, srcH));
-    boxActive = !!regionW.value;
-    refreshSource();
-    syncFillWidgetsVisible();
-    if (mounted.resizeToContent) mounted.resizeToContent();
-    draw();
-  };
-  const origConnChange = node.onConnectionsChange;
-  node.onConnectionsChange = function(...args) {
-    origConnChange == null ? void 0 : origConnChange.apply(this, args);
-    refreshSource();
-  };
-  const refreshPoll = window.setInterval(refreshSource, 500);
-  const origRemoved = node.onRemoved;
-  node.onRemoved = function(...args) {
-    stopPlayback();
-    clearInterval(refreshPoll);
-    live$1.delete(String(node.id));
-    origRemoved == null ? void 0 : origRemoved.apply(this, args);
-  };
-  syncFillWidgetsVisible();
-  requestAnimationFrame(() => {
-    refreshSource();
-    draw();
-  });
-}
 const FINE_GAIN = 0.1;
 if (typeof window !== "undefined") {
   window.addEventListener("keydown", (e) => {
@@ -16732,16 +15902,16 @@ function attachFineRange(root) {
     root.removeEventListener("dblclick", onDblClick, true);
   };
 }
-const NODE_NAME$2 = "NKDPaint";
-const EXT_NAME$2 = "NKD.BasicTools.Paint";
+const NODE_NAME$3 = "NKDPaint";
+const EXT_NAME$3 = "NKD.BasicTools.Paint";
 console.log("[NKD Paint] rev 1");
-const CANVAS_W = 240;
+const CANVAS_W$1 = 240;
 const MAX_SIDE = 2048;
 const UNDO_BUDGET = 256 * 1024 * 1024;
 const ZOOM_MIN = 0.25, ZOOM_MAX = 16;
 const SUBFOLDER = "nkd_paint";
-const frames = /* @__PURE__ */ new Map();
-const live = /* @__PURE__ */ new Map();
+const frames$1 = /* @__PURE__ */ new Map();
+const live$1 = /* @__PURE__ */ new Map();
 function paintSource(nodeId, canvas, fullW, fullH) {
   var _a;
   const b = {
@@ -16751,14 +15921,14 @@ function paintSource(nodeId, canvas, fullW, fullH) {
     fullW: fullW || canvas.width,
     fullH: fullH || canvas.height
   };
-  frames.set(nodeId, b);
-  (_a = live.get(nodeId)) == null ? void 0 : _a(b);
+  frames$1.set(nodeId, b);
+  (_a = live$1.get(nodeId)) == null ? void 0 : _a(b);
 }
 function registerPaint() {
   app.registerExtension({
-    name: EXT_NAME$2,
+    name: EXT_NAME$3,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeData.name !== NODE_NAME$3) return;
       if (nodeType.prototype.__nkdPaintWrapped) return;
       nodeType.prototype.__nkdPaintWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -17461,7 +16631,7 @@ function setupPaintWidget(node) {
       loadFile(direct);
       return;
     }
-    const f = frames.get(String(node.id));
+    const f = frames$1.get(String(node.id));
     if (f) {
       lastRef = null;
       if (base !== f) setBase(f);
@@ -17470,7 +16640,7 @@ function setupPaintWidget(node) {
     const far = resolveSource(node, "image");
     if (far) loadFile(far);
   }
-  live.set(String(node.id), (b) => {
+  live$1.set(String(node.id), (b) => {
     if (imageLinked() && !directRef()) {
       lastRef = null;
       setBase(b);
@@ -17507,7 +16677,7 @@ function setupPaintWidget(node) {
     root,
     minWidth: 120,
     minWidthOf: barMinWidth,
-    estimate: () => (bar.offsetHeight || 60) + Math.round(CANVAS_W * layerCv.height / layerCv.width),
+    estimate: () => (bar.offsetHeight || 60) + Math.round(CANVAS_W$1 * layerCv.height / layerCv.width),
     getValue: () => layerW.value,
     setValue: (v) => {
       layerW.value = v;
@@ -17539,7 +16709,7 @@ function setupPaintWidget(node) {
     if (raf) cancelAnimationFrame(raf);
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("keyup", onKeyUp, true);
-    live.delete(String(node.id));
+    live$1.delete(String(node.id));
     detachFine();
     mounted.release();
     origRemoved == null ? void 0 : origRemoved.apply(this, args);
@@ -17550,6 +16720,840 @@ function setupPaintWidget(node) {
     syncDims();
     refreshSource();
     ensureLayerSize();
+    draw();
+  });
+}
+const NODE_NAME$2 = "NKDCrop";
+const EXT_NAME$2 = "NKD.BasicTools.Crop";
+console.log("[NKD Crop] rev 1.1.0");
+const frames = /* @__PURE__ */ new Map();
+const live = /* @__PURE__ */ new Map();
+function cropSource(nodeId, canvas, fullW, fullH) {
+  var _a;
+  const f = { canvas, fullW: fullW || canvas.width, fullH: fullH || canvas.height };
+  frames.set(nodeId, f);
+  (_a = live.get(nodeId)) == null ? void 0 : _a(f);
+}
+const CANVAS_W = 180;
+const MARGIN = 0.5;
+const HANDLE_R = 5;
+const HANDLE_HIT = 10;
+const BAR_H = 30;
+const TRANSPORT_H = 26;
+const ROTATE_OFFSET = 22;
+const ROTATE_BASE_DEG = -90;
+const EDGE_SNAP_PX = 8;
+const ASPECTS = {
+  Free: null,
+  "1:1": 1,
+  "4:5": 4 / 5,
+  "3:4": 3 / 4,
+  "2:3": 2 / 3,
+  "9:16": 9 / 16,
+  "5:4": 5 / 4,
+  "4:3": 4 / 3,
+  "3:2": 3 / 2,
+  "16:9": 16 / 9
+};
+const C$1 = {
+  bg: "#111318",
+  srcBorder: "rgba(255,255,255,0.28)",
+  rect: "#4ab4ff",
+  rectFill: "rgba(74,180,255,0.08)",
+  outpaintHatch: "rgba(255,176,32,0.28)",
+  handle: "#4ab4ff",
+  outsideDim: "rgba(0,0,0,0.55)",
+  grid: "rgba(255,255,255,0.35)"
+};
+const DRAW_MIN_PX_FRAC = 0.02;
+function defaultBox(w, h) {
+  return { x0: 0, y0: 0, x1: w, y1: h };
+}
+function parseRegion(json, w, h) {
+  if (!json) return { box: defaultBox(w, h), angle: 0 };
+  try {
+    const d = JSON.parse(json);
+    const x = Number(d.x) || 0, y = Number(d.y) || 0;
+    const bw = Number(d.w) || 1, bh = Number(d.h) || 1;
+    const angle = Number(d.angle) || 0;
+    return { box: { x0: x * w, y0: y * h, x1: (x + bw) * w, y1: (y + bh) * h }, angle };
+  } catch {
+    return { box: defaultBox(w, h), angle: 0 };
+  }
+}
+function serialiseRegion(box, angle, w, h) {
+  if (w <= 0 || h <= 0) return "";
+  return JSON.stringify({
+    x: box.x0 / w,
+    y: box.y0 / h,
+    w: (box.x1 - box.x0) / w,
+    h: (box.y1 - box.y0) / h,
+    angle
+  });
+}
+const boxCenter = (b) => [(b.x0 + b.x1) / 2, (b.y0 + b.y1) / 2];
+function rotatePoint(px, py, cx, cy, deg) {
+  const t = deg * Math.PI / 180;
+  const cos = Math.cos(t), sin = Math.sin(t);
+  const dx = px - cx, dy = py - cy;
+  return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos];
+}
+function snapBox(b, multiple, clampW2, clampH) {
+  const grow = (a, bb, limit) => {
+    const size = bb - a;
+    const rem = (size % multiple + multiple) % multiple;
+    if (rem === 0) return [a, bb];
+    const extra = multiple - rem;
+    const addBefore = Math.floor(extra / 2);
+    let na = a - addBefore, nb = bb + (extra - addBefore);
+    if (limit != null) {
+      if (na < 0) {
+        nb += -na;
+        na = 0;
+      }
+      if (nb > limit) {
+        na -= nb - limit;
+        nb = limit;
+      }
+      na = Math.max(0, na);
+    }
+    return [na, nb];
+  };
+  const [x0, x1] = grow(b.x0, b.x1, clampW2);
+  const [y0, y1] = grow(b.y0, b.y1, clampH);
+  return { x0, y0, x1, y1 };
+}
+function snapBoxRotated(b, multiple) {
+  const [cx, cy] = boxCenter(b);
+  const grow = (v) => {
+    const rem = (v % multiple + multiple) % multiple;
+    return rem === 0 ? v : v + (multiple - rem);
+  };
+  const w = grow(b.x1 - b.x0), h = grow(b.y1 - b.y0);
+  return { x0: cx - w / 2, y0: cy - h / 2, x1: cx + w / 2, y1: cy + h / 2 };
+}
+function snapToSourceEdges(b, tol, w, h, edges, move) {
+  const out = { ...b };
+  const nearest = (v, lim) => {
+    if (v < 0 || v > lim) return null;
+    let best = null;
+    for (const t of [0, lim]) if (Math.abs(v - t) <= tol && (best == null || Math.abs(v - t) < Math.abs(v - best))) best = t;
+    return best;
+  };
+  if (move) {
+    const sx = nearest(out.x0, w), ex = nearest(out.x1, w);
+    const dx = sx != null ? sx - out.x0 : ex != null ? ex - out.x1 : 0;
+    const sy = nearest(out.y0, h), ey = nearest(out.y1, h);
+    const dy = sy != null ? sy - out.y0 : ey != null ? ey - out.y1 : 0;
+    return { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
+  }
+  if (edges.includes("w")) out.x0 = nearest(out.x0, w) ?? out.x0;
+  if (edges.includes("e")) out.x1 = nearest(out.x1, w) ?? out.x1;
+  if (edges.includes("n")) out.y0 = nearest(out.y0, h) ?? out.y0;
+  if (edges.includes("s")) out.y1 = nearest(out.y1, h) ?? out.y1;
+  return out;
+}
+function containRotatedBox(b, deg, w, h) {
+  let out = b;
+  for (let i = 0; i < 6; i++) {
+    const [cx, cy] = boxCenter(out);
+    const corners = [
+      [out.x0, out.y0],
+      [out.x1, out.y0],
+      [out.x1, out.y1],
+      [out.x0, out.y1]
+    ];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [rx, ry] = rotatePoint(px, py, cx, cy, deg);
+      minX = Math.min(minX, rx);
+      maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry);
+      maxY = Math.max(maxY, ry);
+    }
+    const bw = maxX - minX, bh = maxY - minY;
+    if (bw > w + 1e-6 || bh > h + 1e-6) {
+      const scale = Math.min(w / bw, h / bh) * 0.999;
+      out = {
+        x0: cx + (out.x0 - cx) * scale,
+        y0: cy + (out.y0 - cy) * scale,
+        x1: cx + (out.x1 - cx) * scale,
+        y1: cy + (out.y1 - cy) * scale
+      };
+      continue;
+    }
+    let dx = 0, dy = 0;
+    if (minX < 0) dx = -minX;
+    else if (maxX > w) dx = w - maxX;
+    if (minY < 0) dy = -minY;
+    else if (maxY > h) dy = h - maxY;
+    if (dx === 0 && dy === 0) break;
+    out = { x0: out.x0 + dx, y0: out.y0 + dy, x1: out.x1 + dx, y1: out.y1 + dy };
+  }
+  return out;
+}
+function registerCrop() {
+  app.registerExtension({
+    name: EXT_NAME$2,
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeType.prototype.__nkdCropWrapped) return;
+      nodeType.prototype.__nkdCropWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        setupCropWidget(this);
+        return r;
+      };
+    }
+  });
+}
+function setupCropWidget(node) {
+  var _a;
+  const regionW = (_a = node.widgets) == null ? void 0 : _a.find((w) => w.name === "region");
+  if (!regionW) return;
+  hideWidget(regionW);
+  node.properties.nkdCropAspect = node.properties.nkdCropAspect ?? "Free";
+  let srcW = 512, srcH = 512;
+  let srcEl = null;
+  let { box, angle } = parseRegion(regionW.value, srcW, srcH);
+  let boxActive = !!regionW.value;
+  let lastRef = null;
+  let playing = false;
+  let rafId = 0;
+  const root = document.createElement("div");
+  root.className = "nkd-crop-wrap";
+  root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
+  const bar = document.createElement("div");
+  bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
+  const label = document.createElement("span");
+  label.textContent = "Aspect";
+  label.style.cssText = "opacity:0.6;flex:0 0 auto;";
+  const select = document.createElement("select");
+  select.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 4px;flex:0 0 auto;";
+  for (const k of Object.keys(ASPECTS)) {
+    const opt = document.createElement("option");
+    opt.value = k;
+    opt.textContent = k;
+    select.appendChild(opt);
+  }
+  select.value = node.properties.nkdCropAspect;
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "Reset";
+  resetBtn.style.cssText = "margin-left:auto;background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 8px;cursor:pointer;flex:0 0 auto;";
+  bar.append(label, select, resetBtn);
+  const BAR_PAD_X = 16, BAR_GAP = 6;
+  const barMinWidth = () => {
+    const kids = Array.from(bar.children);
+    const content = kids.reduce((sum, k) => sum + k.offsetWidth, 0);
+    return content + BAR_PAD_X + BAR_GAP * Math.max(0, kids.length - 1);
+  };
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "display:block;width:100%;cursor:crosshair;";
+  const transport = document.createElement("div");
+  transport.style.cssText = "display:none;align-items:center;gap:6px;height:26px;padding:0 8px;background:#1a1c22;border-top:1px solid #2a2d36;";
+  const playBtn = document.createElement("button");
+  playBtn.textContent = "▶";
+  playBtn.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 6px;cursor:pointer;width:26px;";
+  const scrub = document.createElement("input");
+  scrub.type = "range";
+  scrub.min = "0";
+  scrub.max = "1000";
+  scrub.value = "0";
+  scrub.style.cssText = "flex:1;";
+  transport.append(playBtn, scrub);
+  root.append(bar, canvas, transport);
+  const dpr = () => Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+  const modeW = findW(node, "mode");
+  const isOutpaint = () => (modeW == null ? void 0 : modeW.value) === "Outpaint";
+  const isRotated = () => Math.abs(angle) > 0.01;
+  function rotatedBounds() {
+    const [cx, cy] = boxCenter(box);
+    const corners = [
+      [box.x0, box.y0],
+      [box.x1, box.y0],
+      [box.x1, box.y1],
+      [box.x0, box.y1]
+    ];
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const [px, py] of corners) {
+      const [rx, ry] = rotatePoint(px, py, cx, cy, angle);
+      minX = Math.min(minX, rx);
+      maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry);
+      maxY = Math.max(maxY, ry);
+    }
+    return { minX, maxX, minY, maxY };
+  }
+  function overflowFraction() {
+    const { minX, maxX, minY, maxY } = rotatedBounds();
+    const overflow = Math.max(0, -minX, maxX - srcW, -minY, maxY - srcH);
+    return overflow / Math.max(1, Math.min(srcW, srcH));
+  }
+  const EDGE_LOOKAHEAD = 0.12;
+  function marginNeedFraction() {
+    const { minX, maxX, minY, maxY } = rotatedBounds();
+    const buffer = EDGE_LOOKAHEAD * Math.max(1, Math.min(srcW, srcH));
+    const need = Math.max(
+      0,
+      buffer - minX,
+      maxX - (srcW - buffer),
+      buffer - minY,
+      maxY - (srcH - buffer)
+    );
+    return need / Math.max(1, Math.min(srcW, srcH));
+  }
+  const TIER1_MAX = 0.6;
+  const TIER2_MAX = 2.5;
+  const TIER2_RATE = 0.35;
+  const MARGIN_SLACK = 1.25;
+  const marginFor = (want) => want <= TIER1_MAX ? want : Math.min(TIER2_MAX, TIER1_MAX + (want - TIER1_MAX) * TIER2_RATE);
+  const margin = () => {
+    if (!isOutpaint()) return 0;
+    const need = marginNeedFraction() * MARGIN_SLACK;
+    return marginFor(Math.max(MARGIN, need));
+  };
+  const divisibleByW = findW(node, "divisible_by");
+  const gridMultiple = () => {
+    const v = divisibleByW == null ? void 0 : divisibleByW.value;
+    return v && v !== "disabled" ? parseInt(v, 10) : null;
+  };
+  function canvasSize() {
+    const m = margin();
+    const cw = canvas.clientWidth || CANVAS_W;
+    const ch = cw * (srcH * (1 + 2 * m)) / (srcW * (1 + 2 * m));
+    return [cw, ch];
+  }
+  function scaleAndOrigin() {
+    const m = margin();
+    const [cw] = canvasSize();
+    const scale = cw / (srcW * (1 + 2 * m));
+    return { scale, ox: m * srcW * scale, oy: m * srcH * scale };
+  }
+  const toCanvas2 = (px, py) => {
+    const { scale, ox, oy } = scaleAndOrigin();
+    return [ox + px * scale, oy + py * scale];
+  };
+  const toSource = (cx, cy) => {
+    const { scale, ox, oy } = scaleAndOrigin();
+    return [(cx - ox) / scale, (cy - oy) / scale];
+  };
+  const edgeSnapTol = (e) => e.altKey || isRotated() ? 0 : EDGE_SNAP_PX / scaleAndOrigin().scale;
+  function syncCanvasBuffer() {
+    const [cw, ch] = canvasSize();
+    const d = dpr();
+    const w = Math.max(1, Math.round(cw * d)), h = Math.max(1, Math.round(cw * d * (ch / cw)));
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(w / cw, 0, 0, h / ch, 0, 0);
+    return ctx;
+  }
+  let drawScheduled = false;
+  function scheduleDraw() {
+    if (drawScheduled) return;
+    drawScheduled = true;
+    requestAnimationFrame(() => {
+      drawScheduled = false;
+      draw();
+    });
+  }
+  function draw() {
+    var _a2;
+    const [cw, ch] = canvasSize();
+    const ctx = syncCanvasBuffer();
+    ctx.clearRect(0, 0, cw, ch);
+    ctx.fillStyle = isOutpaint() && ((_a2 = findW(node, "fill")) == null ? void 0 : _a2.value) === "transparent" ? checker(ctx) : C$1.bg;
+    ctx.fillRect(0, 0, cw, ch);
+    const [sx0, sy0] = toCanvas2(0, 0);
+    const [sx1, sy1] = toCanvas2(srcW, srcH);
+    if (srcEl) {
+      ctx.fillStyle = checker(ctx);
+      ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+      try {
+        ctx.drawImage(srcEl, sx0, sy0, sx1 - sx0, sy1 - sy0);
+      } catch {
+      }
+    } else {
+      ctx.fillStyle = "#1a1c22";
+      ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+    }
+    ctx.strokeStyle = C$1.srcBorder;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
+    if (!boxActive) return;
+    const [rx0, ry0] = toCanvas2(box.x0, box.y0);
+    const [rx1, ry1] = toCanvas2(box.x1, box.y1);
+    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
+    const rw = rx1 - rx0, rh = ry1 - ry0;
+    const corners = [[rx0, ry0], [rx1, ry0], [rx1, ry1], [rx0, ry1]].map(([x, y]) => rotatePoint(x, y, ccx, ccy, angle));
+    const addQuadSubpath = () => {
+      ctx.moveTo(corners[0][0], corners[0][1]);
+      for (let i = 1; i < 4; i++) ctx.lineTo(corners[i][0], corners[i][1]);
+      ctx.closePath();
+    };
+    const strokeQuad = () => {
+      ctx.beginPath();
+      addQuadSubpath();
+    };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, cw, ch);
+    addQuadSubpath();
+    ctx.fillStyle = C$1.outsideDim;
+    ctx.fill("evenodd");
+    ctx.restore();
+    ctx.save();
+    strokeQuad();
+    ctx.clip();
+    ctx.fillStyle = C$1.rectFill;
+    ctx.fill();
+    if (overflowFraction() > 1e-4) {
+      ctx.translate(ccx, ccy);
+      ctx.rotate(angle * Math.PI / 180);
+      ctx.translate(-ccx, -ccy);
+      ctx.strokeStyle = C$1.outpaintHatch;
+      ctx.lineWidth = 1;
+      const step = 8;
+      for (let d2 = -rh; d2 < rw; d2 += step) {
+        ctx.beginPath();
+        ctx.moveTo(rx0 + d2, ry0);
+        ctx.lineTo(rx0 + d2 + rh, ry0 + rh);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    ctx.save();
+    ctx.translate(ccx, ccy);
+    ctx.rotate(angle * Math.PI / 180);
+    ctx.translate(-ccx, -ccy);
+    ctx.strokeStyle = C$1.grid;
+    ctx.lineWidth = 1;
+    for (let k = 1; k <= 2; k++) {
+      const gx = rx0 + rw * k / 3;
+      ctx.beginPath();
+      ctx.moveTo(gx, ry0);
+      ctx.lineTo(gx, ry1);
+      ctx.stroke();
+      const gy = ry0 + rh * k / 3;
+      ctx.beginPath();
+      ctx.moveTo(rx0, gy);
+      ctx.lineTo(rx1, gy);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.strokeStyle = C$1.rect;
+    ctx.lineWidth = 1.5;
+    strokeQuad();
+    ctx.stroke();
+    const localPts = [
+      [rx0, ry0, "nw"],
+      [rx1, ry0, "ne"],
+      [rx0, ry1, "sw"],
+      [rx1, ry1, "se"],
+      [(rx0 + rx1) / 2, ry0, "n"],
+      [(rx0 + rx1) / 2, ry1, "s"],
+      [rx0, (ry0 + ry1) / 2, "w"],
+      [rx1, (ry0 + ry1) / 2, "e"]
+    ];
+    ctx.fillStyle = C$1.handle;
+    for (const [lx, ly] of localPts) {
+      const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
+      ctx.beginPath();
+      ctx.arc(hx, hy, HANDLE_R, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
+    ctx.strokeStyle = C$1.rect;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(topX, topY);
+    ctx.lineTo(hubX, hubY);
+    ctx.stroke();
+    ctx.fillStyle = C$1.handle;
+    ctx.beginPath();
+    ctx.arc(hubX, hubY, HANDLE_R, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function stopPlayback() {
+    playing = false;
+    playBtn.textContent = "▶";
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = 0;
+    if (srcEl instanceof HTMLVideoElement) srcEl.pause();
+  }
+  function stepPlayback() {
+    if (!playing) return;
+    draw();
+    const v = srcEl;
+    if (v.duration > 0) scrub.value = String(Math.round(v.currentTime / v.duration * 1e3));
+    rafId = requestAnimationFrame(stepPlayback);
+  }
+  function setPlaying(p2) {
+    if (!(srcEl instanceof HTMLVideoElement)) return;
+    if (p2) {
+      playing = true;
+      playBtn.textContent = "⏸";
+      srcEl.play().catch(() => {
+        playing = false;
+        playBtn.textContent = "▶";
+      });
+      rafId = requestAnimationFrame(stepPlayback);
+    } else {
+      stopPlayback();
+    }
+  }
+  playBtn.addEventListener("click", () => setPlaying(!playing));
+  scrub.addEventListener("input", () => {
+    if (!(srcEl instanceof HTMLVideoElement)) return;
+    stopPlayback();
+    if (srcEl.duration > 0) srcEl.currentTime = Number(scrub.value) / 1e3 * srcEl.duration;
+    draw();
+  });
+  function loadThumb(ref2) {
+    const kind = slotKind(node, "image");
+    const url = viewUrl$1(ref2);
+    stopPlayback();
+    if (kind === "video") {
+      const v = document.createElement("video");
+      v.muted = true;
+      v.playsInline = true;
+      v.preload = "metadata";
+      v.loop = true;
+      v.src = url;
+      transport.style.display = "flex";
+      scrub.value = "0";
+      v.onloadeddata = () => {
+        srcEl = v;
+        srcW = v.videoWidth || srcW;
+        srcH = v.videoHeight || srcH;
+        draw();
+      };
+      srcEl = null;
+    } else {
+      transport.style.display = "none";
+      const img = new Image();
+      img.onload = () => {
+        srcEl = img;
+        srcW = img.naturalWidth || srcW;
+        srcH = img.naturalHeight || srcH;
+        draw();
+      };
+      img.src = url;
+    }
+  }
+  function useFrame(f) {
+    stopPlayback();
+    transport.style.display = "none";
+    lastRef = null;
+    srcEl = f.canvas;
+    srcW = f.fullW;
+    srcH = f.fullH;
+    draw();
+  }
+  function refreshSource() {
+    const direct = resolveSource(node, "image", 0);
+    const pushed = frames.get(String(node.id));
+    const ref2 = direct ?? (pushed ? null : resolveSource(node, "image"));
+    if (!ref2) {
+      if (pushed && srcEl !== pushed.canvas) useFrame(pushed);
+      return;
+    }
+    if (lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) {
+      return;
+    }
+    lastRef = ref2;
+    srcEl = null;
+    loadThumb(ref2);
+  }
+  live.set(String(node.id), (f) => {
+    if (!resolveSource(node, "image", 0)) useFrame(f);
+  });
+  function hitTest(cx, cy) {
+    if (!boxActive) return "draw";
+    const [rx0, ry0] = toCanvas2(box.x0, box.y0);
+    const [rx1, ry1] = toCanvas2(box.x1, box.y1);
+    const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
+    if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT) return "rotate";
+    const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
+    const near = (ax, ay) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
+    if (near(rx0, ry0)) return "nw";
+    if (near(rx1, ry0)) return "ne";
+    if (near(rx0, ry1)) return "sw";
+    if (near(rx1, ry1)) return "se";
+    if (near((rx0 + rx1) / 2, ry0)) return "n";
+    if (near((rx0 + rx1) / 2, ry1)) return "s";
+    if (near(rx0, (ry0 + ry1) / 2)) return "w";
+    if (near(rx1, (ry0 + ry1) / 2)) return "e";
+    if (lx >= rx0 && lx <= rx1 && ly >= ry0 && ly <= ry1) return "move";
+    return "draw";
+  }
+  function applyAspect(b, ratio, handle) {
+    const r = ratio ?? ASPECTS[node.properties.nkdCropAspect];
+    if (!r) return b;
+    if (handle === "n" || handle === "s") {
+      const h2 = b.y1 - b.y0;
+      const w2 = h2 * r;
+      const cx = (b.x0 + b.x1) / 2;
+      return { x0: cx - w2 / 2, y0: b.y0, x1: cx + w2 / 2, y1: b.y1 };
+    }
+    const w = b.x1 - b.x0;
+    const h = w / r;
+    return { x0: b.x0, y0: b.y0, x1: b.x1, y1: b.y0 + h };
+  }
+  function finalizeBox(b) {
+    let out = b;
+    const grid = gridMultiple();
+    if (grid) {
+      out = isRotated() ? snapBoxRotated(out, grid) : snapBox(out, grid, isOutpaint() ? null : srcW, isOutpaint() ? null : srcH);
+    }
+    if (!isOutpaint()) out = containRotatedBox(out, angle, srcW, srcH);
+    return out;
+  }
+  let drag = null;
+  function eventToSource(e) {
+    const rect = canvas.getBoundingClientRect();
+    const [cw, ch] = canvasSize();
+    const cx = (e.clientX - rect.left) * (cw / rect.width);
+    const cy = (e.clientY - rect.top) * (ch / rect.height);
+    return toSource(cx, cy);
+  }
+  canvas.addEventListener("pointerdown", (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const [cw, ch] = canvasSize();
+    const cx = (e.clientX - rect.left) * (cw / rect.width);
+    const cy = (e.clientY - rect.top) * (ch / rect.height);
+    const h = hitTest(cx, cy);
+    canvas.setPointerCapture(e.pointerId);
+    const [sxRaw, syRaw] = eventToSource(e);
+    if (h === "draw") {
+      const preBox = { ...box }, preAngle = angle, preActive = boxActive;
+      angle = 0;
+      boxActive = true;
+      box = { x0: sxRaw, y0: syRaw, x1: sxRaw, y1: syRaw };
+      drag = {
+        handle: h,
+        startBox: box,
+        startSrc: [sxRaw, syRaw],
+        startAngle: 0,
+        preBox,
+        preAngle,
+        preActive
+      };
+      draw();
+      e.stopPropagation();
+      return;
+    }
+    const startSrc = h === "move" || h === "rotate" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(box), -angle);
+    drag = { handle: h, startBox: { ...box }, startSrc, startAngle: angle };
+    e.stopPropagation();
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const b0 = drag.startBox;
+    if (drag.handle === "draw") {
+      const [sx2, sy2] = eventToSource(e);
+      const [ax, ay] = drag.startSrc;
+      let next2 = {
+        x0: Math.min(ax, sx2),
+        y0: Math.min(ay, sy2),
+        x1: Math.max(ax, sx2),
+        y1: Math.max(ay, sy2)
+      };
+      const m = margin();
+      const lo = -m, hi = 1 + m;
+      next2.x0 = Math.max(lo * srcW, next2.x0);
+      next2.y0 = Math.max(lo * srcH, next2.y0);
+      next2.x1 = Math.min(hi * srcW, next2.x1);
+      next2.y1 = Math.min(hi * srcH, next2.y1);
+      next2 = snapToSourceEdges(next2, edgeSnapTol(e), srcW, srcH, "nsew", false);
+      const locked = ASPECTS[node.properties.nkdCropAspect];
+      if (locked) next2 = applyAspect(next2, locked);
+      box = finalizeBox(next2);
+      scheduleDraw();
+      return;
+    }
+    if (drag.handle === "rotate") {
+      const [sx2, sy2] = eventToSource(e);
+      const [cx, cy] = boxCenter(b0);
+      const rawDeg = Math.atan2(sy2 - cy, sx2 - cx) * 180 / Math.PI;
+      let next2 = rawDeg - ROTATE_BASE_DEG;
+      if (e.shiftKey) next2 = Math.round(next2 / 15) * 15;
+      angle = (next2 % 360 + 360) % 360;
+      box = finalizeBox(box);
+      scheduleDraw();
+      return;
+    }
+    const [sxRaw, syRaw] = eventToSource(e);
+    const [sx, sy] = drag.handle === "move" ? [sxRaw, syRaw] : rotatePoint(sxRaw, syRaw, ...boxCenter(b0), -drag.startAngle);
+    const dx = sx - drag.startSrc[0], dy = sy - drag.startSrc[1];
+    let next = { ...b0 };
+    const minSize = Math.max(4, Math.min(srcW, srcH) * 0.02);
+    switch (drag.handle) {
+      case "move":
+        next = { x0: b0.x0 + dx, y0: b0.y0 + dy, x1: b0.x1 + dx, y1: b0.y1 + dy };
+        break;
+      case "n":
+        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
+        break;
+      case "s":
+        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
+        break;
+      case "w":
+        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
+        break;
+      case "e":
+        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
+        break;
+      case "nw":
+        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
+        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
+        break;
+      case "ne":
+        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
+        next.y0 = Math.min(b0.y1 - minSize, b0.y0 + dy);
+        break;
+      case "sw":
+        next.x0 = Math.min(b0.x1 - minSize, b0.x0 + dx);
+        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
+        break;
+      case "se":
+        next.x1 = Math.max(b0.x0 + minSize, b0.x1 + dx);
+        next.y1 = Math.max(b0.y0 + minSize, b0.y1 + dy);
+        break;
+    }
+    if (!isRotated()) {
+      const m = margin();
+      const lo = -m, hi = 1 + m;
+      next.x0 = Math.max(lo * srcW, next.x0);
+      next.y0 = Math.max(lo * srcH, next.y0);
+      next.x1 = Math.min(hi * srcW, next.x1);
+      next.y1 = Math.min(hi * srcH, next.y1);
+    }
+    next = snapToSourceEdges(next, edgeSnapTol(e), srcW, srcH, drag.handle, drag.handle === "move");
+    if (drag.handle !== "move") {
+      const locked = ASPECTS[node.properties.nkdCropAspect];
+      const startW = b0.x1 - b0.x0, startH = b0.y1 - b0.y0;
+      const shiftRatio = !locked && e.shiftKey && startH > 0 ? startW / startH : null;
+      next = applyAspect(next, locked ?? shiftRatio, drag.handle);
+    }
+    box = finalizeBox(next);
+    scheduleDraw();
+  });
+  function endDrag() {
+    var _a2;
+    if (!drag) return;
+    if (drag.handle === "draw") {
+      const tooSmall = box.x1 - box.x0 < srcW * DRAW_MIN_PX_FRAC || box.y1 - box.y0 < srcH * DRAW_MIN_PX_FRAC;
+      if (tooSmall) {
+        box = drag.preBox;
+        angle = drag.preAngle;
+        boxActive = drag.preActive;
+        drag = null;
+        draw();
+        return;
+      }
+    }
+    drag = null;
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
+    (_a2 = regionW.callback) == null ? void 0 : _a2.call(regionW, regionW.value);
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  select.addEventListener("change", () => {
+    node.properties.nkdCropAspect = select.value;
+    box = finalizeBox(applyAspect(box));
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
+    draw();
+  });
+  resetBtn.addEventListener("click", () => {
+    angle = 0;
+    boxActive = true;
+    box = finalizeBox(defaultBox(srcW, srcH));
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
+    draw();
+  });
+  const fillW = findW(node, "fill");
+  function syncFillWidgetsVisible() {
+    const outpaint = isOutpaint();
+    setWidgetVisible(node, "fill", outpaint);
+    setWidgetVisible(node, "fill_color", outpaint && (fillW == null ? void 0 : fillW.value) === "color");
+    draw();
+    if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
+    node.setSize(node.computeSize());
+    node.setDirtyCanvas(true, true);
+  }
+  function wrapCallback(w, flag, handler) {
+    if (!w || w[flag]) return;
+    const orig = w.callback;
+    w.callback = function(...args) {
+      const r = orig == null ? void 0 : orig.apply(this, args);
+      handler();
+      return r;
+    };
+    w[flag] = true;
+  }
+  wrapCallback(fillW, "_nkdCropCb", syncFillWidgetsVisible);
+  function reflowBox() {
+    box = finalizeBox(box);
+    regionW.value = serialiseRegion(box, angle, srcW, srcH);
+    if (mounted == null ? void 0 : mounted.resizeToContent) mounted.resizeToContent();
+    draw();
+  }
+  wrapCallback(modeW, "_nkdCropCb", () => {
+    syncFillWidgetsVisible();
+    reflowBox();
+  });
+  wrapCallback(divisibleByW, "_nkdCropCb", reflowBox);
+  const mounted = mountDomWidget(node, {
+    name: "nkd_crop_editor",
+    type: "NKD_CROP",
+    root,
+    // The real floor is whatever the toolbar needs to not wrap (Aspect label + select +
+    // Reset), not the canvas — the canvas itself is happy at any size, same as an <img>.
+    minWidth: 120,
+    minWidthOf: barMinWidth,
+    estimate: () => BAR_H + Math.round(CANVAS_W * srcH / srcW) + (transport.style.display === "flex" ? TRANSPORT_H : 0),
+    getValue: () => regionW.value,
+    setValue: (v) => {
+      regionW.value = v;
+      ({ box, angle } = parseRegion(v, srcW, srcH));
+      boxActive = !!v;
+      draw();
+    },
+    onResize: () => scheduleDraw()
+  });
+  const origConfigure = node.onConfigure;
+  node.onConfigure = function(data) {
+    origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+    select.value = node.properties.nkdCropAspect ?? "Free";
+    ({ box, angle } = parseRegion(regionW.value, srcW, srcH));
+    boxActive = !!regionW.value;
+    refreshSource();
+    syncFillWidgetsVisible();
+    if (mounted.resizeToContent) mounted.resizeToContent();
+    draw();
+  };
+  const origConnChange = node.onConnectionsChange;
+  node.onConnectionsChange = function(...args) {
+    origConnChange == null ? void 0 : origConnChange.apply(this, args);
+    refreshSource();
+  };
+  const refreshPoll = window.setInterval(refreshSource, 500);
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function(...args) {
+    stopPlayback();
+    clearInterval(refreshPoll);
+    live.delete(String(node.id));
+    origRemoved == null ? void 0 : origRemoved.apply(this, args);
+  };
+  syncFillWidgetsVisible();
+  requestAnimationFrame(() => {
+    refreshSource();
     draw();
   });
 }
@@ -19273,17 +19277,17 @@ app.registerExtension({
 });
 let activeColorWarp = null;
 const colorWarpFrames = /* @__PURE__ */ new Map();
-function rgbBytesToCanvas(bytes, w, h) {
+function rgbBytesToCanvas(bytes, w, h, channels = 3) {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   const ctx = c.getContext("2d");
   const img = ctx.createImageData(w, h);
-  for (let i = 0, j = 0, k = 0; i < w * h; i++, j += 3, k += 4) {
+  for (let i = 0, j = 0, k = 0; i < w * h; i++, j += channels, k += 4) {
     img.data[k] = bytes[j];
     img.data[k + 1] = bytes[j + 1];
     img.data[k + 2] = bytes[j + 2];
-    img.data[k + 3] = 255;
+    img.data[k + 3] = channels === 4 ? bytes[j + 3] : 255;
   }
   ctx.putImageData(img, 0, 0);
   return c;
@@ -19440,7 +19444,7 @@ api.addEventListener("nkd-crop-source", (e) => {
   try {
     cropSource(
       String(d.node),
-      rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
+      rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height, d.channels),
       d.full_width,
       d.full_height
     );

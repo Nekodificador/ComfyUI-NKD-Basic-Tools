@@ -61,7 +61,11 @@ to stay inside the source rather than pulling black in with it.
   Outpaint lets it extend past the edge and grow the canvas.
 - `fill` decides what goes under the outpainted area: `edge` replicates the border
   pixel, `reflect` mirrors the image back out, and `black`, `white`, `gray` or
-  `color` lay down a flat tone. Default is `edge`.
+  `color` lay down a flat tone. `transparent` leaves it empty and the image comes out
+  RGBA. Default is `edge`.
+- A source with transparency keeps its alpha in Crop mode. In Outpaint, any opaque
+  `fill` fills its see-through areas too, and the mask marks them white alongside the
+  margin.
 - `fill_color` is the colour picker `fill = color` uses. Default `#000000`.
 - `divisible_by` aligns the rectangle itself to a multiple of 8, 16, 32 or 64 by
   growing it, not by resampling. MiniMax and friends want their pixel grid, and

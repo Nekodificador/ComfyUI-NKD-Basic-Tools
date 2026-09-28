@@ -88,7 +88,7 @@ const toHex = (r: number, g: number, b: number) =>
   "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, "0")).join("");
 
 let checkerPattern: CanvasPattern | null = null;
-function checker(ctx: CanvasRenderingContext2D): CanvasPattern {
+export function checker(ctx: CanvasRenderingContext2D): CanvasPattern {
   if (checkerPattern) return checkerPattern;
   const c = mkCanvas(16, 16);
   const x = c.getContext("2d")!;

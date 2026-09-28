@@ -12,11 +12,16 @@ sys.path.insert(0, _PACK)
 sys.path.insert(0, os.path.dirname(os.path.dirname(_PACK)))
 
 import math
+import types
 
 import comfy.utils as comfy_utils  # noqa: E402
 import torch  # noqa: E402
 
-from nkd_crop import (  # noqa: E402
+_pkg = types.ModuleType("nkdbt")          # nkd_crop imports `.helpers`
+_pkg.__path__ = [_PACK]
+sys.modules["nkdbt"] = _pkg
+
+from nkdbt.nkd_crop import (  # noqa: E402
     NKDCrop, _contain_rotated_bbox, _crop_pad, _crop_pad_mask, _crop_pad_rotated, _parse_angle,
     _parse_region, _region_box, _snap_bbox, _snap_bbox_rotated, _uncrop_manual,
 )
@@ -254,6 +259,43 @@ def test_uncrop_manual_pastes_the_patch_back_at_the_original_box():
     out = _uncrop_manual(patch, bg, (15, 15, 25, 25), 0.0, feather=0, hardness=0.0)
     assert torch.allclose(out[:, 15:25, 15:25, :], torch.ones(1, 10, 10, 3), atol=0.02)
     assert torch.allclose(out[:, 0:15, 0:15, :], torch.zeros(1, 15, 15, 3))
+
+
+def test_uncrop_manual_mixes_rgb_and_rgba():
+    """RGBA source, RGB patch back from a VAE (and vice versa) used to raise a size mismatch."""
+    bg = torch.zeros(1, 40, 40, 4)
+    out = _uncrop_manual(torch.ones(1, 10, 10, 3), bg, (15, 15, 25, 25), 0.0, feather=0,
+                         hardness=0.0)
+    assert out.shape == (1, 40, 40, 4)
+    assert torch.allclose(out[:, 15:25, 15:25, 3], torch.ones(1, 10, 10), atol=0.02)
+    assert torch.allclose(out[:, 0:15, 0:15, 3], torch.zeros(1, 15, 15))
+    out = _uncrop_manual(torch.ones(1, 10, 10, 4), torch.zeros(1, 40, 40, 3), (15, 15, 25, 25),
+                         0.0, feather=0, hardness=0.0)
+    assert out.shape == (1, 40, 40, 3)
+
+
+def test_outpaint_transparent_fill_adds_alpha():
+    img = torch.full((1, 20, 20, 3), 0.5)
+    out = NKDCrop.execute(img, region(-0.5, 0, 1.5, 1), "transparent", "#000000", 0.0,
+                          "disabled", "Outpaint", "lanczos").result[0]
+    assert out.shape == (1, 20, 30, 4)
+    assert torch.all(out[:, :, :10, 3] == 0) and torch.all(out[:, :, 10:, 3] == 1)
+
+
+def test_outpaint_opaque_fill_also_fills_source_transparency():
+    img = torch.zeros(1, 20, 20, 4)
+    img[:, :, :10] = torch.tensor([1.0, 0.0, 0.0, 1.0])   # left half opaque red, right see-through
+    res = NKDCrop.execute(img, region(0, 0, 1.5, 1), "white", "#000000", 0.0,
+                          "disabled", "Outpaint", "lanczos").result
+    out, mask = res[0], res[1]
+    assert out.shape == (1, 20, 30, 3)
+    assert torch.allclose(out[:, :, 12:], torch.ones(1, 20, 18, 3))
+    assert torch.all(mask[:, :, 10:] == 1) and torch.all(mask[:, :, :10] == 0)
+    out = NKDCrop.execute(img, region(0, 0, 1.5, 1), "edge", "#000000", 0.0,
+                          "disabled", "Outpaint", "lanczos").result[0]
+    assert out.shape == (1, 20, 30, 3)
+    assert torch.allclose(out[:, :, 12:], torch.tensor([1.0, 0.0, 0.0]).expand(1, 20, 18, 3),
+                          atol=0.02)
 
 
 def test_uncrop_manual_feather_only_erodes_inward_never_bleeds_outside():

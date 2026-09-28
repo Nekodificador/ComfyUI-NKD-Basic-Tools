@@ -268,7 +268,7 @@ def _crop_pad(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int,
                   else (_FLAT_FILLS.get(fill, 0.0),) * 3)
         canvas = torch.empty((B, C, new_h, new_w), dtype=t.dtype, device=t.device)
         for c in range(C):
-            canvas[:, c] = (r, g, b, 1.0)[c] if c < 4 else 0.0
+            canvas[:, c] = (r, g, b, float(fill != "transparent"))[c] if c < 4 else 0.0
         if has_overlap:
             canvas[:, :, pad_top:pad_top + chw.shape[2], pad_left:pad_left + chw.shape[3]] = chw
         padded = canvas
@@ -316,7 +316,7 @@ def _crop_pad_rotated(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int, angle
     if pad_mode == "zeros":
         r, g, b = (_hex_to_rgb(fill_color) if fill == "color"
                   else (_FLAT_FILLS.get(fill, 0.0),) * 3)
-        colors = (r, g, b, 1.0)
+        colors = (r, g, b, float(fill != "transparent"))
         color = torch.tensor([colors[c] if c < 4 else 0.0 for c in range(C)],
                              device=device, dtype=t.dtype).view(1, C, 1, 1)
         v = valid2d.view(1, 1, new_h, new_w)
@@ -325,6 +325,28 @@ def _crop_pad_rotated(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int, angle
     out = sampled.movedim(1, -1).clamp(0.0, 1.0)
     mask = (1.0 - valid2d).clamp(0.0, 1.0).view(1, new_h, new_w).expand(B, -1, -1)
     return out, mask
+
+
+def _pull_push(c: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    """Fill where `w` (weight, [B,1,H,W]) is low with colour pulled in from where it's high.
+    `c` is premultiplied by `w`. Halve until 1px, then blend each coarser level back under."""
+    if min(c.shape[2], c.shape[3]) <= 1:
+        return c / w.clamp(min=1e-6)
+    coarse = _pull_push(F.avg_pool2d(c, 2, ceil_mode=True), F.avg_pool2d(w, 2, ceil_mode=True))
+    up = F.interpolate(coarse, size=c.shape[2:], mode="bilinear", align_corners=False)
+    return c + up * (1.0 - w)
+
+
+def _fill_alpha(t: torch.Tensor, fill: str, fill_color: str) -> torch.Tensor:
+    """Flatten an RGBA `[B,H,W,4]` to opaque RGB the way `fill` fills the outpainted margin:
+    a flat colour sits behind the image, edge/reflect bleed the nearest opaque pixels in."""
+    rgb, a = t[..., :3], t[..., 3:]
+    if fill in ("edge", "reflect"):
+        chw_a = a.movedim(-1, 1)
+        return _pull_push((rgb * a).movedim(-1, 1), chw_a).movedim(1, -1).clamp(0.0, 1.0)
+    r, g, b = _hex_to_rgb(fill_color) if fill == "color" else (_FLAT_FILLS.get(fill, 0.0),) * 3
+    bg = torch.tensor((r, g, b), dtype=t.dtype, device=t.device)
+    return rgb * a + bg * (1.0 - a)
 
 
 def _crop_pad_mask(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int,
@@ -415,6 +437,11 @@ def _uncrop_manual(patch: torch.Tensor, background: torch.Tensor,
     crop_w, crop_h = x1 - x0, y1 - y0
     if patch.shape[1] != crop_h or patch.shape[2] != crop_w:
         patch = _resize_auto(patch, crop_w, crop_h)
+    # An RGBA source usually comes back RGB after a VAE round trip (or the other way round):
+    # match the background's channels, with any missing alpha treated as opaque.
+    if patch.shape[-1] < C:
+        patch = F.pad(patch, (0, C - patch.shape[-1]), value=1.0)
+    patch = patch[..., :C]
 
     cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
     theta = -math.radians(angle)   # undo the crop's own rotation
@@ -453,7 +480,7 @@ def _uncrop_manual(patch: torch.Tensor, background: torch.Tensor,
 
 # ── The node ───────────────────────────────────────────────────────────────
 
-FILL_MODES = ["edge", "reflect", "black", "white", "gray", "color"]
+FILL_MODES = ["edge", "reflect", "black", "white", "gray", "color", "transparent"]
 DIVISIBLE_BY = ["disabled", "8", "16", "32", "64"]
 MODES = ["Crop", "Outpaint"]
 RESIZE_METHODS = ["lanczos", "bicubic", "bilinear", "area", "nearest-exact"]
@@ -489,8 +516,9 @@ class NKDCrop(io.ComfyNode):
                 io.Combo.Input(
                     "fill", options=FILL_MODES, default="edge",
                     tooltip="How the outpainted area is filled before generation: edge "
-                            "replicates the border pixel, reflect mirrors it, or pick a flat "
-                            "colour."),
+                            "replicates the border pixel, reflect mirrors it, pick a flat "
+                            "colour, or leave it transparent (the image gains an alpha "
+                            "channel)."),
                 io.Color.Input(
                     "fill_color", default="#000000",
                     tooltip="Colour used when fill = color."),
@@ -559,13 +587,22 @@ class NKDCrop(io.ComfyNode):
             frames = image.get_components().images
 
         B, H, W, C = frames.shape
-        push_source(node_id(cls), frames, event="nkd-crop-source")
+        push_source(node_id(cls), frames, event="nkd-crop-source", alpha=True)
         x0, y0, x1, y1, angle = _region_box(region, mode, W, H, divisible_by)
         effective_fill = fill if mode == "Outpaint" else "edge"
         crop_data = NKDManualCropData(background=frames.cpu(), crop_box=(x0, y0, x1, y1),
                                       angle=angle)
-        out_image, gen_mask = _crop_pad(frames, x0, y0, x1, y1, effective_fill, fill_color,
+        src = frames
+        if effective_fill == "transparent" and C == 3:
+            src = F.pad(frames, (0, 1), value=1.0)
+        elif mode == "Outpaint" and C == 4 and effective_fill != "transparent":
+            src = _fill_alpha(frames, effective_fill, fill_color)
+        out_image, gen_mask = _crop_pad(src, x0, y0, x1, y1, effective_fill, fill_color,
                                         angle)
+        if mode == "Outpaint" and C == 4:
+            # The source's own see-through areas are just as empty as the outpainted margin.
+            alpha = _crop_pad_mask(frames[..., 3], x0, y0, x1, y1, "black", fill_color, angle)
+            gen_mask = torch.maximum(gen_mask, 1.0 - alpha)
         out_image = _resize_to_budget(out_image, max_megapixels, divisible_by, resize_method)
         gen_mask = _resize_to_budget(gen_mask, max_megapixels, divisible_by, resize_method)
         h, w = out_image.shape[1], out_image.shape[2]
