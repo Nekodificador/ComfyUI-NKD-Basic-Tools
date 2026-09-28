@@ -8,7 +8,9 @@
       data-placeholder="Write your prompt… (type @ to insert a variable)"
       @input="onInput"
       @keydown="onKeydown"
-      @paste.prevent="onPaste"
+      @paste.prevent.stop="onPaste"
+      @copy.stop
+      @cut.stop
       @blur="onBlur"
       @keyup="saveSelection"
       @mouseup="saveSelection"
