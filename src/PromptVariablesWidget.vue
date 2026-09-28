@@ -1,5 +1,5 @@
 <template>
-  <div class="nkd-pv" @mousedown.stop @mouseup.stop @mousemove.stop>
+  <div ref="root" class="nkd-pv" @mousedown.stop @mouseup.stop @mousemove.stop>
     <div
       ref="editor"
       class="nkd-pv-editor"
@@ -45,12 +45,48 @@
         :title="v.connected ? 'Insert chip (wired)' : 'Insert chip (not wired yet)'"
         @click.stop.prevent="insertChip(v.name)"
       >+ {{ v.label }}</button>
+      <button
+        class="nkd-pv-add nkd-pv-lib-toggle"
+        :class="{ active: panelOpen }"
+        title="Your saved variables, shared by every workflow"
+        @click.stop.prevent="panelOpen = !panelOpen"
+      >Saved {{ panelOpen ? "▴" : "▾" }}</button>
+    </div>
+    <div v-if="panelOpen" ref="libEl" class="nkd-pv-lib" @keydown.stop @paste.stop @copy.stop @cut.stop>
+      <div v-for="item in library.items" :key="item.name" class="nkd-pv-lib-row">
+        <div class="nkd-pv-lib-head">
+          <span class="nkd-pv-lib-at">@</span>
+          <input
+            class="nkd-pv-lib-name"
+            :value="item.name"
+            spellcheck="false"
+            title="Letters, numbers, - and _ (spaces become _)"
+            @change="renameSaved(item, $event)"
+            @keydown.enter="blurTarget"
+          />
+          <button class="nkd-pv-add" title="Insert into the prompt" @click.stop.prevent="insertChip('@' + item.name)">Insert</button>
+          <button class="nkd-pv-add" title="Delete from your library" @click.stop.prevent="deleteSaved(item)">×</button>
+        </div>
+        <textarea
+          class="nkd-pv-lib-value"
+          rows="2"
+          spellcheck="false"
+          placeholder="Value (one item per line)"
+          :value="item.value"
+          @input="editSaved(item, $event)"
+        ></textarea>
+      </div>
+      <div v-if="!library.items.length" class="nkd-pv-lib-empty">
+        No saved variables yet. Select text in the prompt and press + New to save it.
+      </div>
+      <button class="nkd-pv-add" @click.stop.prevent="newSaved">+ New</button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, nextTick } from "vue";
+import { onMounted, reactive, ref, nextTick, watch } from "vue";
+import { cleanName, library, loadLibrary, saveLibrary, type SavedVar } from "./promptLibrary";
 
 export interface VarInfo {
   name: string;      // socket id, e.g. "variable_0"
@@ -60,11 +96,36 @@ export interface VarInfo {
 
 const props = defineProps<{
   onChange: (text: string) => void;
+  onSavedChange: (json: string) => void;
+  onPanelResize: (delta: number) => void;
 }>();
 
+const root = ref<HTMLDivElement | null>(null);
 const editor = ref<HTMLDivElement | null>(null);
 const acMenuEl = ref<HTMLDivElement | null>(null);
 const vars = ref<VarInfo[]>([]);
+// This node's own copy of the saved variables it uses ({name: value}): what the backend
+// resolves, so the workflow still runs on a machine without this library.
+let nodeSaved: Record<string, string> = {};
+const panelOpen = ref(false);
+const libEl = ref<HTMLDivElement | null>(null);
+
+// Report every change in the Saved panel's height (open, close, entries added or removed,
+// a value box dragged taller) so the host resizes the node by exactly that much.
+const PANEL_GAP = 6; // .nkd-pv gap
+let panelH = 0;
+function reportPanelHeight() {
+  const h = libEl.value ? libEl.value.offsetHeight + PANEL_GAP : 0;
+  if (h === panelH) return;
+  props.onPanelResize(h - panelH);
+  panelH = h;
+}
+const panelRo = new ResizeObserver(reportPanelHeight);
+watch(libEl, (el, old) => {
+  if (old) panelRo.unobserve(old);
+  if (el) panelRo.observe(el);
+  else reportPanelHeight();
+}, { flush: "post" });
 let savedRange: Range | null = null;
 let debounceTimer: number | undefined;
 
@@ -75,7 +136,7 @@ const acMenu = reactive({
   anchorRange: null as Range | null,
 });
 
-const TOKEN_RE = /\{(variable_\d+)(:[rc])?\}/g;
+const TOKEN_RE = /\{(variable_\d+|@[\p{L}\p{N}_-]{1,40})(:[rc])?\}/gu;
 
 // Per-chip pick mode. Shift-click rotates "" → random → cycle → "".
 type Mode = "" | "r" | "c";
@@ -83,7 +144,18 @@ const NEXT_MODE: Record<Mode, Mode> = { "": "r", r: "c", c: "" };
 
 let draggedChip: HTMLElement | null = null;
 
+function savedValue(name: string): string | undefined {
+  const bare = name.slice(1);
+  return nodeSaved[bare] ?? library.items.find((x) => x.name === bare)?.value;
+}
+
+function savedVars(): VarInfo[] {
+  const names = new Set([...library.items.map((x) => x.name), ...Object.keys(nodeSaved)]);
+  return [...names].map((n) => ({ name: `@${n}`, label: `@${n}`, connected: true }));
+}
+
 function labelFor(name: string): string {
+  if (name.startsWith("@")) return name;
   const v = vars.value.find((x) => x.name === name);
   if (v) return v.label;
   const m = name.match(/_(\d+)$/);
@@ -102,7 +174,7 @@ function chipEl(name: string, mode: Mode = ""): HTMLSpanElement {
   span.contentEditable = "false";
   span.dataset.var = name;
   applyMode(span, mode);
-  span.title = "Shift+clic: normal → aleatorio 🎲 → ciclo 🔁 · arrastra para mover";
+  span.title = "Shift+click: normal → random 🎲 → cycle 🔁 · drag to move";
   span.draggable = true;
   span.addEventListener("dragstart", (e: DragEvent) => {
     draggedChip = span;
@@ -116,6 +188,11 @@ function chipEl(name: string, mode: Mode = ""): HTMLSpanElement {
   dot.className = "nkd-pv-dot";
   span.appendChild(dot);
   span.appendChild(document.createTextNode(labelFor(name)));
+  if (name.startsWith("@")) {
+    span.classList.add("nkd-pv-chip-saved");
+    styleSavedChip(span);
+    return span;
+  }
   const v = vars.value.find((x) => x.name === name);
   if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
   return span;
@@ -200,7 +277,18 @@ function deserialise(text: string) {
 
 function emitChange() {
   window.clearTimeout(debounceTimer);
-  debounceTimer = window.setTimeout(() => props.onChange(serialise()), 120);
+  debounceTimer = window.setTimeout(() => {
+    const text = serialise();
+    props.onChange(text);
+    // Keep only what the prompt still references, so the copy never piles up.
+    const used: Record<string, string> = {};
+    for (const m of text.matchAll(TOKEN_RE)) {
+      const bare = m[1].slice(1);
+      if (m[1].startsWith("@") && nodeSaved[bare] !== undefined) used[bare] = nodeSaved[bare];
+    }
+    nodeSaved = used;
+    props.onSavedChange(Object.keys(used).length ? JSON.stringify(used) : "");
+  }, 120);
 }
 
 function onInput() {
@@ -261,7 +349,7 @@ function checkAutocomplete() {
   // Only trigger if @ is at start or preceded by whitespace
   if (atIdx > 0 && !/\s/.test(info.text[atIdx - 1])) { acClose(); return; }
   const query = info.text.slice(atIdx + 1).toLowerCase();
-  const filtered = vars.value.filter((v) =>
+  const filtered = [...vars.value, ...savedVars()].filter((v) =>
     v.label.toLowerCase().includes(query) || v.name.toLowerCase().includes(query)
   );
   if (filtered.length === 0) { acClose(); return; }
@@ -297,6 +385,7 @@ function acPick(item: VarInfo) {
     sel?.removeAllRanges();
     sel?.addRange(acMenu.anchorRange);
     acMenu.anchorRange.deleteContents();
+    adoptSaved(item.name);
     const chip = chipEl(item.name);
     acMenu.anchorRange.insertNode(chip);
     const space = document.createTextNode(" ");
@@ -369,6 +458,7 @@ function insertAtCursor(node: Node) {
 }
 
 function insertChip(name: string) {
+  adoptSaved(name);
   insertAtCursor(chipEl(name));
   insertAtCursor(document.createTextNode(" "));
   emitChange();
@@ -382,7 +472,7 @@ function setVariables(list: VarInfo[]) {
   vars.value = list;
   // Refresh connection styling AND labels on existing chips in place
   // (renamed sockets propagate to their chips).
-  editor.value?.querySelectorAll<HTMLElement>(".nkd-pv-chip").forEach((chip) => {
+  editor.value?.querySelectorAll<HTMLElement>(".nkd-pv-chip:not(.nkd-pv-chip-saved)").forEach((chip) => {
     const v = list.find((x) => x.name === chip.dataset.var);
     chip.classList.toggle("nkd-pv-chip-off", !(v && v.connected));
     if (v && chip.lastChild && chip.lastChild.textContent !== v.label) {
@@ -391,15 +481,120 @@ function setVariables(list: VarInfo[]) {
   });
 }
 
+function setSaved(json: string) {
+  try {
+    const data = JSON.parse(json || "{}");
+    nodeSaved = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+  } catch {
+    nodeSaved = {};
+  }
+  refreshSavedChips();
+}
+
+// --- saved variables -------------------------------------------------------
+
+function styleSavedChip(chip: HTMLElement) {
+  const value = savedValue(chip.dataset.var ?? "");
+  chip.classList.toggle("nkd-pv-chip-off", value === undefined);
+  chip.title = value === undefined
+    ? "Saved variable not found in this node or your library"
+    : `${value}\n\nShift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
+}
+
+function refreshSavedChips() {
+  editor.value?.querySelectorAll<HTMLElement>(".nkd-pv-chip-saved").forEach(styleSavedChip);
+}
+
+// Inserting a saved variable copies its current library value into this node.
+function adoptSaved(name: string) {
+  if (!name.startsWith("@")) return;
+  const item = library.items.find((x) => x.name === name.slice(1));
+  if (item) nodeSaved[item.name] = item.value;
+}
+
+function selectedText(): string {
+  const r = savedRange;
+  return r && !r.collapsed && editor.value?.contains(r.startContainer) ? r.toString().trim() : "";
+}
+
+function newSaved() {
+  let i = library.items.length + 1;
+  while (library.items.some((x) => x.name === `var_${i}`)) i++;
+  const name = `var_${i}`;
+  library.items.push({ name, value: selectedText() });
+  saveLibrary();
+  nextTick(() => {
+    const el = [...(root.value?.querySelectorAll<HTMLInputElement>(".nkd-pv-lib-name") ?? [])]
+      .find((x) => x.value === name);
+    el?.focus();
+    el?.select();
+  });
+}
+
+// Editing from this node's panel also updates this node's copy: it's the one you're
+// looking at. Other nodes and workflows keep theirs until you insert the variable again.
+function editSaved(item: SavedVar, e: Event) {
+  item.value = (e.target as HTMLTextAreaElement).value;
+  saveLibrary();
+  if (nodeSaved[item.name] !== undefined) {
+    nodeSaved[item.name] = item.value;
+    emitChange();
+  }
+  refreshSavedChips();
+}
+
+function renameSaved(item: SavedVar, e: Event) {
+  const input = e.target as HTMLInputElement;
+  const name = cleanName(input.value);
+  const taken = library.items.some((x) => x !== item && x.name === name);
+  if (!name || taken) {
+    input.value = item.name;
+    input.title = taken ? `"@${name}" already exists` : "Use letters, numbers, - or _";
+    input.classList.add("nkd-pv-lib-bad");
+    window.setTimeout(() => {
+      input.classList.remove("nkd-pv-lib-bad");
+      input.title = "Letters, numbers, - and _ (spaces become _)";
+    }, 1500);
+    return;
+  }
+  input.value = name;
+  if (name === item.name) return;
+  const old = item.name;
+  item.name = name;
+  saveLibrary();
+  if (nodeSaved[old] !== undefined) {
+    nodeSaved[name] = nodeSaved[old];
+    delete nodeSaved[old];
+  }
+  editor.value?.querySelectorAll<HTMLElement>(`.nkd-pv-chip-saved[data-var="@${old}"]`).forEach((chip) => {
+    chip.dataset.var = `@${name}`;
+    if (chip.lastChild) chip.lastChild.textContent = `@${name}`;
+  });
+  emitChange();
+}
+
+function deleteSaved(item: SavedVar) {
+  if (!window.confirm(`Delete saved variable "@${item.name}" from your library?`)) return;
+  library.items.splice(library.items.indexOf(item), 1);
+  saveLibrary();
+  refreshSavedChips();
+}
+
+function blurTarget(e: Event) {
+  (e.target as HTMLElement).blur();
+}
+
 function cleanup() {
   window.clearTimeout(debounceTimer);
+  panelRo.disconnect();
 }
 
 onMounted(() => {
-  // Nothing to seed — the host calls deserialise() once widgets are restored.
+  // The host calls deserialise() once widgets are restored; the library just has to land.
+  loadLibrary().then(refreshSavedChips);
 });
 
-defineExpose({ serialise, deserialise, setVariables, cleanup });
+defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 </script>
 
 <style scoped>
@@ -455,6 +650,74 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
 }
 .nkd-pv-add.connected {
   color: #4ab4ff;
+}
+.nkd-pv-lib-toggle {
+  margin-left: auto;
+}
+.nkd-pv-lib-toggle.active,
+.nkd-pv-lib-toggle:hover {
+  border-color: #b48cff;
+  color: #d6c2ff;
+}
+.nkd-pv-lib {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 6px;
+  background: #16181e;
+  border: 1px solid #3a3d46;
+  border-radius: 4px;
+}
+.nkd-pv-lib > .nkd-pv-add {
+  align-self: flex-start;
+}
+.nkd-pv-lib-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.nkd-pv-lib-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.nkd-pv-lib-at {
+  color: #b48cff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.nkd-pv-lib-name,
+.nkd-pv-lib-value {
+  background: #111318;
+  border: 1px solid #3a3d46;
+  border-radius: 4px;
+  color: #c8d0e0;
+  font-size: 11px;
+  font-family: inherit;
+  padding: 2px 6px;
+  outline: none;
+}
+.nkd-pv-lib-name {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.nkd-pv-lib-value {
+  resize: vertical;
+  min-height: 34px;
+  line-height: 1.45;
+}
+.nkd-pv-lib-name:focus,
+.nkd-pv-lib-value:focus {
+  border-color: #b48cff;
+}
+.nkd-pv-lib-name.nkd-pv-lib-bad {
+  border-color: #ff5c5c;
+}
+.nkd-pv-lib-empty {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
 }
 .nkd-pv-ac {
   position: absolute;
@@ -526,6 +789,14 @@ defineExpose({ serialise, deserialise, setVariables, cleanup });
   border-radius: 50%;
   background: #4ab4ff;
   flex: 0 0 auto;
+}
+.nkd-pv-chip-saved {
+  border-color: rgba(180, 140, 255, 0.8);
+  color: #e0d2ff;
+  background: rgba(180, 140, 255, 0.14);
+}
+.nkd-pv-chip-saved .nkd-pv-dot {
+  background: #b48cff;
 }
 .nkd-pv-chip-off {
   border-style: dashed;

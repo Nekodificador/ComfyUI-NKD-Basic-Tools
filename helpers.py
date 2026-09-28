@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import math
 import re
 from typing import Optional, Tuple
@@ -21,7 +22,23 @@ except ImportError:
 _LIST_MARKER_RE = re.compile(r"^\s*(?:\d+\s*[.):]|[-*•])\s*")
 
 
-_VAR_TOKEN_RE = re.compile(r"\{(variable_\d+)(:[rc])?\}")
+# `{variable_N}` is a wired socket, `{@name}` a saved variable from the library.
+_VAR_TOKEN_RE = re.compile(r"\{(variable_\d+|@[\w-]{1,40})(:[rc])?\}")
+
+
+def _saved_variables(saved: str) -> dict:
+    """The saved-variable values a Prompt Variables node carries, as `{"@name": [lines]}`.
+
+    `saved` is the node's own JSON copy `{"name": "text"}`: one item per non-empty line,
+    so a palette or a set of test prompts behaves like a wired list."""
+    try:
+        data = json.loads(saved or "{}")
+    except ValueError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {f"@{k}": [l.strip() for l in v.splitlines() if l.strip()]
+            for k, v in data.items() if isinstance(k, str) and isinstance(v, str)}
 
 
 def _tidy_prompt(text: str) -> str:

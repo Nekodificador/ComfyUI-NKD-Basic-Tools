@@ -235,22 +235,38 @@ comfyApp.registerExtension({
 
       const textWidget = this.widgets?.find((w: any) => w.name === "text");
       if (!textWidget) return result;
+      const savedWidget = this.widgets?.find((w: any) => w.name === "saved");
       // Hide in BOTH renderers: canvas (1.0) reads type/computeSize, Vue
       // Nodes (2.0) reads hidden/options.hidden.
-      textWidget.type = "hidden";
-      textWidget.hidden = true;
-      if (textWidget.options) textWidget.options.hidden = true;
-      textWidget.computedHeight = 0;
-      textWidget.computeSize = () => [0, -4];
+      for (const w of [textWidget, savedWidget]) {
+        if (!w) continue;
+        w.type = "hidden";
+        w.hidden = true;
+        if (w.options) w.options.hidden = true;
+        w.computedHeight = 0;
+        w.computeSize = () => [0, -4];
+      }
 
       const container = document.createElement("div");
 
       let instance: any = null;
+      let holdEditor = false;
       const vueApp = createApp(PromptVariablesWidget, {
         onChange: (text: string) => {
           if (textWidget.value !== text) {
             textWidget.value = text;
           }
+        },
+        onSavedChange: (json: string) => {
+          if (savedWidget) savedWidget.value = json;
+        },
+        // The Saved panel grows or shrinks the node by exactly its own height. The editor
+        // keeps its size meanwhile: onResize would otherwise refit it to the new node.
+        onPanelResize: (delta: number) => {
+          holdEditor = true;
+          this.setSize([this.size[0], this.size[1] + delta]);
+          this.setDirtyCanvas(true, true);
+          requestAnimationFrame(() => requestAnimationFrame(() => { holdEditor = false; }));
         },
       });
       instance = vueApp.mount(container) as any;
@@ -274,6 +290,10 @@ comfyApp.registerExtension({
       const innerComputeSize = domWidget.computeSize;
       domWidget.computeSize = (width: number) => {
         const result = innerComputeSize(width);
+        // Measure live: the Saved panel comes and goes before the ResizeObserver catches
+        // up, and LiteGraph would grow the node back to the stale, panel-open minimum.
+        const root = container.firstElementChild as HTMLElement | null;
+        if (root && root.offsetHeight > 0) result[1] = root.offsetHeight + ROW_SAFETY;
         const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
         if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
           result[1] = result[1] - editorEl.offsetHeight + BASE_EDITOR_H;
@@ -285,6 +305,7 @@ comfyApp.registerExtension({
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
+        if (holdEditor) return;
         // Grow/shrink the editor to fill the node when user drags a corner.
         const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
         if (!editorEl) return;
@@ -298,6 +319,7 @@ comfyApp.registerExtension({
 
       // First render once widget values exist + keep chips/sockets in sync.
       requestAnimationFrame(() => {
+        instance?.setSaved(savedWidget?.value ?? "");
         instance?.deserialise(textWidget.value ?? "");
         instance?.setVariables(readVariables(this));
         this.setDirtyCanvas(true, true);
@@ -319,6 +341,7 @@ comfyApp.registerExtension({
       this.onConfigure = function () {
         const r = origConfigure?.apply(this, arguments);
         // Widget values are restored after creation — re-render the chips.
+        instance?.setSaved(savedWidget?.value ?? "");
         requestAnimationFrame(() => {
           syncLabels(this);
           instance?.deserialise(textWidget.value ?? "");

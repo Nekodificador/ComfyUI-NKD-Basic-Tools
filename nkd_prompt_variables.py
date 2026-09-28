@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io, ui
 
-from .helpers import _resolve_prompts
+from .helpers import _resolve_prompts, _saved_variables
 
 _DEFAULT_TEXT = ""
 
@@ -38,7 +38,7 @@ class NKDPromptVariables(io.ComfyNode):
                                   template=io.Autogrow.TemplatePrefix(
                                       input=io.String.Input("var"),
                                       prefix="variable_",
-                                      min=1,
+                                      min=0,
                                       max=16,
                                   )),
                 io.Boolean.Input("randomize_all", default=False,
@@ -52,6 +52,10 @@ class NKDPromptVariables(io.ComfyNode):
                              display_name="Seed",
                              tooltip="Drives the random picks — same seed, same "
                                      "choices."),
+                # Last, so older workflows' widget values keep their positions.
+                io.String.Input("saved", default="", socketless=True, optional=True,
+                                tooltip="Managed by the editor: this node's copy of the "
+                                        "saved variables it uses."),
             ],
             outputs=[
                 io.String.Output(display_name="prompt", is_output_list=True,
@@ -62,13 +66,15 @@ class NKDPromptVariables(io.ComfyNode):
 
     @classmethod
     def execute(cls, text, variables: io.Autogrow.Type, randomize_all,
-                seed) -> io.NodeOutput:
+                seed, saved="") -> io.NodeOutput:
         # is_input_list: plain widgets arrive as single-value lists; the
         # variables dict carries the FULL list wired into each socket.
         text = text[0] if isinstance(text, list) else text
         randomize_all = randomize_all[0] if isinstance(randomize_all, list) else randomize_all
         seed = seed[0] if isinstance(seed, list) else seed
-        prompts = _resolve_prompts(text, dict(variables), randomize_all, seed)
+        saved = saved[0] if isinstance(saved, list) else saved
+        prompts = _resolve_prompts(text, {**dict(variables or {}), **_saved_variables(saved)},
+                                   randomize_all, seed)
         if not prompts:
             prompts = [""]
         preview = "\n".join(f"[{i + 1}] {p}" for i, p in enumerate(prompts)) \

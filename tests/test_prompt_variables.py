@@ -1,10 +1,11 @@
 """Self-check for the prompt variable resolver. Pure python:
 python tests/test_prompt_variables.py"""
+import json
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from helpers import _resolve_prompts
+from helpers import _resolve_prompts, _saved_variables
 
 
 def demo():
@@ -79,6 +80,15 @@ def demo():
     outs = {_resolve_prompts("{variable_0:r}", {"variable_0": list("abcdefgh")},
                              seed=s)[0] for s in range(10)}
     assert len(outs) > 1
+
+    # Saved variables: one item per line, alongside wired ones; junk JSON is ignored
+    saved = _saved_variables(json.dumps({"teal": "deep teal\n\n  mint  ", "bad": 3}))
+    assert saved == {"@teal": ["deep teal", "mint"]}
+    out = _resolve_prompts("{variable_0} in {@teal}", {"variable_0": ["a cat"], **saved})
+    assert out == ["a cat in deep teal", "a cat in mint"], out
+    assert _resolve_prompts("{@teal:r}", saved, seed=1)[0] in ("deep teal", "mint")
+    assert _saved_variables("not json") == {} and _saved_variables("") == {}
+    assert _resolve_prompts("{@azul_océano}", _saved_variables('{"azul_océano": "navy"}')) == ["navy"]
 
     print("prompt variables self-check OK")
 

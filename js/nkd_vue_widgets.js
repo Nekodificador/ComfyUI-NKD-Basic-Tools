@@ -6427,6 +6427,30 @@ const withModifiers = (fn, modifiers) => {
     return fn(event, ...args);
   }));
 };
+const keyNames = {
+  esc: "escape",
+  space: " ",
+  up: "arrow-up",
+  left: "arrow-left",
+  right: "arrow-right",
+  down: "arrow-down",
+  delete: "backspace"
+};
+const withKeys = (fn, modifiers) => {
+  const cache = fn._withKeys || (fn._withKeys = {});
+  const cacheKey = modifiers.join(".");
+  return cache[cacheKey] || (cache[cacheKey] = ((event) => {
+    if (!("key" in event)) {
+      return;
+    }
+    const eventKey = hyphenate(event.key);
+    if (modifiers.some(
+      (k) => k === eventKey || keyNames[k] === eventKey
+    )) {
+      return fn(event);
+    }
+  }));
+};
 const rendererOptions = /* @__PURE__ */ extend({ patchProp }, nodeOps);
 let renderer;
 function ensureRenderer() {
@@ -6469,19 +6493,77 @@ function normalizeContainer(container) {
   }
   return container;
 }
+const FILE = "nkd_prompt_variables.json";
+const NAME_RE = /^[\p{L}\p{N}_-]{1,40}$/u;
+function cleanName(raw) {
+  return raw.normalize("NFC").trim().replace(/\s+/g, "_").replace(/[^\p{L}\p{N}_-]/gu, "").slice(0, 40);
+}
+const library = /* @__PURE__ */ reactive({ items: [] });
+let loading = null;
+let saveTimer;
+function loadLibrary() {
+  loading ?? (loading = (async () => {
+    try {
+      const res = await api.getUserData(FILE);
+      if (res.status !== 200) return;
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        library.items = data.filter((v) => NAME_RE.test(v == null ? void 0 : v.name) && typeof v.value === "string");
+      }
+    } catch {
+    }
+  })());
+  return loading;
+}
+function saveLibrary() {
+  window.clearTimeout(saveTimer);
+  saveTimer = window.setTimeout(() => {
+    api.storeUserData(FILE, library.items, { overwrite: true, stringify: true, throwOnError: false }).catch(() => {
+    });
+  }, 400);
+}
 const _hoisted_1$5 = ["onMousedown"];
 const _hoisted_2$5 = { class: "nkd-pv-bar" };
 const _hoisted_3$5 = ["title", "onClick"];
+const _hoisted_4$4 = { class: "nkd-pv-lib-head" };
+const _hoisted_5$1 = ["value", "onChange"];
+const _hoisted_6$1 = ["onClick"];
+const _hoisted_7$1 = ["onClick"];
+const _hoisted_8 = ["value", "onInput"];
+const _hoisted_9 = {
+  key: 0,
+  class: "nkd-pv-lib-empty"
+};
+const PANEL_GAP = 6;
 const _sfc_main$5 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
-    onChange: { type: Function }
+    onChange: { type: Function },
+    onSavedChange: { type: Function },
+    onPanelResize: { type: Function }
   },
   setup(__props, { expose: __expose }) {
     const props = __props;
+    const root = /* @__PURE__ */ ref(null);
     const editor = /* @__PURE__ */ ref(null);
     const acMenuEl = /* @__PURE__ */ ref(null);
     const vars = /* @__PURE__ */ ref([]);
+    let nodeSaved = {};
+    const panelOpen = /* @__PURE__ */ ref(false);
+    const libEl = /* @__PURE__ */ ref(null);
+    let panelH = 0;
+    function reportPanelHeight() {
+      const h = libEl.value ? libEl.value.offsetHeight + PANEL_GAP : 0;
+      if (h === panelH) return;
+      props.onPanelResize(h - panelH);
+      panelH = h;
+    }
+    const panelRo = new ResizeObserver(reportPanelHeight);
+    watch(libEl, (el, old) => {
+      if (old) panelRo.unobserve(old);
+      if (el) panelRo.observe(el);
+      else reportPanelHeight();
+    }, { flush: "post" });
     let savedRange = null;
     let debounceTimer;
     const acMenu = /* @__PURE__ */ reactive({
@@ -6490,10 +6572,20 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       idx: 0,
       anchorRange: null
     });
-    const TOKEN_RE = /\{(variable_\d+)(:[rc])?\}/g;
+    const TOKEN_RE = /\{(variable_\d+|@[\p{L}\p{N}_-]{1,40})(:[rc])?\}/gu;
     const NEXT_MODE = { "": "r", r: "c", c: "" };
     let draggedChip = null;
+    function savedValue(name) {
+      var _a;
+      const bare = name.slice(1);
+      return nodeSaved[bare] ?? ((_a = library.items.find((x) => x.name === bare)) == null ? void 0 : _a.value);
+    }
+    function savedVars() {
+      const names = /* @__PURE__ */ new Set([...library.items.map((x) => x.name), ...Object.keys(nodeSaved)]);
+      return [...names].map((n) => ({ name: `@${n}`, label: `@${n}`, connected: true }));
+    }
     function labelFor(name) {
+      if (name.startsWith("@")) return name;
       const v = vars.value.find((x) => x.name === name);
       if (v) return v.label;
       const m = name.match(/_(\d+)$/);
@@ -6510,7 +6602,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       span.contentEditable = "false";
       span.dataset.var = name;
       applyMode(span, mode);
-      span.title = "Shift+clic: normal → aleatorio 🎲 → ciclo 🔁 · arrastra para mover";
+      span.title = "Shift+click: normal → random 🎲 → cycle 🔁 · drag to move";
       span.draggable = true;
       span.addEventListener("dragstart", (e) => {
         var _a;
@@ -6525,6 +6617,11 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       dot.className = "nkd-pv-dot";
       span.appendChild(dot);
       span.appendChild(document.createTextNode(labelFor(name)));
+      if (name.startsWith("@")) {
+        span.classList.add("nkd-pv-chip-saved");
+        styleSavedChip(span);
+        return span;
+      }
       const v = vars.value.find((x) => x.name === name);
       if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
       return span;
@@ -6599,7 +6696,17 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     }
     function emitChange() {
       window.clearTimeout(debounceTimer);
-      debounceTimer = window.setTimeout(() => props.onChange(serialise2()), 120);
+      debounceTimer = window.setTimeout(() => {
+        const text = serialise2();
+        props.onChange(text);
+        const used = {};
+        for (const m of text.matchAll(TOKEN_RE)) {
+          const bare = m[1].slice(1);
+          if (m[1].startsWith("@") && nodeSaved[bare] !== void 0) used[bare] = nodeSaved[bare];
+        }
+        nodeSaved = used;
+        props.onSavedChange(Object.keys(used).length ? JSON.stringify(used) : "");
+      }, 120);
     }
     function onInput() {
       emitChange();
@@ -6661,7 +6768,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
         return;
       }
       const query = info.text.slice(atIdx + 1).toLowerCase();
-      const filtered = vars.value.filter(
+      const filtered = [...vars.value, ...savedVars()].filter(
         (v) => v.label.toLowerCase().includes(query) || v.name.toLowerCase().includes(query)
       );
       if (filtered.length === 0) {
@@ -6694,6 +6801,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
         sel == null ? void 0 : sel.removeAllRanges();
         sel == null ? void 0 : sel.addRange(acMenu.anchorRange);
         acMenu.anchorRange.deleteContents();
+        adoptSaved(item.name);
         const chip = chipEl(item.name);
         acMenu.anchorRange.insertNode(chip);
         const space = document.createTextNode(" ");
@@ -6761,6 +6869,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       savedRange = range.cloneRange();
     }
     function insertChip(name) {
+      adoptSaved(name);
       insertAtCursor(chipEl(name));
       insertAtCursor(document.createTextNode(" "));
       emitChange();
@@ -6770,7 +6879,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       const changed = JSON.stringify(list) !== JSON.stringify(vars.value);
       if (!changed) return;
       vars.value = list;
-      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-chip").forEach((chip) => {
+      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-chip:not(.nkd-pv-chip-saved)").forEach((chip) => {
         const v = list.find((x) => x.name === chip.dataset.var);
         chip.classList.toggle("nkd-pv-chip-off", !(v && v.connected));
         if (v && chip.lastChild && chip.lastChild.textContent !== v.label) {
@@ -6778,20 +6887,115 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
         }
       });
     }
+    function setSaved(json) {
+      try {
+        const data = JSON.parse(json || "{}");
+        nodeSaved = data && typeof data === "object" && !Array.isArray(data) ? data : {};
+      } catch {
+        nodeSaved = {};
+      }
+      refreshSavedChips();
+    }
+    function styleSavedChip(chip) {
+      const value = savedValue(chip.dataset.var ?? "");
+      chip.classList.toggle("nkd-pv-chip-off", value === void 0);
+      chip.title = value === void 0 ? "Saved variable not found in this node or your library" : `${value}
+
+Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
+    }
+    function refreshSavedChips() {
+      var _a;
+      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-chip-saved").forEach(styleSavedChip);
+    }
+    function adoptSaved(name) {
+      if (!name.startsWith("@")) return;
+      const item = library.items.find((x) => x.name === name.slice(1));
+      if (item) nodeSaved[item.name] = item.value;
+    }
+    function selectedText() {
+      var _a;
+      const r = savedRange;
+      return r && !r.collapsed && ((_a = editor.value) == null ? void 0 : _a.contains(r.startContainer)) ? r.toString().trim() : "";
+    }
+    function newSaved() {
+      let i = library.items.length + 1;
+      while (library.items.some((x) => x.name === `var_${i}`)) i++;
+      const name = `var_${i}`;
+      library.items.push({ name, value: selectedText() });
+      saveLibrary();
+      nextTick(() => {
+        var _a;
+        const el = [...((_a = root.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-lib-name")) ?? []].find((x) => x.value === name);
+        el == null ? void 0 : el.focus();
+        el == null ? void 0 : el.select();
+      });
+    }
+    function editSaved(item, e) {
+      item.value = e.target.value;
+      saveLibrary();
+      if (nodeSaved[item.name] !== void 0) {
+        nodeSaved[item.name] = item.value;
+        emitChange();
+      }
+      refreshSavedChips();
+    }
+    function renameSaved(item, e) {
+      var _a;
+      const input = e.target;
+      const name = cleanName(input.value);
+      const taken = library.items.some((x) => x !== item && x.name === name);
+      if (!name || taken) {
+        input.value = item.name;
+        input.title = taken ? `"@${name}" already exists` : "Use letters, numbers, - or _";
+        input.classList.add("nkd-pv-lib-bad");
+        window.setTimeout(() => {
+          input.classList.remove("nkd-pv-lib-bad");
+          input.title = "Letters, numbers, - and _ (spaces become _)";
+        }, 1500);
+        return;
+      }
+      input.value = name;
+      if (name === item.name) return;
+      const old = item.name;
+      item.name = name;
+      saveLibrary();
+      if (nodeSaved[old] !== void 0) {
+        nodeSaved[name] = nodeSaved[old];
+        delete nodeSaved[old];
+      }
+      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(`.nkd-pv-chip-saved[data-var="@${old}"]`).forEach((chip) => {
+        chip.dataset.var = `@${name}`;
+        if (chip.lastChild) chip.lastChild.textContent = `@${name}`;
+      });
+      emitChange();
+    }
+    function deleteSaved(item) {
+      if (!window.confirm(`Delete saved variable "@${item.name}" from your library?`)) return;
+      library.items.splice(library.items.indexOf(item), 1);
+      saveLibrary();
+      refreshSavedChips();
+    }
+    function blurTarget(e) {
+      e.target.blur();
+    }
     function cleanup() {
       window.clearTimeout(debounceTimer);
+      panelRo.disconnect();
     }
     onMounted(() => {
+      loadLibrary().then(refreshSavedChips);
     });
-    __expose({ serialise: serialise2, deserialise: deserialise2, setVariables, cleanup });
+    __expose({ serialise: serialise2, deserialise: deserialise2, setVariables, setSaved, cleanup });
     return (_ctx, _cache) => {
       return openBlock(), createElementBlock("div", {
+        ref_key: "root",
+        ref: root,
         class: "nkd-pv",
-        onMousedown: _cache[4] || (_cache[4] = withModifiers(() => {
+        onMousedown: _cache[9] || (_cache[9] = withModifiers(() => {
         }, ["stop"])),
-        onMouseup: _cache[5] || (_cache[5] = withModifiers(() => {
+        onMouseup: _cache[10] || (_cache[10] = withModifiers(() => {
         }, ["stop"])),
-        onMousemove: _cache[6] || (_cache[6] = withModifiers(() => {
+        onMousemove: _cache[11] || (_cache[11] = withModifiers(() => {
         }, ["stop"]))
       }, [
         createBaseVNode("div", {
@@ -6846,9 +7050,70 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
             }, "+ " + toDisplayString(v.label), 11, _hoisted_3$5);
-          }), 128))
-        ])
-      ], 32);
+          }), 128)),
+          createBaseVNode("button", {
+            class: normalizeClass(["nkd-pv-add nkd-pv-lib-toggle", { active: panelOpen.value }]),
+            title: "Your saved variables, shared by every workflow",
+            onClick: _cache[4] || (_cache[4] = withModifiers(($event) => panelOpen.value = !panelOpen.value, ["stop", "prevent"]))
+          }, "Saved " + toDisplayString(panelOpen.value ? "▴" : "▾"), 3)
+        ]),
+        panelOpen.value ? (openBlock(), createElementBlock("div", {
+          key: 1,
+          ref_key: "libEl",
+          ref: libEl,
+          class: "nkd-pv-lib",
+          onKeydown: _cache[5] || (_cache[5] = withModifiers(() => {
+          }, ["stop"])),
+          onPaste: _cache[6] || (_cache[6] = withModifiers(() => {
+          }, ["stop"])),
+          onCopy: _cache[7] || (_cache[7] = withModifiers(() => {
+          }, ["stop"])),
+          onCut: _cache[8] || (_cache[8] = withModifiers(() => {
+          }, ["stop"]))
+        }, [
+          (openBlock(true), createElementBlock(Fragment, null, renderList(unref(library).items, (item) => {
+            return openBlock(), createElementBlock("div", {
+              key: item.name,
+              class: "nkd-pv-lib-row"
+            }, [
+              createBaseVNode("div", _hoisted_4$4, [
+                _cache[12] || (_cache[12] = createBaseVNode("span", { class: "nkd-pv-lib-at" }, "@", -1)),
+                createBaseVNode("input", {
+                  class: "nkd-pv-lib-name",
+                  value: item.name,
+                  spellcheck: "false",
+                  title: "Letters, numbers, - and _ (spaces become _)",
+                  onChange: ($event) => renameSaved(item, $event),
+                  onKeydown: withKeys(blurTarget, ["enter"])
+                }, null, 40, _hoisted_5$1),
+                createBaseVNode("button", {
+                  class: "nkd-pv-add",
+                  title: "Insert into the prompt",
+                  onClick: withModifiers(($event) => insertChip("@" + item.name), ["stop", "prevent"])
+                }, "Insert", 8, _hoisted_6$1),
+                createBaseVNode("button", {
+                  class: "nkd-pv-add",
+                  title: "Delete from your library",
+                  onClick: withModifiers(($event) => deleteSaved(item), ["stop", "prevent"])
+                }, "×", 8, _hoisted_7$1)
+              ]),
+              createBaseVNode("textarea", {
+                class: "nkd-pv-lib-value",
+                rows: "2",
+                spellcheck: "false",
+                placeholder: "Value (one item per line)",
+                value: item.value,
+                onInput: ($event) => editSaved(item, $event)
+              }, null, 40, _hoisted_8)
+            ]);
+          }), 128)),
+          !unref(library).items.length ? (openBlock(), createElementBlock("div", _hoisted_9, " No saved variables yet. Select text in the prompt and press + New to save it. ")) : createCommentVNode("", true),
+          createBaseVNode("button", {
+            class: "nkd-pv-add",
+            onClick: withModifiers(newSaved, ["stop", "prevent"])
+          }, "+ New")
+        ], 544)) : createCommentVNode("", true)
+      ], 544);
     };
   }
 });
@@ -6859,7 +7124,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-a6f9b9e2"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-94c6912e"]]);
 const MODES = ["smooth", "bezier", "steps"];
 function midWarp(f, mid) {
   const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
@@ -14743,16 +15008,16 @@ function mountFaceRig(host, opts) {
     st.textContent = ".nkd-fr-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:rgba(11,13,18,0.45);border-radius:6px;pointer-events:none;}.nkd-fr-loading span{color:rgba(255,255,255,0.6);font-size:11px;}.nkd-fr-dots{display:flex;gap:6px;}.nkd-fr-dots i{width:7px;height:7px;border-radius:50%;background:#4ab4ff;animation:nkd-fr-bounce 1.1s ease-in-out infinite;}.nkd-fr-dots i:nth-child(2){animation-delay:0.18s}.nkd-fr-dots i:nth-child(3){animation-delay:0.36s}@keyframes nkd-fr-bounce{0%,80%,100%{transform:scale(0.7);opacity:0.4}40%{transform:scale(1.15);opacity:1}}";
     document.head.appendChild(st);
   }
-  const loading = document.createElement("div");
-  loading.className = "nkd-fr-loading";
-  loading.style.display = "none";
-  loading.innerHTML = "<div class='nkd-fr-dots'><i></i><i></i><i></i></div><span>preparing…</span>";
-  canvasWrap.appendChild(loading);
+  const loading2 = document.createElement("div");
+  loading2.className = "nkd-fr-loading";
+  loading2.style.display = "none";
+  loading2.innerHTML = "<div class='nkd-fr-dots'><i></i><i></i><i></i></div><span>preparing…</span>";
+  canvasWrap.appendChild(loading2);
   let loadingTimer = 0;
   function loadingSoon() {
     if (!loadingTimer) {
       loadingTimer = window.setTimeout(() => {
-        loading.style.display = "flex";
+        loading2.style.display = "flex";
       }, 300);
     }
   }
@@ -14761,7 +15026,7 @@ function mountFaceRig(host, opts) {
       clearTimeout(loadingTimer);
       loadingTimer = 0;
     }
-    loading.style.display = "none";
+    loading2.style.display = "none";
   }
   root.appendChild(canvasWrap);
   const ctx = canvas.getContext("2d");
@@ -16525,10 +16790,10 @@ function setupPaintWidget(node) {
     (_a = layerW.callback) == null ? void 0 : _a.call(layerW, v);
     (_c = (_b = node.graph) == null ? void 0 : _b.setDirtyCanvas) == null ? void 0 : _c.call(_b, true, true);
   }
-  let saveTimer = 0, saving = false, saveAgain = false;
+  let saveTimer2 = 0, saving = false, saveAgain = false;
   function scheduleSave() {
-    clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(saveLayer, 300);
+    clearTimeout(saveTimer2);
+    saveTimer2 = window.setTimeout(saveLayer, 300);
   }
   async function saveLayer() {
     var _a, _b, _c;
@@ -18631,22 +18896,40 @@ app.registerExtension({
     if (nodeData.name !== NODE_NAME) return;
     const origCreated = nodeType.prototype.onNodeCreated;
     nodeType.prototype.onNodeCreated = function() {
-      var _a;
+      var _a, _b;
       const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
       const textWidget = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "text");
       if (!textWidget) return result;
-      textWidget.type = "hidden";
-      textWidget.hidden = true;
-      if (textWidget.options) textWidget.options.hidden = true;
-      textWidget.computedHeight = 0;
-      textWidget.computeSize = () => [0, -4];
+      const savedWidget = (_b = this.widgets) == null ? void 0 : _b.find((w) => w.name === "saved");
+      for (const w of [textWidget, savedWidget]) {
+        if (!w) continue;
+        w.type = "hidden";
+        w.hidden = true;
+        if (w.options) w.options.hidden = true;
+        w.computedHeight = 0;
+        w.computeSize = () => [0, -4];
+      }
       const container = document.createElement("div");
       let instance = null;
+      let holdEditor = false;
       const vueApp = createApp(PromptVariablesWidget, {
         onChange: (text) => {
           if (textWidget.value !== text) {
             textWidget.value = text;
           }
+        },
+        onSavedChange: (json) => {
+          if (savedWidget) savedWidget.value = json;
+        },
+        // The Saved panel grows or shrinks the node by exactly its own height. The editor
+        // keeps its size meanwhile: onResize would otherwise refit it to the new node.
+        onPanelResize: (delta) => {
+          holdEditor = true;
+          this.setSize([this.size[0], this.size[1] + delta]);
+          this.setDirtyCanvas(true, true);
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            holdEditor = false;
+          }));
         }
       });
       instance = vueApp.mount(container);
@@ -18671,6 +18954,8 @@ app.registerExtension({
       const innerComputeSize = domWidget.computeSize;
       domWidget.computeSize = (width) => {
         const result2 = innerComputeSize(width);
+        const root = container.firstElementChild;
+        if (root && root.offsetHeight > 0) result2[1] = root.offsetHeight + ROW_SAFETY;
         const editorEl = container.querySelector(".nkd-pv-editor");
         if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
           result2[1] = result2[1] - editorEl.offsetHeight + BASE_EDITOR_H;
@@ -18681,6 +18966,7 @@ app.registerExtension({
       this.onResize = function(size) {
         origResize == null ? void 0 : origResize.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
+        if (holdEditor) return;
         const editorEl = container.querySelector(".nkd-pv-editor");
         if (!editorEl) return;
         const computed2 = this.computeSize();
@@ -18691,6 +18977,7 @@ app.registerExtension({
         }
       };
       requestAnimationFrame(() => {
+        instance == null ? void 0 : instance.setSaved((savedWidget == null ? void 0 : savedWidget.value) ?? "");
         instance == null ? void 0 : instance.deserialise(textWidget.value ?? "");
         instance == null ? void 0 : instance.setVariables(readVariables(this));
         this.setDirtyCanvas(true, true);
@@ -18708,6 +18995,7 @@ app.registerExtension({
       const origConfigure = this.onConfigure;
       this.onConfigure = function() {
         const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        instance == null ? void 0 : instance.setSaved((savedWidget == null ? void 0 : savedWidget.value) ?? "");
         requestAnimationFrame(() => {
           syncLabels(this);
           instance == null ? void 0 : instance.deserialise(textWidget.value ?? "");
@@ -19759,7 +20047,7 @@ console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DE
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-a6f9b9e2] {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-a6f9b9e2] {\n  height: 150px;\n  min-height: 90px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 6px 8px;\n  color: #c8d0e0;\n  font-size: 11.5px;\n  line-height: 1.55;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pv-editor[data-v-a6f9b9e2]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-a6f9b9e2]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-a6f9b9e2] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-a6f9b9e2] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-a6f9b9e2]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-a6f9b9e2] {\n  color: #4ab4ff;\n}\n.nkd-pv-ac[data-v-a6f9b9e2] {\n  position: absolute;\n  z-index: 100;\n  background: #1e2028;\n  border: 1px solid #3a3d46;\n  border-radius: 5px;\n  padding: 3px;\n  min-width: 120px;\n  max-height: 160px;\n  overflow-y: auto;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-a6f9b9e2] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  color: #c8d0e0;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-a6f9b9e2]:hover,\n.nkd-pv-ac-item.active[data-v-a6f9b9e2] {\n  background: rgba(74, 180, 255, 0.18);\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-a6f9b9e2] {\n  background: transparent !important;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n\n.nkd-pv-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 15px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\n.nkd-pv-chip *::selection {\n  background: transparent;\n}\n.nkd-pv-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-94c6912e] {\r\n  position: relative;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  box-sizing: border-box;\r\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-94c6912e] {\r\n  height: 150px;\r\n  min-height: 90px;\r\n  overflow-y: auto;\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  padding: 6px 8px;\r\n  color: #c8d0e0;\r\n  font-size: 11.5px;\r\n  line-height: 1.55;\r\n  white-space: pre-wrap;\r\n  word-break: break-word;\r\n  outline: none;\n}\n.nkd-pv-editor[data-v-94c6912e]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-94c6912e]:empty::before {\r\n  content: attr(data-placeholder);\r\n  color: rgba(255, 255, 255, 0.22);\r\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-94c6912e] {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-94c6912e] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  padding: 2px 8px;\r\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-94c6912e]:hover {\r\n  border-color: #4ab4ff;\r\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-94c6912e] {\r\n  color: #4ab4ff;\n}\n.nkd-pv-lib-toggle[data-v-94c6912e] {\r\n  margin-left: auto;\n}\n.nkd-pv-lib-toggle.active[data-v-94c6912e],\r\n.nkd-pv-lib-toggle[data-v-94c6912e]:hover {\r\n  border-color: #b48cff;\r\n  color: #d6c2ff;\n}\n.nkd-pv-lib[data-v-94c6912e] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  max-height: 220px;\r\n  overflow-y: auto;\r\n  padding: 6px;\r\n  background: #16181e;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\n}\n.nkd-pv-lib > .nkd-pv-add[data-v-94c6912e] {\r\n  align-self: flex-start;\n}\n.nkd-pv-lib-row[data-v-94c6912e] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 3px;\n}\n.nkd-pv-lib-head[data-v-94c6912e] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\n}\n.nkd-pv-lib-at[data-v-94c6912e] {\r\n  color: #b48cff;\r\n  font-size: 11px;\r\n  font-weight: 600;\n}\n.nkd-pv-lib-name[data-v-94c6912e],\r\n.nkd-pv-lib-value[data-v-94c6912e] {\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  font-family: inherit;\r\n  padding: 2px 6px;\r\n  outline: none;\n}\n.nkd-pv-lib-name[data-v-94c6912e] {\r\n  flex: 1 1 auto;\r\n  min-width: 0;\n}\n.nkd-pv-lib-value[data-v-94c6912e] {\r\n  resize: vertical;\r\n  min-height: 34px;\r\n  line-height: 1.45;\n}\n.nkd-pv-lib-name[data-v-94c6912e]:focus,\r\n.nkd-pv-lib-value[data-v-94c6912e]:focus {\r\n  border-color: #b48cff;\n}\n.nkd-pv-lib-name.nkd-pv-lib-bad[data-v-94c6912e] {\r\n  border-color: #ff5c5c;\n}\n.nkd-pv-lib-empty[data-v-94c6912e] {\r\n  color: rgba(255, 255, 255, 0.4);\r\n  font-size: 11px;\n}\n.nkd-pv-ac[data-v-94c6912e] {\r\n  position: absolute;\r\n  z-index: 100;\r\n  background: #1e2028;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 5px;\r\n  padding: 3px;\r\n  min-width: 120px;\r\n  max-height: 160px;\r\n  overflow-y: auto;\r\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-94c6912e] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 4px 8px;\r\n  border-radius: 3px;\r\n  font-size: 11px;\r\n  color: #c8d0e0;\r\n  cursor: pointer;\r\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-94c6912e]:hover,\r\n.nkd-pv-ac-item.active[data-v-94c6912e] {\r\n  background: rgba(74, 180, 255, 0.18);\r\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-94c6912e] {\r\n  background: transparent !important;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\r\n\n.nkd-pv-chip {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  gap: 5px;\r\n  background: rgba(74, 180, 255, 0.14);\r\n  border: 1px solid rgba(74, 180, 255, 0.75);\r\n  color: #bfe3ff;\r\n  border-radius: 999px;\r\n  padding: 0 9px 0 7px;\r\n  margin: 0 2px;\r\n  font-size: 10px;\r\n  font-weight: 600;\r\n  letter-spacing: 0.2px;\r\n  line-height: 15px;\r\n  vertical-align: text-bottom;\r\n  user-select: none;\r\n  cursor: grab;\r\n  white-space: nowrap;\r\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\r\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\r\n.nkd-pv-chip *::selection {\r\n  background: transparent;\n}\n.nkd-pv-dot {\r\n  width: 6px;\r\n  height: 6px;\r\n  border-radius: 50%;\r\n  background: #4ab4ff;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-saved {\r\n  border-color: rgba(180, 140, 255, 0.8);\r\n  color: #e0d2ff;\r\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pv-chip-saved .nkd-pv-dot {\r\n  background: #b48cff;\n}\n.nkd-pv-chip-off {\r\n  border-style: dashed;\r\n  border-color: rgba(255, 255, 255, 0.32);\r\n  color: rgba(255, 255, 255, 0.5);\r\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\r\n  border-color: rgba(255, 209, 102, 0.85);\r\n  color: #ffe3a8;\r\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\r\n  content: "🎲";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\r\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\r\n  border-color: rgba(102, 224, 170, 0.85);\r\n  color: #b6f2d8;\r\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\r\n  content: "🔁";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\r\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\r\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
