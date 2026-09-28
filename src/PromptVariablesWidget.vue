@@ -52,7 +52,7 @@
         @click.stop.prevent="panelOpen = !panelOpen"
       >Saved {{ panelOpen ? "▴" : "▾" }}</button>
     </div>
-    <div v-if="panelOpen" ref="libEl" class="nkd-pv-lib" @keydown.stop @paste.stop @copy.stop @cut.stop>
+    <div v-if="panelOpen" ref="libEl" class="nkd-pv-lib" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
       <div v-for="item in library.items" :key="item.name" class="nkd-pv-lib-row">
         <div class="nkd-pv-lib-head">
           <span class="nkd-pv-lib-at">@</span>
@@ -275,20 +275,34 @@ function deserialise(text: string) {
 
 // --- editing ---------------------------------------------------------------
 
+function applyChange() {
+  window.clearTimeout(debounceTimer);
+  const text = serialise();
+  props.onChange(text);
+  // Keep only what the prompt still references, so the copy never piles up.
+  const used: Record<string, string> = {};
+  for (const m of text.matchAll(TOKEN_RE)) {
+    const bare = m[1].slice(1);
+    if (m[1].startsWith("@") && nodeSaved[bare] !== undefined) used[bare] = nodeSaved[bare];
+  }
+  nodeSaved = used;
+  props.onSavedChange(Object.keys(used).length ? JSON.stringify(used) : "");
+}
+
 function emitChange() {
   window.clearTimeout(debounceTimer);
-  debounceTimer = window.setTimeout(() => {
-    const text = serialise();
-    props.onChange(text);
-    // Keep only what the prompt still references, so the copy never piles up.
-    const used: Record<string, string> = {};
-    for (const m of text.matchAll(TOKEN_RE)) {
-      const bare = m[1].slice(1);
-      if (m[1].startsWith("@") && nodeSaved[bare] !== undefined) used[bare] = nodeSaved[bare];
-    }
-    nodeSaved = used;
-    props.onSavedChange(Object.keys(used).length ? JSON.stringify(used) : "");
-  }, 120);
+  debounceTimer = window.setTimeout(applyChange, 120);
+}
+
+// Ctrl/Cmd+Enter (and Ctrl+Shift+Enter) is ComfyUI's Queue: apply the text right away,
+// then let the key through instead of keeping it inside the editor.
+function isQueueKey(e: KeyboardEvent): boolean {
+  return (e.ctrlKey || e.metaKey) && e.key === "Enter";
+}
+
+function onPanelKeydown(e: KeyboardEvent) {
+  if (isQueueKey(e)) applyChange();
+  else e.stopPropagation();
 }
 
 function onInput() {
@@ -297,6 +311,11 @@ function onInput() {
 }
 
 function onKeydown(e: KeyboardEvent) {
+  if (isQueueKey(e)) {
+    acClose();
+    applyChange();
+    return;
+  }
   e.stopPropagation(); // keep ComfyUI hotkeys out of the editor
 
   if (acMenu.open) {
