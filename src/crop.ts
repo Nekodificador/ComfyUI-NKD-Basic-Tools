@@ -663,7 +663,9 @@ function setupCropWidget(node: any): void {
     stopPlayback();
     if (kind === "video") {
       const v = document.createElement("video");
-      v.muted = true; v.playsInline = true; v.preload = "metadata"; v.loop = true;
+      // "auto", not "metadata": with metadata only, loadeddata can fire before any frame is
+      // decoded (a 4K clip did), and the backdrop draws blank.
+      v.muted = true; v.playsInline = true; v.preload = "auto"; v.loop = true;
       v.src = url;
       transport.style.display = "flex";
       scrub.value = "0";

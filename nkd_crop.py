@@ -244,6 +244,11 @@ def _crop_pad(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int,
     pad_left, pad_top = cx0 - x0, cy0 - y0
     pad_right, pad_bottom = x1 - cx1, y1 - cy1
 
+    if has_overlap and not (pad_left or pad_top or pad_right or pad_bottom):
+        # Fully inside: hand back the slice itself, like core ImageCrop. A 4K clip is tens of
+        # GB as float, and copying it is what ran a video crop out of memory.
+        return crop, torch.zeros((B, new_h, new_w), dtype=t.dtype, device=t.device)
+
     mask = torch.ones((B, new_h, new_w), dtype=t.dtype, device=t.device)
     if has_overlap:
         mask[:, pad_top:pad_top + crop.shape[1], pad_left:pad_left + crop.shape[2]] = 0.0
@@ -273,7 +278,8 @@ def _crop_pad(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int,
             canvas[:, :, pad_top:pad_top + chw.shape[2], pad_left:pad_left + chw.shape[3]] = chw
         padded = canvas
 
-    return padded.movedim(1, -1).clamp(0.0, 1.0), mask.clamp(0.0, 1.0)
+    # Source pixels and fill colours are already in [0, 1]; a clamp would only copy the clip.
+    return padded.movedim(1, -1), mask
 
 
 def _crop_pad_rotated(t: torch.Tensor, x0: int, y0: int, x1: int, y1: int, angle_deg: float,

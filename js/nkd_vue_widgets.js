@@ -17530,7 +17530,7 @@ function setupCropWidget(node) {
       const v = document.createElement("video");
       v.muted = true;
       v.playsInline = true;
-      v.preload = "metadata";
+      v.preload = "auto";
       v.loop = true;
       v.src = url;
       transport.style.display = "flex";
