@@ -1518,6 +1518,10 @@ function isRef(r) {
 function ref(value) {
   return createRef(value, false);
 }
+// @__NO_SIDE_EFFECTS__
+function shallowRef(value) {
+  return createRef(value, true);
+}
 function createRef(rawValue, shallow) {
   if (/* @__PURE__ */ isRef(rawValue)) {
     return rawValue;
@@ -2317,8 +2321,354 @@ function createPathGetter(ctx, path) {
     return cur;
   };
 }
+const pendingMounts = /* @__PURE__ */ new WeakMap();
 const TeleportEndKey = /* @__PURE__ */ Symbol("_vte");
 const isTeleport = (type) => type.__isTeleport;
+const isTeleportDisabled = (props) => props && (props.disabled || props.disabled === "");
+const isTeleportDeferred = (props) => props && (props.defer || props.defer === "");
+const isTargetSVG = (target) => typeof SVGElement !== "undefined" && target instanceof SVGElement;
+const isTargetMathML = (target) => typeof MathMLElement === "function" && target instanceof MathMLElement;
+const resolveTarget = (props, select) => {
+  const targetSelector = props && props.to;
+  if (isString(targetSelector)) {
+    if (!select) {
+      return null;
+    } else {
+      const target = select(targetSelector);
+      return target;
+    }
+  } else {
+    return targetSelector;
+  }
+};
+const TeleportImpl = {
+  name: "Teleport",
+  __isTeleport: true,
+  process(n1, n2, container, anchor, parentComponent, parentSuspense, namespace, slotScopeIds, optimized, internals) {
+    const {
+      mc: mountChildren,
+      pc: patchChildren,
+      pbc: patchBlockChildren,
+      o: { insert, querySelector, createText, createComment, parentNode }
+    } = internals;
+    const disabled = isTeleportDisabled(n2.props);
+    let { dynamicChildren } = n2;
+    const mount = (vnode, container2, anchor2) => {
+      if (vnode.shapeFlag & 16) {
+        mountChildren(
+          vnode.children,
+          container2,
+          anchor2,
+          parentComponent,
+          parentSuspense,
+          namespace,
+          slotScopeIds,
+          optimized
+        );
+      }
+    };
+    const mountToTarget = (vnode = n2) => {
+      const disabled2 = isTeleportDisabled(vnode.props);
+      const target = vnode.target = resolveTarget(vnode.props, querySelector);
+      const targetAnchor = prepareAnchor(target, vnode, createText, insert);
+      if (target) {
+        if (namespace !== "svg" && isTargetSVG(target)) {
+          namespace = "svg";
+        } else if (namespace !== "mathml" && isTargetMathML(target)) {
+          namespace = "mathml";
+        }
+        if (parentComponent && parentComponent.isCE) {
+          (parentComponent.ce._teleportTargets || (parentComponent.ce._teleportTargets = /* @__PURE__ */ new Set())).add(target);
+        }
+        if (!disabled2) {
+          mount(vnode, target, targetAnchor);
+          updateCssVars(vnode, false);
+        }
+      }
+    };
+    const queuePendingMount = (vnode) => {
+      const mountJob = () => {
+        if (pendingMounts.get(vnode) !== mountJob) return;
+        pendingMounts.delete(vnode);
+        if (isTeleportDisabled(vnode.props)) {
+          const mountContainer = parentNode(vnode.el) || container;
+          mount(vnode, mountContainer, vnode.anchor);
+          updateCssVars(vnode, true);
+        }
+        mountToTarget(vnode);
+      };
+      pendingMounts.set(vnode, mountJob);
+      queuePostRenderEffect(mountJob, parentSuspense);
+    };
+    if (n1 == null) {
+      const placeholder = n2.el = createText("");
+      const mainAnchor = n2.anchor = createText("");
+      insert(placeholder, container, anchor);
+      insert(mainAnchor, container, anchor);
+      if (isTeleportDeferred(n2.props) || parentSuspense && parentSuspense.pendingBranch) {
+        queuePendingMount(n2);
+        return;
+      }
+      if (disabled) {
+        mount(n2, container, mainAnchor);
+        updateCssVars(n2, true);
+      }
+      mountToTarget();
+    } else {
+      n2.el = n1.el;
+      const mainAnchor = n2.anchor = n1.anchor;
+      const pendingMount = pendingMounts.get(n1);
+      if (pendingMount) {
+        pendingMount.flags |= 8;
+        pendingMounts.delete(n1);
+        queuePendingMount(n2);
+        return;
+      }
+      n2.targetStart = n1.targetStart;
+      const target = n2.target = n1.target;
+      const targetAnchor = n2.targetAnchor = n1.targetAnchor;
+      const wasDisabled = isTeleportDisabled(n1.props);
+      const currentContainer = wasDisabled ? container : target;
+      const currentAnchor = wasDisabled ? mainAnchor : targetAnchor;
+      if (namespace === "svg" || isTargetSVG(target)) {
+        namespace = "svg";
+      } else if (namespace === "mathml" || isTargetMathML(target)) {
+        namespace = "mathml";
+      }
+      if (dynamicChildren) {
+        patchBlockChildren(
+          n1.dynamicChildren,
+          dynamicChildren,
+          currentContainer,
+          parentComponent,
+          parentSuspense,
+          namespace,
+          slotScopeIds
+        );
+        traverseStaticChildren(n1, n2, true);
+      } else if (!optimized) {
+        patchChildren(
+          n1,
+          n2,
+          currentContainer,
+          currentAnchor,
+          parentComponent,
+          parentSuspense,
+          namespace,
+          slotScopeIds,
+          false
+        );
+      }
+      if (disabled) {
+        if (!wasDisabled) {
+          moveTeleport(
+            n2,
+            container,
+            mainAnchor,
+            internals,
+            1
+          );
+        } else {
+          if (n2.props && n1.props && n2.props.to !== n1.props.to) {
+            n2.props.to = n1.props.to;
+          }
+        }
+      } else {
+        if ((n2.props && n2.props.to) !== (n1.props && n1.props.to)) {
+          const nextTarget = resolveTarget(n2.props, querySelector);
+          if (nextTarget) {
+            n2.target = nextTarget;
+            moveTeleport(
+              n2,
+              nextTarget,
+              null,
+              internals,
+              0
+            );
+          }
+        } else if (wasDisabled) {
+          moveTeleport(
+            n2,
+            target,
+            targetAnchor,
+            internals,
+            1
+          );
+        }
+      }
+      updateCssVars(n2, disabled);
+    }
+  },
+  remove(vnode, parentComponent, parentSuspense, { um: unmount, o: { remove: hostRemove } }, doRemove) {
+    const {
+      shapeFlag,
+      children,
+      anchor,
+      targetStart,
+      targetAnchor,
+      target,
+      props
+    } = vnode;
+    const disabled = isTeleportDisabled(props);
+    const shouldRemove = doRemove || !disabled;
+    const pendingMount = pendingMounts.get(vnode);
+    if (pendingMount) {
+      pendingMount.flags |= 8;
+      pendingMounts.delete(vnode);
+    }
+    if (target) {
+      hostRemove(targetStart);
+      hostRemove(targetAnchor);
+    }
+    doRemove && hostRemove(anchor);
+    if (!pendingMount && (disabled || target) && shapeFlag & 16) {
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        unmount(
+          child,
+          parentComponent,
+          parentSuspense,
+          shouldRemove,
+          !!child.dynamicChildren
+        );
+      }
+    }
+  },
+  move: moveTeleport,
+  hydrate: hydrateTeleport
+};
+function moveTeleport(vnode, container, parentAnchor, { o: { insert }, m: move }, moveType = 2) {
+  if (moveType === 0) {
+    insert(vnode.targetAnchor, container, parentAnchor);
+  }
+  const { el, anchor, shapeFlag, children, props } = vnode;
+  const isReorder = moveType === 2;
+  if (isReorder) {
+    insert(el, container, parentAnchor);
+  }
+  if (!pendingMounts.has(vnode) && (!isReorder || isTeleportDisabled(props))) {
+    if (shapeFlag & 16) {
+      for (let i = 0; i < children.length; i++) {
+        move(
+          children[i],
+          container,
+          parentAnchor,
+          2
+        );
+      }
+    }
+  }
+  if (isReorder) {
+    insert(anchor, container, parentAnchor);
+  }
+}
+function hydrateTeleport(node, vnode, parentComponent, parentSuspense, slotScopeIds, optimized, {
+  o: { nextSibling, parentNode, querySelector, insert, createText }
+}, hydrateChildren) {
+  function hydrateAnchor(target2, targetNode) {
+    let targetAnchor = targetNode;
+    while (targetAnchor) {
+      if (targetAnchor && targetAnchor.nodeType === 8) {
+        if (targetAnchor.data === "teleport start anchor") {
+          vnode.targetStart = targetAnchor;
+        } else if (targetAnchor.data === "teleport anchor") {
+          vnode.targetAnchor = targetAnchor;
+          target2._lpa = vnode.targetAnchor && nextSibling(vnode.targetAnchor);
+          break;
+        }
+      }
+      targetAnchor = nextSibling(targetAnchor);
+    }
+  }
+  function hydrateDisabledTeleport(node2, vnode2) {
+    vnode2.anchor = hydrateChildren(
+      nextSibling(node2),
+      vnode2,
+      parentNode(node2),
+      parentComponent,
+      parentSuspense,
+      slotScopeIds,
+      optimized
+    );
+  }
+  const target = vnode.target = resolveTarget(
+    vnode.props,
+    querySelector
+  );
+  const disabled = isTeleportDisabled(vnode.props);
+  if (target) {
+    const targetNode = target._lpa || target.firstChild;
+    if (vnode.shapeFlag & 16) {
+      if (disabled) {
+        hydrateDisabledTeleport(node, vnode);
+        hydrateAnchor(target, targetNode);
+        if (!vnode.targetAnchor) {
+          prepareAnchor(
+            target,
+            vnode,
+            createText,
+            insert,
+            // if target is the same as the main view, insert anchors before current node
+            // to avoid hydrating mismatch
+            parentNode(node) === target ? node : null
+          );
+        }
+      } else {
+        vnode.anchor = nextSibling(node);
+        hydrateAnchor(target, targetNode);
+        if (!vnode.targetAnchor) {
+          prepareAnchor(target, vnode, createText, insert);
+        }
+        hydrateChildren(
+          targetNode && nextSibling(targetNode),
+          vnode,
+          target,
+          parentComponent,
+          parentSuspense,
+          slotScopeIds,
+          optimized
+        );
+      }
+    }
+    updateCssVars(vnode, disabled);
+  } else if (disabled) {
+    if (vnode.shapeFlag & 16) {
+      hydrateDisabledTeleport(node, vnode);
+      vnode.targetStart = node;
+      vnode.targetAnchor = nextSibling(node);
+    }
+  }
+  return vnode.anchor && nextSibling(vnode.anchor);
+}
+const Teleport = TeleportImpl;
+function updateCssVars(vnode, isDisabled) {
+  const ctx = vnode.ctx;
+  if (ctx && ctx.ut) {
+    let node, anchor;
+    if (isDisabled) {
+      node = vnode.el;
+      anchor = vnode.anchor;
+    } else {
+      node = vnode.targetStart;
+      anchor = vnode.targetAnchor;
+    }
+    while (node && node !== anchor) {
+      if (node.nodeType === 1) node.setAttribute("data-v-owner", ctx.uid);
+      node = node.nextSibling;
+    }
+    ctx.ut();
+  }
+}
+function prepareAnchor(target, vnode, createText, insert, anchor = null) {
+  const targetStart = vnode.targetStart = createText("");
+  const targetAnchor = vnode.targetAnchor = createText("");
+  targetStart[TeleportEndKey] = targetAnchor;
+  if (target) {
+    insert(targetStart, target, anchor);
+    insert(targetAnchor, target, anchor);
+  }
+  return targetAnchor;
+}
 const leaveCbKey = /* @__PURE__ */ Symbol("_leaveCb");
 function setTransitionHooks(vnode, hooks) {
   if (vnode.shapeFlag & 6 && vnode.component) {
@@ -6522,6 +6872,257 @@ function saveLibrary() {
     });
   }, 400);
 }
+const STYLE_ID = "nkd-modal-styles";
+const CSS$1 = `
+.nkd-modal-overlay {
+  position: fixed; inset: 0; z-index: 100000;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.8); backdrop-filter: blur(3px);
+  font: 12px system-ui, sans-serif; color: #c8d0e0;
+}
+/* Framed panel, never edge-to-edge: the graph staying visible around the border
+   is what keeps the editor feeling like part of the workflow. */
+.nkd-modal-panel {
+  display: flex; flex-direction: column;
+  background: #111318; color: #c8d0e0;
+  border: 1px solid #3a3d46; border-radius: 10px;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.7);
+  overflow: hidden;
+}
+.nkd-modal-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px; background: #1a1c22;
+  border-bottom: 1px solid rgba(255,255,255,0.07); font-weight: 500;
+}
+.nkd-modal-hint { color: rgba(255,255,255,0.40); font-size: 11px; font-weight: 400; }
+.nkd-modal-spacer { flex: 1 1 auto; }
+.nkd-modal-x {
+  background: transparent; border: none; color: #c8d0e0;
+  font-size: 16px; cursor: pointer; padding: 2px 8px; border-radius: 4px;
+}
+.nkd-modal-x:hover { background: rgba(255,77,77,0.25); color: #ff6b6b; }
+.nkd-modal-body { position: relative; flex: 1 1 auto; min-height: 0; background: #0b0d12; display: flex; }
+.nkd-modal-body > canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.nkd-modal-foot {
+  display: flex; align-items: center; gap: 12px;
+  padding: 8px 14px; background: #1a1c22;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+.nkd-modal-foot-left, .nkd-modal-foot-right { display: flex; align-items: center; gap: 12px; }
+
+/* Shared controls. Vue templates use these class names directly instead of
+   re-declaring the same rules in <style scoped>. */
+.nkd-modal-btn {
+  background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
+  color: #c8d0e0; padding: 4px 10px; font-size: 12px; cursor: pointer;
+}
+.nkd-modal-btn:hover { border-color: #4ab4ff; }
+.nkd-modal-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.nkd-modal-btn.on { border-color: #4ab4ff; color: #4ab4ff; background: rgba(74,180,255,0.12); }
+.nkd-modal-btn.primary { border-color: #4ab4ff; color: #4ab4ff; font-weight: 500; padding: 5px 14px; }
+.nkd-modal-btn.primary:hover { background: rgba(74,180,255,0.15); }
+.nkd-modal-lbl { color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
+.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; touch-action: none; }
+.nkd-modal-num {
+  color: #c8d0e0; font-variant-numeric: tabular-nums;
+  min-width: 52px; text-align: right;
+}
+.nkd-modal-sel {
+  background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
+  color: #c8d0e0; padding: 3px 8px; font-size: 12px; cursor: pointer;
+}
+.nkd-modal-status { color: #4ab4ff; font-variant-numeric: tabular-nums; }
+.nkd-modal-status.bad { color: #ff6b6b; }
+`;
+function ensureNkdModalStyles() {
+  if (document.getElementById(STYLE_ID)) return;
+  const el = document.createElement("style");
+  el.id = STYLE_ID;
+  el.textContent = CSS$1;
+  document.head.appendChild(el);
+}
+function div(cls) {
+  const d = document.createElement("div");
+  d.className = cls;
+  return d;
+}
+function openNkdModal(opts) {
+  ensureNkdModalStyles();
+  const overlay = div("nkd-modal-overlay");
+  const panel = div("nkd-modal-panel");
+  panel.style.width = opts.width ?? "92vw";
+  panel.style.height = opts.height ?? "92vh";
+  panel.style.maxWidth = opts.maxWidth ?? "1800px";
+  const head = div("nkd-modal-head");
+  const titleEl = document.createElement("span");
+  titleEl.textContent = opts.title;
+  const hintEl = document.createElement("span");
+  hintEl.className = "nkd-modal-hint";
+  hintEl.textContent = opts.hint ?? "";
+  const xBtn = document.createElement("button");
+  xBtn.className = "nkd-modal-x";
+  xBtn.textContent = "✕";
+  xBtn.title = "Close (Esc)";
+  head.append(titleEl, hintEl, div("nkd-modal-spacer"), xBtn);
+  const body = div("nkd-modal-body");
+  const footer = div("nkd-modal-foot");
+  const footerLeft = div("nkd-modal-foot-left");
+  const footerRight = div("nkd-modal-foot-right");
+  footer.append(footerLeft, div("nkd-modal-spacer"), footerRight);
+  panel.append(head, body, footer);
+  overlay.append(panel);
+  document.body.appendChild(overlay);
+  let closed = false;
+  function close(reason = "dismiss") {
+    var _a;
+    if (closed) return;
+    closed = true;
+    window.removeEventListener("keydown", onKey, true);
+    overlay.remove();
+    (_a = opts.onClose) == null ? void 0 : _a.call(opts, reason);
+  }
+  function onKey(e) {
+    if (e.key !== "Escape") return;
+    e.stopPropagation();
+    e.preventDefault();
+    close("dismiss");
+  }
+  xBtn.onclick = () => close("dismiss");
+  if (opts.closeOnEsc !== false) window.addEventListener("keydown", onKey, true);
+  if (opts.closeOnBackdrop !== false) {
+    overlay.addEventListener("pointerdown", (e) => {
+      if (e.target === overlay) close("dismiss");
+    });
+  }
+  return {
+    overlay,
+    panel,
+    head,
+    body,
+    footer,
+    footerLeft,
+    footerRight,
+    setTitle: (t) => {
+      titleEl.textContent = t;
+    },
+    setHint: (h) => {
+      hintEl.textContent = h;
+    },
+    addPrimary(label, onClick) {
+      const b = nkdButton(label, () => {
+        onClick == null ? void 0 : onClick();
+        close("save");
+      });
+      b.classList.add("primary");
+      footerRight.appendChild(b);
+      return b;
+    },
+    close
+  };
+}
+function nkdButton(label, onClick, title) {
+  const b = document.createElement("button");
+  b.className = "nkd-modal-btn";
+  b.textContent = label;
+  if (title) b.title = title;
+  b.onclick = onClick;
+  return b;
+}
+function nkdToggle(label, initial, onChange, title) {
+  let on = initial;
+  const b = nkdButton(label, () => {
+    on = !on;
+    b.classList.toggle("on", on);
+    onChange(on);
+  }, title);
+  b.classList.toggle("on", on);
+  return b;
+}
+const FINE_GAIN$1 = 0.1;
+function nkdSlider(label, cfg, onInput, title) {
+  const wrap = document.createElement("label");
+  wrap.className = "nkd-modal-lbl";
+  if (title) wrap.title = title;
+  const rng = document.createElement("input");
+  rng.type = "range";
+  rng.className = "nkd-modal-rng";
+  rng.min = String(cfg.min);
+  rng.max = String(cfg.max);
+  rng.step = "any";
+  rng.value = String(cfg.value);
+  if (cfg.width) rng.style.width = `${cfg.width}px`;
+  const out = cfg.format ? document.createElement("span") : null;
+  if (out) out.className = "nkd-modal-num";
+  const fine = cfg.fine ?? cfg.step / 10;
+  const clamp2 = (v) => Math.max(cfg.min, Math.min(cfg.max, v));
+  const quantize = (v, soft) => {
+    const q = soft ? fine : cfg.step;
+    return Math.round(Math.round(clamp2(v) / q) * q * 1e6) / 1e6;
+  };
+  const show = (v) => {
+    if (out) out.textContent = cfg.format(v);
+  };
+  const apply2 = (v, soft) => {
+    const q = quantize(v, soft);
+    rng.value = String(q);
+    show(q);
+    onInput(q);
+  };
+  rng.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || rng.disabled) return;
+    e.preventDefault();
+    rng.focus();
+    try {
+      rng.setPointerCapture(e.pointerId);
+    } catch {
+    }
+    const rect = rng.getBoundingClientRect();
+    const span = cfg.max - cfg.min;
+    const width = Math.max(1, rect.width);
+    let v = e.shiftKey ? parseFloat(rng.value) : clamp2(cfg.min + (e.clientX - rect.left) / width * span);
+    apply2(v, e.shiftKey);
+    let prevX = e.clientX;
+    const move = (ev) => {
+      v = clamp2(v + (ev.clientX - prevX) / width * span * (ev.shiftKey ? FINE_GAIN$1 : 1));
+      prevX = ev.clientX;
+      apply2(v, ev.shiftKey);
+    };
+    const up = (ev) => {
+      rng.removeEventListener("pointermove", move);
+      rng.removeEventListener("pointerup", up);
+      rng.removeEventListener("pointercancel", up);
+      try {
+        rng.releasePointerCapture(ev.pointerId);
+      } catch {
+      }
+    };
+    rng.addEventListener("pointermove", move);
+    rng.addEventListener("pointerup", up);
+    rng.addEventListener("pointercancel", up);
+  });
+  rng.addEventListener("keydown", (e) => {
+    const dir = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const q = e.shiftKey ? fine : cfg.step;
+    apply2(parseFloat(rng.value) + dir * q, e.shiftKey);
+  });
+  const txt = document.createElement("span");
+  txt.className = "nkd-modal-lbl-txt";
+  txt.textContent = label;
+  wrap.append(txt, rng);
+  if (out) wrap.appendChild(out);
+  show(cfg.value);
+  wrap.sync = (v) => {
+    rng.value = String(v);
+    show(v);
+  };
+  wrap.setDisabled = (off) => {
+    rng.disabled = off;
+    wrap.style.opacity = off ? "0.45" : "";
+  };
+  return wrap;
+}
 const _hoisted_1$5 = ["onMousedown"];
 const _hoisted_2$5 = { class: "nkd-pv-bar" };
 const _hoisted_3$5 = ["title", "onClick"];
@@ -6534,13 +7135,11 @@ const _hoisted_9 = {
   key: 0,
   class: "nkd-pv-lib-empty"
 };
-const PANEL_GAP = 6;
 const _sfc_main$5 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function },
-    onSavedChange: { type: Function },
-    onPanelResize: { type: Function }
+    onSavedChange: { type: Function }
   },
   setup(__props, { expose: __expose }) {
     const props = __props;
@@ -6549,21 +7148,29 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     const acMenuEl = /* @__PURE__ */ ref(null);
     const vars = /* @__PURE__ */ ref([]);
     let nodeSaved = {};
-    const panelOpen = /* @__PURE__ */ ref(false);
-    const libEl = /* @__PURE__ */ ref(null);
-    let panelH = 0;
-    function reportPanelHeight() {
-      const h = libEl.value ? libEl.value.offsetHeight + PANEL_GAP : 0;
-      if (h === panelH) return;
-      props.onPanelResize(h - panelH);
-      panelH = h;
+    const modal = /* @__PURE__ */ shallowRef(null);
+    function toggleLibrary() {
+      if (modal.value) {
+        modal.value.close();
+        return;
+      }
+      const m = openNkdModal({
+        title: "😺 Saved variables",
+        hint: "Shared by every workflow",
+        width: "min(560px, 92vw)",
+        height: "min(640px, 80vh)",
+        onClose: () => {
+          modal.value = null;
+        }
+      });
+      m.addPrimary("Done");
+      modal.value = m;
     }
-    const panelRo = new ResizeObserver(reportPanelHeight);
-    watch(libEl, (el, old) => {
-      if (old) panelRo.unobserve(old);
-      if (el) panelRo.observe(el);
-      else reportPanelHeight();
-    }, { flush: "post" });
+    function insertSaved(item) {
+      var _a;
+      insertChip("@" + item.name);
+      (_a = modal.value) == null ? void 0 : _a.close();
+    }
     let savedRange = null;
     let debounceTimer;
     const acMenu = /* @__PURE__ */ reactive({
@@ -6966,7 +7573,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
       saveLibrary();
       nextTick(() => {
         var _a;
-        const el = [...((_a = root.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-lib-name")) ?? []].find((x) => x.value === name);
+        const el = Array.from(((_a = modal.value) == null ? void 0 : _a.body.querySelectorAll(".nkd-pv-lib-name")) ?? []).find((x) => x.value === name);
         el == null ? void 0 : el.focus();
         el == null ? void 0 : el.select();
       });
@@ -7020,8 +7627,9 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
       e.target.blur();
     }
     function cleanup() {
+      var _a;
       window.clearTimeout(debounceTimer);
-      panelRo.disconnect();
+      (_a = modal.value) == null ? void 0 : _a.close();
     }
     onMounted(() => {
       loadLibrary().then(refreshSavedChips);
@@ -7032,11 +7640,11 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
         ref_key: "root",
         ref: root,
         class: "nkd-pv",
-        onMousedown: _cache[8] || (_cache[8] = withModifiers(() => {
+        onMousedown: _cache[7] || (_cache[7] = withModifiers(() => {
         }, ["stop"])),
-        onMouseup: _cache[9] || (_cache[9] = withModifiers(() => {
+        onMouseup: _cache[8] || (_cache[8] = withModifiers(() => {
         }, ["stop"])),
-        onMousemove: _cache[10] || (_cache[10] = withModifiers(() => {
+        onMousemove: _cache[9] || (_cache[9] = withModifiers(() => {
         }, ["stop"]))
       }, [
         createBaseVNode("div", {
@@ -7093,66 +7701,74 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
             }, "+ " + toDisplayString(v.label), 11, _hoisted_3$5);
           }), 128)),
           createBaseVNode("button", {
-            class: normalizeClass(["nkd-pv-add nkd-pv-lib-toggle", { active: panelOpen.value }]),
+            class: normalizeClass(["nkd-pv-add nkd-pv-lib-toggle", { active: modal.value }]),
             title: "Your saved variables, shared by every workflow",
-            onClick: _cache[4] || (_cache[4] = withModifiers(($event) => panelOpen.value = !panelOpen.value, ["stop", "prevent"]))
-          }, "Saved " + toDisplayString(panelOpen.value ? "▴" : "▾"), 3)
+            onClick: withModifiers(toggleLibrary, ["stop", "prevent"])
+          }, "Saved", 2)
         ]),
-        panelOpen.value ? (openBlock(), createElementBlock("div", {
+        modal.value ? (openBlock(), createBlock(Teleport, {
           key: 1,
-          ref_key: "libEl",
-          ref: libEl,
-          class: "nkd-pv-lib",
-          onKeydown: onPanelKeydown,
-          onPaste: _cache[5] || (_cache[5] = withModifiers(() => {
-          }, ["stop"])),
-          onCopy: _cache[6] || (_cache[6] = withModifiers(() => {
-          }, ["stop"])),
-          onCut: _cache[7] || (_cache[7] = withModifiers(() => {
-          }, ["stop"]))
+          to: modal.value.body
         }, [
-          (openBlock(true), createElementBlock(Fragment, null, renderList(unref(library).items, (item) => {
-            return openBlock(), createElementBlock("div", {
-              key: item.name,
-              class: "nkd-pv-lib-row"
-            }, [
-              createBaseVNode("div", _hoisted_4$4, [
-                _cache[11] || (_cache[11] = createBaseVNode("span", { class: "nkd-pv-lib-at" }, "@", -1)),
-                createBaseVNode("input", {
-                  class: "nkd-pv-lib-name",
-                  value: item.name,
+          createBaseVNode("div", {
+            class: "nkd-pv-lib",
+            onKeydown: onPanelKeydown,
+            onPaste: _cache[4] || (_cache[4] = withModifiers(() => {
+            }, ["stop"])),
+            onCopy: _cache[5] || (_cache[5] = withModifiers(() => {
+            }, ["stop"])),
+            onCut: _cache[6] || (_cache[6] = withModifiers(() => {
+            }, ["stop"]))
+          }, [
+            (openBlock(true), createElementBlock(Fragment, null, renderList(unref(library).items, (item) => {
+              return openBlock(), createElementBlock("div", {
+                key: item.name,
+                class: "nkd-pv-lib-row"
+              }, [
+                createBaseVNode("div", _hoisted_4$4, [
+                  _cache[10] || (_cache[10] = createBaseVNode("span", { class: "nkd-pv-lib-at" }, "@", -1)),
+                  createBaseVNode("input", {
+                    class: "nkd-pv-lib-name",
+                    value: item.name,
+                    spellcheck: "false",
+                    title: "Letters, numbers, - and _ (spaces become _)",
+                    onChange: ($event) => renameSaved(item, $event),
+                    onKeydown: withKeys(blurTarget, ["enter"])
+                  }, null, 40, _hoisted_5$1),
+                  createBaseVNode("button", {
+                    class: "nkd-modal-btn",
+                    title: "Insert into the prompt",
+                    onClick: withModifiers(($event) => insertSaved(item), ["stop", "prevent"])
+                  }, "Insert", 8, _hoisted_6$1),
+                  createBaseVNode("button", {
+                    class: "nkd-modal-btn",
+                    title: "Delete from your library",
+                    onClick: withModifiers(($event) => deleteSaved(item), ["stop", "prevent"])
+                  }, "×", 8, _hoisted_7$1)
+                ]),
+                createBaseVNode("textarea", {
+                  class: "nkd-pv-lib-value",
+                  rows: "2",
                   spellcheck: "false",
-                  title: "Letters, numbers, - and _ (spaces become _)",
-                  onChange: ($event) => renameSaved(item, $event),
-                  onKeydown: withKeys(blurTarget, ["enter"])
-                }, null, 40, _hoisted_5$1),
-                createBaseVNode("button", {
-                  class: "nkd-pv-add",
-                  title: "Insert into the prompt",
-                  onClick: withModifiers(($event) => insertChip("@" + item.name), ["stop", "prevent"])
-                }, "Insert", 8, _hoisted_6$1),
-                createBaseVNode("button", {
-                  class: "nkd-pv-add",
-                  title: "Delete from your library",
-                  onClick: withModifiers(($event) => deleteSaved(item), ["stop", "prevent"])
-                }, "×", 8, _hoisted_7$1)
-              ]),
-              createBaseVNode("textarea", {
-                class: "nkd-pv-lib-value",
-                rows: "2",
-                spellcheck: "false",
-                placeholder: "Value (one item per line)",
-                value: item.value,
-                onInput: ($event) => editSaved(item, $event)
-              }, null, 40, _hoisted_8)
-            ]);
-          }), 128)),
-          !unref(library).items.length ? (openBlock(), createElementBlock("div", _hoisted_9, " No saved variables yet. Select text in the prompt and press + New to save it. ")) : createCommentVNode("", true),
+                  placeholder: "Value (one item per line)",
+                  value: item.value,
+                  onInput: ($event) => editSaved(item, $event)
+                }, null, 40, _hoisted_8)
+              ]);
+            }), 128)),
+            !unref(library).items.length ? (openBlock(), createElementBlock("div", _hoisted_9, " No saved variables yet. Select text in the prompt and press + New to save it. ")) : createCommentVNode("", true)
+          ], 32)
+        ], 8, ["to"])) : createCommentVNode("", true),
+        modal.value ? (openBlock(), createBlock(Teleport, {
+          key: 2,
+          to: modal.value.footerLeft
+        }, [
           createBaseVNode("button", {
-            class: "nkd-pv-add",
+            class: "nkd-modal-btn",
+            title: "Save the selected text, or an empty entry",
             onClick: withModifiers(newSaved, ["stop", "prevent"])
           }, "+ New")
-        ], 544)) : createCommentVNode("", true)
+        ], 8, ["to"])) : createCommentVNode("", true)
       ], 544);
     };
   }
@@ -7164,7 +7780,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-15b3ce0b"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-58f2854d"]]);
 const MODES = ["smooth", "bezier", "steps"];
 function midWarp(f, mid) {
   const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
@@ -12244,257 +12860,6 @@ function mkPane() {
   const p2 = document.createElement("div");
   p2.style.cssText = `position:relative;flex:1 1 0;min-width:0;overflow:hidden;background:${PANEL}`;
   return p2;
-}
-const STYLE_ID = "nkd-modal-styles";
-const CSS$1 = `
-.nkd-modal-overlay {
-  position: fixed; inset: 0; z-index: 100000;
-  display: flex; align-items: center; justify-content: center;
-  background: rgba(0,0,0,0.8); backdrop-filter: blur(3px);
-  font: 12px system-ui, sans-serif; color: #c8d0e0;
-}
-/* Framed panel, never edge-to-edge: the graph staying visible around the border
-   is what keeps the editor feeling like part of the workflow. */
-.nkd-modal-panel {
-  display: flex; flex-direction: column;
-  background: #111318; color: #c8d0e0;
-  border: 1px solid #3a3d46; border-radius: 10px;
-  box-shadow: 0 12px 48px rgba(0,0,0,0.7);
-  overflow: hidden;
-}
-.nkd-modal-head {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 14px; background: #1a1c22;
-  border-bottom: 1px solid rgba(255,255,255,0.07); font-weight: 500;
-}
-.nkd-modal-hint { color: rgba(255,255,255,0.40); font-size: 11px; font-weight: 400; }
-.nkd-modal-spacer { flex: 1 1 auto; }
-.nkd-modal-x {
-  background: transparent; border: none; color: #c8d0e0;
-  font-size: 16px; cursor: pointer; padding: 2px 8px; border-radius: 4px;
-}
-.nkd-modal-x:hover { background: rgba(255,77,77,0.25); color: #ff6b6b; }
-.nkd-modal-body { position: relative; flex: 1 1 auto; min-height: 0; background: #0b0d12; display: flex; }
-.nkd-modal-body > canvas { display: block; width: 100%; height: 100%; touch-action: none; }
-.nkd-modal-foot {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 14px; background: #1a1c22;
-  border-top: 1px solid rgba(255,255,255,0.07);
-}
-.nkd-modal-foot-left, .nkd-modal-foot-right { display: flex; align-items: center; gap: 12px; }
-
-/* Shared controls. Vue templates use these class names directly instead of
-   re-declaring the same rules in <style scoped>. */
-.nkd-modal-btn {
-  background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
-  color: #c8d0e0; padding: 4px 10px; font-size: 12px; cursor: pointer;
-}
-.nkd-modal-btn:hover { border-color: #4ab4ff; }
-.nkd-modal-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-.nkd-modal-btn.on { border-color: #4ab4ff; color: #4ab4ff; background: rgba(74,180,255,0.12); }
-.nkd-modal-btn.primary { border-color: #4ab4ff; color: #4ab4ff; font-weight: 500; padding: 5px 14px; }
-.nkd-modal-btn.primary:hover { background: rgba(74,180,255,0.15); }
-.nkd-modal-lbl { color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
-.nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; touch-action: none; }
-.nkd-modal-num {
-  color: #c8d0e0; font-variant-numeric: tabular-nums;
-  min-width: 52px; text-align: right;
-}
-.nkd-modal-sel {
-  background: #252830; border: 1px solid #3a3d46; border-radius: 4px;
-  color: #c8d0e0; padding: 3px 8px; font-size: 12px; cursor: pointer;
-}
-.nkd-modal-status { color: #4ab4ff; font-variant-numeric: tabular-nums; }
-.nkd-modal-status.bad { color: #ff6b6b; }
-`;
-function ensureNkdModalStyles() {
-  if (document.getElementById(STYLE_ID)) return;
-  const el = document.createElement("style");
-  el.id = STYLE_ID;
-  el.textContent = CSS$1;
-  document.head.appendChild(el);
-}
-function div(cls) {
-  const d = document.createElement("div");
-  d.className = cls;
-  return d;
-}
-function openNkdModal(opts) {
-  ensureNkdModalStyles();
-  const overlay = div("nkd-modal-overlay");
-  const panel = div("nkd-modal-panel");
-  panel.style.width = opts.width ?? "92vw";
-  panel.style.height = opts.height ?? "92vh";
-  panel.style.maxWidth = opts.maxWidth ?? "1800px";
-  const head = div("nkd-modal-head");
-  const titleEl = document.createElement("span");
-  titleEl.textContent = opts.title;
-  const hintEl = document.createElement("span");
-  hintEl.className = "nkd-modal-hint";
-  hintEl.textContent = opts.hint ?? "";
-  const xBtn = document.createElement("button");
-  xBtn.className = "nkd-modal-x";
-  xBtn.textContent = "✕";
-  xBtn.title = "Close (Esc)";
-  head.append(titleEl, hintEl, div("nkd-modal-spacer"), xBtn);
-  const body = div("nkd-modal-body");
-  const footer = div("nkd-modal-foot");
-  const footerLeft = div("nkd-modal-foot-left");
-  const footerRight = div("nkd-modal-foot-right");
-  footer.append(footerLeft, div("nkd-modal-spacer"), footerRight);
-  panel.append(head, body, footer);
-  overlay.append(panel);
-  document.body.appendChild(overlay);
-  let closed = false;
-  function close(reason = "dismiss") {
-    var _a;
-    if (closed) return;
-    closed = true;
-    window.removeEventListener("keydown", onKey, true);
-    overlay.remove();
-    (_a = opts.onClose) == null ? void 0 : _a.call(opts, reason);
-  }
-  function onKey(e) {
-    if (e.key !== "Escape") return;
-    e.stopPropagation();
-    e.preventDefault();
-    close("dismiss");
-  }
-  xBtn.onclick = () => close("dismiss");
-  if (opts.closeOnEsc !== false) window.addEventListener("keydown", onKey, true);
-  if (opts.closeOnBackdrop !== false) {
-    overlay.addEventListener("pointerdown", (e) => {
-      if (e.target === overlay) close("dismiss");
-    });
-  }
-  return {
-    overlay,
-    panel,
-    head,
-    body,
-    footer,
-    footerLeft,
-    footerRight,
-    setTitle: (t) => {
-      titleEl.textContent = t;
-    },
-    setHint: (h) => {
-      hintEl.textContent = h;
-    },
-    addPrimary(label, onClick) {
-      const b = nkdButton(label, () => {
-        onClick == null ? void 0 : onClick();
-        close("save");
-      });
-      b.classList.add("primary");
-      footerRight.appendChild(b);
-      return b;
-    },
-    close
-  };
-}
-function nkdButton(label, onClick, title) {
-  const b = document.createElement("button");
-  b.className = "nkd-modal-btn";
-  b.textContent = label;
-  if (title) b.title = title;
-  b.onclick = onClick;
-  return b;
-}
-function nkdToggle(label, initial, onChange, title) {
-  let on = initial;
-  const b = nkdButton(label, () => {
-    on = !on;
-    b.classList.toggle("on", on);
-    onChange(on);
-  }, title);
-  b.classList.toggle("on", on);
-  return b;
-}
-const FINE_GAIN$1 = 0.1;
-function nkdSlider(label, cfg, onInput, title) {
-  const wrap = document.createElement("label");
-  wrap.className = "nkd-modal-lbl";
-  if (title) wrap.title = title;
-  const rng = document.createElement("input");
-  rng.type = "range";
-  rng.className = "nkd-modal-rng";
-  rng.min = String(cfg.min);
-  rng.max = String(cfg.max);
-  rng.step = "any";
-  rng.value = String(cfg.value);
-  if (cfg.width) rng.style.width = `${cfg.width}px`;
-  const out = cfg.format ? document.createElement("span") : null;
-  if (out) out.className = "nkd-modal-num";
-  const fine = cfg.fine ?? cfg.step / 10;
-  const clamp2 = (v) => Math.max(cfg.min, Math.min(cfg.max, v));
-  const quantize = (v, soft) => {
-    const q = soft ? fine : cfg.step;
-    return Math.round(Math.round(clamp2(v) / q) * q * 1e6) / 1e6;
-  };
-  const show = (v) => {
-    if (out) out.textContent = cfg.format(v);
-  };
-  const apply2 = (v, soft) => {
-    const q = quantize(v, soft);
-    rng.value = String(q);
-    show(q);
-    onInput(q);
-  };
-  rng.addEventListener("pointerdown", (e) => {
-    if (e.button !== 0 || rng.disabled) return;
-    e.preventDefault();
-    rng.focus();
-    try {
-      rng.setPointerCapture(e.pointerId);
-    } catch {
-    }
-    const rect = rng.getBoundingClientRect();
-    const span = cfg.max - cfg.min;
-    const width = Math.max(1, rect.width);
-    let v = e.shiftKey ? parseFloat(rng.value) : clamp2(cfg.min + (e.clientX - rect.left) / width * span);
-    apply2(v, e.shiftKey);
-    let prevX = e.clientX;
-    const move = (ev) => {
-      v = clamp2(v + (ev.clientX - prevX) / width * span * (ev.shiftKey ? FINE_GAIN$1 : 1));
-      prevX = ev.clientX;
-      apply2(v, ev.shiftKey);
-    };
-    const up = (ev) => {
-      rng.removeEventListener("pointermove", move);
-      rng.removeEventListener("pointerup", up);
-      rng.removeEventListener("pointercancel", up);
-      try {
-        rng.releasePointerCapture(ev.pointerId);
-      } catch {
-      }
-    };
-    rng.addEventListener("pointermove", move);
-    rng.addEventListener("pointerup", up);
-    rng.addEventListener("pointercancel", up);
-  });
-  rng.addEventListener("keydown", (e) => {
-    const dir = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
-    if (!dir) return;
-    e.preventDefault();
-    const q = e.shiftKey ? fine : cfg.step;
-    apply2(parseFloat(rng.value) + dir * q, e.shiftKey);
-  });
-  const txt = document.createElement("span");
-  txt.className = "nkd-modal-lbl-txt";
-  txt.textContent = label;
-  wrap.append(txt, rng);
-  if (out) wrap.appendChild(out);
-  show(cfg.value);
-  wrap.sync = (v) => {
-    rng.value = String(v);
-    show(v);
-  };
-  wrap.setDisabled = (off) => {
-    rng.disabled = off;
-    wrap.style.opacity = off ? "0.45" : "";
-  };
-  return wrap;
 }
 const FLATTEN_TOL = 1 / 24576;
 const MIN_W$2 = 1;
@@ -18985,7 +19350,6 @@ app.registerExtension({
       }
       const container = document.createElement("div");
       let instance = null;
-      let holdEditor = false;
       const vueApp = createApp(PromptVariablesWidget, {
         onChange: (text) => {
           if (textWidget.value !== text) {
@@ -18994,16 +19358,6 @@ app.registerExtension({
         },
         onSavedChange: (json) => {
           if (savedWidget) savedWidget.value = json;
-        },
-        // The Saved panel grows or shrinks the node by exactly its own height. The editor
-        // keeps its size meanwhile: onResize would otherwise refit it to the new node.
-        onPanelResize: (delta) => {
-          holdEditor = true;
-          this.setSize([this.size[0], this.size[1] + delta]);
-          this.setDirtyCanvas(true, true);
-          requestAnimationFrame(() => requestAnimationFrame(() => {
-            holdEditor = false;
-          }));
         }
       });
       instance = vueApp.mount(container);
@@ -19040,7 +19394,6 @@ app.registerExtension({
       this.onResize = function(size) {
         origResize == null ? void 0 : origResize.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
-        if (holdEditor) return;
         const editorEl = container.querySelector(".nkd-pv-editor");
         if (!editorEl) return;
         const computed2 = this.computeSize();
@@ -20137,7 +20490,7 @@ console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DE
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-15b3ce0b] {\r\n  position: relative;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  box-sizing: border-box;\r\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-15b3ce0b] {\r\n  height: 150px;\r\n  min-height: 90px;\r\n  overflow-y: auto;\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  padding: 6px 8px;\r\n  color: #c8d0e0;\r\n  font-size: 11.5px;\r\n  line-height: 1.55;\r\n  white-space: pre-wrap;\r\n  word-break: break-word;\r\n  outline: none;\n}\n.nkd-pv-editor[data-v-15b3ce0b]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-15b3ce0b]:empty::before {\r\n  content: attr(data-placeholder);\r\n  color: rgba(255, 255, 255, 0.22);\r\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-15b3ce0b] {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-15b3ce0b] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  padding: 2px 8px;\r\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-15b3ce0b]:hover {\r\n  border-color: #4ab4ff;\r\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-15b3ce0b] {\r\n  color: #4ab4ff;\n}\n.nkd-pv-lib-toggle[data-v-15b3ce0b] {\r\n  margin-left: auto;\n}\n.nkd-pv-lib-toggle.active[data-v-15b3ce0b],\r\n.nkd-pv-lib-toggle[data-v-15b3ce0b]:hover {\r\n  border-color: #b48cff;\r\n  color: #d6c2ff;\n}\n.nkd-pv-lib[data-v-15b3ce0b] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  max-height: 220px;\r\n  overflow-y: auto;\r\n  padding: 6px;\r\n  background: #16181e;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\n}\n.nkd-pv-lib > .nkd-pv-add[data-v-15b3ce0b] {\r\n  align-self: flex-start;\n}\n.nkd-pv-lib-row[data-v-15b3ce0b] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 3px;\n}\n.nkd-pv-lib-head[data-v-15b3ce0b] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\n}\n.nkd-pv-lib-at[data-v-15b3ce0b] {\r\n  color: #b48cff;\r\n  font-size: 11px;\r\n  font-weight: 600;\n}\n.nkd-pv-lib-name[data-v-15b3ce0b],\r\n.nkd-pv-lib-value[data-v-15b3ce0b] {\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  font-family: inherit;\r\n  padding: 2px 6px;\r\n  outline: none;\n}\n.nkd-pv-lib-name[data-v-15b3ce0b] {\r\n  flex: 1 1 auto;\r\n  min-width: 0;\n}\n.nkd-pv-lib-value[data-v-15b3ce0b] {\r\n  resize: vertical;\r\n  min-height: 34px;\r\n  line-height: 1.45;\n}\n.nkd-pv-lib-name[data-v-15b3ce0b]:focus,\r\n.nkd-pv-lib-value[data-v-15b3ce0b]:focus {\r\n  border-color: #b48cff;\n}\n.nkd-pv-lib-name.nkd-pv-lib-bad[data-v-15b3ce0b] {\r\n  border-color: #ff5c5c;\n}\n.nkd-pv-lib-empty[data-v-15b3ce0b] {\r\n  color: rgba(255, 255, 255, 0.4);\r\n  font-size: 11px;\n}\n.nkd-pv-ac[data-v-15b3ce0b] {\r\n  position: absolute;\r\n  z-index: 100;\r\n  background: #1e2028;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 5px;\r\n  padding: 3px;\r\n  min-width: 120px;\r\n  max-height: 160px;\r\n  overflow-y: auto;\r\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-15b3ce0b] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 4px 8px;\r\n  border-radius: 3px;\r\n  font-size: 11px;\r\n  color: #c8d0e0;\r\n  cursor: pointer;\r\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-15b3ce0b]:hover,\r\n.nkd-pv-ac-item.active[data-v-15b3ce0b] {\r\n  background: rgba(74, 180, 255, 0.18);\r\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-15b3ce0b] {\r\n  background: transparent !important;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\r\n\n.nkd-pv-chip {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  gap: 5px;\r\n  background: rgba(74, 180, 255, 0.14);\r\n  border: 1px solid rgba(74, 180, 255, 0.75);\r\n  color: #bfe3ff;\r\n  border-radius: 999px;\r\n  padding: 0 9px 0 7px;\r\n  margin: 0 2px;\r\n  font-size: 10px;\r\n  font-weight: 600;\r\n  letter-spacing: 0.2px;\r\n  line-height: 15px;\r\n  vertical-align: text-bottom;\r\n  user-select: none;\r\n  cursor: grab;\r\n  white-space: nowrap;\r\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\r\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\r\n.nkd-pv-chip *::selection {\r\n  background: transparent;\n}\n.nkd-pv-dot {\r\n  width: 6px;\r\n  height: 6px;\r\n  border-radius: 50%;\r\n  background: #4ab4ff;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-saved {\r\n  border-color: rgba(180, 140, 255, 0.8);\r\n  color: #e0d2ff;\r\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pv-chip-saved .nkd-pv-dot {\r\n  background: #b48cff;\n}\n.nkd-pv-chip-off {\r\n  border-style: dashed;\r\n  border-color: rgba(255, 255, 255, 0.32);\r\n  color: rgba(255, 255, 255, 0.5);\r\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\r\n  border-color: rgba(255, 209, 102, 0.85);\r\n  color: #ffe3a8;\r\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\r\n  content: "🎲";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\r\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\r\n  border-color: rgba(102, 224, 170, 0.85);\r\n  color: #b6f2d8;\r\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\r\n  content: "🔁";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\r\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\r\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-58f2854d] {\r\n  position: relative;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  box-sizing: border-box;\r\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-58f2854d] {\r\n  height: 150px;\r\n  min-height: 90px;\r\n  overflow-y: auto;\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  padding: 6px 8px;\r\n  color: #c8d0e0;\r\n  font-size: 11.5px;\r\n  line-height: 1.55;\r\n  white-space: pre-wrap;\r\n  word-break: break-word;\r\n  outline: none;\n}\n.nkd-pv-editor[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-58f2854d]:empty::before {\r\n  content: attr(data-placeholder);\r\n  color: rgba(255, 255, 255, 0.22);\r\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  padding: 2px 8px;\r\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-58f2854d]:hover {\r\n  border-color: #4ab4ff;\r\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-58f2854d] {\r\n  color: #4ab4ff;\n}\n.nkd-pv-lib-toggle[data-v-58f2854d] {\r\n  margin-left: auto;\n}\n.nkd-pv-lib-toggle.active[data-v-58f2854d],\r\n.nkd-pv-lib-toggle[data-v-58f2854d]:hover {\r\n  border-color: #b48cff;\r\n  color: #d6c2ff;\n}\n.nkd-pv-lib[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 10px;\r\n  flex: 1 1 auto;\r\n  min-width: 0;\r\n  overflow-y: auto;\r\n  padding: 14px;\r\n  box-sizing: border-box;\n}\n.nkd-pv-lib-row[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 3px;\n}\n.nkd-pv-lib-head[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\n}\n.nkd-pv-lib-at[data-v-58f2854d] {\r\n  color: #b48cff;\r\n  font-size: 11px;\r\n  font-weight: 600;\n}\n.nkd-pv-lib-name[data-v-58f2854d],\r\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 12px;\r\n  font-family: inherit;\r\n  padding: 4px 8px;\r\n  outline: none;\n}\n.nkd-pv-lib-name[data-v-58f2854d] {\r\n  flex: 1 1 auto;\r\n  min-width: 0;\n}\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  resize: vertical;\r\n  min-height: 34px;\r\n  line-height: 1.45;\n}\n.nkd-pv-lib-name[data-v-58f2854d]:focus,\r\n.nkd-pv-lib-value[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-lib-name.nkd-pv-lib-bad[data-v-58f2854d] {\r\n  border-color: #ff5c5c;\n}\n.nkd-pv-lib-empty[data-v-58f2854d] {\r\n  color: rgba(255, 255, 255, 0.4);\r\n  font-size: 12px;\n}\n.nkd-pv-ac[data-v-58f2854d] {\r\n  position: absolute;\r\n  z-index: 100;\r\n  background: #1e2028;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 5px;\r\n  padding: 3px;\r\n  min-width: 120px;\r\n  max-height: 160px;\r\n  overflow-y: auto;\r\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 4px 8px;\r\n  border-radius: 3px;\r\n  font-size: 11px;\r\n  color: #c8d0e0;\r\n  cursor: pointer;\r\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-58f2854d]:hover,\r\n.nkd-pv-ac-item.active[data-v-58f2854d] {\r\n  background: rgba(74, 180, 255, 0.18);\r\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-58f2854d] {\r\n  background: transparent !important;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\r\n\n.nkd-pv-chip {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  gap: 5px;\r\n  background: rgba(74, 180, 255, 0.14);\r\n  border: 1px solid rgba(74, 180, 255, 0.75);\r\n  color: #bfe3ff;\r\n  border-radius: 999px;\r\n  padding: 0 9px 0 7px;\r\n  margin: 0 2px;\r\n  font-size: 10px;\r\n  font-weight: 600;\r\n  letter-spacing: 0.2px;\r\n  line-height: 15px;\r\n  vertical-align: text-bottom;\r\n  user-select: none;\r\n  cursor: grab;\r\n  white-space: nowrap;\r\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\r\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\r\n.nkd-pv-chip *::selection {\r\n  background: transparent;\n}\n.nkd-pv-dot {\r\n  width: 6px;\r\n  height: 6px;\r\n  border-radius: 50%;\r\n  background: #4ab4ff;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-saved {\r\n  border-color: rgba(180, 140, 255, 0.8);\r\n  color: #e0d2ff;\r\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pv-chip-saved .nkd-pv-dot {\r\n  background: #b48cff;\n}\n.nkd-pv-chip-off {\r\n  border-style: dashed;\r\n  border-color: rgba(255, 255, 255, 0.32);\r\n  color: rgba(255, 255, 255, 0.5);\r\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\r\n  border-color: rgba(255, 209, 102, 0.85);\r\n  color: #ffe3a8;\r\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\r\n  content: "🎲";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\r\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\r\n  border-color: rgba(102, 224, 170, 0.85);\r\n  color: #b6f2d8;\r\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\r\n  content: "🔁";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\r\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\r\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

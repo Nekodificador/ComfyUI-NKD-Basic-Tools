@@ -250,7 +250,6 @@ comfyApp.registerExtension({
       const container = document.createElement("div");
 
       let instance: any = null;
-      let holdEditor = false;
       const vueApp = createApp(PromptVariablesWidget, {
         onChange: (text: string) => {
           if (textWidget.value !== text) {
@@ -259,14 +258,6 @@ comfyApp.registerExtension({
         },
         onSavedChange: (json: string) => {
           if (savedWidget) savedWidget.value = json;
-        },
-        // The Saved panel grows or shrinks the node by exactly its own height. The editor
-        // keeps its size meanwhile: onResize would otherwise refit it to the new node.
-        onPanelResize: (delta: number) => {
-          holdEditor = true;
-          this.setSize([this.size[0], this.size[1] + delta]);
-          this.setDirtyCanvas(true, true);
-          requestAnimationFrame(() => requestAnimationFrame(() => { holdEditor = false; }));
         },
       });
       instance = vueApp.mount(container) as any;
@@ -290,8 +281,6 @@ comfyApp.registerExtension({
       const innerComputeSize = domWidget.computeSize;
       domWidget.computeSize = (width: number) => {
         const result = innerComputeSize(width);
-        // Measure live: the Saved panel comes and goes before the ResizeObserver catches
-        // up, and LiteGraph would grow the node back to the stale, panel-open minimum.
         const root = container.firstElementChild as HTMLElement | null;
         if (root && root.offsetHeight > 0) result[1] = root.offsetHeight + ROW_SAFETY;
         const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
@@ -305,7 +294,6 @@ comfyApp.registerExtension({
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
-        if (holdEditor) return;
         // Grow/shrink the editor to fill the node when user drags a corner.
         const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
         if (!editorEl) return;

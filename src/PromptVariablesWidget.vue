@@ -47,12 +47,13 @@
       >+ {{ v.label }}</button>
       <button
         class="nkd-pv-add nkd-pv-lib-toggle"
-        :class="{ active: panelOpen }"
+        :class="{ active: modal }"
         title="Your saved variables, shared by every workflow"
-        @click.stop.prevent="panelOpen = !panelOpen"
-      >Saved {{ panelOpen ? "▴" : "▾" }}</button>
+        @click.stop.prevent="toggleLibrary"
+      >Saved</button>
     </div>
-    <div v-if="panelOpen" ref="libEl" class="nkd-pv-lib" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
+    <Teleport v-if="modal" :to="modal.body">
+    <div class="nkd-pv-lib" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
       <div v-for="item in library.items" :key="item.name" class="nkd-pv-lib-row">
         <div class="nkd-pv-lib-head">
           <span class="nkd-pv-lib-at">@</span>
@@ -64,8 +65,8 @@
             @change="renameSaved(item, $event)"
             @keydown.enter="blurTarget"
           />
-          <button class="nkd-pv-add" title="Insert into the prompt" @click.stop.prevent="insertChip('@' + item.name)">Insert</button>
-          <button class="nkd-pv-add" title="Delete from your library" @click.stop.prevent="deleteSaved(item)">×</button>
+          <button class="nkd-modal-btn" title="Insert into the prompt" @click.stop.prevent="insertSaved(item)">Insert</button>
+          <button class="nkd-modal-btn" title="Delete from your library" @click.stop.prevent="deleteSaved(item)">×</button>
         </div>
         <textarea
           class="nkd-pv-lib-value"
@@ -79,14 +80,18 @@
       <div v-if="!library.items.length" class="nkd-pv-lib-empty">
         No saved variables yet. Select text in the prompt and press + New to save it.
       </div>
-      <button class="nkd-pv-add" @click.stop.prevent="newSaved">+ New</button>
     </div>
+    </Teleport>
+    <Teleport v-if="modal" :to="modal.footerLeft">
+      <button class="nkd-modal-btn" title="Save the selected text, or an empty entry" @click.stop.prevent="newSaved">+ New</button>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, nextTick, watch } from "vue";
+import { onMounted, reactive, ref, shallowRef, nextTick } from "vue";
 import { cleanName, library, loadLibrary, saveLibrary, type SavedVar } from "./promptLibrary";
+import { openNkdModal, type NkdModal } from "./nkd_modal";
 
 export interface VarInfo {
   name: string;      // socket id, e.g. "variable_0"
@@ -97,7 +102,6 @@ export interface VarInfo {
 const props = defineProps<{
   onChange: (text: string) => void;
   onSavedChange: (json: string) => void;
-  onPanelResize: (delta: number) => void;
 }>();
 
 const root = ref<HTMLDivElement | null>(null);
@@ -107,25 +111,26 @@ const vars = ref<VarInfo[]>([]);
 // This node's own copy of the saved variables it uses ({name: value}): what the backend
 // resolves, so the workflow still runs on a machine without this library.
 let nodeSaved: Record<string, string> = {};
-const panelOpen = ref(false);
-const libEl = ref<HTMLDivElement | null>(null);
+// The Saved library lives in a modal, so opening it never resizes the node.
+const modal = shallowRef<NkdModal | null>(null);
 
-// Report every change in the Saved panel's height (open, close, entries added or removed,
-// a value box dragged taller) so the host resizes the node by exactly that much.
-const PANEL_GAP = 6; // .nkd-pv gap
-let panelH = 0;
-function reportPanelHeight() {
-  const h = libEl.value ? libEl.value.offsetHeight + PANEL_GAP : 0;
-  if (h === panelH) return;
-  props.onPanelResize(h - panelH);
-  panelH = h;
+function toggleLibrary() {
+  if (modal.value) { modal.value.close(); return; }
+  const m = openNkdModal({
+    title: "😺 Saved variables",
+    hint: "Shared by every workflow",
+    width: "min(560px, 92vw)",
+    height: "min(640px, 80vh)",
+    onClose: () => { modal.value = null; },
+  });
+  m.addPrimary("Done");
+  modal.value = m;
 }
-const panelRo = new ResizeObserver(reportPanelHeight);
-watch(libEl, (el, old) => {
-  if (old) panelRo.unobserve(old);
-  if (el) panelRo.observe(el);
-  else reportPanelHeight();
-}, { flush: "post" });
+
+function insertSaved(item: SavedVar) {
+  insertChip("@" + item.name);
+  modal.value?.close();
+}
 let savedRange: Range | null = null;
 let debounceTimer: number | undefined;
 
@@ -577,7 +582,7 @@ function newSaved() {
   library.items.push({ name, value: selectedText() });
   saveLibrary();
   nextTick(() => {
-    const el = [...(root.value?.querySelectorAll<HTMLInputElement>(".nkd-pv-lib-name") ?? [])]
+    const el = Array.from(modal.value?.body.querySelectorAll<HTMLInputElement>(".nkd-pv-lib-name") ?? [])
       .find((x) => x.value === name);
     el?.focus();
     el?.select();
@@ -639,7 +644,7 @@ function blurTarget(e: Event) {
 
 function cleanup() {
   window.clearTimeout(debounceTimer);
-  panelRo.disconnect();
+  modal.value?.close();
 }
 
 onMounted(() => {
@@ -715,16 +720,12 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 .nkd-pv-lib {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  max-height: 220px;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
   overflow-y: auto;
-  padding: 6px;
-  background: #16181e;
-  border: 1px solid #3a3d46;
-  border-radius: 4px;
-}
-.nkd-pv-lib > .nkd-pv-add {
-  align-self: flex-start;
+  padding: 14px;
+  box-sizing: border-box;
 }
 .nkd-pv-lib-row {
   display: flex;
@@ -743,13 +744,13 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 }
 .nkd-pv-lib-name,
 .nkd-pv-lib-value {
-  background: #111318;
+  background: #252830;
   border: 1px solid #3a3d46;
   border-radius: 4px;
   color: #c8d0e0;
-  font-size: 11px;
+  font-size: 12px;
   font-family: inherit;
-  padding: 2px 6px;
+  padding: 4px 8px;
   outline: none;
 }
 .nkd-pv-lib-name {
@@ -763,14 +764,14 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 }
 .nkd-pv-lib-name:focus,
 .nkd-pv-lib-value:focus {
-  border-color: #b48cff;
+  border-color: #4ab4ff;
 }
 .nkd-pv-lib-name.nkd-pv-lib-bad {
   border-color: #ff5c5c;
 }
 .nkd-pv-lib-empty {
   color: rgba(255, 255, 255, 0.4);
-  font-size: 11px;
+  font-size: 12px;
 }
 .nkd-pv-ac {
   position: absolute;
