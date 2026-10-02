@@ -156,6 +156,7 @@ export interface FaceRigOpts {
    *  old one, and the editor shows a face nobody connected. */
   hasSource?: () => boolean;
   /** Read fresh per request — these are node widgets the user can change. */
+  faceIndex: () => number;
   cropFactor: () => number;
   srcRatio: () => number;
   apiBase?: string;
@@ -322,7 +323,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
   let inflight = false;
   let wanted: "drag" | "final" | null = null;
   let firstRender = true;
-  let sentCrop: number | null = null;  // crop_factor the backend prepared with
+  let sentPrep: string | null = null;  // crop_factor:face_index the backend prepared with
   // One automatic run per dead end. Without the latch a run that finds no
   // face answers with "no source", which asks for another run, forever.
   let askedForRun = false;
@@ -370,17 +371,20 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
       const my = ++token;
       try {
         const crop = opts.cropFactor();
+        const face = opts.faceIndex();
+        const prep = crop + ":" + face;
         const body: any = {
           node: opts.nodeId(), rig: serialise(state), quality,
-          crop_factor: crop, src_ratio: opts.srcRatio(),
+          crop_factor: crop, face_index: face, src_ratio: opts.srcRatio(),
         };
         // The frame rides along whenever the backend may need to (re)prepare:
-        // first request of a session, or the crop_factor widget changed. It
-        // fingerprints, so an unchanged picture costs nothing — and a changed
-        // upstream image or crop re-prepares instead of showing a stale face.
-        if (sentCrop !== crop) {
+        // first request of a session, or the crop_factor or face_index widget
+        // changed. It fingerprints, so an unchanged picture costs nothing — and
+        // a changed upstream image, crop or face re-prepares instead of showing
+        // a stale face.
+        if (sentPrep !== prep) {
           const f = opts.frame?.();
-          if (f) { body.frame = f; sentCrop = crop; }
+          if (f) { body.frame = f; sentPrep = prep; }
         }
         let res = await fetch(api + "/nkd/facerig/preview", {
           method: "POST", headers: { "Content-Type": "application/json" },
@@ -405,7 +409,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
             break;
           }
           body.frame = frame;
-          sentCrop = crop;
+          sentPrep = prep;
           res = await fetch(api + "/nkd/facerig/preview", {
             method: "POST", headers: { "Content-Type": "application/json" },
             body: JSON.stringify(body),
@@ -1041,7 +1045,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
     serialise: () => serialise(state),
     retry: () => requestRender("final"),
     refreshSource() {
-      sentCrop = null;                // forces the frame onto the next request
+      sentPrep = null;                // forces the frame onto the next request
       askedForRun = false;            // a new picture deserves a new attempt
       requestRender("final");
     },

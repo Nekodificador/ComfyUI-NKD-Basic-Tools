@@ -1332,6 +1332,7 @@ comfyApp.registerExtension({
       const rig = mountFaceRig(container, {
         nodeId: () => String(node.id),
         json: dataW?.value || "",
+        faceIndex: () => Number(widgetValues(node, ["face_index"]).face_index ?? 0),
         cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2.0),
         srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1.0),
         hasSource: () => node.inputs?.find((i: any) => i.name === "image")?.link != null,
@@ -1385,11 +1386,11 @@ comfyApp.registerExtension({
       // Editor height ≈ canvas (square, node width) + button row + status.
       sizeDomWidgetToContent(node, domW, container, 300, (w) => w + 70);
 
-      // crop_factor and src_ratio are read fresh on every preview request,
-      // but a request still has to be *asked for* when they change. A new
-      // crop_factor re-prepares (the editor resends the frame on its own
-      // when the crop it last sent differs); src_ratio is just a render.
-      for (const name of ["crop_factor", "src_ratio"]) {
+      // face_index, crop_factor and src_ratio are read fresh on every preview
+      // request, but a request still has to be *asked for* when they change. A
+      // new face_index or crop_factor re-prepares (the editor resends the frame
+      // on its own when the pair it last sent differs); src_ratio is just a render.
+      for (const name of ["face_index", "crop_factor", "src_ratio"]) {
         const w = this.widgets?.find((x: any) => x.name === name);
         if (!w) continue;
         const orig = w.callback;

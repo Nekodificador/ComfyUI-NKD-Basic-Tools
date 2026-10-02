@@ -176,7 +176,7 @@ class Engine:
 
     # --- the expensive half, run once per photo --------------------------
 
-    def _face_bbox(self, rgb: np.ndarray):
+    def _face_bbox(self, rgb: np.ndarray, face_index: int):
         """((x1, y1, x2, y2), settled) — the face, in the order that keeps parity.
 
         The stock YOLOv8 face model first, conf 0.7, first box wins: that is
@@ -191,14 +191,19 @@ class Engine:
         face that is small in a wide picture — hence everything above it.
         """
         boxes = yolo_boxes(rgb, 0.7) or face_boxes(rgb, second_opinion=False)
+        if face_index >= max(len(boxes), 1):
+            raise RuntimeError(
+                "😺NKD Face Rig: asked for face %d but only %d %s found."
+                % (face_index, len(boxes) or 1, "was" if len(boxes) <= 1 else "were"))
         if boxes:
-            return boxes[0], True
+            return boxes[face_index], True
         lmk, settled = self.locate(rgb)
         (x1, y1), (x2, y2) = lmk.min(0)[:2], lmk.max(0)[:2]
         return (float(x1), float(y1), float(x2), float(y2)), settled
 
     @torch.no_grad()
-    def prepare(self, rgb: np.ndarray, crop_factor: float = 2.0) -> PreparedSource:
+    def prepare(self, rgb: np.ndarray, crop_factor: float = 2.0,
+                face_index: int = 0) -> PreparedSource:
         """The established crop pipeline, step for step.
 
         Every quirk below is deliberate parity, not taste: the `int()`
@@ -208,7 +213,7 @@ class Engine:
         crop rather than via 512 (a second resize softens pixels).
         """
         h, w = rgb.shape[:2]
-        (x1, y1, x2, y2), settled = self._face_bbox(rgb)
+        (x1, y1, x2, y2), settled = self._face_bbox(rgb, face_index)
         bw, bh = x2 - x1, y2 - y1
         side = max(bw, bh) * crop_factor
         cx, cy = x1 + bw / 2, y1 + bh / 2

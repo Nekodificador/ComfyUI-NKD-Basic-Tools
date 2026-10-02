@@ -60,19 +60,19 @@ class Expression:
 _SOURCES: dict = {}
 
 
-def _fingerprint(rgb: np.ndarray, crop_factor: float) -> str:
+def _fingerprint(rgb: np.ndarray, crop_factor: float, face_index: int) -> str:
     return hashlib.blake2b(rgb.tobytes(), digest_size=16,
-                           salt=b"nkdfacerig").hexdigest() + ":%.3f" % crop_factor
+                           salt=b"nkdfacerig").hexdigest() + ":%.3f:%d" % (crop_factor, face_index)
 
 
-def prepared_source(node_id, rgb: np.ndarray, crop_factor: float):
+def prepared_source(node_id, rgb: np.ndarray, crop_factor: float, face_index: int = 0):
     """The cached `PreparedSource` for this node, rebuilt only when it must be."""
     key = str(node_id)
-    fp = _fingerprint(rgb, crop_factor)
+    fp = _fingerprint(rgb, crop_factor, face_index)
     hit = _SOURCES.get(key)
     if hit is not None and hit[0] == fp:
         return hit[1]
-    src = Engine.get().prepare(rgb, crop_factor)
+    src = Engine.get().prepare(rgb, crop_factor, face_index)
     _SOURCES[key] = (fp, src)
     return src
 
@@ -190,6 +190,12 @@ class NKDFaceRig(io.ComfyNode):
                     "stitching", default=True,
                     tooltip="Blend the posed face back into the original shoulders. Turn it "
                             "off only to see the raw crop."),
+                io.Int.Input(
+                    "face_index", default=0, min=0, max=64,
+                    display_name="Face",
+                    tooltip="Which face to pose when the picture has more than one. Faces are "
+                            "numbered by detector confidence, so Face 1 here can be a "
+                            "different person than Face 1 in 😺NKD Face Crop."),
                 NKDExpression.Input(
                     "expression", optional=True,
                     tooltip="An expression from another rig, added on top of this one."),
@@ -207,7 +213,7 @@ class NKDFaceRig(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, image, rig, crop_factor, src_ratio, stitching,
+    def execute(cls, image, rig, crop_factor, src_ratio, stitching, face_index,
                 expression=None):
         # Pushed before anything else can fail. The editor does not draw with
         # this frame — it wants the full-resolution original, and the backend
@@ -215,7 +221,7 @@ class NKDFaceRig(io.ComfyNode):
         # the run finished and there is now a source to ask for.
         push_source(node_id(cls), image)
         rgb = to_uint8(image)
-        src = prepared_source(cls.hidden.unique_id, rgb, float(crop_factor))
+        src = prepared_source(cls.hidden.unique_id, rgb, float(crop_factor), face_index)
 
         # Emotion presets were tried and cut: the latent axes are too coarse
         # for recipe-driven expressions to read believably across faces, and

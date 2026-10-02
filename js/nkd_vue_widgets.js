@@ -15163,7 +15163,7 @@ function mountFaceRig(host, opts) {
   let inflight = false;
   let wanted = null;
   let firstRender = true;
-  let sentCrop = null;
+  let sentPrep = null;
   let askedForRun = false;
   let token = 0;
   function poseChanged() {
@@ -15200,18 +15200,21 @@ function mountFaceRig(host, opts) {
       const my = ++token;
       try {
         const crop = opts.cropFactor();
+        const face = opts.faceIndex();
+        const prep = crop + ":" + face;
         const body = {
           node: opts.nodeId(),
           rig: serialise$1(state),
           quality,
           crop_factor: crop,
+          face_index: face,
           src_ratio: opts.srcRatio()
         };
-        if (sentCrop !== crop) {
+        if (sentPrep !== prep) {
           const f = (_a = opts.frame) == null ? void 0 : _a.call(opts);
           if (f) {
             body.frame = f;
-            sentCrop = crop;
+            sentPrep = prep;
           }
         }
         let res = await fetch(api2 + "/nkd/facerig/preview", {
@@ -15235,7 +15238,7 @@ function mountFaceRig(host, opts) {
             break;
           }
           body.frame = frame;
-          sentCrop = crop;
+          sentPrep = prep;
           res = await fetch(api2 + "/nkd/facerig/preview", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -15837,7 +15840,7 @@ function mountFaceRig(host, opts) {
     serialise: () => serialise$1(state),
     retry: () => requestRender("final"),
     refreshSource() {
-      sentCrop = null;
+      sentPrep = null;
       askedForRun = false;
       requestRender("final");
     },
@@ -20023,6 +20026,7 @@ app.registerExtension({
       const rig = mountFaceRig(container, {
         nodeId: () => String(node.id),
         json: (dataW == null ? void 0 : dataW.value) || "",
+        faceIndex: () => Number(widgetValues(node, ["face_index"]).face_index ?? 0),
         cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2),
         srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1),
         hasSource: () => {
@@ -20077,7 +20081,7 @@ app.registerExtension({
       });
       if (domW) domW.serialize = false;
       sizeDomWidgetToContent(node, domW, container, 300, (w) => w + 70);
-      for (const name of ["crop_factor", "src_ratio"]) {
+      for (const name of ["face_index", "crop_factor", "src_ratio"]) {
         const w = (_b = this.widgets) == null ? void 0 : _b.find((x) => x.name === name);
         if (!w) continue;
         const orig = w.callback;

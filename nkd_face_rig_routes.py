@@ -71,7 +71,7 @@ def _encode(rgb: np.ndarray, drag: bool) -> tuple:
 
 
 def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
-           src_ratio=1.0):
+           src_ratio=1.0, face_index=0):
     """(bytes, mime, anchors, settled) — or None when there is no source."""
     drag = quality == "drag"
 
@@ -80,7 +80,8 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
     # cache hit, a changed upstream image re-prepares. Trusting a bare cache
     # hit here kept showing the old face after the user swapped the photo.
     if frame:
-        src = prepared_source(node_id, _decode(frame), float(crop_factor))
+        src = prepared_source(node_id, _decode(frame), float(crop_factor),
+                              int(face_index))
     else:
         src = cached_source(node_id)
         if src is None:
@@ -139,6 +140,7 @@ def _register_routes() -> None:
                 frame=body.get("frame"),
                 crop_factor=body.get("crop_factor", 2.0),
                 src_ratio=body.get("src_ratio", 1.0),
+                face_index=body.get("face_index", 0),
             )
         except Exception as exc:                    # a preview must never 500 the editor
             return web.json_response({"error": str(exc)[:300]})
