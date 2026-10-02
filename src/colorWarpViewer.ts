@@ -83,7 +83,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   title.textContent = "😺 Color Warp";
   title.style.cssText = "font-weight:600;font-size:13px";
   const hint = document.createElement("span");
-  hint.textContent = "drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
+  hint.textContent = "hold \\ = original · drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
   hint.style.cssText = "opacity:0.7;font-size:11px";
   const spacer = document.createElement("span");
   spacer.style.cssText = "flex:1 1 auto";
@@ -100,6 +100,8 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   const trailsBtn = mkToggle("Trails", false);
   const lumaBtn = mkToggle("Luma", false);
   const labelsBtn = mkToggle("Labels", false);
+  const beforeBtn = mkBtn("Before", TEXT);
+  beforeBtn.title = "Hold to see the original (\\)";
 
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
@@ -114,7 +116,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     `border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
   const barSpacer = document.createElement("span");
   barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
+  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, beforeBtn, pinBtn, resetBtn, saveBtn);
 
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
@@ -262,6 +264,15 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     gridCanvas.style.height = lumaOn ? `calc(100% - ${LUMA_H}px)` : "100%";
     requestAnimationFrame(render);
   };
+  // Before/after: the original shows while the button or `\` is held.
+  const showOriginal = (on: boolean) => {
+    preview.setOriginal(on);
+    beforeBtn.style.borderColor = on ? ACCENT : BORDER;
+  };
+  beforeBtn.addEventListener("pointerdown", () => showOriginal(true));
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) {
+    beforeBtn.addEventListener(ev, () => showOriginal(false));
+  }
   // Node coordinate labels (A1…): only for discussing nodes over text.
   labelsBtn.onclick = () => {
     grid.labels = !grid.labels;
@@ -363,6 +374,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     destroyed = true;
     ro.disconnect();
     window.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("keyup", onKeyUp, true);
     grid.dispose();
     luma.dispose();
     preview.dispose();
@@ -382,10 +394,13 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
       closeWith(true);
       return;
     }
+    if (e.key === "\\") { e.stopPropagation(); showOriginal(true); return; }
     const k = e.key.toLowerCase();
     if (k === "r") { e.stopPropagation(); grid.resetAll(); }
   };
   window.addEventListener("keydown", onKey, true);
+  const onKeyUp = (e: KeyboardEvent) => { if (e.key === "\\") showOriginal(false); };
+  window.addEventListener("keyup", onKeyUp, true);
   host.addEventListener("pointerdown", (e) => { if (e.target === host) closeWith(true); });
   saveBtn.onclick = () => closeWith(true);
   closeBtn.onclick = () => closeWith(true);

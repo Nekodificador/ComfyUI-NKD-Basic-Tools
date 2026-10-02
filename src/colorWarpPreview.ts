@@ -24,6 +24,7 @@ in vec2 vUv;
 uniform sampler2D uImg;
 uniform highp sampler3D uLut;
 uniform float uN;
+uniform float uOrig;    // 1 = show the source, ungraded
 uniform float uMask;    // 0 = off, 1 = affected-region mask
 uniform float uMaskHue; // target OKLCh hue in turns [0,1)
 uniform float uMaskSat; // target engine sat (C/C_REF) [0,1]
@@ -51,7 +52,7 @@ void main() {
   // Half-texel scale/offset so grid endpoints hit texel centers — matches the
   // CPU applyRgb which samples on the [0, N-1] integer lattice.
   vec3 coord = (c * (uN - 1.0) + 0.5) / uN;
-  vec3 graded = texture(uLut, coord).rgb;
+  vec3 graded = uOrig > 0.5 ? c : texture(uLut, coord).rgb;
   if (uMask > 0.5) {
     // Weight the SOURCE pixel by how close its engine (hue,sat) is to the grid
     // cursor cell; show that region in colour over a grayscale base.
@@ -81,7 +82,7 @@ export class ColorWarpPreview {
   private lutTex: WebGLTexture | null = null;
   private vao: WebGLVertexArrayObject | null = null;
   private uImg = -1; private uLut = -1; private uN = -1;
-  private uMask = -1; private uMaskHue = -1; private uMaskSat = -1;
+  private uOrig = -1; private uMask = -1; private uMaskHue = -1; private uMaskSat = -1;
   private cpu = false;
   private ctx2d: CanvasRenderingContext2D | null = null;
   private lutDirty = true;
@@ -98,6 +99,7 @@ export class ColorWarpPreview {
   private rect = { x: 0, y: 0, w: 0, h: 0, iw: 0, ih: 0 };
   // Alt affected-region mask target (HSL): null = off.
   private mask: { hue: number; sat: number } | null = null;
+  private original = false;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -137,6 +139,7 @@ export class ColorWarpPreview {
     this.uImg = gl.getUniformLocation(prog, "uImg") as any;
     this.uLut = gl.getUniformLocation(prog, "uLut") as any;
     this.uN = gl.getUniformLocation(prog, "uN") as any;
+    this.uOrig = gl.getUniformLocation(prog, "uOrig") as any;
     this.uMask = gl.getUniformLocation(prog, "uMask") as any;
     this.uMaskHue = gl.getUniformLocation(prog, "uMaskHue") as any;
     this.uMaskSat = gl.getUniformLocation(prog, "uMaskSat") as any;
@@ -188,6 +191,13 @@ export class ColorWarpPreview {
       this.srcData = tx.getImageData(0, 0, src.width, src.height);
     } catch { this.srcData = null; }
     if (this.gl) this.uploadImage();
+    this.schedule();
+  }
+
+  // Before/after: true shows the source instead of the graded image.
+  setOriginal(on: boolean) {
+    if (this.original === on) return;
+    this.original = on;
     this.schedule();
   }
 
@@ -344,6 +354,7 @@ export class ColorWarpPreview {
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.uniform1i(this.uLut, 1);
     gl.uniform1f(this.uN, this.lutSize);
+    gl.uniform1f(this.uOrig, this.original ? 1 : 0);
     gl.uniform1f(this.uMask, this.mask ? 1 : 0);
     gl.uniform1f(this.uMaskHue, this.mask ? ((this.mask.hue % 360 + 360) % 360) / 360 : 0);
     gl.uniform1f(this.uMaskSat, this.mask ? this.mask.sat : 0);
@@ -378,7 +389,7 @@ export class ColorWarpPreview {
     const maskHue = this.mask ? (this.mask.hue % 360 + 360) % 360 : 0;
     for (let k = 0; k < px.length; k += 4) {
       const src: [number, number, number] = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
-      const rgb = applyRgb(lut, this.lutSize, src);
+      const rgb = this.original ? src : applyRgb(lut, this.lutSize, src);
       if (this.mask) {
         const [h, s] = srgbToEngine(src); // OKLCh hue + C/C_REF, same as shader
         let dh = Math.abs(h - maskHue); dh = Math.min(dh, 360 - dh) / 180; // 0..1 (turns*2)

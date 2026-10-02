@@ -10984,6 +10984,7 @@ in vec2 vUv;
 uniform sampler2D uImg;
 uniform highp sampler3D uLut;
 uniform float uN;
+uniform float uOrig;    // 1 = show the source, ungraded
 uniform float uMask;    // 0 = off, 1 = affected-region mask
 uniform float uMaskHue; // target OKLCh hue in turns [0,1)
 uniform float uMaskSat; // target engine sat (C/C_REF) [0,1]
@@ -11011,7 +11012,7 @@ void main() {
   // Half-texel scale/offset so grid endpoints hit texel centers — matches the
   // CPU applyRgb which samples on the [0, N-1] integer lattice.
   vec3 coord = (c * (uN - 1.0) + 0.5) / uN;
-  vec3 graded = texture(uLut, coord).rgb;
+  vec3 graded = uOrig > 0.5 ? c : texture(uLut, coord).rgb;
   if (uMask > 0.5) {
     // Weight the SOURCE pixel by how close its engine (hue,sat) is to the grid
     // cursor cell; show that region in colour over a grayscale base.
@@ -11042,6 +11043,7 @@ class ColorWarpPreview {
     __publicField(this, "uImg", -1);
     __publicField(this, "uLut", -1);
     __publicField(this, "uN", -1);
+    __publicField(this, "uOrig", -1);
     __publicField(this, "uMask", -1);
     __publicField(this, "uMaskHue", -1);
     __publicField(this, "uMaskSat", -1);
@@ -11060,6 +11062,7 @@ class ColorWarpPreview {
     __publicField(this, "rect", { x: 0, y: 0, w: 0, h: 0, iw: 0, ih: 0 });
     // Alt affected-region mask target (HSL): null = off.
     __publicField(this, "mask", null);
+    __publicField(this, "original", false);
     this.canvas = canvas;
     const gl = canvas.getContext("webgl2");
     if (gl && this.initGL(gl)) {
@@ -11095,6 +11098,7 @@ class ColorWarpPreview {
     this.uImg = gl.getUniformLocation(prog, "uImg");
     this.uLut = gl.getUniformLocation(prog, "uLut");
     this.uN = gl.getUniformLocation(prog, "uN");
+    this.uOrig = gl.getUniformLocation(prog, "uOrig");
     this.uMask = gl.getUniformLocation(prog, "uMask");
     this.uMaskHue = gl.getUniformLocation(prog, "uMaskHue");
     this.uMaskSat = gl.getUniformLocation(prog, "uMaskSat");
@@ -11153,6 +11157,12 @@ class ColorWarpPreview {
       this.srcData = null;
     }
     if (this.gl) this.uploadImage();
+    this.schedule();
+  }
+  // Before/after: true shows the source instead of the graded image.
+  setOriginal(on) {
+    if (this.original === on) return;
+    this.original = on;
     this.schedule();
   }
   // Alt affected-region mask (Phase 7.2). hueDeg = engine OKLCh hue; sat = C/C_REF.
@@ -11302,6 +11312,7 @@ class ColorWarpPreview {
     gl.bindTexture(gl.TEXTURE_3D, this.lutTex);
     gl.uniform1i(this.uLut, 1);
     gl.uniform1f(this.uN, this.lutSize);
+    gl.uniform1f(this.uOrig, this.original ? 1 : 0);
     gl.uniform1f(this.uMask, this.mask ? 1 : 0);
     gl.uniform1f(this.uMaskHue, this.mask ? (this.mask.hue % 360 + 360) % 360 / 360 : 0);
     gl.uniform1f(this.uMaskSat, this.mask ? this.mask.sat : 0);
@@ -11335,7 +11346,7 @@ class ColorWarpPreview {
     const maskHue = this.mask ? (this.mask.hue % 360 + 360) % 360 : 0;
     for (let k = 0; k < px.length; k += 4) {
       const src = [px[k] / 255, px[k + 1] / 255, px[k + 2] / 255];
-      const rgb = applyRgb(lut, this.lutSize, src);
+      const rgb = this.original ? src : applyRgb(lut, this.lutSize, src);
       if (this.mask) {
         const [h, s] = srgbToEngine(src);
         let dh2 = Math.abs(h - maskHue);
@@ -11891,7 +11902,7 @@ function openColorWarpViewer(opts) {
   title.textContent = "😺 Color Warp";
   title.style.cssText = "font-weight:600;font-size:13px";
   const hint = document.createElement("span");
-  hint.textContent = "drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
+  hint.textContent = "hold \\ = original · drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
   hint.style.cssText = "opacity:0.7;font-size:11px";
   const spacer = document.createElement("span");
   spacer.style.cssText = "flex:1 1 auto";
@@ -11905,6 +11916,8 @@ function openColorWarpViewer(opts) {
   const trailsBtn = mkToggle("Trails", false);
   const lumaBtn = mkToggle("Luma", false);
   const labelsBtn = mkToggle("Labels", false);
+  const beforeBtn = mkBtn("Before", TEXT);
+  beforeBtn.title = "Hold to see the original (\\)";
   const saveBtn = mkBtn("Save & close", ACCENT);
   const closeBtn = mkBtn("✕", TEXT);
   closeBtn.style.padding = "4px 9px";
@@ -11913,7 +11926,7 @@ function openColorWarpViewer(opts) {
   bottomBar.style.cssText = `display:flex;align-items:center;gap:12px;padding:8px 14px;background:${BAR_BG};border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
   const barSpacer = document.createElement("span");
   barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, pinBtn, resetBtn, saveBtn);
+  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, beforeBtn, pinBtn, resetBtn, saveBtn);
   const body = document.createElement("div");
   body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
   const leftPane = mkPane();
@@ -12025,6 +12038,14 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     gridCanvas.style.height = lumaOn ? `calc(100% - ${LUMA_H}px)` : "100%";
     requestAnimationFrame(render);
   };
+  const showOriginal = (on) => {
+    preview.setOriginal(on);
+    beforeBtn.style.borderColor = on ? ACCENT : BORDER;
+  };
+  beforeBtn.addEventListener("pointerdown", () => showOriginal(true));
+  for (const ev of ["pointerup", "pointerleave", "pointercancel"]) {
+    beforeBtn.addEventListener(ev, () => showOriginal(false));
+  }
   labelsBtn.onclick = () => {
     grid.labels = !grid.labels;
     setToggle(labelsBtn, grid.labels);
@@ -12114,6 +12135,7 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     destroyed = true;
     ro.disconnect();
     window.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("keyup", onKeyUp, true);
     grid.dispose();
     luma.dispose();
     preview.dispose();
@@ -12134,6 +12156,11 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
       closeWith(true);
       return;
     }
+    if (e.key === "\\") {
+      e.stopPropagation();
+      showOriginal(true);
+      return;
+    }
     const k = e.key.toLowerCase();
     if (k === "r") {
       e.stopPropagation();
@@ -12141,6 +12168,10 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     }
   };
   window.addEventListener("keydown", onKey, true);
+  const onKeyUp = (e) => {
+    if (e.key === "\\") showOriginal(false);
+  };
+  window.addEventListener("keyup", onKeyUp, true);
   host.addEventListener("pointerdown", (e) => {
     if (e.target === host) closeWith(true);
   });
