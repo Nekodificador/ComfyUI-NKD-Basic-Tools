@@ -19804,8 +19804,19 @@ function collectUpstream(nodeId, output, into) {
     if (Array.isArray(value)) collectUpstream(String(value[0]), output, into);
   }
 }
+async function lastRunPrompt() {
+  var _a;
+  try {
+    const res = await api.fetchApi("/history?max_items=1", { cache: "no-store" });
+    const last = Object.values(await res.json())[0];
+    return ((_a = last == null ? void 0 : last.prompt) == null ? void 0 : _a[2]) ?? null;
+  } catch {
+    return null;
+  }
+}
 async function queueNode(node) {
   var _a, _b, _c;
+  const lastRun = await lastRunPrompt();
   const origQueue = api.queuePrompt;
   try {
     api.queuePrompt = async function(index, prompt) {
@@ -19813,6 +19824,10 @@ async function queueNode(node) {
       if (prompt == null ? void 0 : prompt.output) {
         const filtered = {};
         collectUpstream(String(node.id), prompt.output, filtered);
+        for (const id of Object.keys(filtered)) {
+          const ran = lastRun == null ? void 0 : lastRun[id];
+          if (id !== String(node.id) && (ran == null ? void 0 : ran.class_type) === filtered[id].class_type) filtered[id] = ran;
+        }
         dbg(
           "queueNode",
           node.id,

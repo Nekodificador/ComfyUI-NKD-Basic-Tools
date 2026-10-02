@@ -1138,7 +1138,21 @@ function collectUpstream(nodeId: string, output: any, into: any): void {
   }
 }
 
+async function lastRunPrompt(): Promise<any> {
+  try {
+    const res = await api.fetchApi("/history?max_items=1", { cache: "no-store" });
+    const last: any = Object.values(await res.json())[0];
+    return last?.prompt?.[2] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function queueNode(node: any): Promise<void> {
+  // Upstream goes in as it was last run: the widgets have moved on since (a
+  // randomized seed advances after every queue), and the current values would
+  // re-execute the whole generation instead of hitting the executor's cache.
+  const lastRun = await lastRunPrompt();
   // The original method, not a bound copy, so it can be restored and still
   // called with the right receiver.
   const origQueue = (api as any).queuePrompt;
@@ -1146,8 +1160,12 @@ async function queueNode(node: any): Promise<void> {
     (api as any).queuePrompt = async function (index: number, prompt: any) {
       (api as any).queuePrompt = origQueue;          // one call only
       if (prompt?.output) {
-        const filtered = {};
+        const filtered: any = {};
         collectUpstream(String(node.id), prompt.output, filtered);
+        for (const id of Object.keys(filtered)) {
+          const ran = lastRun?.[id];
+          if (id !== String(node.id) && ran?.class_type === filtered[id].class_type) filtered[id] = ran;
+        }
         dbg("queueNode", node.id, "→ trimmed prompt to", Object.keys(filtered).length,
             "of", Object.keys(prompt.output).length, "nodes:", Object.keys(filtered));
         prompt = { ...prompt, output: filtered };
