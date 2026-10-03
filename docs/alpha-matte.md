@@ -29,6 +29,7 @@ estimate (blur-fusion, Forte & Pitié 2021), so very wide soft edges keep a trac
 but most of the spill goes.
 
 - Mask Is Subject keeps white in the mask. Off, white becomes transparent.
+- Black Point and White Point tighten the finished matte: alpha at or below the black point becomes fully transparent, at or above the white point fully opaque, and the rest is stretched in between. Raise the black point to clear the haze a roto model leaves around the subject, lower the white point to make a slightly see-through subject solid. They act after the feather, so they tighten that too; set both to the same value for a hard matte.
 - Expand / Choke grows the matte, or chokes it with a negative value to drop a rim of old background.
 - Feather softens the edge by that many pixels.
 - Smooth In Time is for video: each frame's matte is averaged with its neighbours so the edge doesn't boil.

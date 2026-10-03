@@ -56,6 +56,22 @@ def test_decontaminate_removes_spill():
     assert torch.allclose(fg[opaque], img[opaque], atol=1e-5)
 
 
+def test_levels_tighten_the_finished_matte():
+    img, a = _scene()
+    run = dict(mask_is_subject=True, expand=0, smooth_in_time=0, decontaminate=False)
+    _, alpha = NKDAlphaMatte.execute(img, a, feather=0, black_point=0.25, white_point=0.75,
+                                     **run).result
+    assert alpha[a <= 0.25].max() == 0.0 and alpha[a >= 0.75].min() == 1.0
+    mid = (a > 0.3) & (a < 0.7)
+    assert torch.allclose(alpha[mid], (a[mid] - 0.25) / 0.5, atol=1e-5)
+    # After the feather: a feathered edge still comes out tightened.
+    _, soft = NKDAlphaMatte.execute(img, a, feather=8, **run).result
+    _, hard = NKDAlphaMatte.execute(img, a, feather=8, black_point=0.5, white_point=0.5,
+                                    **run).result
+    assert ((soft > 0.01) & (soft < 0.99)).any()
+    assert set(hard.unique().tolist()) <= {0.0, 1.0}
+
+
 def test_broadcast_and_resize():
     img = torch.rand(5, 32, 48, 3)
     mask = torch.ones(1, 16, 24)

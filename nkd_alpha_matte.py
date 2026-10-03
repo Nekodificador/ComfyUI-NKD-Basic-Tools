@@ -82,6 +82,17 @@ class NKDAlphaMatte(io.ComfyNode):
                                  tooltip="On: white in the mask is what you keep (SAM, "
                                          "rembg, painted masks). Off: white is what becomes "
                                          "transparent, as Load Image's alpha mask."),
+                io.Float.Input("black_point", default=0.0, min=0.0, max=1.0, step=0.01,
+                               display_name="Black Point",
+                               tooltip="Alpha at or below this becomes fully transparent. "
+                                       "Raise it to clear the faint haze a roto model "
+                                       "leaves around the subject."),
+                io.Float.Input("white_point", default=1.0, min=0.0, max=1.0, step=0.01,
+                               display_name="White Point",
+                               tooltip="Alpha at or above this becomes fully opaque. Lower "
+                                       "it to make a subject that came out slightly see-"
+                                       "through solid again. Set both to the same value "
+                                       "for a hard matte."),
                 io.Int.Input("expand", default=0, min=-256, max=256,
                              display_name="Expand / Choke",
                              tooltip="Grow the matte by this many pixels, or choke it with "
@@ -111,7 +122,7 @@ class NKDAlphaMatte(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, mask, mask_is_subject, expand, feather, smooth_in_time,
-                decontaminate) -> io.NodeOutput:
+                decontaminate, black_point=0.0, white_point=1.0) -> io.NodeOutput:
         rgb = image[..., :3]
         if mask.dim() == 2:
             mask = mask.unsqueeze(0)
@@ -125,6 +136,9 @@ class NKDAlphaMatte(io.ComfyNode):
         alpha = mask_core.process(mask, invert=not mask_is_subject,
                                   temporal_smooth_frames=smooth_in_time,
                                   expand_px=expand, feather_px=feather)
+        # Levels on the FINISHED matte, after the feather: they are there to tighten what
+        # comes out, and run any earlier the feather would just soften it again.
+        alpha = mask_core.levels(alpha, black_point, white_point)
         if decontaminate:
             device = mask_core._work_device(rgb)
             rgb = torch.cat([
