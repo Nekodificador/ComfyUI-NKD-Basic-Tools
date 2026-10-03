@@ -36,6 +36,18 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD Vector Mask](docs/vector-mask.md) | Roto by hand with a pen tool. What gets saved is control points, so it's still editable next week. |
 | [😺NKD Painter Node](docs/paint.md) | Scribble straight on the node, over the image or on a blank canvas. The untouched image, the painted one, the strokes alone and their exact mask come out separately; one switch turns it into a ControlNet Scribble source. |
 
+## Compositing
+
+Cut a subject out of a shot and put it somewhere else, frame by frame, and get a
+video out the other end that keeps its transparency.
+
+<!-- hero video goes here -->
+
+| Node | What it does |
+|---|---|
+| [😺NKD Alpha Matte](docs/alpha-matte.md) | Turns an image and a roto mask into a transparent cut-out, frame by frame, and cleans the old background out of the soft edge so it doesn't halo. |
+| [😺NKD Merge](docs/merge.md) | Puts a cut-out over a background, frame by frame, and you place it by dragging it in the node: move, scale, rotate, snap to the frame. |
+
 ## Faces
 
 Frame a face the way models want it, or pose its expression by hand.

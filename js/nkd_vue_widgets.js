@@ -13480,7 +13480,7 @@ class FieldPreview {
   }
 }
 const DEFAULT_INFLUENCE = 0.25;
-const C$2 = {
+const C$3 = {
   bg: "#0b0d12",
   add: "#4ab4ff",
   sub: "#ff6b6b",
@@ -13500,7 +13500,7 @@ const C$2 = {
 };
 const HIT = 10;
 const PT_R = { idle: 4.5, hover: 6, active: 7 };
-const HANDLE_HIT$1 = 7;
+const HANDLE_HIT$2 = 7;
 const CLONE_HIT = 8;
 const UNDO_DEPTH$1 = 30;
 const MIN_PTS = { shape: 3, path: 2 };
@@ -14134,10 +14134,10 @@ class SplineEditor {
         t: 0,
         aspect,
         pins: this.pins.map((p2) => ({
-          x: round(p2.x),
-          y: round(p2.y),
-          blur: round(p2.blur),
-          r: round(p2.r)
+          x: round$1(p2.x),
+          y: round$1(p2.y),
+          blur: round$1(p2.blur),
+          r: round$1(p2.r)
         }))
       });
     }
@@ -14149,14 +14149,14 @@ class SplineEditor {
         type: s.type,
         closed,
         pts: s.pts.map((p2) => ({
-          x: round(p2.x),
-          y: round(p2.y),
-          ...p2.h ? { h: p2.h.map(round) } : {},
+          x: round$1(p2.x),
+          y: round$1(p2.y),
+          ...p2.h ? { h: p2.h.map(round$1) } : {},
           ...p2.corner ? { corner: true } : {},
           ...p2.fo ? { fo: [round2(p2.fo[0]), round2(p2.fo[1])] } : {},
           ...p2.sp != null && p2.sp !== 1 ? { sp: round2(p2.sp) } : {}
         })),
-        poly: poly.map((q) => [round(q[0]), round(q[1])])
+        poly: poly.map((q) => [round$1(q[0]), round$1(q[1])])
       };
       if (this.mode === "shape") {
         base.op = s.op;
@@ -14173,7 +14173,7 @@ class SplineEditor {
           base.fo = fx.map((v, i) => [round2(v), round2(fy[i])]);
         }
       } else {
-        base.speed = round(s.speed);
+        base.speed = round$1(s.speed);
         if (s.pts.some((p2) => (p2.sp ?? 1) !== 1)) {
           base.sv = sampleAttr(s.pts, s.type, closed, us, (p2) => Math.max(0, p2.sp ?? 1)).map((v) => round2(Math.max(0, v)));
         }
@@ -14299,7 +14299,7 @@ class SplineEditor {
       if (h) {
         for (const side of [0, 2]) {
           const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
-          if (Math.hypot(px - hx, py - hy) <= HANDLE_HIT$1) {
+          if (Math.hypot(px - hx, py - hy) <= HANDLE_HIT$2) {
             return { s: this.active, i: this.selPt, handle: side };
           }
         }
@@ -14643,7 +14643,7 @@ class SplineEditor {
     const ctx = this.ctx;
     const { width, height } = this.logicalSize();
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = C$2.bg;
+    ctx.fillStyle = C$3.bg;
     ctx.fillRect(0, 0, width, height);
     ctx.imageSmoothingEnabled = this.zoom < 4;
     this.drawBackdrop();
@@ -14659,7 +14659,7 @@ class SplineEditor {
       ctx.save();
       ctx.fillStyle = "rgba(74,180,255,0.10)";
       ctx.fillRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
-      ctx.strokeStyle = C$2.marquee;
+      ctx.strokeStyle = C$3.marquee;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
@@ -14681,8 +14681,8 @@ class SplineEditor {
     if (poly.length < 3 || !off) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C$2.soft : C$2.softDim;
-    ctx.fillStyle = si === this.active ? C$2.soft : C$2.softDim;
+    ctx.strokeStyle = si === this.active ? C$3.soft : C$3.softDim;
+    ctx.fillStyle = si === this.active ? C$3.soft : C$3.softDim;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     const [x0, y0] = this.toScreen(poly[0][0] + off[0][0], poly[0][1] + off[0][1]);
@@ -14706,12 +14706,12 @@ class SplineEditor {
       ctx.beginPath();
       ctx.arc(gx, gy, hot ? 5.5 : 4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = C$2.ptStroke;
+      ctx.strokeStyle = C$3.ptStroke;
       ctx.setLineDash([]);
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = si === this.active ? C$2.soft : C$2.softDim;
+      ctx.strokeStyle = si === this.active ? C$3.soft : C$3.softDim;
       ctx.lineWidth = 1.2;
     });
     ctx.restore();
@@ -14745,8 +14745,8 @@ class SplineEditor {
     if (poly.length < 2) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C$2.soft : C$2.softDim;
-    ctx.fillStyle = si === this.active ? C$2.soft : C$2.softDim;
+    ctx.strokeStyle = si === this.active ? C$3.soft : C$3.softDim;
+    ctx.fillStyle = si === this.active ? C$3.soft : C$3.softDim;
     ctx.lineWidth = 1.2;
     s.pts.forEach((p2) => {
       const sp = p2.sp ?? 1;
@@ -14809,14 +14809,14 @@ class SplineEditor {
   drawShape(s, si) {
     const ctx = this.ctx;
     const isActive = si === this.active;
-    const color = this.mode === "shape" ? s.op === "sub" ? C$2.sub : C$2.add : C$2.path;
+    const color = this.mode === "shape" ? s.op === "sub" ? C$3.sub : C$3.add : C$3.path;
     if (s.pts.length >= 2) {
       this.tracePath(ctx, s);
       if (s.closed && this.showFill && s.pts.length >= 3) {
         ctx.fillStyle = s.op === "sub" ? "rgba(255,107,107,0.20)" : "rgba(74,180,255,0.20)";
         ctx.fill();
       }
-      ctx.strokeStyle = isActive ? color : C$2.idle;
+      ctx.strokeStyle = isActive ? color : C$3.idle;
       ctx.lineWidth = isActive ? 2 : 1.4;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -14828,7 +14828,7 @@ class SplineEditor {
     if (s.type === "bspline" && s.pts.length >= 2) {
       ctx.save();
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = isActive ? C$2.hull : "rgba(255,255,255,0.12)";
+      ctx.strokeStyle = isActive ? C$3.hull : "rgba(255,255,255,0.12)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       const [x0, y0] = this.toScreen(s.pts[0].x, s.pts[0].y);
@@ -14846,8 +14846,8 @@ class SplineEditor {
       const h = p2 ? this.handlesOf(s, this.selPt) : null;
       if (p2 && h) {
         const [cx, cy] = this.toScreen(p2.x, p2.y);
-        ctx.strokeStyle = C$2.handle;
-        ctx.fillStyle = C$2.handle;
+        ctx.strokeStyle = C$3.handle;
+        ctx.fillStyle = C$3.handle;
         ctx.lineWidth = 1;
         for (const side of [0, 2]) {
           const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
@@ -14877,15 +14877,15 @@ class SplineEditor {
       } else {
         ctx.arc(x, y, r, 0, Math.PI * 2);
       }
-      ctx.fillStyle = selected ? C$2.ptActive : hovered ? C$2.ptHover : isActive ? C$2.pt : C$2.idle;
+      ctx.fillStyle = selected ? C$3.ptActive : hovered ? C$3.ptHover : isActive ? C$3.pt : C$3.idle;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
-      ctx.strokeStyle = C$2.ptStroke;
+      ctx.strokeStyle = C$3.ptStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
       if (this.sel.has(SplineEditor.key(si, i))) {
-        ctx.strokeStyle = C$2.marquee;
+        ctx.strokeStyle = C$3.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, r + 3, 0, Math.PI * 2);
@@ -14933,7 +14933,7 @@ class SplineEditor {
       }
       if (p2.r !== DEFAULT_INFLUENCE) {
         ctx.save();
-        ctx.strokeStyle = i === this.selPt ? C$2.soft : C$2.softDim;
+        ctx.strokeStyle = i === this.selPt ? C$3.soft : C$3.softDim;
         ctx.setLineDash([6, 5]);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -14941,10 +14941,10 @@ class SplineEditor {
         ctx.stroke();
         ctx.restore();
       }
-      drawRing(ctx, x, y, p2.blur, C$2.add, i === this.selPt, `${Math.round(radius)} px`);
+      drawRing(ctx, x, y, p2.blur, C$3.add, i === this.selPt, `${Math.round(radius)} px`);
       if (this.sel.has(SplineEditor.key(0, i))) {
         ctx.save();
-        ctx.strokeStyle = C$2.marquee;
+        ctx.strokeStyle = C$3.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -14966,7 +14966,7 @@ const polyArea = (poly) => {
   }
   return Math.abs(a) / 2;
 };
-const round = (v) => Math.round(v * 1e5) / 1e5;
+const round$1 = (v) => Math.round(v * 1e5) / 1e5;
 const round2 = (v) => Math.round(v * 100) / 100;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const num$1 = (v, d) => Number.isFinite(Number(v)) ? Number(v) : d;
@@ -15418,7 +15418,7 @@ const CONTROLS = [
 ];
 const SIDE_COLOR = { L: "#4a90ff", R: "#ff5c5c", C: "#ffd24a" };
 const ACTIVE_COLOR = "#ffffff";
-const HANDLE_R$1 = 17;
+const HANDLE_R$2 = 17;
 const FINE = 0.1;
 const ROT_MAX = 20;
 const UNDO_DEPTH = 30;
@@ -15787,7 +15787,7 @@ function mountFaceRig(host, opts) {
     } else {
       dy = get(c.yPos) - get(c.yNeg);
     }
-    return [dx * HANDLE_R$1, dy * HANDLE_R$1];
+    return [dx * HANDLE_R$2, dy * HANDLE_R$2];
   }
   function handleCenter(c) {
     const a = anchors[c.anchor];
@@ -15891,19 +15891,19 @@ function mountFaceRig(host, opts) {
       if (c.kind === "pad") {
         ctx.globalAlpha = fa * 0.9;
         ctx.beginPath();
-        ctx.arc(ax, ay, HANDLE_R$1, 0, Math.PI * 2);
+        ctx.arc(ax, ay, HANDLE_R$2, 0, Math.PI * 2);
         ctx.stroke();
       } else {
         ctx.globalAlpha = fa * 0.9;
         ctx.beginPath();
-        ctx.moveTo(ax, ay - HANDLE_R$1);
-        ctx.lineTo(ax, ay + HANDLE_R$1);
+        ctx.moveTo(ax, ay - HANDLE_R$2);
+        ctx.lineTo(ax, ay + HANDLE_R$2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.moveTo(ax - 4, ay - HANDLE_R$1);
-        ctx.lineTo(ax + 4, ay - HANDLE_R$1);
-        ctx.moveTo(ax - 4, ay + HANDLE_R$1);
-        ctx.lineTo(ax + 4, ay + HANDLE_R$1);
+        ctx.moveTo(ax - 4, ay - HANDLE_R$2);
+        ctx.lineTo(ax + 4, ay - HANDLE_R$2);
+        ctx.moveTo(ax - 4, ay + HANDLE_R$2);
+        ctx.lineTo(ax + 4, ay + HANDLE_R$2);
         ctx.stroke();
       }
       const [hx, hy] = handleCenter(c);
@@ -15922,7 +15922,7 @@ function mountFaceRig(host, opts) {
         ctx.globalAlpha = fa * 0.8;
         ctx.font = "11px system-ui, sans-serif";
         ctx.textAlign = "center";
-        ctx.fillText(c.label, ax, ay - HANDLE_R$1 - 6);
+        ctx.fillText(c.label, ax, ay - HANDLE_R$2 - 6);
         ctx.textAlign = "left";
       }
     }
@@ -16046,7 +16046,7 @@ function mountFaceRig(host, opts) {
     const k = zoomScale();
     let prevX = e.clientX, prevY = e.clientY;
     const move = (ev) => {
-      const gain = (ev.shiftKey ? FINE : 1) * k / HANDLE_R$1;
+      const gain = (ev.shiftKey ? FINE : 1) * k / HANDLE_R$2;
       const dx = (ev.clientX - prevX) * gain;
       const dy = (ev.clientY - prevY) * gain;
       prevX = ev.clientX;
@@ -16610,16 +16610,16 @@ function attachFineRange(root) {
     root.removeEventListener("dblclick", onDblClick, true);
   };
 }
-const NODE_NAME$3 = "NKDPaint";
-const EXT_NAME$3 = "NKD.BasicTools.Paint";
+const NODE_NAME$4 = "NKDPaint";
+const EXT_NAME$4 = "NKD.BasicTools.Paint";
 console.log("[NKD Paint] rev 1");
-const CANVAS_W$1 = 240;
+const CANVAS_W$2 = 240;
 const MAX_SIDE = 2048;
 const UNDO_BUDGET = 256 * 1024 * 1024;
 const ZOOM_MIN = 0.25, ZOOM_MAX = 16;
 const SUBFOLDER = "nkd_paint";
 const frames$1 = /* @__PURE__ */ new Map();
-const live$1 = /* @__PURE__ */ new Map();
+const live$2 = /* @__PURE__ */ new Map();
 function paintSource(nodeId, canvas, fullW, fullH) {
   var _a;
   const b = {
@@ -16630,13 +16630,13 @@ function paintSource(nodeId, canvas, fullW, fullH) {
     fullH: fullH || canvas.height
   };
   frames$1.set(nodeId, b);
-  (_a = live$1.get(nodeId)) == null ? void 0 : _a(b);
+  (_a = live$2.get(nodeId)) == null ? void 0 : _a(b);
 }
 function registerPaint() {
   app.registerExtension({
-    name: EXT_NAME$3,
+    name: EXT_NAME$4,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$3) return;
+      if (nodeData.name !== NODE_NAME$4) return;
       if (nodeType.prototype.__nkdPaintWrapped) return;
       nodeType.prototype.__nkdPaintWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -17348,7 +17348,7 @@ function setupPaintWidget(node) {
     const far = resolveSource(node, "image");
     if (far) loadFile(far);
   }
-  live$1.set(String(node.id), (b) => {
+  live$2.set(String(node.id), (b) => {
     if (imageLinked() && !directRef()) {
       lastRef = null;
       setBase(b);
@@ -17385,7 +17385,7 @@ function setupPaintWidget(node) {
     root,
     minWidth: 120,
     minWidthOf: barMinWidth,
-    estimate: () => (bar.offsetHeight || 60) + Math.round(CANVAS_W$1 * layerCv.height / layerCv.width),
+    estimate: () => (bar.offsetHeight || 60) + Math.round(CANVAS_W$2 * layerCv.height / layerCv.width),
     getValue: () => layerW.value,
     setValue: (v) => {
       layerW.value = v;
@@ -17417,7 +17417,7 @@ function setupPaintWidget(node) {
     if (raf) cancelAnimationFrame(raf);
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("keyup", onKeyUp, true);
-    live$1.delete(String(node.id));
+    live$2.delete(String(node.id));
     detachFine();
     mounted.release();
     origRemoved == null ? void 0 : origRemoved.apply(this, args);
@@ -17431,24 +17431,24 @@ function setupPaintWidget(node) {
     draw();
   });
 }
-const NODE_NAME$2 = "NKDCrop";
-const EXT_NAME$2 = "NKD.BasicTools.Crop";
+const NODE_NAME$3 = "NKDCrop";
+const EXT_NAME$3 = "NKD.BasicTools.Crop";
 console.log("[NKD Crop] rev 1.1.0");
 const frames = /* @__PURE__ */ new Map();
-const live = /* @__PURE__ */ new Map();
+const live$1 = /* @__PURE__ */ new Map();
 function cropSource(nodeId, canvas, fullW, fullH) {
   var _a;
   const f = { canvas, fullW: fullW || canvas.width, fullH: fullH || canvas.height };
   frames.set(nodeId, f);
-  (_a = live.get(nodeId)) == null ? void 0 : _a(f);
+  (_a = live$1.get(nodeId)) == null ? void 0 : _a(f);
 }
-const CANVAS_W = 180;
-const MARGIN = 0.5;
-const HANDLE_R = 5;
-const HANDLE_HIT = 10;
-const BAR_H = 30;
-const TRANSPORT_H = 26;
-const ROTATE_OFFSET = 22;
+const CANVAS_W$1 = 180;
+const MARGIN$1 = 0.5;
+const HANDLE_R$1 = 5;
+const HANDLE_HIT$1 = 10;
+const BAR_H$1 = 30;
+const TRANSPORT_H$1 = 26;
+const ROTATE_OFFSET$1 = 22;
 const ROTATE_BASE_DEG = -90;
 const EDGE_SNAP_PX = 8;
 const ASPECTS = {
@@ -17463,7 +17463,7 @@ const ASPECTS = {
   "3:2": 3 / 2,
   "16:9": 16 / 9
 };
-const C$1 = {
+const C$2 = {
   bg: "#111318",
   srcBorder: "rgba(255,255,255,0.28)",
   rect: "#4ab4ff",
@@ -17602,9 +17602,9 @@ function containRotatedBox(b, deg, w, h) {
 }
 function registerCrop() {
   app.registerExtension({
-    name: EXT_NAME$2,
+    name: EXT_NAME$3,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeData.name !== NODE_NAME$3) return;
       if (nodeType.prototype.__nkdCropWrapped) return;
       nodeType.prototype.__nkdCropWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -17633,7 +17633,7 @@ function setupCropWidget(node) {
   root.className = "nkd-crop-wrap";
   root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
   const bar = document.createElement("div");
-  bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
+  bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H$1}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
   const label = document.createElement("span");
   label.textContent = "Aspect";
   label.style.cssText = "opacity:0.6;flex:0 0 auto;";
@@ -17719,7 +17719,7 @@ function setupCropWidget(node) {
   const margin = () => {
     if (!isOutpaint()) return 0;
     const need = marginNeedFraction() * MARGIN_SLACK;
-    return marginFor(Math.max(MARGIN, need));
+    return marginFor(Math.max(MARGIN$1, need));
   };
   const divisibleByW = findW(node, "divisible_by");
   const gridMultiple = () => {
@@ -17728,7 +17728,7 @@ function setupCropWidget(node) {
   };
   function canvasSize() {
     const m = margin();
-    const cw = canvas.clientWidth || CANVAS_W;
+    const cw = canvas.clientWidth || CANVAS_W$1;
     const ch = cw * (srcH * (1 + 2 * m)) / (srcW * (1 + 2 * m));
     return [cw, ch];
   }
@@ -17773,7 +17773,7 @@ function setupCropWidget(node) {
     const [cw, ch] = canvasSize();
     const ctx = syncCanvasBuffer();
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = isOutpaint() && ((_a2 = findW(node, "fill")) == null ? void 0 : _a2.value) === "transparent" ? checker(ctx) : C$1.bg;
+    ctx.fillStyle = isOutpaint() && ((_a2 = findW(node, "fill")) == null ? void 0 : _a2.value) === "transparent" ? checker(ctx) : C$2.bg;
     ctx.fillRect(0, 0, cw, ch);
     const [sx0, sy0] = toCanvas2(0, 0);
     const [sx1, sy1] = toCanvas2(srcW, srcH);
@@ -17788,7 +17788,7 @@ function setupCropWidget(node) {
       ctx.fillStyle = "#1a1c22";
       ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
     }
-    ctx.strokeStyle = C$1.srcBorder;
+    ctx.strokeStyle = C$2.srcBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
     if (!boxActive) return;
@@ -17810,19 +17810,19 @@ function setupCropWidget(node) {
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
     addQuadSubpath();
-    ctx.fillStyle = C$1.outsideDim;
+    ctx.fillStyle = C$2.outsideDim;
     ctx.fill("evenodd");
     ctx.restore();
     ctx.save();
     strokeQuad();
     ctx.clip();
-    ctx.fillStyle = C$1.rectFill;
+    ctx.fillStyle = C$2.rectFill;
     ctx.fill();
     if (overflowFraction() > 1e-4) {
       ctx.translate(ccx, ccy);
       ctx.rotate(angle * Math.PI / 180);
       ctx.translate(-ccx, -ccy);
-      ctx.strokeStyle = C$1.outpaintHatch;
+      ctx.strokeStyle = C$2.outpaintHatch;
       ctx.lineWidth = 1;
       const step = 8;
       for (let d2 = -rh; d2 < rw; d2 += step) {
@@ -17837,7 +17837,7 @@ function setupCropWidget(node) {
     ctx.translate(ccx, ccy);
     ctx.rotate(angle * Math.PI / 180);
     ctx.translate(-ccx, -ccy);
-    ctx.strokeStyle = C$1.grid;
+    ctx.strokeStyle = C$2.grid;
     ctx.lineWidth = 1;
     for (let k = 1; k <= 2; k++) {
       const gx = rx0 + rw * k / 3;
@@ -17852,7 +17852,7 @@ function setupCropWidget(node) {
       ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = C$1.rect;
+    ctx.strokeStyle = C$2.rect;
     ctx.lineWidth = 1.5;
     strokeQuad();
     ctx.stroke();
@@ -17866,24 +17866,24 @@ function setupCropWidget(node) {
       [rx0, (ry0 + ry1) / 2, "w"],
       [rx1, (ry0 + ry1) / 2, "e"]
     ];
-    ctx.fillStyle = C$1.handle;
+    ctx.fillStyle = C$2.handle;
     for (const [lx, ly] of localPts) {
       const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
       ctx.beginPath();
-      ctx.arc(hx, hy, HANDLE_R, 0, Math.PI * 2);
+      ctx.arc(hx, hy, HANDLE_R$1, 0, Math.PI * 2);
       ctx.fill();
     }
     const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
-    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
-    ctx.strokeStyle = C$1.rect;
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET$1, ccx, ccy, angle);
+    ctx.strokeStyle = C$2.rect;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(topX, topY);
     ctx.lineTo(hubX, hubY);
     ctx.stroke();
-    ctx.fillStyle = C$1.handle;
+    ctx.fillStyle = C$2.handle;
     ctx.beginPath();
-    ctx.arc(hubX, hubY, HANDLE_R, 0, Math.PI * 2);
+    ctx.arc(hubX, hubY, HANDLE_R$1, 0, Math.PI * 2);
     ctx.fill();
   }
   function stopPlayback() {
@@ -17977,7 +17977,7 @@ function setupCropWidget(node) {
     srcEl = null;
     loadThumb(ref2);
   }
-  live.set(String(node.id), (f) => {
+  live$1.set(String(node.id), (f) => {
     if (!resolveSource(node, "image", 0)) useFrame(f);
   });
   function hitTest(cx, cy) {
@@ -17985,10 +17985,10 @@ function setupCropWidget(node) {
     const [rx0, ry0] = toCanvas2(box.x0, box.y0);
     const [rx1, ry1] = toCanvas2(box.x1, box.y1);
     const [ccx, ccy] = [(rx0 + rx1) / 2, (ry0 + ry1) / 2];
-    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET, ccx, ccy, angle);
-    if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT) return "rotate";
+    const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET$1, ccx, ccy, angle);
+    if (Math.hypot(cx - hubX, cy - hubY) <= HANDLE_HIT$1) return "rotate";
     const [lx, ly] = rotatePoint(cx, cy, ccx, ccy, -angle);
-    const near = (ax, ay) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT;
+    const near = (ax, ay) => Math.hypot(lx - ax, ly - ay) <= HANDLE_HIT$1;
     if (near(rx0, ry0)) return "nw";
     if (near(rx1, ry0)) return "ne";
     if (near(rx0, ry1)) return "sw";
@@ -18225,7 +18225,7 @@ function setupCropWidget(node) {
     // Reset), not the canvas — the canvas itself is happy at any size, same as an <img>.
     minWidth: 120,
     minWidthOf: barMinWidth,
-    estimate: () => BAR_H + Math.round(CANVAS_W * srcH / srcW) + (transport.style.display === "flex" ? TRANSPORT_H : 0),
+    estimate: () => BAR_H$1 + Math.round(CANVAS_W$1 * srcH / srcW) + (transport.style.display === "flex" ? TRANSPORT_H$1 : 0),
     getValue: () => regionW.value,
     setValue: (v) => {
       regionW.value = v;
@@ -18256,13 +18256,601 @@ function setupCropWidget(node) {
   node.onRemoved = function(...args) {
     stopPlayback();
     clearInterval(refreshPoll);
-    live.delete(String(node.id));
+    live$1.delete(String(node.id));
     origRemoved == null ? void 0 : origRemoved.apply(this, args);
   };
   syncFillWidgetsVisible();
   requestAnimationFrame(() => {
     refreshSource();
     draw();
+  });
+}
+const NODE_NAME$2 = "NKDMerge";
+const EXT_NAME$2 = "NKD.BasicTools.Merge";
+console.log("[NKD Merge] rev 1.0.0");
+const DEFAULT = { x: 0.5, y: 0.5, scale: 1, angle: 0 };
+const sources = /* @__PURE__ */ new Map();
+const live = /* @__PURE__ */ new Map();
+const notify = (id) => {
+  for (const [node, fn] of live) if (String(node.id) === id) fn();
+};
+function mergeSource(d) {
+  const load = (b64) => {
+    const im = new Image();
+    im.onload = () => notify(String(d.node));
+    im.src = `data:image/webp;base64,${b64}`;
+    return im;
+  };
+  sources.set(String(d.node), {
+    bg: d.bg.map(load),
+    fg: d.fg.map(load),
+    bgW: d.bg_size[0],
+    bgH: d.bg_size[1],
+    fgW: d.fg_size[0],
+    fgH: d.fg_size[1]
+  });
+  notify(String(d.node));
+}
+const BAR_H = 30;
+const TOGGLE_H = 24;
+const TRANSPORT_H = 26;
+const CANVAS_W = 240;
+const MARGIN = 0.15;
+const MARGIN_MAX = 1;
+const HANDLE_R = 4;
+const HANDLE_HIT = 9;
+const ROTATE_OFFSET = 20;
+const SNAP_PX = 8;
+const C$1 = {
+  bg: "#111318",
+  frame: "rgba(255,255,255,0.35)",
+  dim: "rgba(0,0,0,0.55)",
+  box: "#4ab4ff",
+  hover: "#ffd166",
+  guide: "#ff6b6b"
+};
+function parseT(json) {
+  try {
+    const d = JSON.parse(json || "{}");
+    const out = { ...DEFAULT };
+    for (const k of Object.keys(out)) {
+      if (typeof d[k] === "number" && isFinite(d[k])) out[k] = d[k];
+    }
+    return out;
+  } catch {
+    return { ...DEFAULT };
+  }
+}
+const round = (v, d) => Math.round(v * 10 ** d) / 10 ** d;
+const serialiseT = (t) => JSON.stringify({
+  x: round(t.x, 5),
+  y: round(t.y, 5),
+  scale: round(t.scale, 5),
+  angle: round(t.angle, 3)
+});
+function baseScale(fit, s) {
+  if (fit === "fill") return Math.max(s.bgW / s.fgW, s.bgH / s.fgH);
+  if (fit === "pixels") return 1;
+  return Math.min(s.bgW / s.fgW, s.bgH / s.fgH);
+}
+async function fetchSource(nodeId) {
+  if (sources.has(nodeId)) return;
+  try {
+    const res = await api.fetchApi(
+      `/nkd/merge/source?node_id=${encodeURIComponent(nodeId)}`,
+      { cache: "no-store" }
+    );
+    if (res.ok) mergeSource(await res.json());
+  } catch {
+  }
+}
+function registerMerge() {
+  app.registerExtension({
+    name: EXT_NAME$2,
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeType.prototype.__nkdMergeWrapped) return;
+      nodeType.prototype.__nkdMergeWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        setupMergeWidget(this);
+        return r;
+      };
+    }
+  });
+}
+function setupMergeWidget(node) {
+  const tW = findW(node, "transform");
+  if (!tW) return;
+  hideWidget(tW);
+  const fitW = findW(node, "fit");
+  let t = parseT(tW.value);
+  let frame = 0;
+  let playing = 0;
+  const src = () => sources.get(String(node.id)) ?? null;
+  const root = document.createElement("div");
+  root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
+  const bar = document.createElement("div");
+  bar.style.cssText = `display:flex;align-items:center;gap:6px;height:${BAR_H}px;padding:0 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;`;
+  const fieldCss = "width:46px;background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 3px;flex:0 0 auto;";
+  const btnCss = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 7px;cursor:pointer;flex:0 0 auto;";
+  node.properties.nkdMergePreview = node.properties.nkdMergePreview ?? true;
+  const showing = () => node.properties.nkdMergePreview !== false;
+  const toggleBtn = document.createElement("button");
+  toggleBtn.style.cssText = `display:flex;align-items:center;justify-content:center;gap:6px;width:100%;height:${TOGGLE_H}px;background:#1a1c22;color:#c8d0e0;border:0;border-bottom:1px solid #2a2d36;font:11px sans-serif;cursor:pointer;`;
+  const toggleIcon = document.createElement("i");
+  toggleIcon.style.cssText = "font-size:10px;color:inherit;";
+  const toggleText = document.createElement("span");
+  toggleBtn.append(toggleIcon, toggleText);
+  const field = (label, title) => {
+    const l = document.createElement("span");
+    l.textContent = label;
+    l.title = title;
+    l.style.cssText = "opacity:0.6;flex:0 0 auto;";
+    const i = document.createElement("input");
+    i.type = "number";
+    i.title = title;
+    i.style.cssText = fieldCss;
+    bar.append(l, i);
+    return i;
+  };
+  const xIn = field("X", "Centre of the foreground, background pixels from the left");
+  const yIn = field("Y", "Centre of the foreground, background pixels from the top");
+  const sIn = field("%", "Scale, on top of what `fit` sets");
+  const aIn = field("°", "Rotation, clockwise");
+  const centerBtn = document.createElement("button");
+  centerBtn.textContent = "Center";
+  centerBtn.style.cssText = btnCss + "margin-left:auto;";
+  const resetBtn = document.createElement("button");
+  resetBtn.textContent = "Reset";
+  resetBtn.style.cssText = btnCss;
+  bar.append(centerBtn, resetBtn);
+  const canvas = document.createElement("canvas");
+  canvas.style.cssText = "display:block;width:100%;cursor:default;touch-action:none;";
+  const transport = document.createElement("div");
+  transport.style.cssText = "display:none;align-items:center;gap:6px;height:26px;padding:0 8px;background:#1a1c22;border-top:1px solid #2a2d36;";
+  const playBtn = document.createElement("button");
+  playBtn.textContent = "▶";
+  playBtn.style.cssText = btnCss + "width:26px;padding:2px 0;";
+  const scrub = document.createElement("input");
+  scrub.type = "range";
+  scrub.min = "0";
+  scrub.value = "0";
+  scrub.style.cssText = "flex:1;";
+  transport.append(playBtn, scrub);
+  root.append(toggleBtn, bar, canvas, transport);
+  const barMinWidth = () => {
+    const kids = Array.from(bar.children);
+    return kids.reduce((sum, k) => sum + k.offsetWidth, 0) + 16 + 6 * (kids.length - 1);
+  };
+  const aspect = () => {
+    const s = src();
+    return s ? s.bgH / s.bgW : 9 / 16;
+  };
+  let margin = MARGIN;
+  function fitMargin() {
+    const s = src();
+    if (!s) {
+      margin = MARGIN;
+      return;
+    }
+    const pad = 0.06;
+    const cs = corners();
+    const xs = cs.map((c) => c[0] / s.bgW), ys = cs.map((c) => c[1] / s.bgH);
+    const need = Math.max(
+      -Math.min(...xs),
+      Math.max(...xs) - 1,
+      -Math.min(...ys),
+      Math.max(...ys) - 1
+    ) + pad;
+    margin = Math.min(MARGIN_MAX, Math.max(MARGIN, need));
+  }
+  function view() {
+    const s = src();
+    const cw = canvas.clientWidth || CANVAS_W;
+    const bgW = (s == null ? void 0 : s.bgW) ?? 1;
+    const k = cw / (bgW * (1 + 2 * margin));
+    return {
+      k,
+      ox: margin * bgW * k,
+      oy: margin * ((s == null ? void 0 : s.bgH) ?? 1) * k,
+      cw,
+      ch: cw * aspect()
+    };
+  }
+  const toCanvas2 = (px, py) => {
+    const { k, ox, oy } = view();
+    return [ox + px * k, oy + py * k];
+  };
+  const toBg = (cx, cy) => {
+    const { k, ox, oy } = view();
+    return [(cx - ox) / k, (cy - oy) / k];
+  };
+  function placed() {
+    const s = src();
+    const sc = baseScale((fitW == null ? void 0 : fitW.value) ?? "fit", s) * t.scale;
+    return {
+      cx: t.x * s.bgW,
+      cy: t.y * s.bgH,
+      w: s.fgW * sc,
+      h: s.fgH * sc,
+      a: t.angle * Math.PI / 180
+    };
+  }
+  function toLocal(px, py) {
+    const p2 = placed();
+    const dx = px - p2.cx, dy = py - p2.cy;
+    const c = Math.cos(p2.a), sn = Math.sin(p2.a);
+    return [dx * c + dy * sn, -dx * sn + dy * c];
+  }
+  function fromLocal(lx, ly) {
+    const p2 = placed();
+    const c = Math.cos(p2.a), sn = Math.sin(p2.a);
+    return [p2.cx + lx * c - ly * sn, p2.cy + lx * sn + ly * c];
+  }
+  const corners = () => {
+    const p2 = placed();
+    return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => fromLocal(sx * p2.w / 2, sy * p2.h / 2));
+  };
+  let hover = "";
+  let guides = {};
+  function draw() {
+    var _a;
+    const { cw, ch, k } = view();
+    const d = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    const w = Math.round(cw * d), h = Math.round(ch * d);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
+    }
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(w / cw, 0, 0, h / ch, 0, 0);
+    ctx.fillStyle = C$1.bg;
+    ctx.fillRect(0, 0, cw, ch);
+    const s = src();
+    if (!s) {
+      ctx.fillStyle = "rgba(255,255,255,0.45)";
+      ctx.font = "11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Run once to place the foreground", cw / 2, ch / 2);
+      return;
+    }
+    const [x0, y0] = toCanvas2(0, 0);
+    const [x1, y1] = toCanvas2(s.bgW, s.bgH);
+    ctx.fillStyle = checker(ctx);
+    ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+    const bgIm = s.bg[frame % s.bg.length];
+    if (bgIm == null ? void 0 : bgIm.complete) ctx.drawImage(bgIm, x0, y0, x1 - x0, y1 - y0);
+    const p2 = placed();
+    const fgIm = s.fg[frame % s.fg.length];
+    const [ccx, ccy] = toCanvas2(p2.cx, p2.cy);
+    ctx.save();
+    ctx.globalAlpha = ((_a = findW(node, "opacity")) == null ? void 0 : _a.value) ?? 1;
+    ctx.translate(ccx, ccy);
+    ctx.rotate(p2.a);
+    if (fgIm == null ? void 0 : fgIm.complete) ctx.drawImage(fgIm, -p2.w * k / 2, -p2.h * k / 2, p2.w * k, p2.h * k);
+    ctx.restore();
+    ctx.fillStyle = C$1.dim;
+    ctx.beginPath();
+    ctx.rect(0, 0, cw, ch);
+    ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    ctx.fill("evenodd");
+    ctx.strokeStyle = C$1.frame;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
+    ctx.strokeStyle = C$1.guide;
+    ctx.setLineDash([4, 3]);
+    if (guides.x !== void 0) {
+      const [gx] = toCanvas2(guides.x, 0);
+      ctx.beginPath();
+      ctx.moveTo(gx, 0);
+      ctx.lineTo(gx, ch);
+      ctx.stroke();
+    }
+    if (guides.y !== void 0) {
+      const [, gy] = toCanvas2(0, guides.y);
+      ctx.beginPath();
+      ctx.moveTo(0, gy);
+      ctx.lineTo(cw, gy);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    const cs = corners().map(([x, y]) => toCanvas2(x, y));
+    ctx.strokeStyle = hover === "move" ? C$1.hover : C$1.box;
+    ctx.beginPath();
+    cs.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
+    ctx.closePath();
+    ctx.stroke();
+    cs.forEach(([x, y], i) => {
+      ctx.fillStyle = hover === `c${i}` ? C$1.hover : C$1.box;
+      ctx.fillRect(x - HANDLE_R, y - HANDLE_R, HANDLE_R * 2, HANDLE_R * 2);
+    });
+    const [rx, ry] = rotateHandle();
+    const [tx, ty] = toCanvas2(...fromLocal(0, -p2.h / 2));
+    ctx.strokeStyle = C$1.box;
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(rx, ry);
+    ctx.stroke();
+    ctx.fillStyle = hover === "rotate" ? C$1.hover : C$1.box;
+    ctx.beginPath();
+    ctx.arc(rx, ry, HANDLE_R + 1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  function rotateHandle() {
+    const p2 = placed();
+    const [tx, ty] = toCanvas2(...fromLocal(0, -p2.h / 2));
+    return [tx + Math.sin(p2.a) * ROTATE_OFFSET, ty - Math.cos(p2.a) * ROTATE_OFFSET];
+  }
+  let drawQueued = false;
+  const scheduleDraw = () => {
+    if (drawQueued) return;
+    drawQueued = true;
+    requestAnimationFrame(() => {
+      drawQueued = false;
+      draw();
+    });
+  };
+  function syncFields() {
+    const s = src();
+    xIn.value = s ? String(round(t.x * s.bgW, 1)) : String(round(t.x * 100, 1));
+    yIn.value = s ? String(round(t.y * s.bgH, 1)) : String(round(t.y * 100, 1));
+    sIn.value = String(round(t.scale * 100, 2));
+    aIn.value = String(round(t.angle, 2));
+  }
+  function commit() {
+    tW.value = serialiseT(t);
+    syncFields();
+    if (src()) fitMargin();
+    scheduleDraw();
+  }
+  const fromField = (i, apply2) => i.addEventListener("change", () => {
+    const v = parseFloat(i.value);
+    if (isFinite(v)) apply2(v);
+    commit();
+  });
+  fromField(xIn, (v) => {
+    const s = src();
+    t.x = s ? v / s.bgW : v / 100;
+  });
+  fromField(yIn, (v) => {
+    const s = src();
+    t.y = s ? v / s.bgH : v / 100;
+  });
+  fromField(sIn, (v) => {
+    if (v > 0) t.scale = v / 100;
+  });
+  fromField(aIn, (v) => {
+    t.angle = v;
+  });
+  centerBtn.onclick = () => {
+    t.x = 0.5;
+    t.y = 0.5;
+    commit();
+  };
+  resetBtn.onclick = () => {
+    t = { ...DEFAULT };
+    commit();
+  };
+  const evPos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const { cw } = view();
+    const f = cw / r.width;
+    return [(e.clientX - r.left) * f, (e.clientY - r.top) * f];
+  };
+  function hitTest(cx, cy) {
+    if (!src()) return "";
+    const [rx, ry] = rotateHandle();
+    if (Math.hypot(cx - rx, cy - ry) <= HANDLE_HIT) return "rotate";
+    const cs = corners().map(([x, y]) => toCanvas2(x, y));
+    for (let i = 0; i < 4; i++) {
+      if (Math.hypot(cx - cs[i][0], cy - cs[i][1]) <= HANDLE_HIT) return `c${i}`;
+    }
+    const [lx, ly] = toLocal(...toBg(cx, cy));
+    const p2 = placed();
+    return Math.abs(lx) <= p2.w / 2 && Math.abs(ly) <= p2.h / 2 ? "move" : "";
+  }
+  function snap(e) {
+    guides = {};
+    const s = src();
+    if (e.altKey) return [0, 0];
+    const tol = SNAP_PX / view().k;
+    const cs = corners();
+    const xs = cs.map((c) => c[0]), ys = cs.map((c) => c[1]);
+    const p2 = placed();
+    const best = (own, targets) => {
+      let d = Infinity, at2;
+      for (const o of own) for (const g of targets) {
+        if (Math.abs(g - o) < Math.abs(d) && Math.abs(g - o) <= tol) {
+          d = g - o;
+          at2 = g;
+        }
+      }
+      return { d: at2 === void 0 ? 0 : d, at: at2 };
+    };
+    const bx = best([p2.cx, Math.min(...xs), Math.max(...xs)], [s.bgW / 2, 0, s.bgW]);
+    const by = best([p2.cy, Math.min(...ys), Math.max(...ys)], [s.bgH / 2, 0, s.bgH]);
+    guides = { x: bx.at, y: by.at };
+    return [bx.d, by.d];
+  }
+  let drag = null;
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const [cx, cy] = evPos(e);
+    const mode = hitTest(cx, cy);
+    if (!mode) return;
+    e.preventDefault();
+    e.stopPropagation();
+    canvas.setPointerCapture(e.pointerId);
+    const p2 = placed();
+    const [ccx, ccy] = toCanvas2(p2.cx, p2.cy);
+    drag = {
+      mode,
+      last: [cx, cy],
+      free: [t.x, t.y],
+      startAngle: t.angle,
+      dist: Math.max(1, Math.hypot(cx - ccx, cy - ccy)),
+      ang0: Math.atan2(cy - ccy, cx - ccx)
+    };
+  });
+  canvas.addEventListener("pointermove", (e) => {
+    const [cx, cy] = evPos(e);
+    if (!drag) {
+      const h = hitTest(cx, cy);
+      if (h !== hover) {
+        hover = h;
+        scheduleDraw();
+      }
+      canvas.style.cursor = h === "move" ? "move" : h === "rotate" ? "grab" : h ? "nwse-resize" : "default";
+      return;
+    }
+    e.stopPropagation();
+    const s = src();
+    const gain = e.shiftKey && drag.mode !== "rotate" ? FINE_GAIN : 1;
+    const dx = (cx - drag.last[0]) * gain, dy = (cy - drag.last[1]) * gain;
+    drag.last = [cx, cy];
+    const k = view().k;
+    if (drag.mode === "move") {
+      drag.free = [drag.free[0] + dx / k / s.bgW, drag.free[1] + dy / k / s.bgH];
+      t.x = drag.free[0];
+      t.y = drag.free[1];
+      const [sx, sy] = snap(e);
+      t.x += sx / s.bgW;
+      t.y += sy / s.bgH;
+    } else if (drag.mode === "rotate") {
+      const p2 = placed();
+      const [ccx, ccy] = toCanvas2(p2.cx, p2.cy);
+      const delta = (Math.atan2(cy - ccy, cx - ccx) - drag.ang0) * 180 / Math.PI;
+      let a = drag.startAngle + delta;
+      if (e.shiftKey) a = Math.round(a / 15) * 15;
+      t.angle = (a + 540) % 360 - 180;
+    } else {
+      const p2 = placed();
+      const [ccx, ccy] = toCanvas2(p2.cx, p2.cy);
+      const dist = Math.max(1, Math.hypot(cx - ccx, cy - ccy));
+      t.scale = Math.max(0.01, t.scale * Math.pow(dist / drag.dist, gain));
+      drag.dist = dist;
+    }
+    tW.value = serialiseT(t);
+    syncFields();
+    scheduleDraw();
+  });
+  const endDrag = (e) => {
+    var _a;
+    if (!drag) return;
+    drag = null;
+    guides = {};
+    (_a = canvas.releasePointerCapture) == null ? void 0 : _a.call(canvas, e.pointerId);
+    commit();
+  };
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+  canvas.addEventListener("dblclick", (e) => {
+    if (hitTest(...evPos(e)) === "rotate") {
+      t.angle = 0;
+      commit();
+    }
+  });
+  function refreshTransport() {
+    const s = src();
+    const n = s ? Math.max(s.bg.length, s.fg.length) : 1;
+    transport.style.display = n > 1 && showing() ? "flex" : "none";
+    scrub.max = String(Math.max(0, n - 1));
+    if (frame >= n) frame = 0;
+    scrub.value = String(frame);
+  }
+  function applyPreview() {
+    var _a;
+    const on = showing();
+    toggleIcon.className = on ? "pi pi-chevron-up" : "pi pi-chevron-down";
+    toggleText.textContent = on ? "Hide preview" : "Show preview";
+    canvas.style.display = on ? "block" : "none";
+    if (!on && playing) playBtn.click();
+    refreshTransport();
+    (_a = mounted == null ? void 0 : mounted.resizeToContent) == null ? void 0 : _a.call(mounted);
+    if (on) scheduleDraw();
+  }
+  toggleBtn.onclick = () => {
+    node.properties.nkdMergePreview = !showing();
+    applyPreview();
+  };
+  scrub.addEventListener("input", () => {
+    frame = parseInt(scrub.value, 10) || 0;
+    scheduleDraw();
+  });
+  playBtn.onclick = () => {
+    if (playing) {
+      clearInterval(playing);
+      playing = 0;
+      playBtn.textContent = "▶";
+      return;
+    }
+    playBtn.textContent = "❚❚";
+    playing = window.setInterval(() => {
+      const n = parseInt(scrub.max, 10) + 1;
+      frame = (frame + 1) % n;
+      scrub.value = String(frame);
+      draw();
+    }, 125);
+  };
+  const mounted = mountDomWidget(node, {
+    name: "nkd_merge_editor",
+    type: "NKD_MERGE",
+    root,
+    minWidth: 120,
+    minWidthOf: barMinWidth,
+    estimate: () => TOGGLE_H + BAR_H + (showing() ? Math.round(CANVAS_W * aspect()) : 0) + (transport.style.display === "flex" ? TRANSPORT_H : 0),
+    getValue: () => tW.value,
+    setValue: (v) => {
+      tW.value = v;
+      t = parseT(v);
+      syncFields();
+      if (src()) fitMargin();
+      scheduleDraw();
+    },
+    onResize: () => scheduleDraw()
+  });
+  live.set(node, () => {
+    var _a;
+    refreshTransport();
+    syncFields();
+    fitMargin();
+    (_a = mounted.resizeToContent) == null ? void 0 : _a.call(mounted);
+    scheduleDraw();
+  });
+  for (const name of ["fit", "opacity"]) {
+    const w = findW(node, name);
+    if (!w || w._nkdMergeCb) continue;
+    const orig = w.callback;
+    w.callback = function(...args) {
+      const r = orig == null ? void 0 : orig.apply(this, args);
+      if (src()) fitMargin();
+      scheduleDraw();
+      return r;
+    };
+    w._nkdMergeCb = true;
+  }
+  const origConfigure = node.onConfigure;
+  node.onConfigure = function() {
+    origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+    t = parseT(tW.value);
+    syncFields();
+    if (src()) fitMargin();
+    applyPreview();
+    void fetchSource(String(node.id));
+  };
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function(...args) {
+    if (playing) clearInterval(playing);
+    live.delete(node);
+    origRemoved == null ? void 0 : origRemoved.apply(this, args);
+  };
+  syncFields();
+  requestAnimationFrame(() => {
+    applyPreview();
+    draw();
+    void fetchSource(String(node.id));
   });
 }
 function impactColor(score, alpha = 1) {
@@ -19179,9 +19767,12 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDCrop: 1,
   NKDPaint: 1,
   NKDLoraControl: 1,
-  NKDResolutionSelector: 1
+  NKDResolutionSelector: 1,
+  NKDAlphaMatte: 1,
+  NKDMerge: 1
 });
 registerCrop();
+registerMerge();
 registerPaint();
 registerLoraControl();
 const NODE_NAME = "NKDPromptVariables";
@@ -20154,6 +20745,14 @@ api.addEventListener("nkd-paint-source", (e) => {
       d.full_width,
       d.full_height
     );
+  } catch {
+  }
+});
+api.addEventListener("nkd-merge-source", (e) => {
+  const d = e == null ? void 0 : e.detail;
+  if (!(d == null ? void 0 : d.bg) || !(d == null ? void 0 : d.fg)) return;
+  try {
+    mergeSource(d);
   } catch {
   }
 });

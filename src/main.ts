@@ -16,6 +16,7 @@ import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
 import { registerCrop, cropSource } from "./crop";
+import { registerMerge, mergeSource } from "./merge";
 import { registerPaint, paintSource } from "./paint";
 import { registerLoraControl } from "./loraBlocks";
 
@@ -29,10 +30,11 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
   NKDFaceRig: 1, NKDCrop: 1, NKDPaint: 1, NKDLoraControl: 1,
-  NKDResolutionSelector: 1,
+  NKDResolutionSelector: 1, NKDAlphaMatte: 1, NKDMerge: 1,
 });
 
 registerCrop();
+registerMerge();
 registerPaint();
 registerLoraControl();
 
@@ -1084,6 +1086,12 @@ api.addEventListener("nkd-paint-source", (e: any) => {
     paintSource(String(d.node), rgbBytesToCanvas(b64Bytes(d.data), d.width, d.height),
                 d.full_width, d.full_height);
   } catch { /* ignore malformed */ }
+});
+
+api.addEventListener("nkd-merge-source", (e: any) => {
+  const d = e?.detail;
+  if (!d?.bg || !d?.fg) return;
+  try { mergeSource(d); } catch { /* ignore malformed */ }
 });
 
 api.addEventListener("nkd-crop-source", (e: any) => {
