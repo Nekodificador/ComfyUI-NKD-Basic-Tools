@@ -117,7 +117,7 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
     # It is another 10 ms of landmark inference, which is worth paying once per
     # gesture and not worth paying forty times a second.
     lmk = None if drag else relocate(src, out)
-    return body, mime, anchors(src, lmk), src.settled
+    return body, mime, anchors(src, lmk), src.settled, src.crop_valid
 
 
 def _register_routes() -> None:
@@ -151,7 +151,7 @@ def _register_routes() -> None:
             # queue the graph for a face they can see.
             return web.json_response({"needsFrame": True})
 
-        data, mime, anch, settled = got
+        data, mime, anch, settled, crop_valid = got
         # One JSON envelope, image included as a data URL.
         #
         # The anchors used to ride in a response header, to keep the image a
@@ -166,6 +166,7 @@ def _register_routes() -> None:
             "image": "data:{};base64,{}".format(mime, base64.b64encode(data).decode()),
             "anchors": anch.get("_anchors", anch),
             "outlines": anch.get("_outlines", {}),
+            "crop_valid": list(crop_valid),
             "settled": settled,
         }
         if not settled:
