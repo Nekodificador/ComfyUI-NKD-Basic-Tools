@@ -24,7 +24,7 @@ Create Layered Image stacks a batch as layers instead of playing it as frames.
 
 ## Placing the foreground
 
-Run the graph once and both inputs show up in the node: the background, with the
+Run the node once (its own play button is enough, no Preview Image needed) and both inputs show up in the node: the background, with the
 foreground on top inside a blue frame. Anything outside the background is dimmed,
 because the render crops it.
 
@@ -54,6 +54,7 @@ foreground where you put it.
 - `fit` decides what a scale of 100% means. With fit the whole foreground fits inside the background, with fill it covers it and the overflow is cropped, and with pixels it keeps its own size. A cut-out from the same shot at another resolution lines up on its own with fit.
 - `opacity` fades the whole foreground.
 - `blend_mode` offers the same modes as Create Layered Image.
+- `invert_alpha` flips the foreground's matte, whichever one is in use: handy when a mask arrives the other way round (1 = background).
 
 The `image` output has as many frames as the longer input, and the shorter one
 loops. It's RGBA only when the background was, so a transparent background stays
