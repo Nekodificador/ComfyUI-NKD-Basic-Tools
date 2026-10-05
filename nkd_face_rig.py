@@ -27,6 +27,7 @@ from comfy_api.latest import ComfyExtension, io
 
 from . import nkd_face_rig_axes as axes
 from .helpers import node_id, push_source
+from .nkd_face_core import available_yolo_models
 from .nkd_face_rig_engine import Engine
 
 NKDExpression = io.Custom("NKD_EXPRESSION")
@@ -58,21 +59,38 @@ class Expression:
 # three rigs on three photos keeps three, and re-running with the same photo
 # reuses them.
 _SOURCES: dict = {}
+_SOURCE_DETECTORS: dict = {}
 
 
-def _fingerprint(rgb: np.ndarray, crop_factor: float, face_index: int) -> str:
+def _default_face_detector() -> str:
+    models = available_yolo_models()
+    for preferred in ("face_yolov8n.pt", "bbox/face_yolov8n.pt"):
+        if preferred in models:
+            return preferred
+    return models[0] if models else "YuNet"
+
+
+def _fingerprint(rgb: np.ndarray, crop_factor: float, face_index: int,
+                 face_detector: str = "face_yolov8n.pt") -> str:
     return hashlib.blake2b(rgb.tobytes(), digest_size=16,
-                           salt=b"nkdfacerig").hexdigest() + ":%.3f:%d" % (crop_factor, face_index)
+                           salt=b"nkdfacerig").hexdigest() + ":%.3f:%d" % (crop_factor, face_index) + ":" + face_detector
 
 
-def prepared_source(node_id, rgb: np.ndarray, crop_factor: float, face_index: int = 0):
+def prepared_source(node_id, rgb: np.ndarray, crop_factor: float, face_index: int = 0,
+                    face_detector: str | None = None):
     """The cached `PreparedSource` for this node, rebuilt only when it must be."""
     key = str(node_id)
-    fp = _fingerprint(rgb, crop_factor, face_index)
+    if face_detector is not None:
+        _SOURCE_DETECTORS[key] = face_detector
+    else:
+        face_detector = _SOURCE_DETECTORS.get(key)
+        if face_detector is None:
+            face_detector = _default_face_detector()
+    fp = _fingerprint(rgb, crop_factor, face_index, face_detector)
     hit = _SOURCES.get(key)
     if hit is not None and hit[0] == fp:
         return hit[1]
-    src = Engine.get().prepare(rgb, crop_factor, face_index)
+    src = Engine.get().prepare(rgb, crop_factor, face_index, face_detector)
     _SOURCES[key] = (fp, src)
     return src
 
@@ -152,6 +170,9 @@ class NKDFaceRig(io.ComfyNode):
 
     @classmethod
     def define_schema(cls) -> io.Schema:
+        face_models = available_yolo_models()
+        face_detector_options = ["YuNet"] + face_models
+        default_detector = _default_face_detector()
         return io.Schema(
             node_id="NKDFaceRig",
             display_name="😺NKD Face Rig",
@@ -190,6 +211,13 @@ class NKDFaceRig(io.ComfyNode):
                     "stitching", default=True,
                     tooltip="Blend the posed face back into the original shoulders. Turn it "
                             "off only to see the raw crop."),
+                io.Combo.Input(
+                    "face_detector",
+                    options=face_detector_options,
+                    default=default_detector,
+                    display_name="Face Detector",
+                    tooltip="Select a face YOLO model from models/ultralytics, including nested folders.",
+                ),
                 io.Int.Input(
                     "face_index", default=0, min=0, max=64,
                     display_name="Face",
@@ -214,14 +242,15 @@ class NKDFaceRig(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, rig, crop_factor, src_ratio, stitching, face_index,
-                expression=None):
+                expression=None, face_detector=None):
         # Pushed before anything else can fail. The editor does not draw with
         # this frame — it wants the full-resolution original, and the backend
         # already holds that — but the push arriving is how the editor learns
         # the run finished and there is now a source to ask for.
         push_source(node_id(cls), image)
         rgb = to_uint8(image)
-        src = prepared_source(cls.hidden.unique_id, rgb, float(crop_factor), face_index)
+        src = prepared_source(cls.hidden.unique_id, rgb, float(crop_factor), face_index,
+                              face_detector)
 
         # Emotion presets were tried and cut: the latent axes are too coarse
         # for recipe-driven expressions to read believably across faces, and
