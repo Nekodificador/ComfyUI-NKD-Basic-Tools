@@ -80,6 +80,7 @@ https://github.com/user-attachments/assets/909d881d-3b09-41d2-88ba-aff797db9898
 
 | Node | What it does |
 |---|---|
+| [😺NKD Curves](docs/curves.md) | Brightness, contrast and color balance with Photoshop-style curves, previewed live as you drag. |
 | [😺NKD Color Warp](docs/color-warp.md) | Grades by grabbing the colors themselves, on a wheel your own image is scattered across. Exports the grade as a `.cube` LUT. |
 | [😺NKD Gradient Map / Generate](docs/gradient-map-generate.md) | Recolors a photo by brightness, or builds a gradient from scratch as a background, a mask or a light leak. |
 

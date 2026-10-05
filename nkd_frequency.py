@@ -143,13 +143,15 @@ def _to_nhwc(x: torch.Tensor) -> torch.Tensor:
 
 
 def _send_source_to_widget(unique_id, image: torch.Tensor,
-                           event: str = "nkd-freq-source") -> None:
+                           event: str = "nkd-freq-source", mask: torch.Tensor | None = None) -> None:
     """Push the RESOLVED input image (post resize/subgraph) to this node's live
     preview widget, so partial-executing the node loads the image into the
     preview even when the source isn't a directly-connected Load Image. Sends
     raw RGB bytes (≤512px) as base64 — no ui.PreviewImage, so no thumbnails.
     `src_width`/`src_height` carry the FULL resolution the node actually renders
-    at, so a preview can scale radius-like params to its own downscale."""
+    at, so a preview can scale radius-like params to its own downscale.
+    `mask`, when given, rides along at the same preview size as one byte per
+    pixel, so a mask from any source shows in the preview."""
     if not unique_id:
         return
     try:
@@ -166,10 +168,14 @@ def _send_source_to_widget(unique_id, image: torch.Tensor,
     s = s.squeeze(0).permute(1, 2, 0)  # HWC
     ph, pw = int(s.shape[0]), int(s.shape[1])
     arr = s.clamp(0.0, 1.0).mul(255).byte().cpu().numpy()
-    b64 = base64.b64encode(arr.tobytes()).decode("ascii")
-    PromptServer.instance.send_sync(
-        event, {"node_id": unique_id, "img": b64, "width": pw, "height": ph,
-                "src_width": w, "src_height": h})
+    payload = {"node_id": unique_id, "img": base64.b64encode(arr.tobytes()).decode("ascii"),
+               "width": pw, "height": ph, "src_width": w, "src_height": h}
+    if mask is not None:
+        m = (mask if mask.dim() == 3 else mask.unsqueeze(0))[0:1].unsqueeze(1).float()
+        m = F.interpolate(m, size=(ph, pw), mode="bilinear", align_corners=False)
+        payload["mask"] = base64.b64encode(
+            m.clamp(0.0, 1.0).mul(255).byte().cpu().numpy().tobytes()).decode("ascii")
+    PromptServer.instance.send_sync(event, payload)
 
 
 class NKDFrequencySeparate(io.ComfyNode):

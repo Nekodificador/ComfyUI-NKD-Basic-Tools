@@ -10,7 +10,9 @@ Recolors a photo by brightness, so darks land on one end of the ramp and lights
 on the other. Duotone, teal-orange, any color grade.
 
 - `Invert` flips the ramp, `Strength` dials the effect back.
-- The optional `mask` limits where it lands.
+- The optional `mask` limits where it lands. A mask painted on the Load Image
+  shows in the preview right away; a mask from any other node shows after you
+  run the node once (the preview says so until then).
 - The preview updates as you edit the ramp, and its play button previews the
   grade even when the image comes through a resize or a subgraph.
 
