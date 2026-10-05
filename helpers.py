@@ -857,6 +857,13 @@ def _uncrop(
         patch_resized = _resize_auto(patch, crop_w, crop_h)
     bg = background.clone()
 
+    # Stitch blends the patch against the original background. The background
+    # may be RGB while the processed patch is RGBA (e.g. when an upstream node
+    # preserves transparency). Blend only the channels that exist in the
+    # background so RGB/RGBA inputs remain compatible.
+    if patch_resized.shape[-1] > bg.shape[-1]:
+        patch_resized = patch_resized[..., :bg.shape[-1]]
+
     if mask is not None:
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
         # The mask can arrive already region-sized (chained detail bundles) or
