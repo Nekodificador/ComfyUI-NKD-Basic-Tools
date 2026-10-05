@@ -8,6 +8,7 @@ from .nkd_string_split import NKDStringSplit
 from .nkd_prompt_variables import NKDPromptVariables
 from .nkd_gradient_map import NKDGradientMap
 from .nkd_gradient_generate import NKDGradientGenerate
+from .nkd_curves import NKDCurves
 from .nkd_film_grain import NKDFilmGrain
 from .nkd_noise import NKDNoise
 from .nkd_frequency import NKDFrequencySeparate, NKDFrequencyCombine
@@ -56,6 +57,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDPromptVariables,
             NKDGradientMap,
             NKDGradientGenerate,
+            NKDCurves,
             NKDFilmGrain,
             NKDNoise,
             NKDFrequencySeparate,
@@ -98,6 +100,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDPromptVariables": NKDPromptVariables,
     "NKDGradientMap": NKDGradientMap,
     "NKDGradientGenerate": NKDGradientGenerate,
+    "NKDCurves": NKDCurves,
     "NKDFilmGrain": NKDFilmGrain,
     "NKDNoise": NKDNoise,
     "NKDFrequencySeparate": NKDFrequencySeparate,
@@ -129,6 +132,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDPromptVariables": "😺NKD Prompt Variables",
     "NKDGradientMap": "😺NKD Gradient Map",
     "NKDGradientGenerate": "😺NKD Gradient Generate",
+    "NKDCurves": "😺NKD Curves",
     "NKDFilmGrain": "😺NKD Film Grain",
     "NKDNoise": "😺NKD Noise",
     "NKDFrequencySeparate": "😺NKD Frequency Separate",

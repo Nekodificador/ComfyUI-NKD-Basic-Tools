@@ -218,6 +218,7 @@ class NKDMerge(io.ComfyNode):
             node_id="NKDMerge",
             display_name="😺NKD Merge",
             category="😺NKD Nodes/Compositing",
+            is_output_node=True,  # runnable on its own → feeds the placement editor
             search_aliases=["merge", "composite", "over", "overlay", "layer", "blend", "paste"],
             description=(
                 "Places a transparent cut-out over a background, frame by frame. A still "
@@ -244,6 +245,11 @@ class NKDMerge(io.ComfyNode):
                                 multiline=False, socketless=True,
                                 tooltip="Position, scale and rotation, set by dragging in "
                                         "the node."),
+                io.Boolean.Input("invert_alpha", default=False,
+                                 tooltip="Flip the foreground's matte, whether it comes from "
+                                         "the alpha input or the foreground itself: what "
+                                         "was see-through becomes solid and the other way "
+                                         "round."),
             ],
             outputs=[
                 io.Image.Output(display_name="image",
@@ -259,7 +265,7 @@ class NKDMerge(io.ComfyNode):
 
     @classmethod
     def execute(cls, background, foreground, fit, opacity, blend_mode, transform,
-                alpha=None) -> io.NodeOutput:
+                alpha=None, invert_alpha=False) -> io.NodeOutput:
         if blend_mode not in _LAYER_MODES:
             raise ValueError(f"Unknown blend mode: {blend_mode}")
         if fit not in FITS:
@@ -285,6 +291,8 @@ class NKDMerge(io.ComfyNode):
             b, f = bg[i % bg.shape[0]], fg[i % fg.shape[0]]
             if alpha is not None:
                 f = torch.cat([f[..., :3], alpha[i % alpha.shape[0]].unsqueeze(-1)], -1)
+            if invert_alpha:
+                f = torch.cat([f[..., :3], 1.0 - f[..., 3:4]], -1)
             placed = place(f, m, bg_w, bg_h)
             images.append(blend(b, placed, opacity, blend_mode))
             mattes.append(placed[..., 3])

@@ -10,6 +10,7 @@ import GradientPreviewWidget from "./GradientPreviewWidget.vue";
 import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
 import NoisePreviewWidget from "./NoisePreviewWidget.vue";
 import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
+import CurvesWidget from "./CurvesWidget.vue";
 import { openColorWarpViewer, ColorWarpViewerHandle } from "./colorWarpViewer";
 import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import { mountFaceRig } from "./faceRig";
@@ -30,7 +31,7 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDMaskOps: 1, NKDMaskOpsLean: 1, NKDAudioMask: 1, NKDAVLatent: 1,
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
   NKDFaceRig: 1, NKDCrop: 1, NKDPaint: 1, NKDLoraControl: 1,
-  NKDResolutionSelector: 1, NKDAlphaMatte: 1, NKDMerge: 1,
+  NKDResolutionSelector: 1, NKDAlphaMatte: 1, NKDMerge: 1, NKDCurves: 1,
 });
 
 registerCrop();
@@ -451,6 +452,7 @@ comfyApp.registerExtension({
         getRamp, getInvert, getStrength,
         getSourceImg: () => findSourceImg(this),
         getMaskImg: () => findSourceImg(this, "mask"),
+        hasMask: () => this.inputs?.find((i: any) => i.name === "mask")?.link != null,
       });
       instance = vueApp.mount(container) as any;
 
@@ -480,10 +482,8 @@ comfyApp.registerExtension({
         const d = e?.detail;
         if (!d || String(d.node_id) !== String(node.id)) return;
         try {
-          const bin = atob(d.img);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          instance?.setSentImage?.(bytes, d.width, d.height);
+          const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          instance?.setSentImage?.(bytes(d.img), d.width, d.height, d.mask ? bytes(d.mask) : null);
         } catch { /* ignore malformed */ }
       };
       api.addEventListener("nkd-gradmap-source", onSource);
@@ -794,6 +794,102 @@ comfyApp.registerExtension({
 
       const origRemoved = this.onRemoved;
       this.onRemoved = function () {
+        ro.disconnect();
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
+
+      return result;
+    };
+  },
+});
+
+// 😺NKD Curves — tone-curve editor with the graded image previewed live above it.
+// Hides the raw `curves` string widget; the editor writes it back on every edit.
+const CURVES_MIN_W = 320;
+
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.Curves.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDCurves") return;
+    if (nodeType.prototype.__nkdWrapped) return;
+    nodeType.prototype.__nkdWrapped = true;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+
+      const curvesWidget = this.widgets?.find((w: any) => w.name === "curves");
+      if (!curvesWidget) return result;
+      curvesWidget.type = "hidden";
+      curvesWidget.hidden = true;
+      if (curvesWidget.options) curvesWidget.options.hidden = true;
+      curvesWidget.computedHeight = 0;
+      curvesWidget.computeSize = () => [0, -4];
+
+      const container = document.createElement("div");
+      let instance: any = null;
+      const vueApp = createApp(CurvesWidget, {
+        onChange: (json: string) => {
+          if (curvesWidget.value !== json) curvesWidget.value = json;
+        },
+        getSourceImg: () => findSourceImg(this),
+        getMaskImg: () => findSourceImg(this, "mask"),
+        hasMask: () => this.inputs?.find((i: any) => i.name === "mask")?.link != null,
+      });
+      instance = vueApp.mount(container) as any;
+
+      const domWidget = this.addDOMWidget("curves_editor", "NKD_CURVES_EDITOR", container, {
+        getValue: () => curvesWidget.value,
+        setValue: (v: string) => {
+          curvesWidget.value = v;
+          instance?.deserialise(v ?? "");
+        },
+        serialize: false,
+        hideOnZoom: false,
+      });
+      // Estimate before first measure: 16:10 preview + 4:3 graph + two-row bar.
+      const ro = sizeDomWidgetToContent(this, domWidget, container, CURVES_MIN_W,
+        (w) => Math.round(w * (10 / 16) + w * (240 / 320)) + 56);
+
+      const origResize = this.onResize;
+      this.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < CURVES_MIN_W) size[0] = CURVES_MIN_W;
+      };
+
+      const refreshTimer = window.setInterval(() => instance?.refreshExternal?.(), 300);
+      requestAnimationFrame(() => {
+        instance?.deserialise(curvesWidget.value ?? "");
+        instance?.forceResize?.();
+      });
+
+      const node = this;
+      const onSource = (e: any) => {
+        const d = e?.detail;
+        if (!d || String(d.node_id) !== String(node.id)) return;
+        try {
+          const bytes = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          instance?.setSentImage?.(bytes(d.img), d.width, d.height, d.mask ? bytes(d.mask) : null);
+        } catch { /* ignore malformed */ }
+      };
+      api.addEventListener("nkd-curves-source", onSource);
+
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        requestAnimationFrame(() => {
+          instance?.deserialise(curvesWidget.value ?? "");
+          instance?.forceResize?.();
+        });
+        return r;
+      };
+
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function () {
+        window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-curves-source", onSource);
         ro.disconnect();
         instance?.cleanup?.();
         vueApp.unmount();

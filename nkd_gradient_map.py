@@ -77,7 +77,7 @@ class NKDGradientMap(io.ComfyNode):
         # ramp client-side); partial-execution loads the image even when it
         # arrives via a resize/subgraph.
         _send_source_to_widget(getattr(getattr(cls, "hidden", None), "unique_id", None),
-                               image, event="nkd-gradmap-source")
+                               image, event="nkd-gradmap-source", mask=mask)
         return io.NodeOutput(out, mask_out)
 
 

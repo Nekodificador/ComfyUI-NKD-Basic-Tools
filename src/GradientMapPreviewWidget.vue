@@ -3,7 +3,7 @@
     <canvas ref="canvas" class="nkd-canvas" :style="{ aspectRatio: canvasAspect }"></canvas>
     <div class="nkd-bar">
       <div class="nkd-row nkd-row--controls">
-        <span class="nkd-hint">{{ hintText }}</span>
+        <span class="nkd-hint" :class="{ 'nkd-hint--warn': maskPending }">{{ hintText }}</span>
       </div>
     </div>
   </div>
@@ -21,6 +21,7 @@ const props = defineProps<{
   getStrength: () => number;
   getSourceImg: () => HTMLImageElement | null;
   getMaskImg: () => HTMLImageElement | null;
+  hasMask: () => boolean;
 }>();
 
 const MIN_RENDER_SCALE = 2;
@@ -34,6 +35,7 @@ let dpr = window.devicePixelRatio || 1;
 let logicalW = 0, logicalH = 0; // CSS display size of the canvas
 
 const hintText = ref("Connect an image");
+const maskPending = ref(false);
 // The canvas matches the source image aspect (portrait image → portrait
 // canvas), so the remapped image fills it edge-to-edge — no letterbox waste.
 const canvasAspect = ref(DEFAULT_ASPECT);
@@ -47,9 +49,20 @@ let cacheLuma: Float32Array | null = null;
 let lastSrc: string | null = null;
 let offscreen: HTMLCanvasElement | null = null;
 
-// Optional connected mask, decoded to the same cache grid: the effect is
-// confined to it (blend scaled per pixel), so the preview matches the render.
+// Optional connected mask on the same cache grid: the effect is confined to it
+// (blend scaled per pixel), so the preview matches the render. Two sources,
+// alpha first:
+// - alphaMask: a Load Image's painted alpha, read client-side so it previews
+//   without running.
+// - sentMask: the resolved mask the backend pushes on execution — any source
+//   works, but only once the node has run. Kept at its own size and fitted to
+//   the cache grid, since a directly connected Load Image re-decodes the source
+//   at another size.
 let cacheMask: Float32Array | null = null;
+let alphaMask: Float32Array | null = null;
+let sentMask: { d: Uint8Array; w: number; h: number } | null = null;
+let sentSeq = 0;
+let maskKey = "";
 let lastMaskSrc: string | null = null;
 let maskOffscreen: HTMLCanvasElement | null = null;
 
@@ -100,9 +113,8 @@ function decodeSource(img: HTMLImageElement) {
 // real mask in the thumbnail — e.g. a mask computed elsewhere), we leave the
 // preview UNMASKED rather than guess and draw garbage; the render is confined
 // correctly regardless.
-function decodeMask(img: HTMLImageElement) {
-  cacheMask = null;
-  if (!cacheW || !cacheH) return;
+function decodeMask(img: HTMLImageElement): Float32Array | null {
+  if (!cacheW || !cacheH) return null;
   if (!maskOffscreen) maskOffscreen = document.createElement("canvas");
   maskOffscreen.width = cacheW; maskOffscreen.height = cacheH;
   const mctx = maskOffscreen.getContext("2d")!;
@@ -111,16 +123,28 @@ function decodeMask(img: HTMLImageElement) {
   const data = mctx.getImageData(0, 0, cacheW, cacheH).data;
   let alphaVaries = false;
   for (let i = 3; i < data.length; i += 4) { if (data[i] < 250) { alphaVaries = true; break; } }
-  if (!alphaVaries) return;  // no painted alpha → don't fake a mask
+  if (!alphaVaries) return null;  // no painted alpha → don't fake a mask
   const m = new Float32Array(cacheW * cacheH);
   for (let i = 0, p = 0; i < data.length; i += 4, p++) m[p] = 1 - data[i + 3] / 255;
+  return m;
+}
+
+function resolveMask() {
+  cacheMask = alphaMask;
+  if (cacheMask || !sentMask || !cacheW) return;
+  const { d, w, h } = sentMask;
+  const m = new Float32Array(cacheW * cacheH);
+  for (let y = 0, p = 0; y < cacheH; y++) {
+    const row = Math.min(h - 1, Math.floor((y * h) / cacheH)) * w;
+    for (let x = 0; x < cacheW; x++, p++) m[p] = d[row + Math.min(w - 1, Math.floor((x * w) / cacheW))] / 255;
+  }
   cacheMask = m;
 }
 
 // Backend push on partial-execution: raw RGB bytes of the resolved input, used
 // as the preview source when it arrives behind a resize/subgraph (no decoded
 // upstream img to read). A directly-connected Load Image still refreshes over it.
-function setSentImage(rgb: Uint8Array, w: number, h: number) {
+function setSentImage(rgb: Uint8Array, w: number, h: number, mask: Uint8Array | null) {
   const n = w * h;
   const data = new Uint8ClampedArray(n * 4);
   const luma = new Float32Array(n);
@@ -128,12 +152,12 @@ function setSentImage(rgb: Uint8Array, w: number, h: number) {
     data[i] = rgb[j]; data[i + 1] = rgb[j + 1]; data[i + 2] = rgb[j + 2]; data[i + 3] = 255;
     luma[p] = (rgb[j] * LUMA_R + rgb[j + 1] * LUMA_G + rgb[j + 2] * LUMA_B) / 255;
   }
-  cacheRgb = data; cacheLuma = luma; cacheMask = null;
+  cacheRgb = data; cacheLuma = luma; alphaMask = null;
   cacheW = w; cacheH = h; lastSrc = "__sent__"; lastMaskSrc = null;
-  hintText.value = "Live preview";
-  const wantAspect = `${w} / ${h}`;
-  if (wantAspect !== canvasAspect.value) canvasAspect.value = wantAspect;
-  lastSig = "__force__"; redraw();
+  sentMask = mask ? { d: mask, w, h } : null;
+  sentSeq++;
+  lastSig = "__force__";
+  refreshExternal();
 }
 
 function syncCanvasSize(): boolean {
@@ -215,24 +239,32 @@ function refreshExternal() {
   } else if (!img && lastSrc !== null && lastSrc !== "__sent__") {
     // Keep a backend-pushed image (source lives behind a resize/subgraph, so
     // getSourceImg legitimately finds nothing); only clear a real disconnect.
-    cacheRgb = null; cacheLuma = null; cacheMask = null; lastSrc = null; lastMaskSrc = null;
+    cacheRgb = null; cacheLuma = null; lastSrc = null;
   }
   // Mask: (re)decode when it changes, or when the source grid it aligns to did.
-  const mimg = props.getMaskImg();
-  const msrc = mimg?.currentSrc || mimg?.src || null;
-  if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
-    decodeMask(mimg); lastMaskSrc = msrc;
-  } else if (!mimg && lastMaskSrc !== null) {
-    cacheMask = null; lastMaskSrc = null;
+  const linked = props.hasMask();
+  if (!linked) {
+    alphaMask = null; sentMask = null; lastMaskSrc = null;
+  } else {
+    const mimg = props.getMaskImg();
+    const msrc = mimg?.currentSrc || mimg?.src || null;
+    if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
+      alphaMask = decodeMask(mimg); lastMaskSrc = msrc;
+    }
   }
-  hintText.value = cacheRgb ? (cacheMask ? "Live preview · masked" : "Live preview") : "Connect an image";
+  const key = `${linked}|${lastMaskSrc}|${sentSeq}|${cacheW}x${cacheH}|${lastSrc}`;
+  if (key !== maskKey) { maskKey = key; resolveMask(); }
+  maskPending.value = linked && !!cacheRgb && !cacheMask;
+  hintText.value = !cacheRgb ? "Connect an image"
+    : cacheMask ? "Live preview · masked"
+    : maskPending.value ? "Mask connected · run the node (▶) to preview it" : "Live preview";
   // Match the canvas box to the image aspect. When it changes, the element
   // resizes → the ResizeObserver re-syncs the buffer and redraws.
   const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
   if (wantAspect !== canvasAspect.value) { canvasAspect.value = wantAspect; return; }
   // Dirty-check: skip the (heavy) remap unless something the preview depends on
   // actually changed. This is what keeps the idle poll from pegging the CPU.
-  const sig = `${lastSrc}|${lastMaskSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+  const sig = `${key}|${cacheMask ? 1 : 0}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
   if (sig !== lastSig) { lastSig = sig; redraw(); }
 }
 
@@ -292,4 +324,5 @@ defineExpose({ refreshExternal, forceResize, cleanup, setSentImage });
   opacity: 0.7;
   white-space: nowrap;
 }
+.nkd-hint--warn { color: #ffb43c; opacity: 1; }
 </style>

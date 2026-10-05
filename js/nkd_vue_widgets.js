@@ -7038,7 +7038,7 @@ function nkdToggle(label, initial, onChange, title) {
   b.classList.toggle("on", on);
   return b;
 }
-const FINE_GAIN$1 = 0.1;
+const FINE_GAIN$2 = 0.1;
 function nkdSlider(label, cfg, onInput, title) {
   const wrap = document.createElement("label");
   wrap.className = "nkd-modal-lbl";
@@ -7083,7 +7083,7 @@ function nkdSlider(label, cfg, onInput, title) {
     apply2(v, e.shiftKey);
     let prevX = e.clientX;
     const move = (ev) => {
-      v = clamp2(v + (ev.clientX - prevX) / width * span * (ev.shiftKey ? FINE_GAIN$1 : 1));
+      v = clamp2(v + (ev.clientX - prevX) / width * span * (ev.shiftKey ? FINE_GAIN$2 : 1));
       prevX = ev.clientX;
       apply2(v, ev.shiftKey);
     };
@@ -7123,19 +7123,19 @@ function nkdSlider(label, cfg, onInput, title) {
   };
   return wrap;
 }
-const _hoisted_1$5 = ["onMousedown"];
-const _hoisted_2$5 = { class: "nkd-pv-bar" };
-const _hoisted_3$5 = ["title", "onClick"];
+const _hoisted_1$6 = ["onMousedown"];
+const _hoisted_2$6 = { class: "nkd-pv-bar" };
+const _hoisted_3$6 = ["title", "onClick"];
 const _hoisted_4$4 = { class: "nkd-pv-lib-head" };
-const _hoisted_5$1 = ["value", "onChange"];
-const _hoisted_6$1 = ["onClick"];
-const _hoisted_7$1 = ["onClick"];
+const _hoisted_5$2 = ["value", "onChange"];
+const _hoisted_6$2 = ["onClick"];
+const _hoisted_7$2 = ["onClick"];
 const _hoisted_8 = ["value", "onInput"];
 const _hoisted_9 = {
   key: 0,
   class: "nkd-pv-lib-empty"
 };
-const _sfc_main$5 = /* @__PURE__ */ defineComponent({
+const _sfc_main$6 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
   props: {
     onChange: { type: Function },
@@ -7688,17 +7688,17 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
                 class: normalizeClass(["nkd-pv-dot", { "nkd-pv-dot-off": !item.connected }])
               }, null, 2),
               createTextVNode(" " + toDisplayString(item.label), 1)
-            ], 42, _hoisted_1$5);
+            ], 42, _hoisted_1$6);
           }), 128))
         ], 544)) : createCommentVNode("", true),
-        createBaseVNode("div", _hoisted_2$5, [
+        createBaseVNode("div", _hoisted_2$6, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
               class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
-            }, "+ " + toDisplayString(v.label), 11, _hoisted_3$5);
+            }, "+ " + toDisplayString(v.label), 11, _hoisted_3$6);
           }), 128)),
           createBaseVNode("button", {
             class: normalizeClass(["nkd-pv-add nkd-pv-lib-toggle", { active: modal.value }]),
@@ -7734,17 +7734,17 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
                     title: "Letters, numbers, - and _ (spaces become _)",
                     onChange: ($event) => renameSaved(item, $event),
                     onKeydown: withKeys(blurTarget, ["enter"])
-                  }, null, 40, _hoisted_5$1),
+                  }, null, 40, _hoisted_5$2),
                   createBaseVNode("button", {
                     class: "nkd-modal-btn",
                     title: "Insert into the prompt",
                     onClick: withModifiers(($event) => insertSaved(item), ["stop", "prevent"])
-                  }, "Insert", 8, _hoisted_6$1),
+                  }, "Insert", 8, _hoisted_6$2),
                   createBaseVNode("button", {
                     class: "nkd-modal-btn",
                     title: "Delete from your library",
                     onClick: withModifiers(($event) => deleteSaved(item), ["stop", "prevent"])
-                  }, "×", 8, _hoisted_7$1)
+                  }, "×", 8, _hoisted_7$2)
                 ]),
                 createBaseVNode("textarea", {
                   class: "nkd-pv-lib-value",
@@ -7780,7 +7780,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-58f2854d"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$6, [["__scopeId", "data-v-58f2854d"]]);
 const MODES = ["smooth", "bezier", "steps"];
 function midWarp(f, mid) {
   const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
@@ -7859,17 +7859,17 @@ function expandStops(stops, interp2, remap = (p2) => p2) {
   }
   return out;
 }
-const _hoisted_1$4 = { class: "nkd-bar" };
-const _hoisted_2$4 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3$4 = ["value"];
+const _hoisted_1$5 = { class: "nkd-bar" };
+const _hoisted_2$5 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$5 = ["value"];
 const _hoisted_4$3 = { class: "nkd-row nkd-row--presets" };
-const _hoisted_5 = ["value"];
-const _hoisted_6 = ["value"];
-const _hoisted_7 = ["disabled"];
-const CW = 380, CH = 64;
-const HIT_R$1 = 10;
-const MIN_RENDER_SCALE$4 = 2;
-const _sfc_main$4 = /* @__PURE__ */ defineComponent({
+const _hoisted_5$1 = ["value"];
+const _hoisted_6$1 = ["value"];
+const _hoisted_7$1 = ["disabled"];
+const CW$1 = 380, CH$1 = 64;
+const HIT_R$2 = 10;
+const MIN_RENDER_SCALE$5 = 2;
+const _sfc_main$5 = /* @__PURE__ */ defineComponent({
   __name: "ColorRampWidget",
   props: {
     onChange: { type: Function }
@@ -7877,9 +7877,9 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
   setup(__props, { expose: __expose }) {
     const props = __props;
     const PAD2 = { top: 12, right: 16, bottom: 12, left: 16 };
-    const IW = CW - PAD2.left - PAD2.right;
+    const IW = CW$1 - PAD2.left - PAD2.right;
     const BAR_Y = PAD2.top;
-    const BAR_H2 = CH - PAD2.top - PAD2.bottom;
+    const BAR_H2 = CH$1 - PAD2.top - PAD2.bottom;
     const BAR_MID = BAR_Y + BAR_H2 / 2;
     const C2 = {
       bg: "#111318",
@@ -7919,13 +7919,13 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     function eventToLogical(e) {
       const rect = canvas.value.getBoundingClientRect();
       return {
-        x: (e.clientX - rect.left) * (CW / rect.width),
-        y: (e.clientY - rect.top) * (CH / rect.height)
+        x: (e.clientX - rect.left) * (CW$1 / rect.width),
+        y: (e.clientY - rect.top) * (CH$1 / rect.height)
       };
     }
     function stopAt(x) {
       let best = null;
-      let bestDist = HIT_R$1;
+      let bestDist = HIT_R$2;
       for (const s of stops.value) {
         const d = Math.abs(toCanvasX(s.pos) - x);
         if (d <= bestDist) {
@@ -7940,9 +7940,9 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / CW * dpr, MIN_RENDER_SCALE$4);
-      const sy = Math.max(rect.height / CH * dpr, MIN_RENDER_SCALE$4);
-      const newW = Math.round(CW * sx), newH = Math.round(CH * sy);
+      const sx = Math.max(rect.width / CW$1 * dpr, MIN_RENDER_SCALE$5);
+      const sy = Math.max(rect.height / CH$1 * dpr, MIN_RENDER_SCALE$5);
+      const newW = Math.round(CW$1 * sx), newH = Math.round(CH$1 * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
         c.height = newH;
@@ -7954,9 +7954,9 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     }
     function redraw() {
       if (!ctx) return;
-      ctx.clearRect(0, 0, CW, CH);
+      ctx.clearRect(0, 0, CW$1, CH$1);
       ctx.fillStyle = C2.bg;
-      ctx.fillRect(0, 0, CW, CH);
+      ctx.fillRect(0, 0, CW$1, CH$1);
       const grad = ctx.createLinearGradient(PAD2.left, 0, PAD2.left + IW, 0);
       const sorted = [...stops.value].sort((a, b) => a.pos - b.pos);
       for (const s of expandStops(sorted, interp2.value)) grad.addColorStop(clamp012(s.pos), s.color);
@@ -8005,7 +8005,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       const padX = 6, h = 16;
       const w = textW + padX * 2;
       let tx = x - w / 2;
-      tx = Math.max(2, Math.min(CW - w - 2, tx));
+      tx = Math.max(2, Math.min(CW$1 - w - 2, tx));
       const ty = BAR_MID - 5 - h - 6;
       ctx.fillStyle = C2.tooltipBg;
       ctx.strokeStyle = dragging ? "rgba(255,107,107,0.6)" : C2.tooltipBorder;
@@ -8046,12 +8046,12 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
       }
     }
     function midpointAt(x, y) {
-      if (Math.abs(y - BAR_MID) > HIT_R$1) return null;
+      if (Math.abs(y - BAR_MID) > HIT_R$2) return null;
       const sorted = sortedStops();
       for (let i = 0; i < sorted.length - 1; i++) {
         const a = sorted[i], b = sorted[i + 1];
         const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
-        if (Math.abs(mx - x) <= HIT_R$1) return a;
+        if (Math.abs(mx - x) <= HIT_R$2) return a;
       }
       return null;
     }
@@ -8113,7 +8113,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
         redraw();
         return;
       }
-      if (y >= BAR_Y - HIT_R$1 && y <= BAR_Y + BAR_H2 + HIT_R$1) {
+      if (y >= BAR_Y - HIT_R$2 && y <= BAR_Y + BAR_H2 + HIT_R$2) {
         const pos = fromCanvasX(x);
         const newStop = { pos, color: sampleColorAt(pos), mid: 0.5 };
         stops.value.push(newStop);
@@ -8339,8 +8339,8 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onLeave, ["stop"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$4, [
-          createBaseVNode("div", _hoisted_2$4, [
+        createBaseVNode("div", _hoisted_1$5, [
+          createBaseVNode("div", _hoisted_2$5, [
             _cache[7] || (_cache[7] = createBaseVNode("span", { class: "nkd-hint" }, "Click bar: add stop · click stop: color · Shift+click: delete · drag ◆: tension", -1)),
             _cache[8] || (_cache[8] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("select", {
@@ -8352,7 +8352,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
               createBaseVNode("option", { value: "smooth" }, "Smooth", -1),
               createBaseVNode("option", { value: "bezier" }, "Bezier", -1),
               createBaseVNode("option", { value: "steps" }, "Steps", -1)
-            ])], 40, _hoisted_3$4),
+            ])], 40, _hoisted_3$5),
             createBaseVNode("button", {
               class: "nkd-btn",
               title: "Reverse the color order",
@@ -8375,9 +8375,9 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
                 return openBlock(), createElementBlock("option", {
                   key: p2.name,
                   value: p2.name
-                }, toDisplayString(p2.name), 9, _hoisted_6);
+                }, toDisplayString(p2.name), 9, _hoisted_6$1);
               }), 128))
-            ], 40, _hoisted_5),
+            ], 40, _hoisted_5$1),
             createBaseVNode("button", {
               class: "nkd-btn nkd-btn--preset",
               onClick: withModifiers(saveCurrentAsPreset, ["stop"])
@@ -8386,7 +8386,7 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
               class: "nkd-btn nkd-btn--preset",
               disabled: !selectedPreset.value,
               onClick: withModifiers(deleteSelectedPreset, ["stop"])
-            }, "Delete", 8, _hoisted_7)
+            }, "Delete", 8, _hoisted_7$1)
           ])
         ]),
         createBaseVNode("input", {
@@ -8400,17 +8400,17 @@ const _sfc_main$4 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["__scopeId", "data-v-3d741d05"]]);
-const _hoisted_1$3 = { class: "nkd-bar" };
-const _hoisted_2$3 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3$3 = { class: "nkd-hint" };
-const BOX_W = 320, BOX_H = 210, PAD$1 = 14;
-const HIT_R = 11;
-const MIN_RENDER_SCALE$3 = 2;
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-3d741d05"]]);
+const _hoisted_1$4 = { class: "nkd-bar" };
+const _hoisted_2$4 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$4 = { class: "nkd-hint" };
+const BOX_W = 320, BOX_H = 210, PAD$2 = 14;
+const HIT_R$1 = 11;
+const MIN_RENDER_SCALE$4 = 2;
 const MID_MIN = 0.05, MID_MAX = 0.95;
 const CANVAS_INSET = 5;
 const DIAMOND_RES = 160;
-const _sfc_main$3 = /* @__PURE__ */ defineComponent({
+const _sfc_main$4 = /* @__PURE__ */ defineComponent({
   __name: "GradientPreviewWidget",
   props: {
     onChange: { type: Function },
@@ -8460,7 +8460,7 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     let lastShape = null;
     let dragging = null;
     let hover = null;
-    let fitX = PAD$1, fitY = PAD$1, fitW = BOX_W - PAD$1 * 2, fitH = BOX_H - PAD$1 * 2;
+    let fitX = PAD$2, fitY = PAD$2, fitW = BOX_W - PAD$2 * 2, fitH = BOX_H - PAD$2 * 2;
     function toPx(pt) {
       return [fitX + pt[0] * fitW, fitY + pt[1] * fitH];
     }
@@ -8496,8 +8496,8 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       if (!c) return false;
       const rect = c.getBoundingClientRect();
       if (rect.width < 1 || rect.height < 1) return false;
-      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE$3);
-      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE$3);
+      const sx = Math.max(rect.width / BOX_W * dpr, MIN_RENDER_SCALE$4);
+      const sy = Math.max(rect.height / BOX_H * dpr, MIN_RENDER_SCALE$4);
       const newW = Math.round(BOX_W * sx), newH = Math.round(BOX_H * sy);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -8511,14 +8511,14 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     function computeFitRect() {
       const [w, h] = props.getSize();
       const aspect = w > 0 && h > 0 ? w / h : 1;
-      const maxW = BOX_W - PAD$1 * 2, maxH = BOX_H - PAD$1 * 2;
+      const maxW = BOX_W - PAD$2 * 2, maxH = BOX_H - PAD$2 * 2;
       let fw = maxW, fh = maxW / aspect;
       if (fh > maxH) {
         fh = maxH;
         fw = maxH * aspect;
       }
-      fitX = PAD$1 + (maxW - fw) / 2;
-      fitY = PAD$1 + (maxH - fh) / 2;
+      fitX = PAD$2 + (maxW - fw) / 2;
+      fitY = PAD$2 + (maxH - fh) / 2;
       fitW = fw;
       fitH = fh;
     }
@@ -8751,10 +8751,10 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
       const a = toPx(p0.value), b = toPx(p1.value);
       const da = Math.hypot(a[0] - x, a[1] - y);
       const db = Math.hypot(b[0] - x, b[1] - y);
-      if (da <= HIT_R && da <= db) return "p0";
-      if (db <= HIT_R) return "p1";
+      if (da <= HIT_R$1 && da <= db) return "p0";
+      if (db <= HIT_R$1) return "p1";
       const m = midPx();
-      if (Math.hypot(m[0] - x, m[1] - y) <= HIT_R) return "mid";
+      if (Math.hypot(m[0] - x, m[1] - y) <= HIT_R$1) return "mid";
       return null;
     }
     function onDown(e) {
@@ -8902,9 +8902,9 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
           onMouseleave: withModifiers(onLeave, ["stop"]),
           onDblclick: withModifiers(onDblClick, ["stop", "prevent"])
         }, null, 544),
-        createBaseVNode("div", _hoisted_1$3, [
-          createBaseVNode("div", _hoisted_2$3, [
-            createBaseVNode("span", _hoisted_3$3, toDisplayString(hintText.value), 1),
+        createBaseVNode("div", _hoisted_1$4, [
+          createBaseVNode("div", _hoisted_2$4, [
+            createBaseVNode("span", _hoisted_3$4, toDisplayString(hintText.value), 1),
             _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("button", {
               class: "nkd-btn",
@@ -8916,23 +8916,23 @@ const _sfc_main$3 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-f11c2d3f"]]);
-const _hoisted_1$2 = { class: "nkd-root" };
-const _hoisted_2$2 = { class: "nkd-bar" };
-const _hoisted_3$2 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4$2 = { class: "nkd-hint" };
-const MIN_RENDER_SCALE$2 = 2;
-const CACHE_RES$1 = 640;
-const DEFAULT_ASPECT$1 = "16 / 10";
-const LUMA_R$1 = 0.2126, LUMA_G$1 = 0.7152, LUMA_B$1 = 0.0722;
-const _sfc_main$2 = /* @__PURE__ */ defineComponent({
+const GradientPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$4, [["__scopeId", "data-v-f11c2d3f"]]);
+const _hoisted_1$3 = { class: "nkd-root" };
+const _hoisted_2$3 = { class: "nkd-bar" };
+const _hoisted_3$3 = { class: "nkd-row nkd-row--controls" };
+const MIN_RENDER_SCALE$3 = 2;
+const CACHE_RES$2 = 640;
+const DEFAULT_ASPECT$2 = "16 / 10";
+const LUMA_R$2 = 0.2126, LUMA_G$2 = 0.7152, LUMA_B$2 = 0.0722;
+const _sfc_main$3 = /* @__PURE__ */ defineComponent({
   __name: "GradientMapPreviewWidget",
   props: {
     getRamp: { type: Function },
     getInvert: { type: Function },
     getStrength: { type: Function },
     getSourceImg: { type: Function },
-    getMaskImg: { type: Function }
+    getMaskImg: { type: Function },
+    hasMask: { type: Function }
   },
   setup(__props, { expose: __expose }) {
     const props = __props;
@@ -8942,13 +8942,18 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     let dpr = window.devicePixelRatio || 1;
     let logicalW = 0, logicalH = 0;
     const hintText = /* @__PURE__ */ ref("Connect an image");
-    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT$1);
+    const maskPending = /* @__PURE__ */ ref(false);
+    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT$2);
     let cacheW = 0, cacheH = 0;
     let cacheRgb = null;
     let cacheLuma = null;
     let lastSrc = null;
     let offscreen = null;
     let cacheMask = null;
+    let alphaMask = null;
+    let sentMask = null;
+    let sentSeq = 0;
+    let maskKey = "";
     let lastMaskSrc = null;
     let maskOffscreen = null;
     let outCanvas = null;
@@ -8970,7 +8975,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     function decodeSource(img) {
       const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
       if (!iw || !ih) return;
-      const scale = CACHE_RES$1 / Math.max(iw, ih);
+      const scale = CACHE_RES$2 / Math.max(iw, ih);
       cacheW = Math.max(1, Math.round(iw * scale));
       cacheH = Math.max(1, Math.round(ih * scale));
       if (!offscreen) offscreen = document.createElement("canvas");
@@ -8982,12 +8987,11 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       cacheRgb = data;
       cacheLuma = new Float32Array(cacheW * cacheH);
       for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) {
-        cacheLuma[p2] = (data[i] * LUMA_R$1 + data[i + 1] * LUMA_G$1 + data[i + 2] * LUMA_B$1) / 255;
+        cacheLuma[p2] = (data[i] * LUMA_R$2 + data[i + 1] * LUMA_G$2 + data[i + 2] * LUMA_B$2) / 255;
       }
     }
     function decodeMask(img) {
-      cacheMask = null;
-      if (!cacheW || !cacheH) return;
+      if (!cacheW || !cacheH) return null;
       if (!maskOffscreen) maskOffscreen = document.createElement("canvas");
       maskOffscreen.width = cacheW;
       maskOffscreen.height = cacheH;
@@ -9002,12 +9006,23 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
           break;
         }
       }
-      if (!alphaVaries) return;
+      if (!alphaVaries) return null;
       const m = new Float32Array(cacheW * cacheH);
       for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) m[p2] = 1 - data[i + 3] / 255;
+      return m;
+    }
+    function resolveMask() {
+      cacheMask = alphaMask;
+      if (cacheMask || !sentMask || !cacheW) return;
+      const { d, w, h } = sentMask;
+      const m = new Float32Array(cacheW * cacheH);
+      for (let y = 0, p2 = 0; y < cacheH; y++) {
+        const row = Math.min(h - 1, Math.floor(y * h / cacheH)) * w;
+        for (let x = 0; x < cacheW; x++, p2++) m[p2] = d[row + Math.min(w - 1, Math.floor(x * w / cacheW))] / 255;
+      }
       cacheMask = m;
     }
-    function setSentImage(rgb, w, h) {
+    function setSentImage(rgb, w, h, mask) {
       const n = w * h;
       const data = new Uint8ClampedArray(n * 4);
       const luma = new Float32Array(n);
@@ -9016,20 +9031,19 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
         data[i + 1] = rgb[j + 1];
         data[i + 2] = rgb[j + 2];
         data[i + 3] = 255;
-        luma[p2] = (rgb[j] * LUMA_R$1 + rgb[j + 1] * LUMA_G$1 + rgb[j + 2] * LUMA_B$1) / 255;
+        luma[p2] = (rgb[j] * LUMA_R$2 + rgb[j + 1] * LUMA_G$2 + rgb[j + 2] * LUMA_B$2) / 255;
       }
       cacheRgb = data;
       cacheLuma = luma;
-      cacheMask = null;
+      alphaMask = null;
       cacheW = w;
       cacheH = h;
       lastSrc = "__sent__";
       lastMaskSrc = null;
-      hintText.value = "Live preview";
-      const wantAspect = `${w} / ${h}`;
-      if (wantAspect !== canvasAspect.value) canvasAspect.value = wantAspect;
+      sentMask = mask ? { d: mask, w, h } : null;
+      sentSeq++;
       lastSig = "__force__";
-      redraw();
+      refreshExternal();
     }
     function syncCanvasSize() {
       const c = canvas.value;
@@ -9038,7 +9052,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       if (rect.width < 1 || rect.height < 1) return false;
       logicalW = rect.width;
       logicalH = rect.height;
-      const s = Math.max(dpr, MIN_RENDER_SCALE$2);
+      const s = Math.max(dpr, MIN_RENDER_SCALE$3);
       const newW = Math.round(rect.width * s), newH = Math.round(rect.height * s);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -9108,26 +9122,34 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
       } else if (!img && lastSrc !== null && lastSrc !== "__sent__") {
         cacheRgb = null;
         cacheLuma = null;
-        cacheMask = null;
         lastSrc = null;
-        lastMaskSrc = null;
       }
-      const mimg = props.getMaskImg();
-      const msrc = (mimg == null ? void 0 : mimg.currentSrc) || (mimg == null ? void 0 : mimg.src) || null;
-      if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
-        decodeMask(mimg);
-        lastMaskSrc = msrc;
-      } else if (!mimg && lastMaskSrc !== null) {
-        cacheMask = null;
+      const linked = props.hasMask();
+      if (!linked) {
+        alphaMask = null;
+        sentMask = null;
         lastMaskSrc = null;
+      } else {
+        const mimg = props.getMaskImg();
+        const msrc = (mimg == null ? void 0 : mimg.currentSrc) || (mimg == null ? void 0 : mimg.src) || null;
+        if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
+          alphaMask = decodeMask(mimg);
+          lastMaskSrc = msrc;
+        }
       }
-      hintText.value = cacheRgb ? cacheMask ? "Live preview · masked" : "Live preview" : "Connect an image";
-      const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT$1;
+      const key = `${linked}|${lastMaskSrc}|${sentSeq}|${cacheW}x${cacheH}|${lastSrc}`;
+      if (key !== maskKey) {
+        maskKey = key;
+        resolveMask();
+      }
+      maskPending.value = linked && !!cacheRgb && !cacheMask;
+      hintText.value = !cacheRgb ? "Connect an image" : cacheMask ? "Live preview · masked" : maskPending.value ? "Mask connected · run the node (▶) to preview it" : "Live preview";
+      const wantAspect = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT$2;
       if (wantAspect !== canvasAspect.value) {
         canvasAspect.value = wantAspect;
         return;
       }
-      const sig = `${lastSrc}|${lastMaskSrc}|${cacheW}x${cacheH}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
+      const sig = `${key}|${cacheMask ? 1 : 0}|${props.getRamp()}|${props.getInvert()}|${props.getStrength()}`;
       if (sig !== lastSig) {
         lastSig = sig;
         redraw();
@@ -9149,31 +9171,33 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     onBeforeUnmount(cleanup);
     __expose({ refreshExternal, forceResize, cleanup, setSentImage });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("div", _hoisted_1$2, [
+      return openBlock(), createElementBlock("div", _hoisted_1$3, [
         createBaseVNode("canvas", {
           ref_key: "canvas",
           ref: canvas,
           class: "nkd-canvas",
           style: normalizeStyle({ aspectRatio: canvasAspect.value })
         }, null, 4),
-        createBaseVNode("div", _hoisted_2$2, [
-          createBaseVNode("div", _hoisted_3$2, [
-            createBaseVNode("span", _hoisted_4$2, toDisplayString(hintText.value), 1)
+        createBaseVNode("div", _hoisted_2$3, [
+          createBaseVNode("div", _hoisted_3$3, [
+            createBaseVNode("span", {
+              class: normalizeClass(["nkd-hint", { "nkd-hint--warn": maskPending.value }])
+            }, toDisplayString(hintText.value), 3)
           ])
         ])
       ]);
     };
   }
 });
-const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-aa41997d"]]);
-const _hoisted_1$1 = { class: "nkd-root" };
-const _hoisted_2$1 = { class: "nkd-bar" };
-const _hoisted_3$1 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4$1 = { class: "nkd-hint" };
+const GradientMapPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-be72e354"]]);
+const _hoisted_1$2 = { class: "nkd-root" };
+const _hoisted_2$2 = { class: "nkd-bar" };
+const _hoisted_3$2 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4$2 = { class: "nkd-hint" };
 const PREVIEW_MAX = 256;
-const MIN_RENDER_SCALE$1 = 2;
+const MIN_RENDER_SCALE$2 = 2;
 const LOOP_RADIUS = 1.5;
-const _sfc_main$1 = /* @__PURE__ */ defineComponent({
+const _sfc_main$2 = /* @__PURE__ */ defineComponent({
   __name: "NoisePreviewWidget",
   props: {
     getParams: { type: Function }
@@ -9244,7 +9268,7 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
       if (rect.width < 1 || rect.height < 1) return false;
       logicalW = rect.width;
       logicalH = rect.height;
-      const s = Math.max(dpr, MIN_RENDER_SCALE$1);
+      const s = Math.max(dpr, MIN_RENDER_SCALE$2);
       const nw = Math.round(rect.width * s), nh = Math.round(rect.height * s);
       if (c.width !== nw || c.height !== nh) {
         c.width = nw;
@@ -9323,25 +9347,25 @@ const _sfc_main$1 = /* @__PURE__ */ defineComponent({
     onBeforeUnmount(cleanup);
     __expose({ refreshExternal, forceResize, cleanup });
     return (_ctx, _cache) => {
-      return openBlock(), createElementBlock("div", _hoisted_1$1, [
+      return openBlock(), createElementBlock("div", _hoisted_1$2, [
         createBaseVNode("canvas", {
           ref_key: "canvas",
           ref: canvas,
           class: "nkd-canvas",
           style: normalizeStyle({ aspectRatio: aspect.value })
         }, null, 4),
-        createBaseVNode("div", _hoisted_2$1, [
-          createBaseVNode("div", _hoisted_3$1, [
-            createBaseVNode("span", _hoisted_4$1, toDisplayString(hint.value), 1)
+        createBaseVNode("div", _hoisted_2$2, [
+          createBaseVNode("div", _hoisted_3$2, [
+            createBaseVNode("span", _hoisted_4$2, toDisplayString(hint.value), 1)
           ])
         ])
       ]);
     };
   }
 });
-const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-773b27a5"]]);
+const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-773b27a5"]]);
 const EPS = 1e-6;
-const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
+const LUMA_R$1 = 0.2126, LUMA_G$1 = 0.7152, LUMA_B$1 = 0.0722;
 function srgbToLinear$1(v) {
   return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
 }
@@ -9477,7 +9501,7 @@ function computeSeparation(rgba, w, h, opts) {
   }
   if (opts.detail === "Luminance") {
     const luma = new Float32Array(n);
-    for (let p2 = 0; p2 < n; p2++) luma[p2] = LUMA_R * planes[0][p2] + LUMA_G * planes[1][p2] + LUMA_B * planes[2][p2];
+    for (let p2 = 0; p2 < n; p2++) luma[p2] = LUMA_R$1 * planes[0][p2] + LUMA_G$1 * planes[1][p2] + LUMA_B$1 * planes[2][p2];
     const lfl = lowFreq(luma, w, h, opts.method, r, opts.edge);
     for (let p2 = 0, i = 0; p2 < n; p2++, i += 4) {
       const v = opts.mode === "Divide" ? luma[p2] / (lfl[p2] + EPS) : luma[p2] - lfl[p2];
@@ -9496,14 +9520,14 @@ function computeSeparation(rgba, w, h, opts) {
   }
   return { hf, lf };
 }
-const _hoisted_1 = { class: "nkd-bar" };
-const _hoisted_2 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_3 = { class: "nkd-row nkd-row--controls" };
-const _hoisted_4 = { class: "nkd-hint" };
-const MIN_RENDER_SCALE = 2;
-const CACHE_RES = 512;
-const DEFAULT_ASPECT = "16 / 10";
-const _sfc_main = /* @__PURE__ */ defineComponent({
+const _hoisted_1$1 = { class: "nkd-bar" };
+const _hoisted_2$1 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3$1 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_4$1 = { class: "nkd-hint" };
+const MIN_RENDER_SCALE$1 = 2;
+const CACHE_RES$1 = 512;
+const DEFAULT_ASPECT$1 = "16 / 10";
+const _sfc_main$1 = /* @__PURE__ */ defineComponent({
   __name: "FrequencyPreviewWidget",
   props: {
     getSourceImg: { type: Function },
@@ -9522,7 +9546,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     let dpr = window.devicePixelRatio || 1;
     let logicalW = 0, logicalH = 0;
     const hintText = /* @__PURE__ */ ref("Connect an image");
-    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT);
+    const canvasAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT$1);
     const blend = /* @__PURE__ */ ref(1);
     const zoom = /* @__PURE__ */ ref(false);
     const pan = /* @__PURE__ */ ref([0.5, 0.5]);
@@ -9574,7 +9598,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         octx.drawImage(s.drawable, sx, sy, cw, ch, 0, 0, cw, ch);
         cacheScale = s.natW / s.srcW;
       } else {
-        const fit = Math.min(CACHE_RES / Math.max(s.natW, s.natH), 1);
+        const fit = Math.min(CACHE_RES$1 / Math.max(s.natW, s.natH), 1);
         offscreen.width = cacheW = Math.max(1, Math.round(s.natW * fit));
         offscreen.height = cacheH = Math.max(1, Math.round(s.natH * fit));
         octx.drawImage(s.drawable, 0, 0, cacheW, cacheH);
@@ -9602,7 +9626,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
       if (rect.width < 1 || rect.height < 1) return false;
       logicalW = rect.width;
       logicalH = rect.height;
-      const s = Math.max(dpr, MIN_RENDER_SCALE);
+      const s = Math.max(dpr, MIN_RENDER_SCALE$1);
       const newW = Math.round(rect.width * s), newH = Math.round(rect.height * s);
       if (c.width !== newW || c.height !== newH) {
         c.width = newW;
@@ -9750,7 +9774,7 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         const eff = Math.max(1, Math.round(rawR * cacheScale));
         hintText.value = `${layer} · ${props.getMethod()} · r${rawR} → r${eff} @ ${Math.round(cacheScale * 100)}%`;
       }
-      const wantAspect = s ? `${s.srcW} / ${s.srcH}` : DEFAULT_ASPECT;
+      const wantAspect = s ? `${s.srcW} / ${s.srcH}` : DEFAULT_ASPECT$1;
       if (wantAspect !== canvasAspect.value) {
         canvasAspect.value = wantAspect;
         return;
@@ -9797,8 +9821,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
           onMouseup: withModifiers(onUp, ["stop"]),
           onMouseleave: withModifiers(onUp, ["stop"])
         }, null, 38),
-        createBaseVNode("div", _hoisted_1, [
-          createBaseVNode("div", _hoisted_2, [
+        createBaseVNode("div", _hoisted_1$1, [
+          createBaseVNode("div", _hoisted_2$1, [
             _cache[4] || (_cache[4] = createBaseVNode("span", { class: "nkd-label" }, "Low", -1)),
             withDirectives(createBaseVNode("input", {
               class: "nkd-slider",
@@ -9818,8 +9842,8 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
             ]),
             _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-label" }, "High", -1))
           ]),
-          createBaseVNode("div", _hoisted_3, [
-            createBaseVNode("span", _hoisted_4, toDisplayString(hintText.value), 1),
+          createBaseVNode("div", _hoisted_3$1, [
+            createBaseVNode("span", _hoisted_4$1, toDisplayString(hintText.value), 1),
             _cache[6] || (_cache[6] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
             createBaseVNode("button", {
               class: "nkd-btn",
@@ -9831,7 +9855,675 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-cf839f24"]]);
+const FrequencyPreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$1, [["__scopeId", "data-v-cf839f24"]]);
+const _hoisted_1 = { class: "nkd-bar" };
+const _hoisted_2 = { class: "nkd-row nkd-row--controls" };
+const _hoisted_3 = ["onClick"];
+const _hoisted_4 = { class: "nkd-row nkd-row--hint" };
+const _hoisted_5 = {
+  key: 0,
+  class: "nkd-info"
+};
+const _hoisted_6 = {
+  key: 1,
+  class: "nkd-hint nkd-hint--warn"
+};
+const _hoisted_7 = {
+  key: 2,
+  class: "nkd-hint"
+};
+const CW = 320, CH = 240;
+const PAD$1 = 10;
+const HIT_R = 10;
+const MIN_GAP = 0.01;
+const DELETE_OUT = 24;
+const FINE_GAIN$1 = 0.1;
+const MIN_RENDER_SCALE = 2;
+const CACHE_RES = 640;
+const DEFAULT_ASPECT = "16 / 10";
+const LUMA_R = 0.2126, LUMA_G = 0.7152, LUMA_B = 0.0722;
+const SPLINE_DEGREE = 3;
+const SPLINE_SAMPLES = 500;
+const _sfc_main = /* @__PURE__ */ defineComponent({
+  __name: "CurvesWidget",
+  props: {
+    onChange: { type: Function },
+    getSourceImg: { type: Function },
+    getMaskImg: { type: Function },
+    hasMask: { type: Function }
+  },
+  setup(__props, { expose: __expose }) {
+    const props = __props;
+    const CHANNELS = ["rgb", "r", "g", "b"];
+    const CH_COLOR = { rgb: "#4ab4ff", r: "#ff5c5c", g: "#4cd97b", b: "#5a8cff" };
+    const IW = CW - 2 * PAD$1, IH = CH - 2 * PAD$1;
+    const C2 = {
+      bg: "#111318",
+      grid: "rgba(255,255,255,0.06)",
+      gridBorder: "rgba(255,255,255,0.16)",
+      diag: "rgba(255,255,255,0.12)",
+      hist: "rgba(255,255,255,0.09)",
+      ptHover: "#ffd166",
+      ptActive: "#ff6b6b",
+      ptStroke: "rgba(0,0,0,0.65)"
+    };
+    function bsplineTable(pts) {
+      pts = pts.flatMap((q) => q[2] ? [q, q, q] : [q]);
+      const n = pts.length, p2 = Math.min(SPLINE_DEGREE, n - 1), inner = n - p2;
+      const knots = [];
+      for (let i = 0; i <= p2; i++) knots.push(0);
+      for (let i = 1; i < inner; i++) knots.push(i / inner);
+      for (let i = 0; i <= p2; i++) knots.push(1);
+      const xs = new Float64Array(SPLINE_SAMPLES + 1), ys = new Float64Array(SPLINE_SAMPLES + 1);
+      const N = new Float64Array(knots.length - 1);
+      for (let s = 0; s <= SPLINE_SAMPLES; s++) {
+        const u = Math.min(s / SPLINE_SAMPLES, 1 - 1e-10);
+        for (let i = 0; i < N.length; i++) N[i] = knots[i] <= u && u < knots[i + 1] ? 1 : 0;
+        for (let d = 1; d <= p2; d++) {
+          for (let i = 0; i < N.length - d; i++) {
+            const a = knots[i + d] > knots[i] ? (u - knots[i]) / (knots[i + d] - knots[i]) * N[i] : 0;
+            const b = knots[i + d + 1] > knots[i + 1] ? (knots[i + d + 1] - u) / (knots[i + d + 1] - knots[i + 1]) * N[i + 1] : 0;
+            N[i] = a + b;
+          }
+        }
+        let x = 0, y = 0;
+        for (let i = 0; i < n; i++) {
+          x += N[i] * pts[i][0];
+          y += N[i] * pts[i][1];
+        }
+        xs[s] = x;
+        ys[s] = y;
+      }
+      return [xs, ys];
+    }
+    function curveLut(pts, n) {
+      const [xs, ys] = bsplineTable(pts);
+      const last = xs.length - 1;
+      const out = new Float32Array(n);
+      let k = 0;
+      for (let j = 0; j < n; j++) {
+        const x = j / (n - 1);
+        if (x <= xs[0]) {
+          out[j] = ys[0];
+          continue;
+        }
+        if (x >= xs[last]) {
+          out[j] = ys[last];
+          continue;
+        }
+        while (x > xs[k + 1]) k++;
+        const dx = xs[k + 1] - xs[k];
+        const t = dx > 0 ? (x - xs[k]) / dx : 0;
+        out[j] = Math.min(1, Math.max(0, ys[k] + t * (ys[k + 1] - ys[k])));
+      }
+      return out;
+    }
+    const identity = () => [[0, 0], [1, 1]];
+    let curves = { rgb: identity(), r: identity(), g: identity(), b: identity() };
+    const channel = /* @__PURE__ */ ref("rgb");
+    const readout = /* @__PURE__ */ ref("");
+    const maskNote = /* @__PURE__ */ ref("");
+    const cursor = /* @__PURE__ */ ref("crosshair");
+    const previewAspect = /* @__PURE__ */ ref(DEFAULT_ASPECT);
+    const canvas = /* @__PURE__ */ ref(null);
+    const preview = /* @__PURE__ */ ref(null);
+    let ctx = null;
+    let pctx = null;
+    let ro = null;
+    const dpr = window.devicePixelRatio || 1;
+    let hoverIdx = -1;
+    let dragIdx = -1;
+    let pendingDelete = false;
+    let dragOffX = 0, dragOffY = 0;
+    let virtX = 0, virtY = 0, lastCX = 0, lastCY = 0;
+    const toCX = (nx) => PAD$1 + nx * IW;
+    const toCY = (ny) => PAD$1 + (1 - ny) * IH;
+    const rawNX = (cx) => (cx - PAD$1) / IW;
+    const rawNY = (cy) => 1 - (cy - PAD$1) / IH;
+    const clamp012 = (v) => Math.max(0, Math.min(1, v));
+    const isIdentity = (pts) => pts.length === 2 && pts[0][0] === 0 && pts[0][1] === 0 && pts[1][0] === 1 && pts[1][1] === 1;
+    function activePts() {
+      const pts = curves[channel.value];
+      return pendingDelete && dragIdx >= 0 ? pts.filter((_, i) => i !== dragIdx) : pts;
+    }
+    function serialise2() {
+      const r = (v) => Math.round(v * 1e4) / 1e4;
+      const out = {};
+      for (const c of CHANNELS) out[c] = curves[c].map(([x, y, k]) => k ? [r(x), r(y), 1] : [r(x), r(y)]);
+      return JSON.stringify(out);
+    }
+    function deserialise2(json) {
+      let data = {};
+      try {
+        data = JSON.parse(json);
+      } catch {
+      }
+      for (const c of CHANNELS) {
+        const raw = Array.isArray(data == null ? void 0 : data[c]) ? data[c] : [];
+        const pts = raw.filter((p2) => Array.isArray(p2) && p2.length >= 2).map((p2) => p2[2] ? [clamp012(Number(p2[0]) || 0), clamp012(Number(p2[1]) || 0), 1] : [clamp012(Number(p2[0]) || 0), clamp012(Number(p2[1]) || 0)]).sort((a, b) => a[0] - b[0]);
+        curves[c] = pts.length >= 2 ? pts : identity();
+      }
+      redrawAll();
+    }
+    function commit() {
+      props.onChange(serialise2());
+      redrawAll();
+    }
+    let cacheW = 0, cacheH = 0;
+    let cacheRgb = null;
+    let cacheMask = null;
+    let lastSrc = null, lastMaskSrc = null;
+    let hist = null;
+    let offscreen = null;
+    let outCanvas = null;
+    let outCtx = null;
+    let outImg = null;
+    let lastSig = "";
+    function buildHistogram() {
+      if (!cacheRgb) {
+        hist = null;
+        return;
+      }
+      const h = { rgb: new Float32Array(256), r: new Float32Array(256), g: new Float32Array(256), b: new Float32Array(256) };
+      const d = cacheRgb;
+      for (let i = 0; i < d.length; i += 4) {
+        h.r[d[i]]++;
+        h.g[d[i + 1]]++;
+        h.b[d[i + 2]]++;
+        h.rgb[Math.round(d[i] * LUMA_R + d[i + 1] * LUMA_G + d[i + 2] * LUMA_B)]++;
+      }
+      for (const c of CHANNELS) {
+        let mx = 1;
+        for (let i = 1; i < 255; i++) mx = Math.max(mx, h[c][i]);
+        for (let i = 0; i < 256; i++) h[c][i] = Math.min(1, h[c][i] / mx);
+      }
+      hist = h;
+    }
+    function decodeSource(img) {
+      const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+      if (!iw || !ih) return;
+      const scale = Math.min(1, CACHE_RES / Math.max(iw, ih));
+      cacheW = Math.max(1, Math.round(iw * scale));
+      cacheH = Math.max(1, Math.round(ih * scale));
+      if (!offscreen) offscreen = document.createElement("canvas");
+      offscreen.width = cacheW;
+      offscreen.height = cacheH;
+      const octx = offscreen.getContext("2d");
+      octx.drawImage(img, 0, 0, cacheW, cacheH);
+      cacheRgb = octx.getImageData(0, 0, cacheW, cacheH).data;
+      buildHistogram();
+    }
+    let alphaMask = null;
+    let sentMask = null;
+    let sentSeq = 0;
+    let maskKey = "";
+    function decodeMask(img) {
+      if (!cacheW || !cacheH) return null;
+      const c = document.createElement("canvas");
+      c.width = cacheW;
+      c.height = cacheH;
+      const mctx = c.getContext("2d");
+      mctx.drawImage(img, 0, 0, cacheW, cacheH);
+      const data = mctx.getImageData(0, 0, cacheW, cacheH).data;
+      let varies = false;
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] < 250) {
+          varies = true;
+          break;
+        }
+      }
+      if (!varies) return null;
+      const m = new Float32Array(cacheW * cacheH);
+      for (let i = 0, p2 = 0; i < data.length; i += 4, p2++) m[p2] = 1 - data[i + 3] / 255;
+      return m;
+    }
+    function resolveMask() {
+      cacheMask = alphaMask;
+      if (cacheMask || !sentMask || !cacheW) return;
+      const { d, w, h } = sentMask;
+      const m = new Float32Array(cacheW * cacheH);
+      for (let y = 0, p2 = 0; y < cacheH; y++) {
+        const row = Math.min(h - 1, Math.floor(y * h / cacheH)) * w;
+        for (let x = 0; x < cacheW; x++, p2++) m[p2] = d[row + Math.min(w - 1, Math.floor(x * w / cacheW))] / 255;
+      }
+      cacheMask = m;
+    }
+    function setSentImage(rgb, w, h, mask) {
+      const n = w * h;
+      const data = new Uint8ClampedArray(n * 4);
+      for (let p2 = 0, i = 0, j = 0; p2 < n; p2++, i += 4, j += 3) {
+        data[i] = rgb[j];
+        data[i + 1] = rgb[j + 1];
+        data[i + 2] = rgb[j + 2];
+        data[i + 3] = 255;
+      }
+      cacheRgb = data;
+      cacheW = w;
+      cacheH = h;
+      lastSrc = "__sent__";
+      lastMaskSrc = null;
+      alphaMask = null;
+      sentMask = mask ? { d: mask, w, h } : null;
+      sentSeq++;
+      buildHistogram();
+      previewAspect.value = `${w} / ${h}`;
+      refreshExternal();
+    }
+    function refreshExternal() {
+      const img = props.getSourceImg();
+      const src = (img == null ? void 0 : img.currentSrc) || (img == null ? void 0 : img.src) || null;
+      let srcChanged = false;
+      if (img && img.complete && src && src !== lastSrc) {
+        decodeSource(img);
+        lastSrc = src;
+        srcChanged = true;
+      } else if (!img && lastSrc !== null && lastSrc !== "__sent__") {
+        cacheRgb = null;
+        hist = null;
+        lastSrc = null;
+      }
+      const linked = props.hasMask();
+      if (!linked) {
+        alphaMask = null;
+        sentMask = null;
+        lastMaskSrc = null;
+      } else {
+        const mimg = props.getMaskImg();
+        const msrc = (mimg == null ? void 0 : mimg.currentSrc) || (mimg == null ? void 0 : mimg.src) || null;
+        if (mimg && mimg.complete && cacheRgb && (msrc !== lastMaskSrc || srcChanged)) {
+          alphaMask = decodeMask(mimg);
+          lastMaskSrc = msrc;
+        }
+      }
+      const key = `${linked}|${lastMaskSrc}|${sentSeq}|${cacheW}x${cacheH}|${lastSrc}`;
+      if (key !== maskKey) {
+        maskKey = key;
+        resolveMask();
+      }
+      maskNote.value = linked && cacheRgb && !cacheMask ? "Mask connected · run the node (▶) to preview it" : "";
+      const want = cacheRgb ? `${cacheW} / ${cacheH}` : DEFAULT_ASPECT;
+      if (want !== previewAspect.value) {
+        previewAspect.value = want;
+        return;
+      }
+      const sig = `${key}|${cacheMask ? 1 : 0}`;
+      if (sig !== lastSig) {
+        lastSig = sig;
+        redrawAll();
+      }
+    }
+    function redrawPreview() {
+      const c = preview.value;
+      if (!pctx || !c) return;
+      const w = c.clientWidth, h = c.clientHeight;
+      if (w < 1 || h < 1) return;
+      pctx.fillStyle = C2.bg;
+      pctx.fillRect(0, 0, w, h);
+      if (!cacheRgb) {
+        pctx.font = "11px Inter, sans-serif";
+        pctx.fillStyle = "rgba(255,255,255,0.32)";
+        pctx.textAlign = "center";
+        pctx.textBaseline = "middle";
+        pctx.fillText("Connect an image", w / 2, h / 2);
+        return;
+      }
+      const master = curveLut(activeOr("rgb"), 256);
+      const luts = ["r", "g", "b"].map((ch) => {
+        const l = curveLut(activeOr(ch), 256);
+        const u = new Uint8ClampedArray(256);
+        for (let i = 0; i < 256; i++) {
+          const p2 = l[i] * 255, i0 = Math.min(254, p2 | 0), f = p2 - i0;
+          u[i] = (master[i0] * (1 - f) + master[i0 + 1] * f) * 255 + 0.5;
+        }
+        return u;
+      });
+      if (!outCanvas || outCanvas.width !== cacheW || outCanvas.height !== cacheH) {
+        outCanvas = document.createElement("canvas");
+        outCanvas.width = cacheW;
+        outCanvas.height = cacheH;
+        outCtx = outCanvas.getContext("2d");
+        outImg = outCtx.createImageData(cacheW, cacheH);
+      }
+      const src = cacheRgb, dst = outImg.data, [lr, lg, lb] = luts;
+      for (let p2 = 0, i = 0; i < dst.length; p2++, i += 4) {
+        const r = src[i], g = src[i + 1], b = src[i + 2];
+        if (cacheMask) {
+          const m = cacheMask[p2], k = 1 - m;
+          dst[i] = r * k + lr[r] * m;
+          dst[i + 1] = g * k + lg[g] * m;
+          dst[i + 2] = b * k + lb[b] * m;
+        } else {
+          dst[i] = lr[r];
+          dst[i + 1] = lg[g];
+          dst[i + 2] = lb[b];
+        }
+        dst[i + 3] = 255;
+      }
+      outCtx.putImageData(outImg, 0, 0);
+      pctx.imageSmoothingEnabled = true;
+      pctx.drawImage(outCanvas, 0, 0, w, h);
+    }
+    function activeOr(ch) {
+      return ch === channel.value ? activePts() : curves[ch];
+    }
+    function strokeCurve(pts, color, width) {
+      if (!ctx) return;
+      const lut = curveLut(pts, IW + 1);
+      ctx.beginPath();
+      for (let j = 0; j <= IW; j++) {
+        const x = PAD$1 + j, y = toCY(lut[j]);
+        if (j === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineJoin = "round";
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+    function redrawCurve() {
+      if (!ctx) return;
+      const ch = channel.value;
+      ctx.fillStyle = C2.bg;
+      ctx.fillRect(0, 0, CW, CH);
+      if (hist) {
+        const hst = hist[ch];
+        ctx.beginPath();
+        ctx.moveTo(PAD$1, PAD$1 + IH);
+        for (let i = 0; i < 256; i++) ctx.lineTo(PAD$1 + i / 255 * IW, PAD$1 + IH - hst[i] * IH);
+        ctx.lineTo(PAD$1 + IW, PAD$1 + IH);
+        ctx.closePath();
+        ctx.fillStyle = ch === "rgb" ? C2.hist : CH_COLOR[ch] + "22";
+        ctx.fill();
+      }
+      ctx.setLineDash([2.5, 5]);
+      ctx.lineWidth = 0.75;
+      ctx.strokeStyle = C2.grid;
+      for (let i = 1; i < 4; i++) {
+        const gx = PAD$1 + i / 4 * IW, gy = PAD$1 + i / 4 * IH;
+        ctx.beginPath();
+        ctx.moveTo(gx, PAD$1);
+        ctx.lineTo(gx, PAD$1 + IH);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(PAD$1, gy);
+        ctx.lineTo(PAD$1 + IW, gy);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = C2.diag;
+      ctx.beginPath();
+      ctx.moveTo(toCX(0), toCY(0));
+      ctx.lineTo(toCX(1), toCY(1));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = C2.gridBorder;
+      ctx.strokeRect(PAD$1, PAD$1, IW, IH);
+      for (const c of CHANNELS) {
+        if (c !== ch && !isIdentity(curves[c])) strokeCurve(curves[c], CH_COLOR[c] + "66", 1);
+      }
+      const poly = activePts();
+      ctx.setLineDash([3, 4]);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(255,255,255,0.12)";
+      ctx.beginPath();
+      poly.forEach(([x, y], i) => i ? ctx.lineTo(toCX(x), toCY(y)) : ctx.moveTo(toCX(x), toCY(y)));
+      ctx.stroke();
+      ctx.setLineDash([]);
+      strokeCurve(poly, CH_COLOR[ch], 2);
+      const pts = curves[ch];
+      pts.forEach(([x, y, corner], i) => {
+        if (i === dragIdx && pendingDelete) return;
+        const active2 = i === dragIdx, hover = i === hoverIdx;
+        const r = active2 ? 6 : hover ? 5.5 : 4.5;
+        ctx.beginPath();
+        if (corner) ctx.rect(toCX(x) - r * 0.85, toCY(y) - r * 0.85, r * 1.7, r * 1.7);
+        else ctx.arc(toCX(x), toCY(y), r, 0, Math.PI * 2);
+        ctx.fillStyle = active2 ? C2.ptActive : hover ? C2.ptHover : CH_COLOR[ch];
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = C2.ptStroke;
+        ctx.stroke();
+      });
+    }
+    function redrawAll() {
+      redrawCurve();
+      redrawPreview();
+    }
+    function syncCanvasSize() {
+      const c = canvas.value, p2 = preview.value;
+      if (!c || !p2) return false;
+      const rect = c.getBoundingClientRect();
+      if (rect.width < 1 || rect.height < 1) return false;
+      const s = Math.max(dpr, MIN_RENDER_SCALE);
+      const sx = Math.max(rect.width / CW * dpr, s), sy = Math.max(rect.height / CH * dpr, s);
+      const w = Math.round(CW * sx), h = Math.round(CH * sy);
+      if (c.width !== w || c.height !== h) {
+        c.width = w;
+        c.height = h;
+      }
+      ctx = c.getContext("2d");
+      ctx == null ? void 0 : ctx.setTransform(sx, 0, 0, sy, 0, 0);
+      const pw = p2.clientWidth, ph = p2.clientHeight;
+      if (pw > 0 && ph > 0) {
+        const nw = Math.round(pw * s), nh = Math.round(ph * s);
+        if (p2.width !== nw || p2.height !== nh) {
+          p2.width = nw;
+          p2.height = nh;
+        }
+        pctx = p2.getContext("2d");
+        pctx == null ? void 0 : pctx.setTransform(nw / pw, 0, 0, nh / ph, 0, 0);
+      }
+      redrawAll();
+      return true;
+    }
+    function toLogical(e) {
+      const rect = canvas.value.getBoundingClientRect();
+      return { x: (e.clientX - rect.left) * (CW / rect.width), y: (e.clientY - rect.top) * (CH / rect.height) };
+    }
+    function hitTest(x, y) {
+      const pts = curves[channel.value];
+      let best = -1, bestD = HIT_R;
+      pts.forEach(([px, py], i) => {
+        const d = Math.hypot(toCX(px) - x, toCY(py) - y);
+        if (d <= bestD) {
+          best = i;
+          bestD = d;
+        }
+      });
+      return best;
+    }
+    const fmt = (v) => Math.round(v * 255);
+    function updateReadout(x) {
+      const idx = dragIdx >= 0 ? dragIdx : hoverIdx;
+      const nx = idx >= 0 && !pendingDelete ? curves[channel.value][idx][0] : rawNX(x);
+      if (nx < 0 || nx > 1) {
+        readout.value = "";
+        return;
+      }
+      const lut = curveLut(activePts(), 256);
+      readout.value = `In ${fmt(nx)} → Out ${fmt(lut[fmt(nx)])}`;
+    }
+    function onDown(e) {
+      var _a;
+      const { x, y } = toLogical(e);
+      const pts = curves[channel.value];
+      let idx = hitTest(x, y);
+      if (e.button === 2) {
+        if (idx > 0 && idx < pts.length - 1) {
+          pts.splice(idx, 1);
+          hoverIdx = -1;
+          commit();
+        }
+        return;
+      }
+      if (e.button !== 0) return;
+      if (idx < 0) {
+        const nx = clamp012(rawNX(x)), ny = clamp012(rawNY(y));
+        let at2 = pts.findIndex((p2) => p2[0] > nx);
+        if (at2 <= 0) return;
+        if (nx - pts[at2 - 1][0] < MIN_GAP || pts[at2][0] - nx < MIN_GAP) return;
+        pts.splice(at2, 0, [nx, ny]);
+        idx = at2;
+        dragOffX = dragOffY = 0;
+      } else {
+        dragOffX = pts[idx][0] - rawNX(x);
+        dragOffY = pts[idx][1] - rawNY(y);
+      }
+      dragIdx = idx;
+      pendingDelete = false;
+      virtX = x;
+      virtY = y;
+      lastCX = x;
+      lastCY = y;
+      (_a = canvas.value) == null ? void 0 : _a.setPointerCapture(e.pointerId);
+      cursor.value = "grabbing";
+      updateReadout(x);
+      redrawAll();
+    }
+    function onMove(e) {
+      const { x, y } = toLogical(e);
+      if (dragIdx < 0) {
+        const h = hitTest(x, y);
+        if (h !== hoverIdx) {
+          hoverIdx = h;
+          redrawCurve();
+        }
+        cursor.value = h >= 0 ? "grab" : "crosshair";
+        updateReadout(x);
+        return;
+      }
+      const gain = e.shiftKey ? FINE_GAIN$1 : 1;
+      virtX += (x - lastCX) * gain;
+      virtY += (y - lastCY) * gain;
+      lastCX = x;
+      lastCY = y;
+      const pts = curves[channel.value];
+      const last = pts.length - 1;
+      const interior = dragIdx > 0 && dragIdx < last;
+      pendingDelete = interior && (virtY < PAD$1 - DELETE_OUT || virtY > PAD$1 + IH + DELETE_OUT || virtX < PAD$1 - DELETE_OUT || virtX > PAD$1 + IW + DELETE_OUT);
+      const lo = dragIdx > 0 ? pts[dragIdx - 1][0] + MIN_GAP : 0;
+      const hi = dragIdx < last ? pts[dragIdx + 1][0] - MIN_GAP : 1;
+      pts[dragIdx][0] = Math.max(lo, Math.min(hi, rawNX(virtX) + dragOffX));
+      pts[dragIdx][1] = clamp012(rawNY(virtY) + dragOffY);
+      updateReadout(x);
+      redrawAll();
+    }
+    function onUp(e) {
+      var _a, _b;
+      if (dragIdx < 0) return;
+      if (pendingDelete) curves[channel.value].splice(dragIdx, 1);
+      dragIdx = -1;
+      pendingDelete = false;
+      (_b = (_a = canvas.value) == null ? void 0 : _a.releasePointerCapture) == null ? void 0 : _b.call(_a, e.pointerId);
+      cursor.value = "crosshair";
+      commit();
+    }
+    function onDblClick(e) {
+      const rect = canvas.value.getBoundingClientRect();
+      const idx = hitTest((e.clientX - rect.left) * (CW / rect.width), (e.clientY - rect.top) * (CH / rect.height));
+      const pts = curves[channel.value];
+      if (idx <= 0 || idx >= pts.length - 1) return;
+      const p2 = pts[idx];
+      if (p2[2]) p2.length = 2;
+      else p2[2] = 1;
+      commit();
+    }
+    function onLeave() {
+      if (dragIdx >= 0) return;
+      hoverIdx = -1;
+      readout.value = "";
+      redrawCurve();
+    }
+    function setChannel(c) {
+      channel.value = c;
+      hoverIdx = -1;
+      redrawCurve();
+    }
+    function resetChannel() {
+      curves[channel.value] = identity();
+      commit();
+    }
+    function resetAll() {
+      for (const c of CHANNELS) curves[c] = identity();
+      commit();
+    }
+    function forceResize() {
+      return syncCanvasSize();
+    }
+    function cleanup() {
+      ro == null ? void 0 : ro.disconnect();
+    }
+    onMounted(() => {
+      ro = new ResizeObserver(() => syncCanvasSize());
+      if (canvas.value) ro.observe(canvas.value);
+      if (preview.value) ro.observe(preview.value);
+      syncCanvasSize();
+    });
+    onBeforeUnmount(cleanup);
+    __expose({ serialise: serialise2, deserialise: deserialise2, refreshExternal, setSentImage, forceResize, cleanup });
+    return (_ctx, _cache) => {
+      return openBlock(), createElementBlock("div", {
+        class: "nkd-root",
+        onPointerdown: _cache[0] || (_cache[0] = withModifiers(() => {
+        }, ["stop"])),
+        onMousedown: _cache[1] || (_cache[1] = withModifiers(() => {
+        }, ["stop"])),
+        onMouseup: _cache[2] || (_cache[2] = withModifiers(() => {
+        }, ["stop"])),
+        onMousemove: _cache[3] || (_cache[3] = withModifiers(() => {
+        }, ["stop"])),
+        onContextmenu: _cache[4] || (_cache[4] = withModifiers(() => {
+        }, ["prevent"]))
+      }, [
+        createBaseVNode("canvas", {
+          ref_key: "preview",
+          ref: preview,
+          class: "nkd-preview",
+          style: normalizeStyle({ aspectRatio: previewAspect.value })
+        }, null, 4),
+        createBaseVNode("canvas", {
+          ref_key: "canvas",
+          ref: canvas,
+          class: "nkd-canvas",
+          style: normalizeStyle({ cursor: cursor.value }),
+          onPointerdown: withModifiers(onDown, ["stop", "prevent"]),
+          onDblclick: withModifiers(onDblClick, ["stop", "prevent"]),
+          onPointermove: withModifiers(onMove, ["stop"]),
+          onPointerup: withModifiers(onUp, ["stop"]),
+          onPointercancel: withModifiers(onUp, ["stop"]),
+          onPointerleave: withModifiers(onLeave, ["stop"])
+        }, null, 36),
+        createBaseVNode("div", _hoisted_1, [
+          createBaseVNode("div", _hoisted_2, [
+            (openBlock(), createElementBlock(Fragment, null, renderList(CHANNELS, (c) => {
+              return createBaseVNode("button", {
+                key: c,
+                class: normalizeClass(["nkd-btn nkd-btn--ch", { "nkd-btn--on": channel.value === c }]),
+                style: normalizeStyle(channel.value === c ? { borderColor: CH_COLOR[c], color: CH_COLOR[c] } : {}),
+                onClick: withModifiers(($event) => setChannel(c), ["stop"])
+              }, toDisplayString(c.toUpperCase()), 15, _hoisted_3);
+            }), 64)),
+            _cache[5] || (_cache[5] = createBaseVNode("span", { class: "nkd-spacer" }, null, -1)),
+            createBaseVNode("button", {
+              class: "nkd-btn",
+              title: "Reset this channel",
+              onClick: withModifiers(resetChannel, ["stop"])
+            }, "Reset"),
+            createBaseVNode("button", {
+              class: "nkd-btn",
+              title: "Reset every channel",
+              onClick: withModifiers(resetAll, ["stop"])
+            }, "All")
+          ]),
+          createBaseVNode("div", _hoisted_4, [
+            readout.value ? (openBlock(), createElementBlock("span", _hoisted_5, toDisplayString(readout.value), 1)) : maskNote.value ? (openBlock(), createElementBlock("span", _hoisted_6, toDisplayString(maskNote.value), 1)) : (openBlock(), createElementBlock("span", _hoisted_7, "Click: add · Double-click: corner · Shift: fine · Right-click: delete"))
+          ])
+        ])
+      ], 32);
+    };
+  }
+});
+const CurvesWidget = /* @__PURE__ */ _export_sfc(_sfc_main, [["__scopeId", "data-v-e1c1838f"]]);
 const _M1 = [
   [0.4122214708, 0.5363325363, 0.0514459929],
   [0.2119034982, 0.6806995451, 0.1073969566],
@@ -19769,7 +20461,8 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDLoraControl: 1,
   NKDResolutionSelector: 1,
   NKDAlphaMatte: 1,
-  NKDMerge: 1
+  NKDMerge: 1,
+  NKDCurves: 1
 });
 registerCrop();
 registerMerge();
@@ -20142,7 +20835,11 @@ app.registerExtension({
         getInvert,
         getStrength,
         getSourceImg: () => findSourceImg(this),
-        getMaskImg: () => findSourceImg(this, "mask")
+        getMaskImg: () => findSourceImg(this, "mask"),
+        hasMask: () => {
+          var _a, _b;
+          return ((_b = (_a = this.inputs) == null ? void 0 : _a.find((i) => i.name === "mask")) == null ? void 0 : _b.link) != null;
+        }
       });
       instance = vueApp.mount(container);
       const domWidget = this.addDOMWidget("gradmap_preview", "NKD_GRADIENT_MAP_PREVIEW", container, {
@@ -20178,10 +20875,8 @@ app.registerExtension({
         const d = e == null ? void 0 : e.detail;
         if (!d || String(d.node_id) !== String(node.id)) return;
         try {
-          const bin = atob(d.img);
-          const bytes = new Uint8Array(bin.length);
-          for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-          (_a = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a.call(instance, bytes, d.width, d.height);
+          const bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          (_a = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a.call(instance, bytes(d.img), d.width, d.height, d.mask ? bytes(d.mask) : null);
         } catch {
         }
       };
@@ -20492,6 +21187,104 @@ app.registerExtension({
       const origRemoved = this.onRemoved;
       this.onRemoved = function() {
         var _a2;
+        ro.disconnect();
+        (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
+        vueApp.unmount();
+        origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+      };
+      return result;
+    };
+  }
+});
+const CURVES_MIN_W = 320;
+app.registerExtension({
+  name: "NKD.BasicTools.Curves.Vue",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    if (nodeData.name !== "NKDCurves") return;
+    if (nodeType.prototype.__nkdWrapped) return;
+    nodeType.prototype.__nkdWrapped = true;
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      var _a;
+      const result = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      const curvesWidget = (_a = this.widgets) == null ? void 0 : _a.find((w) => w.name === "curves");
+      if (!curvesWidget) return result;
+      curvesWidget.type = "hidden";
+      curvesWidget.hidden = true;
+      if (curvesWidget.options) curvesWidget.options.hidden = true;
+      curvesWidget.computedHeight = 0;
+      curvesWidget.computeSize = () => [0, -4];
+      const container = document.createElement("div");
+      let instance = null;
+      const vueApp = createApp(CurvesWidget, {
+        onChange: (json) => {
+          if (curvesWidget.value !== json) curvesWidget.value = json;
+        },
+        getSourceImg: () => findSourceImg(this),
+        getMaskImg: () => findSourceImg(this, "mask"),
+        hasMask: () => {
+          var _a2, _b;
+          return ((_b = (_a2 = this.inputs) == null ? void 0 : _a2.find((i) => i.name === "mask")) == null ? void 0 : _b.link) != null;
+        }
+      });
+      instance = vueApp.mount(container);
+      const domWidget = this.addDOMWidget("curves_editor", "NKD_CURVES_EDITOR", container, {
+        getValue: () => curvesWidget.value,
+        setValue: (v) => {
+          curvesWidget.value = v;
+          instance == null ? void 0 : instance.deserialise(v ?? "");
+        },
+        serialize: false,
+        hideOnZoom: false
+      });
+      const ro = sizeDomWidgetToContent(
+        this,
+        domWidget,
+        container,
+        CURVES_MIN_W,
+        (w) => Math.round(w * (10 / 16) + w * (240 / 320)) + 56
+      );
+      const origResize = this.onResize;
+      this.onResize = function(size) {
+        origResize == null ? void 0 : origResize.apply(this, arguments);
+        if (size[0] < CURVES_MIN_W) size[0] = CURVES_MIN_W;
+      };
+      const refreshTimer = window.setInterval(() => {
+        var _a2;
+        return (_a2 = instance == null ? void 0 : instance.refreshExternal) == null ? void 0 : _a2.call(instance);
+      }, 300);
+      requestAnimationFrame(() => {
+        var _a2;
+        instance == null ? void 0 : instance.deserialise(curvesWidget.value ?? "");
+        (_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance);
+      });
+      const node = this;
+      const onSource = (e) => {
+        var _a2;
+        const d = e == null ? void 0 : e.detail;
+        if (!d || String(d.node_id) !== String(node.id)) return;
+        try {
+          const bytes = (b64) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+          (_a2 = instance == null ? void 0 : instance.setSentImage) == null ? void 0 : _a2.call(instance, bytes(d.img), d.width, d.height, d.mask ? bytes(d.mask) : null);
+        } catch {
+        }
+      };
+      api.addEventListener("nkd-curves-source", onSource);
+      const origConfigure = this.onConfigure;
+      this.onConfigure = function() {
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        requestAnimationFrame(() => {
+          var _a2;
+          instance == null ? void 0 : instance.deserialise(curvesWidget.value ?? "");
+          (_a2 = instance == null ? void 0 : instance.forceResize) == null ? void 0 : _a2.call(instance);
+        });
+        return r;
+      };
+      const origRemoved = this.onRemoved;
+      this.onRemoved = function() {
+        var _a2;
+        window.clearInterval(refreshTimer);
+        api.removeEventListener("nkd-curves-source", onSource);
         ro.disconnect();
         (_a2 = instance == null ? void 0 : instance.cleanup) == null ? void 0 : _a2.call(instance);
         vueApp.unmount();
@@ -21089,7 +21882,7 @@ console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DE
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-58f2854d] {\r\n  position: relative;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  box-sizing: border-box;\r\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-58f2854d] {\r\n  height: 150px;\r\n  min-height: 90px;\r\n  overflow-y: auto;\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  padding: 6px 8px;\r\n  color: #c8d0e0;\r\n  font-size: 11.5px;\r\n  line-height: 1.55;\r\n  white-space: pre-wrap;\r\n  word-break: break-word;\r\n  outline: none;\n}\n.nkd-pv-editor[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-58f2854d]:empty::before {\r\n  content: attr(data-placeholder);\r\n  color: rgba(255, 255, 255, 0.22);\r\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  padding: 2px 8px;\r\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-58f2854d]:hover {\r\n  border-color: #4ab4ff;\r\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-58f2854d] {\r\n  color: #4ab4ff;\n}\n.nkd-pv-lib-toggle[data-v-58f2854d] {\r\n  margin-left: auto;\n}\n.nkd-pv-lib-toggle.active[data-v-58f2854d],\r\n.nkd-pv-lib-toggle[data-v-58f2854d]:hover {\r\n  border-color: #b48cff;\r\n  color: #d6c2ff;\n}\n.nkd-pv-lib[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 10px;\r\n  flex: 1 1 auto;\r\n  min-width: 0;\r\n  overflow-y: auto;\r\n  padding: 14px;\r\n  box-sizing: border-box;\n}\n.nkd-pv-lib-row[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 3px;\n}\n.nkd-pv-lib-head[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\n}\n.nkd-pv-lib-at[data-v-58f2854d] {\r\n  color: #b48cff;\r\n  font-size: 11px;\r\n  font-weight: 600;\n}\n.nkd-pv-lib-name[data-v-58f2854d],\r\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 12px;\r\n  font-family: inherit;\r\n  padding: 4px 8px;\r\n  outline: none;\n}\n.nkd-pv-lib-name[data-v-58f2854d] {\r\n  flex: 1 1 auto;\r\n  min-width: 0;\n}\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  resize: vertical;\r\n  min-height: 34px;\r\n  line-height: 1.45;\n}\n.nkd-pv-lib-name[data-v-58f2854d]:focus,\r\n.nkd-pv-lib-value[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-lib-name.nkd-pv-lib-bad[data-v-58f2854d] {\r\n  border-color: #ff5c5c;\n}\n.nkd-pv-lib-empty[data-v-58f2854d] {\r\n  color: rgba(255, 255, 255, 0.4);\r\n  font-size: 12px;\n}\n.nkd-pv-ac[data-v-58f2854d] {\r\n  position: absolute;\r\n  z-index: 100;\r\n  background: #1e2028;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 5px;\r\n  padding: 3px;\r\n  min-width: 120px;\r\n  max-height: 160px;\r\n  overflow-y: auto;\r\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 4px 8px;\r\n  border-radius: 3px;\r\n  font-size: 11px;\r\n  color: #c8d0e0;\r\n  cursor: pointer;\r\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-58f2854d]:hover,\r\n.nkd-pv-ac-item.active[data-v-58f2854d] {\r\n  background: rgba(74, 180, 255, 0.18);\r\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-58f2854d] {\r\n  background: transparent !important;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\r\n\n.nkd-pv-chip {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  gap: 5px;\r\n  background: rgba(74, 180, 255, 0.14);\r\n  border: 1px solid rgba(74, 180, 255, 0.75);\r\n  color: #bfe3ff;\r\n  border-radius: 999px;\r\n  padding: 0 9px 0 7px;\r\n  margin: 0 2px;\r\n  font-size: 10px;\r\n  font-weight: 600;\r\n  letter-spacing: 0.2px;\r\n  line-height: 15px;\r\n  vertical-align: text-bottom;\r\n  user-select: none;\r\n  cursor: grab;\r\n  white-space: nowrap;\r\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\r\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\r\n.nkd-pv-chip *::selection {\r\n  background: transparent;\n}\n.nkd-pv-dot {\r\n  width: 6px;\r\n  height: 6px;\r\n  border-radius: 50%;\r\n  background: #4ab4ff;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-saved {\r\n  border-color: rgba(180, 140, 255, 0.8);\r\n  color: #e0d2ff;\r\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pv-chip-saved .nkd-pv-dot {\r\n  background: #b48cff;\n}\n.nkd-pv-chip-off {\r\n  border-style: dashed;\r\n  border-color: rgba(255, 255, 255, 0.32);\r\n  color: rgba(255, 255, 255, 0.5);\r\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\r\n  border-color: rgba(255, 209, 102, 0.85);\r\n  color: #ffe3a8;\r\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\r\n  content: "🎲";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\r\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\r\n  border-color: rgba(102, 224, 170, 0.85);\r\n  color: #b6f2d8;\r\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\r\n  content: "🔁";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\r\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\r\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-aa41997d] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-aa41997d], .nkd-root[data-v-aa41997d] *, .nkd-root[data-v-aa41997d] *::before, .nkd-root[data-v-aa41997d] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-aa41997d] {\n  width: 100%;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-aa41997d] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-aa41997d] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-aa41997d] { padding: 5px 8px;\n}\n.nkd-hint[data-v-aa41997d] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n}\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-58f2854d] {\r\n  position: relative;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  box-sizing: border-box;\r\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-58f2854d] {\r\n  height: 150px;\r\n  min-height: 90px;\r\n  overflow-y: auto;\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  padding: 6px 8px;\r\n  color: #c8d0e0;\r\n  font-size: 11.5px;\r\n  line-height: 1.55;\r\n  white-space: pre-wrap;\r\n  word-break: break-word;\r\n  outline: none;\n}\n.nkd-pv-editor[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-58f2854d]:empty::before {\r\n  content: attr(data-placeholder);\r\n  color: rgba(255, 255, 255, 0.22);\r\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  padding: 2px 8px;\r\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-58f2854d]:hover {\r\n  border-color: #4ab4ff;\r\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-58f2854d] {\r\n  color: #4ab4ff;\n}\n.nkd-pv-lib-toggle[data-v-58f2854d] {\r\n  margin-left: auto;\n}\n.nkd-pv-lib-toggle.active[data-v-58f2854d],\r\n.nkd-pv-lib-toggle[data-v-58f2854d]:hover {\r\n  border-color: #b48cff;\r\n  color: #d6c2ff;\n}\n.nkd-pv-lib[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 10px;\r\n  flex: 1 1 auto;\r\n  min-width: 0;\r\n  overflow-y: auto;\r\n  padding: 14px;\r\n  box-sizing: border-box;\n}\n.nkd-pv-lib-row[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 3px;\n}\n.nkd-pv-lib-head[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\n}\n.nkd-pv-lib-at[data-v-58f2854d] {\r\n  color: #b48cff;\r\n  font-size: 11px;\r\n  font-weight: 600;\n}\n.nkd-pv-lib-name[data-v-58f2854d],\r\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 12px;\r\n  font-family: inherit;\r\n  padding: 4px 8px;\r\n  outline: none;\n}\n.nkd-pv-lib-name[data-v-58f2854d] {\r\n  flex: 1 1 auto;\r\n  min-width: 0;\n}\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  resize: vertical;\r\n  min-height: 34px;\r\n  line-height: 1.45;\n}\n.nkd-pv-lib-name[data-v-58f2854d]:focus,\r\n.nkd-pv-lib-value[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-lib-name.nkd-pv-lib-bad[data-v-58f2854d] {\r\n  border-color: #ff5c5c;\n}\n.nkd-pv-lib-empty[data-v-58f2854d] {\r\n  color: rgba(255, 255, 255, 0.4);\r\n  font-size: 12px;\n}\n.nkd-pv-ac[data-v-58f2854d] {\r\n  position: absolute;\r\n  z-index: 100;\r\n  background: #1e2028;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 5px;\r\n  padding: 3px;\r\n  min-width: 120px;\r\n  max-height: 160px;\r\n  overflow-y: auto;\r\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 4px 8px;\r\n  border-radius: 3px;\r\n  font-size: 11px;\r\n  color: #c8d0e0;\r\n  cursor: pointer;\r\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-58f2854d]:hover,\r\n.nkd-pv-ac-item.active[data-v-58f2854d] {\r\n  background: rgba(74, 180, 255, 0.18);\r\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-58f2854d] {\r\n  background: transparent !important;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\r\n\n.nkd-pv-chip {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  gap: 5px;\r\n  background: rgba(74, 180, 255, 0.14);\r\n  border: 1px solid rgba(74, 180, 255, 0.75);\r\n  color: #bfe3ff;\r\n  border-radius: 999px;\r\n  padding: 0 9px 0 7px;\r\n  margin: 0 2px;\r\n  font-size: 10px;\r\n  font-weight: 600;\r\n  letter-spacing: 0.2px;\r\n  line-height: 15px;\r\n  vertical-align: text-bottom;\r\n  user-select: none;\r\n  cursor: grab;\r\n  white-space: nowrap;\r\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\r\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\r\n.nkd-pv-chip *::selection {\r\n  background: transparent;\n}\n.nkd-pv-dot {\r\n  width: 6px;\r\n  height: 6px;\r\n  border-radius: 50%;\r\n  background: #4ab4ff;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-saved {\r\n  border-color: rgba(180, 140, 255, 0.8);\r\n  color: #e0d2ff;\r\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pv-chip-saved .nkd-pv-dot {\r\n  background: #b48cff;\n}\n.nkd-pv-chip-off {\r\n  border-style: dashed;\r\n  border-color: rgba(255, 255, 255, 0.32);\r\n  color: rgba(255, 255, 255, 0.5);\r\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\r\n  border-color: rgba(255, 209, 102, 0.85);\r\n  color: #ffe3a8;\r\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\r\n  content: "🎲";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\r\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\r\n  border-color: rgba(102, 224, 170, 0.85);\r\n  color: #b6f2d8;\r\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\r\n  content: "🔁";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\r\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\r\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-e1c1838f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-e1c1838f], .nkd-root[data-v-e1c1838f] *, .nkd-root[data-v-e1c1838f] *::before, .nkd-root[data-v-e1c1838f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-e1c1838f] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-e1c1838f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-e1c1838f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-e1c1838f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-e1c1838f] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-e1c1838f] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-e1c1838f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-e1c1838f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-e1c1838f] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-e1c1838f] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-e1c1838f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-e1c1838f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-e1c1838f] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

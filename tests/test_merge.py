@@ -22,9 +22,11 @@ from nkdbt.nkd_merge import NKDMerge, parse_transform  # noqa: E402
 RED = torch.tensor([1.0, 0.0, 0.0])
 
 
-def _merge(bg, fg, fit="fit", opacity=1.0, blend_mode="normal", alpha=None, **t):
+def _merge(bg, fg, fit="fit", opacity=1.0, blend_mode="normal", alpha=None,
+           invert_alpha=False, **t):
     tr = json.dumps({"x": 0.5, "y": 0.5, "scale": 1.0, "angle": 0.0, **t})
-    r = NKDMerge.execute(bg, fg, fit, opacity, blend_mode, tr, alpha=alpha).result
+    r = NKDMerge.execute(bg, fg, fit, opacity, blend_mode, tr, alpha=alpha,
+                         invert_alpha=invert_alpha).result
     return r[0], r[1]
 
 
@@ -109,6 +111,18 @@ def test_alpha_input():
     out, mask = _merge(bg, torch.ones(1, 10, 10, 3), alpha=alpha)
     assert out[0, 0, 0, 0] > 0.99 and out[0, 0, 8, 0] < 0.01
     assert torch.allclose(mask[0], alpha[0], atol=1e-3)
+
+
+def test_invert_alpha():
+    bg = torch.zeros(1, 10, 10, 3)
+    alpha = torch.zeros(1, 10, 10)
+    alpha[:, :, :5] = 1.0
+    out, mask = _merge(bg, torch.ones(1, 10, 10, 3), alpha=alpha, invert_alpha=True)
+    assert out[0, 0, 0, 0] < 0.01 and out[0, 0, 8, 0] > 0.99
+    assert torch.allclose(mask[0], 1 - alpha[0], atol=1e-3)
+    # the foreground's own alpha flips too
+    out, _ = _merge(bg, _fg(a=0.0), invert_alpha=True)
+    assert _red(out[0, 5, 5])
 
 
 def test_rgba_background_and_blend():
