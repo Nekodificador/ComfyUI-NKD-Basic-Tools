@@ -56,6 +56,46 @@ def _map_frames(fn, x: torch.Tensor) -> torch.Tensor:
     return torch.cat([fn(x[i:i + step]) for i in range(0, x.shape[0], step)], dim=0)
 
 
+def _frame_stage(fn, x: torch.Tensor, work_device: torch.device,
+                 out_device: torch.device, out_dtype: torch.dtype) -> torch.Tensor:
+    """Run a frame-local pipeline without keeping its full batch on the GPU."""
+    per_frame = x.shape[-1] * x.shape[-2]
+    step = max(1, _CHUNK_PIXELS // max(1, per_frame))
+    out = torch.empty(x.shape, device=out_device, dtype=out_dtype)
+    for start in range(0, x.shape[0], step):
+        end = min(start + step, x.shape[0])
+        chunk = x[start:end].to(device=work_device, dtype=torch.float32).unsqueeze(1)
+        out[start:end].copy_(fn(chunk).squeeze(1).to(device=out_device, dtype=out_dtype))
+    return out
+
+
+def _temporal_stage(x: torch.Tensor, frames: int, op: str,
+                    work_device: torch.device) -> torch.Tensor:
+    """Temporal pooling in overlapped chunks, with the result staged on CPU."""
+    if frames <= 0 or x.shape[0] < 2:
+        return x
+    per_frame = x.shape[-1] * x.shape[-2]
+    step = max(1, _CHUNK_PIXELS // max(1, per_frame))
+    out = torch.empty(x.shape, device="cpu", dtype=torch.float32)
+    k = 2 * frames + 1
+    for start in range(0, x.shape[0], step):
+        end = min(start + step, x.shape[0])
+        source_start = max(0, start - frames)
+        source_end = min(x.shape[0], end + frames)
+        t = x[source_start:source_end].to(device=work_device, dtype=torch.float32)
+        t = t.reshape(1, 1, t.shape[0], -1)
+        before = max(0, frames - start)
+        after = max(0, end + frames - x.shape[0])
+        if before or after:
+            t = F.pad(t, (0, 0, before, after), mode="replicate")
+        if op == "max":
+            t = F.max_pool2d(t, (k, 1), stride=1)
+        else:
+            t = F.avg_pool2d(t, (k, 1), stride=1)
+        out[start:end].copy_(t.reshape(end - start, *x.shape[-2:]).cpu())
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Primitives — [B, 1, H, W]
 # ---------------------------------------------------------------------------
@@ -529,6 +569,53 @@ def latent_grid(vae, frames: int):
 # Pipeline
 # ---------------------------------------------------------------------------
 
+def _process_streamed(mask: torch.Tensor, device: torch.device, *,
+                      invert: bool, black_point: float, white_point: float,
+                      despeckle_px: int, fill: bool, close_px: int,
+                      temporal_expand_frames: int, temporal_smooth_frames: int,
+                      expand_px: int, blockify_px: int, blockify_threshold: float,
+                      time_groups: "torch.Tensor | None", feather_px: int,
+                      edge_low: float, edge_high: float) -> torch.Tensor:
+    src_device, src_dtype = mask.device, mask.dtype
+
+    def clean(x):
+        if invert:
+            x = 1.0 - x
+        x = levels(x, black_point, white_point)
+        x = despeckle(x, despeckle_px)
+        if fill:
+            x = fill_holes(x)
+        return close_gaps(x, close_px)
+
+    def shape(x):
+        x = expand(x, expand_px)
+        return blockify(x, blockify_px, blockify_threshold)
+
+    def soften(x):
+        x = blur(x, feather_px)
+        return edge_range(x.clamp(0.0, 1.0), edge_low, edge_high)
+
+    has_temporal = temporal_expand_frames > 0 or temporal_smooth_frames > 0
+    if not has_temporal and time_groups is None:
+        return _frame_stage(lambda x: soften(shape(clean(x))), mask, device,
+                            src_device, src_dtype)
+
+    if has_temporal:
+        x = _frame_stage(clean, mask, device, torch.device("cpu"), torch.float32)
+        x = _temporal_stage(x, temporal_expand_frames, "max", device)
+        x = _temporal_stage(x, temporal_smooth_frames, "mean", device)
+        if time_groups is None:
+            return _frame_stage(lambda t: soften(shape(t)), x, device,
+                                src_device, src_dtype)
+        x = _frame_stage(shape, x, device, torch.device("cpu"), torch.float32)
+    else:
+        x = _frame_stage(lambda t: shape(clean(t)), mask, device,
+                         torch.device("cpu"), torch.float32)
+
+    x = blockify_time(x, time_groups)
+    return _frame_stage(soften, x, device, src_device, src_dtype)
+
+
 def process(mask: torch.Tensor, *, invert: bool = False,
             black_point: float = 0.0, white_point: float = 1.0,
             despeckle_px: int = 0, fill: bool = False, close_px: int = 0,
@@ -551,6 +638,25 @@ def process(mask: torch.Tensor, *, invert: bool = False,
     src_device, src_dtype = mask.device, mask.dtype
 
     def run(device):
+        if mask.numel() > _CHUNK_PIXELS:
+            return _process_streamed(
+                mask, device,
+                invert=invert,
+                black_point=black_point,
+                white_point=white_point,
+                despeckle_px=despeckle_px,
+                fill=fill,
+                close_px=close_px,
+                temporal_expand_frames=temporal_expand_frames,
+                temporal_smooth_frames=temporal_smooth_frames,
+                expand_px=expand_px,
+                blockify_px=blockify_px,
+                blockify_threshold=blockify_threshold,
+                time_groups=time_groups,
+                feather_px=feather_px,
+                edge_low=edge_low,
+                edge_high=edge_high,
+            )
         x = mask.to(device=device, dtype=torch.float32).unsqueeze(1)
         if invert:
             x = 1.0 - x
