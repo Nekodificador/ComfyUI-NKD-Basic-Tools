@@ -847,37 +847,105 @@ def _uncrop(
     x1, y1, x2, y2 = crop_box
     crop_h, crop_w = y2 - y1, x2 - x1
 
-    # Fast path: when the patch already matches the crop_box dimensions (crop
-    # took the bbox 1:1 with no resample), skip the resize entirely. This is what
-    # eliminates the sub-pixel "bevel" on the composite — the patch's pixel grid
-    # is 1:1 with the source region.
+    # Fast path: when the patch already matches the crop_box dimensions
+    # (crop took the bbox 1:1 with no resample), skip the resize entirely.
     if patch.shape[1] == crop_h and patch.shape[2] == crop_w:
         patch_resized = patch
     else:
         patch_resized = _resize_auto(patch, crop_w, crop_h)
+
     bg = background.clone()
 
+    # ------------------------------------------------------------------
+    # Channel handling
+    #
+    # ComfyUI IMAGE is normally RGB [B,H,W,3], but some upstream nodes
+    # can produce RGBA [B,H,W,4]. Stitch must keep the channel count of
+    # the original background.
+    #
+    # If the patch has an alpha channel but the background does not,
+    # the alpha channel is NOT treated as an additional image channel.
+    # The actual stitch alpha remains controlled by the processed mask.
+    # ------------------------------------------------------------------
+    bg_channels = bg.shape[-1]
+    patch_channels = patch_resized.shape[-1]
+
+    if bg_channels == 3 and patch_channels >= 3:
+        patch_rgb = patch_resized[..., :3]
+    elif bg_channels == 4 and patch_channels == 3:
+        # Keep the original background alpha. The generated RGB patch
+        # replaces only RGB; alpha is preserved from the background.
+        patch_rgb = patch_resized
+    elif bg_channels == 4 and patch_channels >= 4:
+        # Patch has RGBA and background has RGBA. Keep the patch's RGB
+        # and preserve the background alpha below unless an explicit
+        # image-alpha composite is ever introduced.
+        patch_rgb = patch_resized[..., :4]
+    else:
+        # Defensive fallback for unusual channel counts.
+        channels = min(bg_channels, patch_channels)
+        patch_rgb = patch_resized[..., :channels]
+
+    # ------------------------------------------------------------------
+    # Build the stitch mask.
+    # ------------------------------------------------------------------
     if mask is not None:
         m = mask if mask.dim() == 3 else mask.unsqueeze(0)
-        # The mask can arrive already region-sized (chained detail bundles) or
-        # in background coords — slice only in the latter case, and resize only
-        # if the shapes still disagree (defensive).
+
+        # The mask can arrive already region-sized (chained detail bundles)
+        # or in background coordinates — slice only in the latter case,
+        # and resize only if the shapes still disagree.
         if m.shape[1] == crop_h and m.shape[2] == crop_w:
             region_mask = m
         else:
             region_mask = m[:, y1:y2, x1:x2]
             if region_mask.shape[1] != crop_h or region_mask.shape[2] != crop_w:
                 region_mask = _resize_mask(region_mask, crop_w, crop_h)
+
         if feather > 0:
             region_mask = _mask_grow(region_mask, 0, feather)
+
         region_mask = _alpha_hardness(region_mask, hardness)
         alpha = region_mask.unsqueeze(-1)
     else:
-        region_mask = torch.ones(patch_resized.shape[0], crop_h, crop_w,
-                                 device=patch_resized.device)
+        region_mask = torch.ones(
+            patch_rgb.shape[0],
+            crop_h,
+            crop_w,
+            device=patch_rgb.device,
+            dtype=patch_rgb.dtype,
+        )
         alpha = region_mask.unsqueeze(-1)
 
-    bg[:, y1:y2, x1:x2, :] = patch_resized * alpha + bg[:, y1:y2, x1:x2, :] * (1.0 - alpha)
+    # Make sure the mask has the same dtype/device as the image tensors.
+    alpha = alpha.to(device=patch_rgb.device, dtype=patch_rgb.dtype)
+
+    bg_region = bg[:, y1:y2, x1:x2, :]
+
+    # ------------------------------------------------------------------
+    # Composite.
+    #
+    # Both sides now have exactly the same number of channels.
+    # ------------------------------------------------------------------
+    if patch_rgb.shape[-1] == bg_region.shape[-1]:
+        blended = patch_rgb * alpha + bg_region * (1.0 - alpha)
+        bg[:, y1:y2, x1:x2, :] = blended
+    elif bg_region.shape[-1] == 3 and patch_rgb.shape[-1] > 3:
+        # Should normally be unreachable because RGBA is reduced to RGB
+        # above, but keep this guard so a future channel format cannot
+        # recreate the original runtime error.
+        patch_rgb = patch_rgb[..., :3]
+        bg[:, y1:y2, x1:x2, :] = (
+            patch_rgb * alpha + bg_region * (1.0 - alpha)
+        )
+    else:
+        # Last-resort channel-safe composite.
+        channels = min(bg_region.shape[-1], patch_rgb.shape[-1])
+        bg[:, y1:y2, x1:x2, :channels] = (
+            patch_rgb[..., :channels] * alpha
+            + bg_region[..., :channels] * (1.0 - alpha)
+        )
+
     return bg, region_mask
 
 
