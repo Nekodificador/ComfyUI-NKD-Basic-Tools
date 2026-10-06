@@ -1,6 +1,6 @@
 # coding: utf-8
 """
-😺NKD Face Rig — the LivePortrait engine, on our own terms.
+рџєNKD Face Rig вЂ” the LivePortrait engine, on our own terms.
 
 The engine is self-contained: LivePortrait is MIT, so we vendor it (see
 `nkd_liveportrait/NOTICE`) and keep everything we add outside that directory.
@@ -14,16 +14,16 @@ Two deliberate departures from upstream:
   where that is won or lost: the motion extractor's keypoints change with the
   framing it sees, so a differently aligned crop gives a visibly different
   render even with identical axes. `prepare` therefore uses the ecosystem's
-  established geometry — YOLOv8 face bbox, square x crop_factor,
-  axis-aligned, `int()` truncation and all — instead of upstream's
+  established geometry вЂ” YOLOv8 face bbox, square x crop_factor,
+  axis-aligned, `int()` truncation and all вЂ” instead of upstream's
   rotation-aligned `crop_image`. InsightFace (upstream's detector) is out
   regardless: it carries a "non-commercial research purposes only" clause in
   LivePortrait's own LICENSE. When ultralytics is not installed the bbox
-  comes from the self-bootstrapping landmark walk in `locate` — close, but
+  comes from the self-bootstrapping landmark walk in `locate` вЂ” close, but
   not pixel-identical.
 * **Our own weight loader.** Upstream's `load_model` calls `torch.load`
   without `weights_only`, which breaks on torch >= 2.6. Loading is a dozen
-  lines, so we do it here rather than patch the vendor — a vendor you never
+  lines, so we do it here rather than patch the vendor вЂ” a vendor you never
   edit is a vendor you can re-download instead of merge.
 
 The split that makes the live preview possible: `PreparedSource` holds
@@ -50,7 +50,7 @@ from .nkd_liveportrait.modules.stitching_retargeting_network import StitchingRet
 from .nkd_liveportrait.modules.warping_network import WarpingNetwork
 from .nkd_liveportrait.utils.camera import get_rotation_matrix, headpose_pred_to_degree
 
-from .nkd_face_core import (  # noqa: F401 — re-exported, the routes and tests import them from here
+from .nkd_face_core import (  # noqa: F401 вЂ” re-exported, the routes and tests import them from here
     HF_REPO,
     WEIGHTS,
     FaceLandmarks,
@@ -71,7 +71,7 @@ _MASK = osp.join(_HERE, "nkd_liveportrait", "utils", "mask_template.png")
 
 
 def _load_state(path: str):
-    """`weights_only=True` first — these checkpoints are plain state dicts.
+    """`weights_only=True` first вЂ” these checkpoints are plain state dicts.
 
     The fallback is not paranoia: torch >= 2.6 flipped the default and strands
     any loader that never chose. If a checkpoint ever does carry a pickled
@@ -97,7 +97,8 @@ class PreparedSource:
     mask_ori: np.ndarray       # feathered paste-back mask, full size, float 0..1
     lmk_crop: np.ndarray       # 203 landmarks in 512-crop coordinates
     crop_factor: float
-    # False when the crop never converged — no face, or one too small to find.
+    crop_valid: tuple[float, float, float, float]
+    # False when the crop never converged вЂ” no face, or one too small to find.
     # The render still works; the rig handles are the part not to trust.
     settled: bool = True
 
@@ -118,7 +119,7 @@ class Engine:
         self.device = torch.device(device)
         # Compatibility target: fp32 weights with the big modules under an fp16
         # autocast (`flag_use_half_precision`). Casting the weights to fp16
-        # outright is faster but numerically different — parity says autocast.
+        # outright is faster but numerically different вЂ” parity says autocast.
         self.autocast = self.device.type == "cuda"
 
         download_weights()
@@ -171,29 +172,29 @@ class Engine:
 
     def locate(self, rgb: np.ndarray, crop_factor: float = 1.7, rounds: int = 5,
                box=None):
-        """The landmark walk — see `FaceLandmarks.locate`."""
+        """The landmark walk вЂ” see `FaceLandmarks.locate`."""
         return self.landmark.locate(rgb, crop_factor, rounds, box)
 
     # --- the expensive half, run once per photo --------------------------
 
     def _face_bbox(self, rgb: np.ndarray, face_index: int):
-        """((x1, y1, x2, y2), settled) — the face, in the order that keeps parity.
+        """((x1, y1, x2, y2), settled) вЂ” the face, in the order that keeps parity.
 
         The stock YOLOv8 face model first, conf 0.7, first box wins: that is
         what makes the crop math downstream see the numbers the ecosystem
         expects, and while it answers nothing else runs. YuNet is the fallback,
         for the machines without ultralytics (AGPL, so never ours to install)
-        and for the pictures YOLO comes up empty on — its box is the same kind
+        and for the pictures YOLO comes up empty on вЂ” its box is the same kind
         of thing, a tight face rectangle, so the crop behaves.
 
         Last of all the landmark walk, whose extent is not a detector box at
         all. It used to be the only fallback, and it is the one that loses a
-        face that is small in a wide picture — hence everything above it.
+        face that is small in a wide picture вЂ” hence everything above it.
         """
         boxes = yolo_boxes(rgb, 0.7) or face_boxes(rgb, second_opinion=False)
         if face_index >= max(len(boxes), 1):
             raise RuntimeError(
-                "😺NKD Face Rig: asked for face %d but only %d %s found."
+                "рџєNKD Face Rig: asked for face %d but only %d %s found."
                 % (face_index, len(boxes) or 1, "was" if len(boxes) <= 1 else "were"))
         if boxes:
             return boxes[face_index], True
@@ -214,14 +215,41 @@ class Engine:
         """
         h, w = rgb.shape[:2]
         (x1, y1, x2, y2), settled = self._face_bbox(rgb, face_index)
+
         bw, bh = x2 - x1, y2 - y1
         side = max(bw, bh) * crop_factor
         cx, cy = x1 + bw / 2, y1 + bh / 2
-        square = [int(cx - side / 2), int(cy - side / 2),
-                  int(cx + side / 2), int(cy + side / 2)]
-        region = [max(square[0], 0), max(square[1], 0),
-                  min(square[2], w), min(square[3], h)]
+
+        square = [
+            int(cx - side / 2),
+            int(cy - side / 2),
+            int(cx + side / 2),
+            int(cy + side / 2)
+        ]
+
+        region = [
+            max(square[0], 0),
+            max(square[1], 0),
+            min(square[2], w),
+            min(square[3], h)
+        ]
+
         changed = region != square
+
+        square_w = square[2] - square[0]
+        square_h = square[3] - square[1]
+
+        valid_x0 = region[0] - square[0]
+        valid_y0 = region[1] - square[1]
+        valid_x1 = valid_x0 + (region[2] - region[0])
+        valid_y1 = valid_y0 + (region[3] - region[1])
+
+        crop_valid = (
+            valid_x0 * 512.0 / square_w,
+            valid_y0 * 512.0 / square_h,
+            valid_x1 * 512.0 / square_w,
+            valid_y1 * 512.0 / square_h,
+        )
 
         face_img = rgb[region[1]:region[3], region[0]:region[2]]
         if changed:
@@ -230,17 +258,33 @@ class Engine:
                                       (square[2] - square[0], square[3] - square[1]),
                                       cv2.INTER_LINEAR)
 
-        s_x = (region[2] - region[0]) / 512.0
-        s_y = (region[3] - region[1]) / 512.0
-        mask_m = np.float32([[s_x, 0, square[0]], [0, s_y, square[1]]])
+        # ------------------------------------------------------------
+        # Paste-back geometry
+        #
+        # The model always renders a 512x512 virtual square.
+        # Therefore both the generated image and its mask must use
+        # exactly the same transform from that virtual square back
+        # into the original image.
+        # ------------------------------------------------------------
+
+        s = (square[2] - square[0]) / 512.0
+
+        crop_trans_m = np.float32([
+            [s, 0, square[0]],
+            [0, s, square[1]]
+        ])
+
+        # Same geometry for the paste mask.
+        mask_m = crop_trans_m.copy()
+
         mask = cv2.imread(_MASK, cv2.IMREAD_COLOR)
-        mask_ori = cv2.warpAffine(mask, mask_m, (w, h),
-                                  cv2.INTER_LINEAR).astype(np.float32) / 255.0
-        if changed:
-            s = (square[2] - square[0]) / 512.0
-            crop_trans_m = np.float32([[s, 0, square[0]], [0, s, square[1]]])
-        else:
-            crop_trans_m = mask_m
+
+        mask_ori = cv2.warpAffine(
+            mask,
+            mask_m,
+            (w, h),
+            flags=cv2.INTER_LINEAR
+        ).astype(np.float32) / 255.0
 
         inp = np.clip(cv2.resize(face_img, (256, 256),
                                  interpolation=cv2.INTER_LINEAR)[np.newaxis]
@@ -257,6 +301,7 @@ class Engine:
         x_s = transform_keypoint(kp_info).to(self.device)
 
         crop_512 = cv2.resize(face_img, (512, 512), interpolation=cv2.INTER_LINEAR)
+
         # Two passes: the first guesses on the bare square (it is square, so no
         # letterboxing needed), the second refines seeded by the first. This is
         # what the rig handles hang from, measured on the crop itself so they
@@ -264,9 +309,17 @@ class Engine:
         lmk = self.landmark.run(crop_512, self.landmark.run(crop_512))
 
         return PreparedSource(
-            rgb=rgb, crop_512=crop_512, f_s=f_s, x_s=x_s, kp_info=kp_info,
-            crop_trans_m=crop_trans_m, mask_ori=mask_ori,
-            lmk_crop=lmk, crop_factor=crop_factor, settled=settled,
+            rgb=rgb,
+            crop_512=crop_512,
+            f_s=f_s,
+            x_s=x_s,
+            kp_info=kp_info,
+            crop_trans_m=crop_trans_m,
+            mask_ori=mask_ori,
+            lmk_crop=lmk,
+            crop_factor=crop_factor,
+            crop_valid=crop_valid,
+            settled=settled,
         )
 
     @torch.no_grad()
@@ -278,7 +331,7 @@ class Engine:
 
         The latent keypoints cannot express a one-sided brow or lid: driving
         either brow keypoint deforms the whole upper face (measured as a
-        pixel-difference map — remixing keypoints was tried twice and only
+        pixel-difference map вЂ” remixing keypoints was tried twice and only
         moved the problem around). So asymmetry is done where it CAN be
         exact: render the left side's gestures and the right side's gestures
         separately, and take each half of the face from its own render. The
@@ -300,11 +353,21 @@ class Engine:
         out = np.clip(out, 0, 255).astype(np.uint8)
         if not paste:
             return out
+
         interp = cv2.INTER_CUBIC if composite == "enhanced" else cv2.INTER_LINEAR
-        full = cv2.warpAffine(out, src.crop_trans_m,
-                              (src.rgb.shape[1], src.rgb.shape[0]), flags=interp)
-        return np.clip(src.mask_ori * full + (1 - src.mask_ori) * src.rgb,
-                       0, 255).astype(np.uint8)
+
+        full = cv2.warpAffine(
+            out,
+            src.crop_trans_m,
+            (src.rgb.shape[1], src.rgb.shape[0]),
+            flags=interp
+        )
+
+        return np.clip(
+            src.mask_ori * full +
+            (1 - src.mask_ori) * src.rgb,
+            0, 255
+        ).astype(np.uint8)
 
     @torch.no_grad()
     def get_kp_info(self, t: torch.Tensor) -> dict:
@@ -370,18 +433,29 @@ class Engine:
 
         if not paste:
             return img
+
         # The classic paste: plain affine into the full frame, feathered mask
-        # blend — not upstream's paste_back, for workflow compatibility.
+        # blend вЂ” not upstream's paste_back, for workflow compatibility.
         # "enhanced" only upgrades the upsampling to bicubic; a change-mask
         # composite was tried here and pasted warped-background patches over
         # the sharp original whenever the head turned. ponytail: the 512
-        # decoder is the real ceiling — a downstream face detailer is the
+        # decoder is the real ceiling вЂ” a downstream face detailer is the
         # honest upgrade.
+
         interp = cv2.INTER_CUBIC if composite == "enhanced" else cv2.INTER_LINEAR
-        full = cv2.warpAffine(img, src.crop_trans_m,
-                              (src.rgb.shape[1], src.rgb.shape[0]), flags=interp)
-        return np.clip(src.mask_ori * full + (1 - src.mask_ori) * src.rgb,
-                       0, 255).astype(np.uint8)
+
+        full = cv2.warpAffine(
+            img,
+            src.crop_trans_m,
+            (src.rgb.shape[1], src.rgb.shape[0]),
+            flags=interp
+        )
+
+        return np.clip(
+            src.mask_ori * full +
+            (1 - src.mask_ori) * src.rgb,
+            0, 255
+        ).astype(np.uint8)
 
     @torch.no_grad()
     def stitch(self, x_s: torch.Tensor, x_d: torch.Tensor) -> torch.Tensor:
@@ -430,7 +504,7 @@ def relocate(src: PreparedSource, crop_rgb: np.ndarray) -> np.ndarray:
 
 
 def transform_keypoint(kp_info: dict) -> torch.Tensor:
-    """`s * (kp @ R + exp) + t_xy` — upstream's `transform_keypoint`.
+    """`s * (kp @ R + exp) + t_xy` вЂ” upstream's `transform_keypoint`.
 
     The z of the translation is dropped, exactly as in the paper.
     """

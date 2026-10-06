@@ -16122,6 +16122,7 @@ function mountFaceRig(host, opts) {
   let anchors = {};
   let outlines = {};
   let frameImg = null;
+  let cropValid = [0, 0, 512, 512];
   const root = document.createElement("div");
   root.className = "nkd-facerig";
   root.style.cssText = "display:flex;flex-direction:column;gap:8px;width:100%;box-sizing:border-box;padding:4px 2px 12px;font:12px system-ui,sans-serif;color:#c8d0e0;";
@@ -16309,6 +16310,14 @@ function mountFaceRig(host, opts) {
         }
         if (my !== token) continue;
         warn.textContent = data.warning ?? "";
+        if (Array.isArray(data.crop_valid) && data.crop_valid.length === 4) {
+          cropValid = [
+            Number(data.crop_valid[0]),
+            Number(data.crop_valid[1]),
+            Number(data.crop_valid[2]),
+            Number(data.crop_valid[3])
+          ];
+        }
         if (data.anchors && (quality === "final" || !Object.keys(anchors).length)) {
           anchors = data.anchors;
           outlines = data.outlines ?? {};
@@ -16469,7 +16478,15 @@ function mountFaceRig(host, opts) {
     }
     ctx.restore();
   }
-  const toScreen = (p2) => [p2[0] * view.size, p2[1] * view.size];
+  const toScreen = (p2) => {
+    const d = displayCropRect();
+    const x = p2[0] * 512;
+    const y = p2[1] * 512;
+    return [
+      d.dx + (x - d.x0) * d.scale,
+      d.dy + (y - d.y0) * d.scale
+    ];
+  };
   function handleOffset(c) {
     const get = (d) => d ? (state.w[d.axis] ?? 0) / d.per : 0;
     let dx = 0, dy = 0;
@@ -16536,11 +16553,34 @@ function mountFaceRig(host, opts) {
     }
     return a;
   }
+  function displayCropRect() {
+    const [x0, y0, x1, y1] = cropValid;
+    const sw = Math.max(1, x1 - x0);
+    const sh = Math.max(1, y1 - y0);
+    const scale = Math.max(view.size / sw, view.size / sh);
+    const dw = sw * scale;
+    const dh = sh * scale;
+    const dx = (view.size - dw) / 2;
+    const dy = (view.size - dh) / 2;
+    return { x0, y0, sw, sh, scale, dx, dy };
+  }
   function drawAll() {
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.clearRect(0, 0, view.size, view.size);
-    if (frameImg) ctx.drawImage(frameImg, 0, 0, view.size, view.size);
-    else {
+    if (frameImg) {
+      const d = displayCropRect();
+      ctx.drawImage(
+        frameImg,
+        d.x0,
+        d.y0,
+        d.sw,
+        d.sh,
+        d.dx,
+        d.dy,
+        d.sw * d.scale,
+        d.sh * d.scale
+      );
+    } else {
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.font = "12px system-ui, sans-serif";
       ctx.textAlign = "center";

@@ -193,6 +193,9 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
   let anchors: Record<string, [number, number]> = {};
   let outlines: Record<string, [number, number][]> = {};
   let frameImg: HTMLImageElement | null = null;
+  // Valid (non-padding) rectangle of the backend's 512×512 crop.
+  // Coordinates are in full crop pixels.
+  let cropValid: [number, number, number, number] = [0, 0, 512, 512];
 
   // ── DOM: one column — canvas, head, presets, options, status ────────────
   const root = document.createElement("div");
@@ -419,6 +422,15 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
         if (data.error) { warn.textContent = data.error; break; }
         if (my !== token) continue;             // a newer render superseded this
         warn.textContent = data.warning ?? "";
+        if (Array.isArray(data.crop_valid) && data.crop_valid.length === 4) {
+          cropValid = [
+            Number(data.crop_valid[0]),
+            Number(data.crop_valid[1]),
+            Number(data.crop_valid[2]),
+            Number(data.crop_valid[3]),
+          ];
+        }
+
         if (data.anchors && (quality === "final" || !Object.keys(anchors).length)) {
           anchors = data.anchors;
           outlines = data.outlines ?? {};
@@ -610,7 +622,17 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
     ctx.restore();
   }
 
-  const toScreen = (p: [number, number]) => [p[0] * view.size, p[1] * view.size] as [number, number];
+  const toScreen = (p: [number, number]) => {
+    const d = displayCropRect();
+
+    const x = p[0] * 512;
+    const y = p[1] * 512;
+
+    return [
+      d.dx + (x - d.x0) * d.scale,
+      d.dy + (y - d.y0) * d.scale,
+    ] as [number, number];
+  };
 
   // Where a control's handle currently sits on screen: its anchor plus its
   // value offset (the draggable box inside the wireframe).
@@ -687,17 +709,44 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
     return a;
   }
 
+  function displayCropRect() {
+    const [x0, y0, x1, y1] = cropValid;
+
+    const sw = Math.max(1, x1 - x0);
+    const sh = Math.max(1, y1 - y0);
+
+    // "cover": preserve aspect ratio and fill the square preview.
+    const scale = Math.max(view.size / sw, view.size / sh);
+
+    const dw = sw * scale;
+    const dh = sh * scale;
+
+    const dx = (view.size - dw) / 2;
+    const dy = (view.size - dh) / 2;
+
+    return { x0, y0, sw, sh, scale, dx, dy };
+  }
+
   function drawAll() {
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.clearRect(0, 0, view.size, view.size);
-    if (frameImg) ctx.drawImage(frameImg, 0, 0, view.size, view.size);
-    else {
+
+    if (frameImg) {
+      const d = displayCropRect();
+
+      ctx.drawImage(
+        frameImg,
+        d.x0, d.y0, d.sw, d.sh,
+        d.dx, d.dy, d.sw * d.scale, d.sh * d.scale
+      );
+    } else {
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.font = "12px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("connect an image", view.size / 2, view.size / 2);
       ctx.textAlign = "left";
     }
+
     drawOverlay(true);
   }
 

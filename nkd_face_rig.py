@@ -178,7 +178,7 @@ class NKDFaceRig(io.ComfyNode):
                     tooltip="The rig pose, written by the editor. Editing it by hand is "
                             "allowed but the editor is easier."),
                 io.Float.Input(
-                    "crop_factor", default=2.0, min=1.5, max=3.0, step=0.05,
+                    "crop_factor", default=1.5, min=1.5, max=3.0, step=0.05,
                     tooltip="How much around the face to take in. Larger keeps more hair "
                             "and shoulders but gives the model less face to work with."),
                 io.Float.Input(
