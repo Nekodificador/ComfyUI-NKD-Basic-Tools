@@ -877,7 +877,9 @@ def _uncrop(
                                  device=patch_resized.device)
         alpha = region_mask.unsqueeze(-1)
 
-    bg[:, y1:y2, x1:x2, :] = patch_resized * alpha + bg[:, y1:y2, x1:x2, :] * (1.0 - alpha)
+    # A patch may carry an alpha the background lacks (or the reverse): blend the shared colour channels only.
+    c = min(bg.shape[-1], patch_resized.shape[-1])
+    bg[:, y1:y2, x1:x2, :c] = patch_resized[..., :c] * alpha + bg[:, y1:y2, x1:x2, :c] * (1.0 - alpha)
     return bg, region_mask
 
 

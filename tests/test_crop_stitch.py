@@ -89,6 +89,11 @@ def demo():
     # Mask center must now be red.
     assert out[0, 220, 550, 0] > 0.9 and out[0, 220, 550, 1] < 0.1
 
+    # An RGBA patch (some edit models add alpha) stitches onto an RGB background.
+    rgba = torch.cat([patch, torch.ones_like(patch[..., :1])], dim=-1)
+    out_rgba, _ = _uncrop(rgba, image, box, orig, processed, feather=10)
+    assert out_rgba.shape == image.shape and torch.equal(out_rgba, out)
+
     # Batched stitch: 3 samples over 1 background.
     patch3 = patch.repeat(3, 1, 1, 1)
     out3, _ = _uncrop(patch3, image.repeat(3, 1, 1, 1), box, orig, processed, feather=10)

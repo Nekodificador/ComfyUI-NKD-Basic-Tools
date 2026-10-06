@@ -230,17 +230,14 @@ class Engine:
                                       (square[2] - square[0], square[3] - square[1]),
                                       cv2.INTER_LINEAR)
 
-        s_x = (region[2] - region[0]) / 512.0
-        s_y = (region[3] - region[1]) / 512.0
-        mask_m = np.float32([[s_x, 0, square[0]], [0, s_y, square[1]]])
+        # The render and its paste mask both live in the 512 virtual square, so
+        # they share one transform — also when the square hangs over the frame edge.
+        s_x = (square[2] - square[0]) / 512.0
+        s_y = (square[3] - square[1]) / 512.0
+        crop_trans_m = np.float32([[s_x, 0, square[0]], [0, s_y, square[1]]])
         mask = cv2.imread(_MASK, cv2.IMREAD_COLOR)
-        mask_ori = cv2.warpAffine(mask, mask_m, (w, h),
+        mask_ori = cv2.warpAffine(mask, crop_trans_m, (w, h),
                                   cv2.INTER_LINEAR).astype(np.float32) / 255.0
-        if changed:
-            s = (square[2] - square[0]) / 512.0
-            crop_trans_m = np.float32([[s, 0, square[0]], [0, s, square[1]]])
-        else:
-            crop_trans_m = mask_m
 
         inp = np.clip(cv2.resize(face_img, (256, 256),
                                  interpolation=cv2.INTER_LINEAR)[np.newaxis]
