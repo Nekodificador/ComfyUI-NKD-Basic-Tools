@@ -55,6 +55,13 @@ const RULES = {
         if (separate) showWidget(w);
         else hideWidget(w);
       }
+      // Inpaint Blend only shapes the patched model's mask, so it needs the model plugged in.
+      const blend = node.widgets?.find((x) => x.name === "inpaint_blend");
+      if (blend) {
+        found = true;
+        if (node.inputs?.find((i) => i.name === "model")?.link != null) showWidget(blend);
+        else hideWidget(blend);
+      }
       if (found) refreshNode(node);
     },
   },
