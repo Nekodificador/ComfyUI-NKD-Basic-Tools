@@ -1,0 +1,5 @@
+# Not needed to run the nodes: kept in the repo, left out of the registry package.
+.github/
+tests/
+tools/
+package-lock.json
