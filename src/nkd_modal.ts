@@ -394,5 +394,15 @@ export function nkdSelect(options: Array<{ value: string; label: string }>, valu
   }
   sel.value = value;
   sel.onchange = () => onChange(sel.value);
+  // Pack convention (from Color Warp): wheel over a dropdown steps through its
+  // options without opening it — up = next option. Stops at the ends.
+  sel.addEventListener("wheel", (e: WheelEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const i = sel.selectedIndex + (e.deltaY < 0 ? 1 : -1);
+    if (i < 0 || i >= sel.options.length) return;
+    sel.selectedIndex = i;
+    sel.dispatchEvent(new Event("change"));
+  }, { passive: false });
   return sel;
 }
