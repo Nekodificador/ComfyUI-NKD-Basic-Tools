@@ -14,10 +14,11 @@ from PIL import Image
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
 
+import os
 import folder_paths
 import node_helpers
 
-from .helpers import node_id, push_source
+from .helpers import node_id, push_source, _safe_annotated_path
 
 
 def _hex_rgb(hex_color: str) -> tuple[float, float, float]:
@@ -85,7 +86,10 @@ class NKDPaint(io.ComfyNode):
             empty = torch.zeros((1, h, w), dtype=torch.float32)
             return io.NodeOutput(base, base, stroke_bg, empty, 1.0 - empty)
 
-        png = node_helpers.pillow(Image.open, folder_paths.get_annotated_filepath(layer)).convert("RGBA")
+        path = _safe_annotated_path(layer)   # only inside ComfyUI's input / output / temp
+        if not path or not os.path.isfile(path):
+            raise ValueError(f"😺NKD Paint: layer file not found in ComfyUI's input/output/temp folders: {layer!r}")
+        png = node_helpers.pillow(Image.open, path).convert("RGBA")
         if png.size != (w, h):
             png = png.resize((w, h), Image.LANCZOS)
         arr = torch.from_numpy(np.asarray(png, dtype=np.float32) / 255.0).unsqueeze(0)  # [1,H,W,4]

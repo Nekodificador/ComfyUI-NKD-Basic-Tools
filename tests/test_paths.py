@@ -23,3 +23,24 @@ def test_safe_name_is_a_bare_file_name():
 
 if __name__ == "__main__":
     test_safe_join_stays_inside(); test_safe_name_is_a_bare_file_name(); print("ok")
+
+
+def test_safe_annotated_path_stays_in_comfy_folders():
+    """A widget's file reference ("name [temp]") resolves only inside input/output/temp."""
+    import types
+    from helpers import _safe_annotated_path
+    with tempfile.TemporaryDirectory() as td:
+        dirs = {k: os.path.join(td, k) for k in ("input", "output", "temp")}
+        for d in dirs.values():
+            os.makedirs(d)
+        sys.modules["folder_paths"] = types.SimpleNamespace(
+            get_input_directory=lambda: dirs["input"], get_output_directory=lambda: dirs["output"],
+            get_temp_directory=lambda: dirs["temp"])
+        try:
+            assert _safe_annotated_path("a.png").startswith(os.path.realpath(dirs["input"]))
+            assert _safe_annotated_path("sub/a.png [temp]").startswith(os.path.realpath(dirs["temp"]))
+            for bad in ("../../x", "sub/../../x [output]", os.path.abspath(os.sep), ""):
+                assert _safe_annotated_path(bad) is None, bad
+        finally:
+            del sys.modules["folder_paths"]
+
