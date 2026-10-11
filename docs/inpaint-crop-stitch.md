@@ -52,4 +52,9 @@ by minimum area, cap the count and choose the order.
 
 ---
 
+## Tips and tricks
+
+<img width="2461" height="1058" alt="image" src="https://github.com/user-attachments/assets/fd650b56-bdbe-403c-bc38-c41a0a00b0de" />
+
+
 [← All 😺NKD Basic Tools nodes](../README.md)
