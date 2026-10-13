@@ -46,6 +46,14 @@ The two optional inputs:
 Sound can be masked down to 1/40 s, so a mask edge lands within 25 ms of where
 you put it. Fine enough for a word, not for a consonant.
 
+### Reuse encodes when editing masks
+
+AV Latent internally expands into separate video encode, audio encode, and mask
+steps. Existing workflows and sockets stay unchanged. With ComfyUI output caching
+enabled, changing masks, Audio, Ramp, or fps reuses the encode results while they
+remain cached. Changes to source media / VAE, or cache eviction, require encoding
+again. The internal mask step does not modify cached latent dictionaries.
+
 ---
 
 [← All 😺NKD Basic Tools nodes](../README.md)
