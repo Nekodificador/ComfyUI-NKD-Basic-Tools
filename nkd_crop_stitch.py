@@ -45,7 +45,10 @@ def _apply_differential_diffusion(model, blend: float = 1.0):
         ts_to = inner.inner_model.model_sampling.timestep(sigma_to)
         current_ts = inner.inner_model.model_sampling.timestep(sigma[0])
         threshold = (current_ts - ts_to) / (ts_from - ts_to)
-        binary_mask = (denoise_mask >= threshold).to(denoise_mask.dtype)
+        # The mask reaching the sampler tops out just under 1.0 (~0.996) and the first
+        # step's threshold is exactly 1.0: unsnapped, the binary mask is EMPTY at step 1.
+        full = torch.where(denoise_mask >= 0.99, torch.ones_like(denoise_mask), denoise_mask)
+        binary_mask = (full >= threshold).to(denoise_mask.dtype)
         if blend < 1.0:
             return blend * binary_mask + (1.0 - blend) * denoise_mask
         return binary_mask

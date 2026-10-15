@@ -29,6 +29,10 @@ flowchart LR
 - `Resize Mode` decides the crop size. `Automatic` keeps the native resolution
   and only rescales when the crop falls outside the min/max limits, `Megapixels`
   gives it a fixed budget, `Longest Side` an exact size.
+  The crop always contains your whole mask. If the image is too short or narrow to
+  give a very wide or tall mask the proportion the limits ask for, the render takes
+  the crop's real proportion instead (long side up to the max), so no part of the
+  mask is left out.
 - Connect `model` and `vae`, both optional, and Crop hands back a prepared model
   and a latent that's ready to sample, so nothing sits between it and your
   sampler.

@@ -587,12 +587,16 @@ def _pick_render_dims_longest(
 
 def _pick_render_dims_auto(
     bbox_w: int, bbox_h: int, min_side: int, max_side: int,
-    multiple: int = _VAE_MULTIPLE,
+    multiple: int = _VAE_MULTIPLE, cap_aspect: bool = True,
 ) -> Tuple[int, int]:
     """Only rescale when needed: native 1:1 while the bbox fits inside
     [min_side, max_side]; upscale the short side to min_side or downscale the
     long side to max_side otherwise. Extreme aspect ratios are capped to
-    max×min (the caller grows the bbox to match, adding context)."""
+    max×min (the caller grows the bbox to match, adding context).
+
+    `cap_aspect=False` is for a bbox that could NOT grow to the capped aspect (the
+    image is too small on that axis): the render then follows the bbox's real
+    aspect, the long side limited to max_side, so the box never has to shrink."""
     if bbox_w <= 0 or bbox_h <= 0:
         return multiple, multiple
     lo = max(multiple, int(round(min_side / multiple)) * multiple)
@@ -600,15 +604,17 @@ def _pick_render_dims_auto(
 
     aspect = bbox_w / bbox_h
     limit = hi / lo
-    if aspect > limit:
-        return hi, lo
-    if aspect < 1.0 / limit:
-        return lo, hi
+    if cap_aspect:
+        if aspect > limit:
+            return hi, lo
+        if aspect < 1.0 / limit:
+            return lo, hi
 
     short, long = min(bbox_w, bbox_h), max(bbox_w, bbox_h)
     if short >= lo and long <= hi:
         return bbox_w, bbox_h  # native — no resample
     scale = (lo / short) if short < lo else (hi / long)
+    scale = min(scale, hi / long)         # never past the long-side limit
     render_w = max(multiple, int(round(bbox_w * scale / multiple)) * multiple)
     render_h = max(multiple, int(round(bbox_h * scale / multiple)) * multiple)
     return render_w, render_h
@@ -620,44 +626,33 @@ def _grow_bbox_to_aspect(
     img_w: int, img_h: int,
     multiple: int = _VAE_MULTIPLE,
 ) -> Tuple[int, int, int, int]:
-    """Grow the bbox so its aspect ratio matches `target_aspect` while staying
-    /multiple-aligned, centred on the original bbox, clamped to image bounds.
+    """Grow the bbox toward `target_aspect` while staying /multiple-aligned, centred
+    on the original bbox, clamped to image bounds.
 
-    If the requested grow would exceed the image on the growing axis, we cap
-    that axis to the image size and SHRINK the other axis instead so the final
-    bbox still matches target_aspect AND fits inside the image."""
+    The result ALWAYS contains the input bbox: it only grows, never shrinks. If the
+    image is too small on the growing axis to reach `target_aspect`, the box grows
+    as far as it can and the aspect is simply not met; the caller then takes the
+    render dims from the final box (see _crop_by_mask). Shrinking the other axis to
+    force the aspect used to push part of the mask outside the box, so that part
+    was silently never regenerated."""
     cur_w = x2 - x1
     cur_h = y2 - y1
     cur_aspect = cur_w / cur_h
 
-    max_w = (img_w // multiple) * multiple
-    max_h = (img_h // multiple) * multiple
+    # Never below the box we were given (it may span a non-/multiple image edge to edge).
+    max_w = max(cur_w, (img_w // multiple) * multiple)
+    max_h = max(cur_h, (img_h // multiple) * multiple)
 
     if cur_aspect < target_aspect:
-        # bbox too tall → try to widen first
+        # bbox too tall → widen
         new_w_ideal = cur_h * target_aspect
-        new_w = max(cur_w, int((new_w_ideal + multiple - 1) // multiple) * multiple)
+        new_w = max(cur_w, min(max_w, int((new_w_ideal + multiple - 1) // multiple) * multiple))
         new_h = cur_h
-        if new_w > max_w:
-            new_w = max_w
-            new_h = max(multiple, int(new_w / target_aspect / multiple) * multiple)
-            if new_h > max_h:
-                new_h = max_h
-                new_w = max(multiple, int(new_h * target_aspect / multiple) * multiple)
     else:
-        # bbox too wide → try to grow taller first
+        # bbox too wide → grow taller
         new_h_ideal = cur_w / target_aspect
-        new_h = max(cur_h, int((new_h_ideal + multiple - 1) // multiple) * multiple)
+        new_h = max(cur_h, min(max_h, int((new_h_ideal + multiple - 1) // multiple) * multiple))
         new_w = cur_w
-        if new_h > max_h:
-            new_h = max_h
-            new_w = max(multiple, int(new_h * target_aspect / multiple) * multiple)
-            if new_w > max_w:
-                new_w = max_w
-                new_h = max(multiple, int(new_w / target_aspect / multiple) * multiple)
-
-    new_w = min(new_w, max_w)
-    new_h = min(new_h, max_h)
 
     # Placement: only the SIZE needs grid alignment (the VAE cares about the
     # crop dimensions, not its offset). Free offsets let the box hug the image
@@ -720,9 +715,9 @@ def _crop_by_mask(
     if target_pixels <= 0 and longest_side <= 0 and max_side <= 0:
         return image[:, y1:y2, x1:x2, :], full_mask[:, y1:y2, x1:x2], (x1, y1, x2, y2), (oh, ow)
 
-    def _render_dims(bw: int, bh: int) -> Tuple[int, int]:
+    def _render_dims(bw: int, bh: int, cap_aspect: bool = True) -> Tuple[int, int]:
         if max_side > 0:
-            return _pick_render_dims_auto(bw, bh, min_side, max_side)
+            return _pick_render_dims_auto(bw, bh, min_side, max_side, cap_aspect=cap_aspect)
         if longest_side > 0:
             return _pick_render_dims_longest(bw, bh, longest_side)
         return _pick_render_dims(bw, bh, target_pixels)
@@ -737,7 +732,7 @@ def _crop_by_mask(
     # invariant we need is render_aspect == bbox_aspect.
     final_aspect = crop_w / crop_h
     if abs(final_aspect - target_aspect) > 1e-6:
-        render_w, render_h = _render_dims(crop_w, crop_h)
+        render_w, render_h = _render_dims(crop_w, crop_h, cap_aspect=False)
 
     cropped_raw = image[:, y1:y2, x1:x2, :]
     mask_raw = full_mask[:, y1:y2, x1:x2]
