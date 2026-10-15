@@ -176,10 +176,11 @@ class Engine:
 
     # --- the expensive half, run once per photo --------------------------
 
-    def _face_bbox(self, rgb: np.ndarray, face_index: int):
+    def _face_bbox(self, rgb: np.ndarray, face_index: int,
+                   face_detector: str = "face_yolov8n.pt"):
         """((x1, y1, x2, y2), settled) — the face, in the order that keeps parity.
 
-        The stock YOLOv8 face model first, conf 0.7, first box wins: that is
+        The selected YOLO face model first, conf 0.7, first box wins: that is
         what makes the crop math downstream see the numbers the ecosystem
         expects, and while it answers nothing else runs. YuNet is the fallback,
         for the machines without ultralytics (AGPL, so never ours to install)
@@ -190,7 +191,11 @@ class Engine:
         all. It used to be the only fallback, and it is the one that loses a
         face that is small in a wide picture — hence everything above it.
         """
-        boxes = yolo_boxes(rgb, 0.7) or face_boxes(rgb, second_opinion=False)
+        if face_detector == "YuNet":
+            boxes = face_boxes(rgb, second_opinion=False)
+        else:
+            boxes = (yolo_boxes(rgb, 0.7, face_detector)
+                     or face_boxes(rgb, second_opinion=False))
         if face_index >= max(len(boxes), 1):
             raise RuntimeError(
                 "😺NKD Face Rig: asked for face %d but only %d %s found."
@@ -203,7 +208,8 @@ class Engine:
 
     @torch.no_grad()
     def prepare(self, rgb: np.ndarray, crop_factor: float = 2.0,
-                face_index: int = 0) -> PreparedSource:
+                face_index: int = 0,
+                face_detector: str = "face_yolov8n.pt") -> PreparedSource:
         """The established crop pipeline, step for step.
 
         Every quirk below is deliberate parity, not taste: the `int()`
@@ -213,7 +219,7 @@ class Engine:
         crop rather than via 512 (a second resize softens pixels).
         """
         h, w = rgb.shape[:2]
-        (x1, y1, x2, y2), settled = self._face_bbox(rgb, face_index)
+        (x1, y1, x2, y2), settled = self._face_bbox(rgb, face_index, face_detector)
         bw, bh = x2 - x1, y2 - y1
         side = max(bw, bh) * crop_factor
         cx, cy = x1 + bw / 2, y1 + bh / 2

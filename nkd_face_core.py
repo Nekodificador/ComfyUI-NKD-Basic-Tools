@@ -25,6 +25,7 @@ Two things are deliberately not models:
 """
 from __future__ import annotations
 
+import os
 import os.path as osp
 import threading
 
@@ -371,32 +372,61 @@ class FaceDetector:
                 for x, y, bw, bh in found[:, :4] / s]
 
 
-def yolo_boxes(rgb: np.ndarray, confidence: float = 0.7) -> list:
-    """The ecosystem's YOLOv8 face model, or `[]` when ultralytics is absent.
+def available_yolo_models() -> list[str]:
+    """Installed face models, relative to ComfyUI/models/ultralytics."""
+    root = osp.join(osp.dirname(model_dir()), "ultralytics")
+    models = []
+    for directory, _, filenames in os.walk(root):
+        for filename in filenames:
+            if filename.lower().endswith(".pt") and "face" in filename.lower():
+                path = osp.join(directory, filename)
+                models.append(osp.relpath(path, root).replace(osp.sep, "/"))
+    return sorted(models)
 
-    Never installed by us — AGPL has to be the user's own choice — and never
-    the first thing asked, because a detector that only some machines have
-    would make the same graph crop differently on each of them. It is here as
-    a second opinion for the pictures YuNet gives up on, and as the one
-    implementation of a loader the rig used to carry its own copy of.
+
+def _resolve_yolo_model(model_name: str):
+    """Resolve a relative model path, including the legacy bbox location."""
+    root = osp.abspath(osp.join(osp.dirname(model_dir()), "ultralytics"))
+    path = osp.abspath(osp.join(root, model_name))
+    if osp.commonpath((root, path)) != root:
+        return None
+    if osp.isfile(path):
+        return path
+    if osp.basename(model_name) == model_name:
+        path = osp.join(root, "bbox", model_name)
+        if osp.isfile(path):
+            return path
+    return None
+
+
+def yolo_boxes(rgb: np.ndarray, confidence: float = 0.7,
+               model_name: str = "face_yolov8n.pt") -> list:
+    """Selected local face model, or [] when it is unavailable.
+
+    Ultralytics remains optional. Only the original default model retains
+    automatic Hugging Face download support for legacy callers.
     """
     try:
         from ultralytics import YOLO  # noqa: PLC0415 — optional
     except ImportError:
         return []
-    global _YOLO
-    if _YOLO is None:
-        path = osp.join(model_dir(), "..", "ultralytics", "face_yolov8n.pt")
-        if not osp.exists(path):
-            from huggingface_hub import hf_hub_download  # noqa: PLC0415
-            path = hf_hub_download(repo_id="Bingsu/adetailer",
-                                   filename="face_yolov8n.pt")
-        _YOLO = YOLO(path)
-    found = _YOLO(rgb, conf=confidence, device="", verbose=False)[0]
+    path = _resolve_yolo_model(model_name)
+    if path is None:
+        if model_name != "face_yolov8n.pt":
+            return []
+        from huggingface_hub import hf_hub_download  # noqa: PLC0415
+        path = hf_hub_download(repo_id="Bingsu/adetailer",
+                               filename="face_yolov8n.pt")
+    path = osp.abspath(path)
+    model = _YOLO.get(path)
+    if model is None:
+        model = YOLO(path)
+        _YOLO[path] = model
+    found = model(rgb, conf=confidence, device="", verbose=False)[0]
     return [tuple(float(v) for v in b) for b in found.boxes.xyxy.cpu().numpy()]
 
 
-_YOLO = None
+_YOLO = {}
 
 
 def face_boxes(rgb: np.ndarray, confidence: float = 0.7,
