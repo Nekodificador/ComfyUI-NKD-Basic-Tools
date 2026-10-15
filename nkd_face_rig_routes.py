@@ -123,10 +123,12 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
 def _register_routes() -> None:
     from aiohttp import web
     from server import PromptServer
+    from .helpers import same_origin_only
 
     routes = PromptServer.instance.routes
 
     @routes.post("/nkd/facerig/preview")
+    @same_origin_only
     async def _preview(request):
         try:
             body = await request.json()
@@ -179,6 +181,7 @@ def _register_routes() -> None:
         return web.json_response(payload, headers={"Cache-Control": "no-store"})
 
     @routes.post("/nkd/facerig/release")
+    @same_origin_only
     async def _release(request):
         """The editor closed. Give the VRAM back."""
         Engine.release()
@@ -197,6 +200,7 @@ def _register_routes() -> None:
         })
 
     @routes.post("/nkd/facerig/preset")
+    @same_origin_only
     async def _preset(request):
         """Resolve a preset to axis weights, including what it could not cover."""
         body = await request.json()

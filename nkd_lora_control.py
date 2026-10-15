@@ -22,7 +22,7 @@ from comfy.utils import load_torch_file
 from comfy_api.latest import io
 
 from . import lora_control_core as core
-from .helpers import _safe_join, _safe_name
+from .helpers import _safe_join, _safe_name, same_origin_only
 
 
 def _resolve(lora_name: str) -> str:
@@ -238,6 +238,7 @@ def _register_preset_routes() -> None:
         return web.json_response({"user": _read_presets()})
 
     @routes.post("/nkd/lora/presets")
+    @same_origin_only
     async def _save(request):
         try:
             payload = await request.json()
@@ -257,6 +258,7 @@ def _register_preset_routes() -> None:
         return web.json_response({"ok": True, "preset": clean})
 
     @routes.delete("/nkd/lora/presets/{name}")
+    @same_origin_only
     async def _delete(request):
         name = request.match_info.get("name", "").strip()
         if not name:
@@ -357,6 +359,7 @@ def _register_routes() -> None:
     from server import PromptServer
 
     @PromptServer.instance.routes.post("/nkd/lora/save")
+    @same_origin_only
     async def _save_shaped(request):
         try:
             body = await request.json()

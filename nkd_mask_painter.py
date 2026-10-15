@@ -12,7 +12,7 @@ folder are all unchanged, so saved workflows resolve and masks already painted
 survive the move.
 """
 import os
-from .helpers import _safe_join
+from .helpers import _safe_join, same_origin_only
 import re
 
 import folder_paths
@@ -226,6 +226,7 @@ def _resolve_clipspace_path(filename: str, ftype: str, subfolder: str) -> str | 
 routes = PromptServer.instance.routes
 
 @routes.get("/nkd/paint/set")
+@same_origin_only
 async def _nkd_bridge_set(request: web.Request) -> web.Response:
     """Register a clipspace file as the active editor PNG for a node and
     return a fresh pb_id. The file is the RGBA composite the mask editor
@@ -271,6 +272,7 @@ async def _nkd_bridge_get(request: web.Request) -> web.Response:
 
 
 @routes.get("/nkd/paint/reset_seed")
+@same_origin_only
 async def _nkd_bridge_reset_seed(request: web.Request) -> web.Response:
     """Forget the cached upstream mask fingerprint for a node so the next
     execute() treats the incoming `mask` as if it had just changed and
@@ -283,6 +285,7 @@ async def _nkd_bridge_reset_seed(request: web.Request) -> web.Response:
 
 
 @routes.get("/nkd/paint/clear")
+@same_origin_only
 async def _nkd_bridge_clear(request: web.Request) -> web.Response:
     """Clear the painted mask AND return the alpha-less companion thumbnail
     so the client can refresh the node preview in place — no requeue needed.

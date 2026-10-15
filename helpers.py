@@ -1160,3 +1160,19 @@ def _safe_annotated_path(name: str):
             "output": folder_paths.get_output_directory,
             "temp": folder_paths.get_temp_directory}[kind]()
     return _safe_join(base, rel) if rel else None
+
+
+def same_origin_only(handler):
+    """Route decorator for anything that writes or changes state: the browser
+    must say the request came from ComfyUI's own page (`Sec-Fetch-Site:
+    same-origin`). Other sites cannot forge that header; a request without it
+    (old browser, script) is refused too, so this fails closed."""
+    import functools
+    from aiohttp import web
+
+    @functools.wraps(handler)
+    async def wrapper(request):
+        if request.headers.get("Sec-Fetch-Site", "") != "same-origin":
+            return web.json_response({"error": "same-origin requests only"}, status=403)
+        return await handler(request)
+    return wrapper

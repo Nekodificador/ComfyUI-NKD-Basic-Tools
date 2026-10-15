@@ -231,6 +231,7 @@ def _register_preset_routes() -> None:
         from aiohttp import web  # type: ignore
     except ImportError:
         return
+    from .helpers import same_origin_only
 
     routes = PromptServer.instance.routes
 
@@ -239,6 +240,7 @@ def _register_preset_routes() -> None:
         return web.json_response({"user": _read_user_presets()})
 
     @routes.post("/nkd_color_ramp/presets")
+    @same_origin_only
     async def save_preset(request):
         try:
             payload = await request.json()
@@ -260,6 +262,7 @@ def _register_preset_routes() -> None:
         return web.json_response({"ok": True, "preset": clean})
 
     @routes.delete("/nkd_color_ramp/presets/{name}")
+    @same_origin_only
     async def delete_preset(request):
         name = request.match_info.get("name", "").strip()
         if not name:

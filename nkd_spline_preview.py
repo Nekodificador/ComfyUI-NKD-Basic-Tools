@@ -123,6 +123,7 @@ def _register_routes() -> None:
     routes = PromptServer.instance.routes
 
     @routes.post("/nkd/spline/preview")
+    @helpers.same_origin_only
     async def _preview(request):
         try:
             body = await request.json()
