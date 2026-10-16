@@ -11,6 +11,7 @@ from __future__ import annotations
 import torch
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
+from comfy_execution.graph_utils import GraphBuilder
 
 from . import mask_core
 
@@ -181,6 +182,7 @@ class NKDAVLatent(io.ComfyNode):
     def define_schema(cls) -> io.Schema:
         return io.Schema(
             node_id="NKDAVLatent",
+            enable_expand=True,
             display_name="😺NKD AV Latent",
             category="😺NKD Nodes/Masking",
             description=(
@@ -191,19 +193,19 @@ class NKDAVLatent(io.ComfyNode):
                 "the soundtrack, which is the part that has no node of its own."
             ),
             inputs=[
-                io.Image.Input("images", tooltip="The video, as frames."),
-                io.Audio.Input("audio", tooltip="Its soundtrack."),
-                io.Vae.Input("video_vae", display_name="video vae"),
-                io.Vae.Input("audio_vae", display_name="audio vae",
+                io.Image.Input("images", raw_link=True, tooltip="The video, as frames."),
+                io.Audio.Input("audio", raw_link=True, tooltip="Its soundtrack."),
+                io.Vae.Input("video_vae", raw_link=True, display_name="video vae"),
+                io.Vae.Input("audio_vae", raw_link=True, display_name="audio vae",
                              tooltip="Resampled to this VAE's own rate first, so the audio "
                                      "doesn't have to arrive at it."),
-                io.Mask.Input("latent_mask", display_name="latent mask", optional=True,
+                io.Mask.Input("latent_mask", raw_link=True, display_name="latent mask", optional=True,
                               tooltip="What to repaint in the picture. Leave it unconnected and "
                                       "the whole video is generated. Feed the latent_mask output "
                                       "of 😺NKD Mask Ops (with its VAE and model connected) and "
                                       "it lands on the model's own grid instead of being "
                                       "stretched onto it here."),
-                io.Mask.Input("audio_mask", display_name="audio mask", optional=True,
+                io.Mask.Input("audio_mask", raw_link=True, display_name="audio mask", optional=True,
                               tooltip="Which moments Follow mask follows, instead of the picture "
                                       "mask above: white regenerates the sound of that moment, "
                                       "black keeps it. Only its timing is read, so feed one at "
@@ -258,13 +260,56 @@ class NKDAVLatent(io.ComfyNode):
     def execute(cls, images, audio, video_vae, audio_vae, audio_mode="keep",
                 latent_mask=None, audio_mask=None, fps=24.0,
                 ramp_ticks=0, ramp_shape="cosine", ramp_out_ticks=0) -> io.NodeOutput:
-        from comfy_extras.nodes_audio import VAEEncodeAudio
+        graph = GraphBuilder()
+        video = graph.node("VAEEncode", id="video", pixels=images, vae=video_vae)
+        sound = graph.node("VAEEncodeAudio", id="audio", audio=audio, vae=audio_vae)
+        masked = graph.node(
+            "NKDAVLatentMask", id="mask", video_latent=video.out(0),
+            audio_latent=sound.out(0), audio_vae=audio_vae, images=images,
+            audio_mode=audio_mode, fps=fps, ramp_ticks=ramp_ticks,
+            ramp_shape=ramp_shape, ramp_out_ticks=ramp_out_ticks)
+        masked.set_input("latent_mask", latent_mask)
+        masked.set_input("audio_mask", audio_mask)
+        return io.NodeOutput(masked.out(0), expand=graph.finalize())
 
-        video_latent = {"samples": video_vae.encode(images[:, :, :, :3])}
+
+class NKDAVLatentMask(io.ComfyNode):
+    """Internal mask step of NKDAVLatent's expanded graph."""
+
+    @classmethod
+    def define_schema(cls) -> io.Schema:
+        inputs = NKDAVLatent.define_schema().inputs
+        for entry in inputs:
+            entry.rawLink = None
+        return io.Schema(
+            node_id="NKDAVLatentMask",
+            is_dev_only=True,
+            display_name="😺NKD AV Latent Mask",
+            category="😺NKD Nodes/Masking",
+            description="Internal mask step of NKD AV Latent.",
+            inputs=[
+                io.Latent.Input("video_latent", tooltip="From VAE Encode."),
+                io.Latent.Input("audio_latent", tooltip="From VAE Encode Audio."),
+                io.Vae.Input("audio_vae", display_name="audio vae",
+                             tooltip="Same VAE used for VAE Encode Audio. Supplies the "
+                                     "latent rate for length fitting; no encoding is performed."),
+                io.Image.Input("images"),
+                *inputs[4:],
+            ],
+            outputs=[io.Latent.Output(display_name="latent")],
+        )
+
+    @classmethod
+    def execute(cls, video_latent, audio_latent, audio_vae, images,
+                audio_mode="keep", latent_mask=None, audio_mask=None, fps=24.0,
+                ramp_ticks=0, ramp_shape="cosine", ramp_out_ticks=0) -> io.NodeOutput:
+        video_latent = video_latent.copy()
+        audio_latent = audio_latent.copy()
+        video_latent.pop("noise_mask", None)
+        audio_latent.pop("noise_mask", None)
         if latent_mask is not None:
             video_latent["noise_mask"] = latent_mask.reshape((-1, 1) + latent_mask.shape[-2:])
 
-        audio_latent = VAEEncodeAudio.execute(audio_vae, audio)[0]
         # Length first, mask after: the mask is sized to the audio latent's own shape, so
         # building it against a length that is about to change would size it wrong.
         # Same arithmetic the model's own empty AV latent uses: round(duration * rate).
@@ -426,7 +471,7 @@ class NKDAVLatentExtend(io.ComfyNode):
 class NKDAVExtension(ComfyExtension):
     @override
     async def get_node_list(self) -> list[type[io.ComfyNode]]:
-        return [NKDAudioMask, NKDAVLatent, NKDAVLatentExtend]
+        return [NKDAudioMask, NKDAVLatent, NKDAVLatentMask, NKDAVLatentExtend]
 
 
 async def comfy_entrypoint() -> NKDAVExtension:
@@ -434,7 +479,8 @@ async def comfy_entrypoint() -> NKDAVExtension:
 
 
 NODE_CLASS_MAPPINGS = {"NKDAudioMask": NKDAudioMask, "NKDAVLatent": NKDAVLatent,
-                       "NKDAVLatentExtend": NKDAVLatentExtend}
+                       "NKDAVLatentExtend": NKDAVLatentExtend, "NKDAVLatentMask": NKDAVLatentMask}
 NODE_DISPLAY_NAME_MAPPINGS = {"NKDAudioMask": "😺NKD Audio Mask",
                               "NKDAVLatent": "😺NKD AV Latent",
-                              "NKDAVLatentExtend": "😺NKD AV Latent Extend"}
+                              "NKDAVLatentExtend": "😺NKD AV Latent Extend",
+                              "NKDAVLatentMask": "😺NKD AV Latent Mask"}

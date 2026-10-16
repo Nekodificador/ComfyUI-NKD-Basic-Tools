@@ -37,11 +37,67 @@ def demo():
     mask = torch.zeros(124, 768, 1344)
     mask[:62, 100:200, 100:200] = 1.0      # first half of the clip, a corner of the frame
 
+    def execute(images, audio, video_vae, audio_vae, **kw):
+        from comfy_extras.nodes_audio import VAEEncodeAudio
+        graph = av.NKDAVLatent.execute(images, audio, video_vae, audio_vae, **kw)
+        values = {}
+        for node_id, node in graph.expand.items():
+            inputs = {k: values[v[0]][v[1]] if isinstance(v, list) and v[0] in values
+                      else v for k, v in node["inputs"].items()}
+            if node["class_type"] == "VAEEncode":
+                values[node_id] = ({"samples": inputs["vae"].encode(inputs["pixels"])},)
+            elif node["class_type"] == "VAEEncodeAudio":
+                values[node_id] = VAEEncodeAudio.execute(**inputs).args
+            else:
+                values[node_id] = av.NKDAVLatentMask.execute(**inputs).args
+        return values[graph.args[0][0]]
+
     def run(**kw):
-        out = av.NKDAVLatent.execute(images, audio, _VideoVae(), _AudioVae(), **kw)[0]
+        out = execute(images, audio, _VideoVae(), _AudioVae(), **kw)[0]
         assert out["samples"].is_nested, "the sampler needs both streams in one latent"
         nm = out.get("noise_mask")
         return out, (None if nm is None else nm.unbind())
+
+    # Real ComfyUI cache signatures: masks/settings must not invalidate encodes.
+    import asyncio
+    import nodes
+    from comfy_execution.graph import DynamicPrompt
+    from comfy_execution.graph_utils import GraphBuilder
+    from comfy_execution.caching import CacheKeySetInputSignature
+
+    from comfy_extras.nodes_audio import VAEEncodeAudio
+    nodes.NODE_CLASS_MAPPINGS["VAEEncodeAudio"] = VAEEncodeAudio
+    nodes.NODE_CLASS_MAPPINGS["NKDAVLatentMask"] = av.NKDAVLatentMask
+
+    class Unchanged:
+        async def get(self, node_id):
+            return False
+
+    async def signatures(mode="keep", ramp=0, mask_value=0, source_value=0):
+        GraphBuilder.set_default_prefix("av", 0, 0)
+        expanded = av.NKDAVLatent.execute(
+            ["images", 0], ["audio", 0], ["vv", 0], ["aa", 0],
+            latent_mask=["mask", 0], audio_mode=mode, ramp_ticks=ramp)
+        prompt = {name: {"class_type": "VAEEncode", "inputs": {"value": value}}
+                  for name, value in (("images", source_value), ("audio", 0),
+                                      ("vv", 0), ("aa", 0), ("mask", mask_value))}
+        prompt.update(expanded.expand)
+        cache = CacheKeySetInputSignature(DynamicPrompt(prompt), prompt, Unchanged())
+        await cache.add_keys(prompt)
+        return {name: cache.get_data_key("av.0.0." + name)
+                for name in ("video", "audio", "mask")}
+
+    original = asyncio.run(signatures())
+    for changed in (dict(mode="regenerate"), dict(ramp=8), dict(mask_value=1)):
+        updated = asyncio.run(signatures(**changed))
+        assert original["video"] == updated["video"]
+        assert original["audio"] == updated["audio"]
+        assert original["mask"] != updated["mask"]
+    updated = asyncio.run(signatures(source_value=1))
+    assert original["video"] != updated["video"]
+    assert original["audio"] == updated["audio"]
+    assert av.NKDAVLatent.define_schema().enable_expand
+    assert av.NKDAVLatentMask.define_schema().is_dev_only
 
     # Keep: the sound is masked off everywhere, so none of it is resampled.
     _, m = run(audio_mode="keep", latent_mask=mask)
@@ -123,7 +179,7 @@ def demo():
                               "encode": lambda self, w: torch.ones(1, 32, 2, t)})()
 
     for encoded in (207, 204, 211):                     # exact, short, long
-        out = av.NKDAVLatent.execute(images, audio, _VideoVae(), vae_returning(encoded),
+        out = execute(images, audio, _VideoVae(), vae_returning(encoded),
                                      audio_mode="follow mask", latent_mask=mask)[0]
         assert out["samples"].unbind()[1].shape[-1] == 207, encoded
         nm = out["noise_mask"].unbind()[1]
@@ -138,12 +194,12 @@ def demo():
     # The rate is read off the VAE, not hardcoded: halve it and the target halves.
     half = type("V", (), {"audio_sample_rate": 32000, "downscale_ratio": 1600,
                           "encode": lambda self, w: torch.zeros(1, 32, 2, 207)})()
-    out = av.NKDAVLatent.execute(images, audio, _VideoVae(), half, audio_mode="keep")[0]
+    out = execute(images, audio, _VideoVae(), half, audio_mode="keep")[0]
     assert out["samples"].unbind()[1].shape[-1] == 103, out["samples"].unbind()[1].shape
 
     # A VAE that doesn't describe itself leaves the length alone rather than guessing.
     mute = type("V", (), {"encode": lambda self, w: torch.zeros(1, 32, 2, 204)})()
-    out = av.NKDAVLatent.execute(images, audio, _VideoVae(), mute, audio_mode="keep")[0]
+    out = execute(images, audio, _VideoVae(), mute, audio_mode="keep")[0]
     assert out["samples"].unbind()[1].shape[-1] == 204
 
     # the core node on its own still does NOT fit - this is the gap being covered

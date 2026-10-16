@@ -16,7 +16,7 @@ from .nkd_color_warp import NKDColorWarp
 from .nkd_mask_ops import NKDMaskOps, NKDMaskOpsLean
 from .nkd_alpha_matte import NKDAlphaMatte
 from .nkd_merge import NKDMerge
-from .nkd_av_latent import NKDAudioMask, NKDAVLatent, NKDAVLatentExtend
+from .nkd_av_latent import NKDAudioMask, NKDAVLatent, NKDAVLatentMask, NKDAVLatentExtend
 from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
@@ -69,6 +69,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDMerge,
             NKDAudioMask,
             NKDAVLatent,
+            NKDAVLatentMask,
             NKDAVLatentExtend,
             NKDMaskPainter,
             NKDVectorMask,
@@ -112,6 +113,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDMerge": NKDMerge,
     "NKDAudioMask": NKDAudioMask,
     "NKDAVLatent": NKDAVLatent,
+    "NKDAVLatentMask": NKDAVLatentMask,
     "NKDAVLatentExtend": NKDAVLatentExtend,
     "NKDMaskPainter": NKDMaskPainter,
     "NKDVectorMask": NKDVectorMask,
@@ -144,6 +146,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDMerge": "😺NKD Merge",
     "NKDAudioMask": "😺NKD Audio Mask",
     "NKDAVLatent": "😺NKD AV Latent",
+    "NKDAVLatentMask": "😺NKD AV Latent Mask",
     "NKDAVLatentExtend": "😺NKD AV Latent Extend",
     "NKDMaskPainter": "😺NKD Mask Painter",
     "NKDVectorMask": "😺NKD Vector Mask",
