@@ -286,7 +286,7 @@ comfyApp.registerExtension({
         const result = innerComputeSize(width);
         const root = container.firstElementChild as HTMLElement | null;
         if (root && root.offsetHeight > 0) result[1] = root.offsetHeight + ROW_SAFETY;
-        const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
+        const editorEl = container.querySelector<HTMLElement>(".nkd-pvar-editor");
         if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
           result[1] = result[1] - editorEl.offsetHeight + BASE_EDITOR_H;
         }
@@ -298,7 +298,7 @@ comfyApp.registerExtension({
         origResize?.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
         // Grow/shrink the editor to fill the node when user drags a corner.
-        const editorEl = container.querySelector<HTMLElement>(".nkd-pv-editor");
+        const editorEl = container.querySelector<HTMLElement>(".nkd-pvar-editor");
         if (!editorEl) return;
         const computed = this.computeSize();
         const overhead = computed[1] - BASE_EDITOR_H;

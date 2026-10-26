@@ -233,11 +233,15 @@ def _register_preset_routes() -> None:
 
     routes = PromptServer.instance.routes
 
-    @routes.get("/nkd/lora/presets")
-    async def _list(_request):
-        return web.json_response({"user": _read_presets()})
+    # GET and POST share one handler so the preset list survives hot reloads.
+    @routes.route("*", "/nkd/lora/presets")
+    async def _presets(request):
+        if request.method == "GET":
+            return web.json_response({"user": _read_presets()})
+        if request.method != "POST":
+            raise web.HTTPMethodNotAllowed(request.method, ["GET", "POST"])
+        return await _save(request)
 
-    @routes.post("/nkd/lora/presets")
     @same_origin_only
     async def _save(request):
         try:

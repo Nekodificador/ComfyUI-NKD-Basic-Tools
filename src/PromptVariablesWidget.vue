@@ -1,8 +1,8 @@
 <template>
-  <div ref="root" class="nkd-pv" @mousedown.stop @mouseup.stop @mousemove.stop>
+  <div ref="root" class="nkd-pvar" @mousedown.stop @mouseup.stop @mousemove.stop>
     <div
       ref="editor"
-      class="nkd-pv-editor"
+      class="nkd-pvar-editor"
       contenteditable="true"
       spellcheck="false"
       data-placeholder="Write your prompt… (type @ to insert a variable)"
@@ -22,43 +22,43 @@
     <div
       v-if="acMenu.open"
       ref="acMenuEl"
-      class="nkd-pv-ac"
+      class="nkd-pvar-ac"
       @mousedown.prevent
     >
       <div
         v-for="(item, i) in acMenu.items"
         :key="item.name"
-        class="nkd-pv-ac-item"
+        class="nkd-pvar-ac-item"
         :class="{ active: i === acMenu.idx }"
         @mousedown.prevent="acPick(item)"
       >
-        <i class="nkd-pv-dot" :class="{ 'nkd-pv-dot-off': !item.connected }"></i>
+        <i class="nkd-pvar-dot" :class="{ 'nkd-pvar-dot-off': !item.connected }"></i>
         {{ item.label }}
       </div>
     </div>
-    <div class="nkd-pv-bar">
+    <div class="nkd-pvar-bar">
       <button
         v-for="v in vars"
         :key="v.name"
-        class="nkd-pv-add"
+        class="nkd-pvar-add"
         :class="{ connected: v.connected }"
         :title="v.connected ? 'Insert chip (wired)' : 'Insert chip (not wired yet)'"
         @click.stop.prevent="insertChip(v.name)"
       >+ {{ v.label }}</button>
       <button
-        class="nkd-pv-add nkd-pv-lib-toggle"
+        class="nkd-pvar-add nkd-pvar-lib-toggle"
         :class="{ active: modal }"
         title="Your saved variables, shared by every workflow"
         @click.stop.prevent="toggleLibrary"
       >Saved</button>
     </div>
     <Teleport v-if="modal" :to="modal.body">
-    <div class="nkd-pv-lib" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
-      <div v-for="item in library.items" :key="item.name" class="nkd-pv-lib-row">
-        <div class="nkd-pv-lib-head">
-          <span class="nkd-pv-lib-at">@</span>
+    <div class="nkd-pvar-lib" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
+      <div v-for="item in library.items" :key="item.name" class="nkd-pvar-lib-row">
+        <div class="nkd-pvar-lib-head">
+          <span class="nkd-pvar-lib-at">@</span>
           <input
-            class="nkd-pv-lib-name"
+            class="nkd-pvar-lib-name"
             :value="item.name"
             spellcheck="false"
             title="Letters, numbers, - and _ (spaces become _)"
@@ -69,7 +69,7 @@
           <button class="nkd-modal-btn" title="Delete from your library" @click.stop.prevent="deleteSaved(item)">×</button>
         </div>
         <textarea
-          class="nkd-pv-lib-value"
+          class="nkd-pvar-lib-value"
           rows="2"
           spellcheck="false"
           placeholder="Value (one item per line)"
@@ -77,7 +77,7 @@
           @input="editSaved(item, $event)"
         ></textarea>
       </div>
-      <div v-if="!library.items.length" class="nkd-pv-lib-empty">
+      <div v-if="!library.items.length" class="nkd-pvar-lib-empty">
         No saved variables yet. Select text in the prompt and press + New to save it.
       </div>
     </div>
@@ -169,13 +169,13 @@ function labelFor(name: string): string {
 
 function applyMode(span: HTMLElement, mode: Mode) {
   span.dataset.mode = mode;
-  span.classList.toggle("nkd-pv-chip-rand", mode === "r");
-  span.classList.toggle("nkd-pv-chip-cycle", mode === "c");
+  span.classList.toggle("nkd-pvar-chip-rand", mode === "r");
+  span.classList.toggle("nkd-pvar-chip-cycle", mode === "c");
 }
 
 function chipEl(name: string, mode: Mode = ""): HTMLSpanElement {
   const span = document.createElement("span");
-  span.className = "nkd-pv-chip";
+  span.className = "nkd-pvar-chip";
   span.contentEditable = "false";
   span.dataset.var = name;
   applyMode(span, mode);
@@ -190,16 +190,16 @@ function chipEl(name: string, mode: Mode = ""): HTMLSpanElement {
     draggedChip = null;
   });
   const dot = document.createElement("i");
-  dot.className = "nkd-pv-dot";
+  dot.className = "nkd-pvar-dot";
   span.appendChild(dot);
   span.appendChild(document.createTextNode(labelFor(name)));
   if (name.startsWith("@")) {
-    span.classList.add("nkd-pv-chip-saved");
+    span.classList.add("nkd-pvar-chip-saved");
     styleSavedChip(span);
     return span;
   }
   const v = vars.value.find((x) => x.name === name);
-  if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
+  if (v && !v.connected) span.classList.add("nkd-pvar-chip-off");
   return span;
 }
 
@@ -255,14 +255,14 @@ function renderText(text: string) {
 // caret back before it and the next word lands on the wrong side. A trailing <br> gives
 // that line a body; serialise() skips it.
 function isTail(node: Node | null): boolean {
-  return node instanceof HTMLBRElement && node.classList.contains("nkd-pv-tail");
+  return node instanceof HTMLBRElement && node.classList.contains("nkd-pvar-tail");
 }
 
 function addTail() {
   const el = editor.value;
   if (!el || isTail(el.lastChild)) return;
   const br = document.createElement("br");
-  br.className = "nkd-pv-tail";
+  br.className = "nkd-pvar-tail";
   el.appendChild(br);
 }
 
@@ -339,7 +339,7 @@ function onPanelKeydown(e: KeyboardEvent) {
 function onInput() {
   // Emptied by hand: drop any leftover <br> so the placeholder shows again.
   const el = editor.value;
-  if (el && !el.textContent && !el.querySelector(".nkd-pv-chip")) el.textContent = "";
+  if (el && !el.textContent && !el.querySelector(".nkd-pvar-chip")) el.textContent = "";
   saveSelection();
   emitChange();
   checkAutocomplete();
@@ -479,7 +479,7 @@ function onPaste(e: ClipboardEvent) {
 }
 
 function onEditorClick(e: MouseEvent) {
-  const chip = (e.target as HTMLElement)?.closest?.(".nkd-pv-chip") as HTMLElement | null;
+  const chip = (e.target as HTMLElement)?.closest?.(".nkd-pvar-chip") as HTMLElement | null;
   if (!chip || !e.shiftKey) return;
   e.preventDefault();
   e.stopPropagation();
@@ -530,9 +530,9 @@ function setVariables(list: VarInfo[]) {
   vars.value = list;
   // Refresh connection styling AND labels on existing chips in place
   // (renamed sockets propagate to their chips).
-  editor.value?.querySelectorAll<HTMLElement>(".nkd-pv-chip:not(.nkd-pv-chip-saved)").forEach((chip) => {
+  editor.value?.querySelectorAll<HTMLElement>(".nkd-pvar-chip:not(.nkd-pvar-chip-saved)").forEach((chip) => {
     const v = list.find((x) => x.name === chip.dataset.var);
-    chip.classList.toggle("nkd-pv-chip-off", !(v && v.connected));
+    chip.classList.toggle("nkd-pvar-chip-off", !(v && v.connected));
     if (v && chip.lastChild && chip.lastChild.textContent !== v.label) {
       chip.lastChild.textContent = v.label;
     }
@@ -553,14 +553,14 @@ function setSaved(json: string) {
 
 function styleSavedChip(chip: HTMLElement) {
   const value = savedValue(chip.dataset.var ?? "");
-  chip.classList.toggle("nkd-pv-chip-off", value === undefined);
+  chip.classList.toggle("nkd-pvar-chip-off", value === undefined);
   chip.title = value === undefined
     ? "Saved variable not found in this node or your library"
     : `${value}\n\nShift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
 }
 
 function refreshSavedChips() {
-  editor.value?.querySelectorAll<HTMLElement>(".nkd-pv-chip-saved").forEach(styleSavedChip);
+  editor.value?.querySelectorAll<HTMLElement>(".nkd-pvar-chip-saved").forEach(styleSavedChip);
 }
 
 // Inserting a saved variable copies its current library value into this node.
@@ -582,7 +582,7 @@ function newSaved() {
   library.items.push({ name, value: selectedText() });
   saveLibrary();
   nextTick(() => {
-    const el = Array.from(modal.value?.body.querySelectorAll<HTMLInputElement>(".nkd-pv-lib-name") ?? [])
+    const el = Array.from(modal.value?.body.querySelectorAll<HTMLInputElement>(".nkd-pvar-lib-name") ?? [])
       .find((x) => x.value === name);
     el?.focus();
     el?.select();
@@ -608,9 +608,9 @@ function renameSaved(item: SavedVar, e: Event) {
   if (!name || taken) {
     input.value = item.name;
     input.title = taken ? `"@${name}" already exists` : "Use letters, numbers, - or _";
-    input.classList.add("nkd-pv-lib-bad");
+    input.classList.add("nkd-pvar-lib-bad");
     window.setTimeout(() => {
-      input.classList.remove("nkd-pv-lib-bad");
+      input.classList.remove("nkd-pvar-lib-bad");
       input.title = "Letters, numbers, - and _ (spaces become _)";
     }, 1500);
     return;
@@ -624,7 +624,7 @@ function renameSaved(item: SavedVar, e: Event) {
     nodeSaved[name] = nodeSaved[old];
     delete nodeSaved[old];
   }
-  editor.value?.querySelectorAll<HTMLElement>(`.nkd-pv-chip-saved[data-var="@${old}"]`).forEach((chip) => {
+  editor.value?.querySelectorAll<HTMLElement>(`.nkd-pvar-chip-saved[data-var="@${old}"]`).forEach((chip) => {
     chip.dataset.var = `@${name}`;
     if (chip.lastChild) chip.lastChild.textContent = `@${name}`;
   });
@@ -656,7 +656,7 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 </script>
 
 <style scoped>
-.nkd-pv {
+.nkd-pvar {
   position: relative;
   display: flex;
   flex-direction: column;
@@ -664,7 +664,7 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   box-sizing: border-box;
   padding: 2px;
 }
-.nkd-pv-editor {
+.nkd-pvar-editor {
   height: 150px;
   min-height: 90px;
   overflow-y: auto;
@@ -679,21 +679,21 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   word-break: break-word;
   outline: none;
 }
-.nkd-pv-editor:focus {
+.nkd-pvar-editor:focus {
   border-color: #4ab4ff;
 }
-.nkd-pv-editor:empty::before {
+.nkd-pvar-editor:empty::before {
   content: attr(data-placeholder);
   color: rgba(255, 255, 255, 0.22);
   pointer-events: none;
 }
-.nkd-pv-bar {
+.nkd-pvar-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
   flex: 0 0 auto;
 }
-.nkd-pv-add {
+.nkd-pvar-add {
   background: #252830;
   border: 1px solid #3a3d46;
   border-radius: 4px;
@@ -702,22 +702,22 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   padding: 2px 8px;
   cursor: pointer;
 }
-.nkd-pv-add:hover {
+.nkd-pvar-add:hover {
   border-color: #4ab4ff;
   color: #4ab4ff;
 }
-.nkd-pv-add.connected {
+.nkd-pvar-add.connected {
   color: #4ab4ff;
 }
-.nkd-pv-lib-toggle {
+.nkd-pvar-lib-toggle {
   margin-left: auto;
 }
-.nkd-pv-lib-toggle.active,
-.nkd-pv-lib-toggle:hover {
+.nkd-pvar-lib-toggle.active,
+.nkd-pvar-lib-toggle:hover {
   border-color: #b48cff;
   color: #d6c2ff;
 }
-.nkd-pv-lib {
+.nkd-pvar-lib {
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -727,23 +727,23 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   padding: 14px;
   box-sizing: border-box;
 }
-.nkd-pv-lib-row {
+.nkd-pvar-lib-row {
   display: flex;
   flex-direction: column;
   gap: 3px;
 }
-.nkd-pv-lib-head {
+.nkd-pvar-lib-head {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.nkd-pv-lib-at {
+.nkd-pvar-lib-at {
   color: #b48cff;
   font-size: 11px;
   font-weight: 600;
 }
-.nkd-pv-lib-name,
-.nkd-pv-lib-value {
+.nkd-pvar-lib-name,
+.nkd-pvar-lib-value {
   background: #252830;
   border: 1px solid #3a3d46;
   border-radius: 4px;
@@ -753,27 +753,27 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   padding: 4px 8px;
   outline: none;
 }
-.nkd-pv-lib-name {
+.nkd-pvar-lib-name {
   flex: 1 1 auto;
   min-width: 0;
 }
-.nkd-pv-lib-value {
+.nkd-pvar-lib-value {
   resize: vertical;
   min-height: 34px;
   line-height: 1.45;
 }
-.nkd-pv-lib-name:focus,
-.nkd-pv-lib-value:focus {
+.nkd-pvar-lib-name:focus,
+.nkd-pvar-lib-value:focus {
   border-color: #4ab4ff;
 }
-.nkd-pv-lib-name.nkd-pv-lib-bad {
+.nkd-pvar-lib-name.nkd-pvar-lib-bad {
   border-color: #ff5c5c;
 }
-.nkd-pv-lib-empty {
+.nkd-pvar-lib-empty {
   color: rgba(255, 255, 255, 0.4);
   font-size: 12px;
 }
-.nkd-pv-ac {
+.nkd-pvar-ac {
   position: absolute;
   z-index: 100;
   background: #1e2028;
@@ -785,7 +785,7 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
-.nkd-pv-ac-item {
+.nkd-pvar-ac-item {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -796,12 +796,12 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   cursor: pointer;
   white-space: nowrap;
 }
-.nkd-pv-ac-item:hover,
-.nkd-pv-ac-item.active {
+.nkd-pvar-ac-item:hover,
+.nkd-pvar-ac-item.active {
   background: rgba(74, 180, 255, 0.18);
   color: #fff;
 }
-.nkd-pv-dot-off {
+.nkd-pvar-dot-off {
   background: transparent !important;
   box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);
 }
@@ -810,7 +810,7 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 <!-- Chips are created with document.createElement, outside Vue's render tree,
      so their styles must be UNSCOPED (scoped rules only match hashed nodes). -->
 <style>
-.nkd-pv-chip {
+.nkd-pvar-chip {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -830,69 +830,69 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   white-space: nowrap;
   transform: translateY(-1px);
 }
-.nkd-pv-chip:active {
+.nkd-pvar-chip:active {
   cursor: grabbing;
 }
-.nkd-pv-chip::selection,
-.nkd-pv-chip *::selection {
+.nkd-pvar-chip::selection,
+.nkd-pvar-chip *::selection {
   background: transparent;
 }
-.nkd-pv-dot {
+.nkd-pvar-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: #4ab4ff;
   flex: 0 0 auto;
 }
-.nkd-pv-chip-saved {
+.nkd-pvar-chip-saved {
   border-color: rgba(180, 140, 255, 0.8);
   color: #e0d2ff;
   background: rgba(180, 140, 255, 0.14);
 }
-.nkd-pv-chip-saved .nkd-pv-dot {
+.nkd-pvar-chip-saved .nkd-pvar-dot {
   background: #b48cff;
 }
-.nkd-pv-chip-off {
+.nkd-pvar-chip-off {
   border-style: dashed;
   border-color: rgba(255, 255, 255, 0.32);
   color: rgba(255, 255, 255, 0.5);
   background: rgba(255, 255, 255, 0.05);
 }
-.nkd-pv-chip-off .nkd-pv-dot {
+.nkd-pvar-chip-off .nkd-pvar-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);
 }
-.nkd-pv-chip-rand {
+.nkd-pvar-chip-rand {
   border-color: rgba(255, 209, 102, 0.85);
   color: #ffe3a8;
   background: rgba(255, 209, 102, 0.12);
 }
-.nkd-pv-chip-rand::after {
+.nkd-pvar-chip-rand::after {
   content: "🎲";
   font-size: 10px;
   line-height: 1;
 }
-.nkd-pv-chip-rand .nkd-pv-dot {
+.nkd-pvar-chip-rand .nkd-pvar-dot {
   background: #ffd166;
 }
-.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {
+.nkd-pvar-chip-rand.nkd-pvar-chip-off .nkd-pvar-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);
 }
-.nkd-pv-chip-cycle {
+.nkd-pvar-chip-cycle {
   border-color: rgba(102, 224, 170, 0.85);
   color: #b6f2d8;
   background: rgba(102, 224, 170, 0.12);
 }
-.nkd-pv-chip-cycle::after {
+.nkd-pvar-chip-cycle::after {
   content: "🔁";
   font-size: 10px;
   line-height: 1;
 }
-.nkd-pv-chip-cycle .nkd-pv-dot {
+.nkd-pvar-chip-cycle .nkd-pvar-dot {
   background: #66e0aa;
 }
-.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {
+.nkd-pvar-chip-cycle.nkd-pvar-chip-off .nkd-pvar-dot {
   background: transparent;
   box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);
 }

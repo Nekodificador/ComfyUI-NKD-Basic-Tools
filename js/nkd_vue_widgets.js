@@ -7124,16 +7124,16 @@ function nkdSlider(label, cfg, onInput, title) {
   return wrap;
 }
 const _hoisted_1$6 = ["onMousedown"];
-const _hoisted_2$6 = { class: "nkd-pv-bar" };
+const _hoisted_2$6 = { class: "nkd-pvar-bar" };
 const _hoisted_3$6 = ["title", "onClick"];
-const _hoisted_4$4 = { class: "nkd-pv-lib-head" };
+const _hoisted_4$4 = { class: "nkd-pvar-lib-head" };
 const _hoisted_5$2 = ["value", "onChange"];
 const _hoisted_6$2 = ["onClick"];
 const _hoisted_7$2 = ["onClick"];
 const _hoisted_8 = ["value", "onInput"];
 const _hoisted_9 = {
   key: 0,
-  class: "nkd-pv-lib-empty"
+  class: "nkd-pvar-lib-empty"
 };
 const _sfc_main$6 = /* @__PURE__ */ defineComponent({
   __name: "PromptVariablesWidget",
@@ -7200,12 +7200,12 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
     }
     function applyMode(span, mode) {
       span.dataset.mode = mode;
-      span.classList.toggle("nkd-pv-chip-rand", mode === "r");
-      span.classList.toggle("nkd-pv-chip-cycle", mode === "c");
+      span.classList.toggle("nkd-pvar-chip-rand", mode === "r");
+      span.classList.toggle("nkd-pvar-chip-cycle", mode === "c");
     }
     function chipEl(name, mode = "") {
       const span = document.createElement("span");
-      span.className = "nkd-pv-chip";
+      span.className = "nkd-pvar-chip";
       span.contentEditable = "false";
       span.dataset.var = name;
       applyMode(span, mode);
@@ -7221,16 +7221,16 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
         draggedChip = null;
       });
       const dot = document.createElement("i");
-      dot.className = "nkd-pv-dot";
+      dot.className = "nkd-pvar-dot";
       span.appendChild(dot);
       span.appendChild(document.createTextNode(labelFor(name)));
       if (name.startsWith("@")) {
-        span.classList.add("nkd-pv-chip-saved");
+        span.classList.add("nkd-pvar-chip-saved");
         styleSavedChip(span);
         return span;
       }
       const v = vars.value.find((x) => x.name === name);
-      if (v && !v.connected) span.classList.add("nkd-pv-chip-off");
+      if (v && !v.connected) span.classList.add("nkd-pvar-chip-off");
       return span;
     }
     function rangeFromPoint(x, y) {
@@ -7278,13 +7278,13 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
       if (text.endsWith("\n")) addTail();
     }
     function isTail(node) {
-      return node instanceof HTMLBRElement && node.classList.contains("nkd-pv-tail");
+      return node instanceof HTMLBRElement && node.classList.contains("nkd-pvar-tail");
     }
     function addTail() {
       const el = editor.value;
       if (!el || isTail(el.lastChild)) return;
       const br = document.createElement("br");
-      br.className = "nkd-pv-tail";
+      br.className = "nkd-pvar-tail";
       el.appendChild(br);
     }
     function isLast(node) {
@@ -7346,7 +7346,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
     }
     function onInput() {
       const el = editor.value;
-      if (el && !el.textContent && !el.querySelector(".nkd-pv-chip")) el.textContent = "";
+      if (el && !el.textContent && !el.querySelector(".nkd-pvar-chip")) el.textContent = "";
       saveSelection();
       emitChange();
       checkAutocomplete();
@@ -7482,7 +7482,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
     }
     function onEditorClick(e) {
       var _a, _b;
-      const chip = (_b = (_a = e.target) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, ".nkd-pv-chip");
+      const chip = (_b = (_a = e.target) == null ? void 0 : _a.closest) == null ? void 0 : _b.call(_a, ".nkd-pvar-chip");
       if (!chip || !e.shiftKey) return;
       e.preventDefault();
       e.stopPropagation();
@@ -7527,9 +7527,9 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
       const changed = JSON.stringify(list) !== JSON.stringify(vars.value);
       if (!changed) return;
       vars.value = list;
-      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-chip:not(.nkd-pv-chip-saved)").forEach((chip) => {
+      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pvar-chip:not(.nkd-pvar-chip-saved)").forEach((chip) => {
         const v = list.find((x) => x.name === chip.dataset.var);
-        chip.classList.toggle("nkd-pv-chip-off", !(v && v.connected));
+        chip.classList.toggle("nkd-pvar-chip-off", !(v && v.connected));
         if (v && chip.lastChild && chip.lastChild.textContent !== v.label) {
           chip.lastChild.textContent = v.label;
         }
@@ -7546,14 +7546,14 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
     }
     function styleSavedChip(chip) {
       const value = savedValue(chip.dataset.var ?? "");
-      chip.classList.toggle("nkd-pv-chip-off", value === void 0);
+      chip.classList.toggle("nkd-pvar-chip-off", value === void 0);
       chip.title = value === void 0 ? "Saved variable not found in this node or your library" : `${value}
 
 Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
     }
     function refreshSavedChips() {
       var _a;
-      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pv-chip-saved").forEach(styleSavedChip);
+      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(".nkd-pvar-chip-saved").forEach(styleSavedChip);
     }
     function adoptSaved(name) {
       if (!name.startsWith("@")) return;
@@ -7573,7 +7573,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
       saveLibrary();
       nextTick(() => {
         var _a;
-        const el = Array.from(((_a = modal.value) == null ? void 0 : _a.body.querySelectorAll(".nkd-pv-lib-name")) ?? []).find((x) => x.value === name);
+        const el = Array.from(((_a = modal.value) == null ? void 0 : _a.body.querySelectorAll(".nkd-pvar-lib-name")) ?? []).find((x) => x.value === name);
         el == null ? void 0 : el.focus();
         el == null ? void 0 : el.select();
       });
@@ -7595,9 +7595,9 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
       if (!name || taken) {
         input.value = item.name;
         input.title = taken ? `"@${name}" already exists` : "Use letters, numbers, - or _";
-        input.classList.add("nkd-pv-lib-bad");
+        input.classList.add("nkd-pvar-lib-bad");
         window.setTimeout(() => {
-          input.classList.remove("nkd-pv-lib-bad");
+          input.classList.remove("nkd-pvar-lib-bad");
           input.title = "Letters, numbers, - and _ (spaces become _)";
         }, 1500);
         return;
@@ -7611,7 +7611,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
         nodeSaved[name] = nodeSaved[old];
         delete nodeSaved[old];
       }
-      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(`.nkd-pv-chip-saved[data-var="@${old}"]`).forEach((chip) => {
+      (_a = editor.value) == null ? void 0 : _a.querySelectorAll(`.nkd-pvar-chip-saved[data-var="@${old}"]`).forEach((chip) => {
         chip.dataset.var = `@${name}`;
         if (chip.lastChild) chip.lastChild.textContent = `@${name}`;
       });
@@ -7639,7 +7639,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
       return openBlock(), createElementBlock("div", {
         ref_key: "root",
         ref: root,
-        class: "nkd-pv",
+        class: "nkd-pvar",
         onMousedown: _cache[7] || (_cache[7] = withModifiers(() => {
         }, ["stop"])),
         onMouseup: _cache[8] || (_cache[8] = withModifiers(() => {
@@ -7650,7 +7650,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
         createBaseVNode("div", {
           ref_key: "editor",
           ref: editor,
-          class: "nkd-pv-editor",
+          class: "nkd-pvar-editor",
           contenteditable: "true",
           spellcheck: "false",
           "data-placeholder": "Write your prompt… (type @ to insert a variable)",
@@ -7674,18 +7674,18 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
           key: 0,
           ref_key: "acMenuEl",
           ref: acMenuEl,
-          class: "nkd-pv-ac",
+          class: "nkd-pvar-ac",
           onMousedown: _cache[3] || (_cache[3] = withModifiers(() => {
           }, ["prevent"]))
         }, [
           (openBlock(true), createElementBlock(Fragment, null, renderList(acMenu.items, (item, i) => {
             return openBlock(), createElementBlock("div", {
               key: item.name,
-              class: normalizeClass(["nkd-pv-ac-item", { active: i === acMenu.idx }]),
+              class: normalizeClass(["nkd-pvar-ac-item", { active: i === acMenu.idx }]),
               onMousedown: withModifiers(($event) => acPick(item), ["prevent"])
             }, [
               createBaseVNode("i", {
-                class: normalizeClass(["nkd-pv-dot", { "nkd-pv-dot-off": !item.connected }])
+                class: normalizeClass(["nkd-pvar-dot", { "nkd-pvar-dot-off": !item.connected }])
               }, null, 2),
               createTextVNode(" " + toDisplayString(item.label), 1)
             ], 42, _hoisted_1$6);
@@ -7695,13 +7695,13 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
           (openBlock(true), createElementBlock(Fragment, null, renderList(vars.value, (v) => {
             return openBlock(), createElementBlock("button", {
               key: v.name,
-              class: normalizeClass(["nkd-pv-add", { connected: v.connected }]),
+              class: normalizeClass(["nkd-pvar-add", { connected: v.connected }]),
               title: v.connected ? "Insert chip (wired)" : "Insert chip (not wired yet)",
               onClick: withModifiers(($event) => insertChip(v.name), ["stop", "prevent"])
             }, "+ " + toDisplayString(v.label), 11, _hoisted_3$6);
           }), 128)),
           createBaseVNode("button", {
-            class: normalizeClass(["nkd-pv-add nkd-pv-lib-toggle", { active: modal.value }]),
+            class: normalizeClass(["nkd-pvar-add nkd-pvar-lib-toggle", { active: modal.value }]),
             title: "Your saved variables, shared by every workflow",
             onClick: withModifiers(toggleLibrary, ["stop", "prevent"])
           }, "Saved", 2)
@@ -7711,7 +7711,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
           to: modal.value.body
         }, [
           createBaseVNode("div", {
-            class: "nkd-pv-lib",
+            class: "nkd-pvar-lib",
             onKeydown: onPanelKeydown,
             onPaste: _cache[4] || (_cache[4] = withModifiers(() => {
             }, ["stop"])),
@@ -7723,12 +7723,12 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
             (openBlock(true), createElementBlock(Fragment, null, renderList(unref(library).items, (item) => {
               return openBlock(), createElementBlock("div", {
                 key: item.name,
-                class: "nkd-pv-lib-row"
+                class: "nkd-pvar-lib-row"
               }, [
                 createBaseVNode("div", _hoisted_4$4, [
-                  _cache[10] || (_cache[10] = createBaseVNode("span", { class: "nkd-pv-lib-at" }, "@", -1)),
+                  _cache[10] || (_cache[10] = createBaseVNode("span", { class: "nkd-pvar-lib-at" }, "@", -1)),
                   createBaseVNode("input", {
-                    class: "nkd-pv-lib-name",
+                    class: "nkd-pvar-lib-name",
                     value: item.name,
                     spellcheck: "false",
                     title: "Letters, numbers, - and _ (spaces become _)",
@@ -7747,7 +7747,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
                   }, "×", 8, _hoisted_7$2)
                 ]),
                 createBaseVNode("textarea", {
-                  class: "nkd-pv-lib-value",
+                  class: "nkd-pvar-lib-value",
                   rows: "2",
                   spellcheck: "false",
                   placeholder: "Value (one item per line)",
@@ -7780,7 +7780,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$6, [["__scopeId", "data-v-58f2854d"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$6, [["__scopeId", "data-v-2b845a08"]]);
 const MODES = ["smooth", "bezier", "steps"];
 function midWarp(f, mid) {
   const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
@@ -8400,7 +8400,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-3d741d05"]]);
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-c321596f"]]);
 const _hoisted_1$4 = { class: "nkd-bar" };
 const _hoisted_2$4 = { class: "nkd-row nkd-row--controls" };
 const _hoisted_3$4 = { class: "nkd-hint" };
@@ -9363,7 +9363,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-773b27a5"]]);
+const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-76fe8be0"]]);
 const EPS = 1e-6;
 const LUMA_R$1 = 0.2126, LUMA_G$1 = 0.7152, LUMA_B$1 = 0.0722;
 function srgbToLinear$1(v) {
@@ -20668,7 +20668,7 @@ app.registerExtension({
         const result2 = innerComputeSize(width);
         const root = container.firstElementChild;
         if (root && root.offsetHeight > 0) result2[1] = root.offsetHeight + ROW_SAFETY;
-        const editorEl = container.querySelector(".nkd-pv-editor");
+        const editorEl = container.querySelector(".nkd-pvar-editor");
         if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
           result2[1] = result2[1] - editorEl.offsetHeight + BASE_EDITOR_H;
         }
@@ -20678,7 +20678,7 @@ app.registerExtension({
       this.onResize = function(size) {
         origResize == null ? void 0 : origResize.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
-        const editorEl = container.querySelector(".nkd-pv-editor");
+        const editorEl = container.querySelector(".nkd-pvar-editor");
         if (!editorEl) return;
         const computed2 = this.computeSize();
         const overhead = computed2[1] - BASE_EDITOR_H;
@@ -21882,7 +21882,7 @@ console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DE
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pv[data-v-58f2854d] {\r\n  position: relative;\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 6px;\r\n  box-sizing: border-box;\r\n  padding: 2px;\n}\n.nkd-pv-editor[data-v-58f2854d] {\r\n  height: 150px;\r\n  min-height: 90px;\r\n  overflow-y: auto;\r\n  background: #111318;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  padding: 6px 8px;\r\n  color: #c8d0e0;\r\n  font-size: 11.5px;\r\n  line-height: 1.55;\r\n  white-space: pre-wrap;\r\n  word-break: break-word;\r\n  outline: none;\n}\n.nkd-pv-editor[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-editor[data-v-58f2854d]:empty::before {\r\n  content: attr(data-placeholder);\r\n  color: rgba(255, 255, 255, 0.22);\r\n  pointer-events: none;\n}\n.nkd-pv-bar[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-wrap: wrap;\r\n  gap: 4px;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-add[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 11px;\r\n  padding: 2px 8px;\r\n  cursor: pointer;\n}\n.nkd-pv-add[data-v-58f2854d]:hover {\r\n  border-color: #4ab4ff;\r\n  color: #4ab4ff;\n}\n.nkd-pv-add.connected[data-v-58f2854d] {\r\n  color: #4ab4ff;\n}\n.nkd-pv-lib-toggle[data-v-58f2854d] {\r\n  margin-left: auto;\n}\n.nkd-pv-lib-toggle.active[data-v-58f2854d],\r\n.nkd-pv-lib-toggle[data-v-58f2854d]:hover {\r\n  border-color: #b48cff;\r\n  color: #d6c2ff;\n}\n.nkd-pv-lib[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 10px;\r\n  flex: 1 1 auto;\r\n  min-width: 0;\r\n  overflow-y: auto;\r\n  padding: 14px;\r\n  box-sizing: border-box;\n}\n.nkd-pv-lib-row[data-v-58f2854d] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  gap: 3px;\n}\n.nkd-pv-lib-head[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 4px;\n}\n.nkd-pv-lib-at[data-v-58f2854d] {\r\n  color: #b48cff;\r\n  font-size: 11px;\r\n  font-weight: 600;\n}\n.nkd-pv-lib-name[data-v-58f2854d],\r\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  background: #252830;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 4px;\r\n  color: #c8d0e0;\r\n  font-size: 12px;\r\n  font-family: inherit;\r\n  padding: 4px 8px;\r\n  outline: none;\n}\n.nkd-pv-lib-name[data-v-58f2854d] {\r\n  flex: 1 1 auto;\r\n  min-width: 0;\n}\n.nkd-pv-lib-value[data-v-58f2854d] {\r\n  resize: vertical;\r\n  min-height: 34px;\r\n  line-height: 1.45;\n}\n.nkd-pv-lib-name[data-v-58f2854d]:focus,\r\n.nkd-pv-lib-value[data-v-58f2854d]:focus {\r\n  border-color: #4ab4ff;\n}\n.nkd-pv-lib-name.nkd-pv-lib-bad[data-v-58f2854d] {\r\n  border-color: #ff5c5c;\n}\n.nkd-pv-lib-empty[data-v-58f2854d] {\r\n  color: rgba(255, 255, 255, 0.4);\r\n  font-size: 12px;\n}\n.nkd-pv-ac[data-v-58f2854d] {\r\n  position: absolute;\r\n  z-index: 100;\r\n  background: #1e2028;\r\n  border: 1px solid #3a3d46;\r\n  border-radius: 5px;\r\n  padding: 3px;\r\n  min-width: 120px;\r\n  max-height: 160px;\r\n  overflow-y: auto;\r\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pv-ac-item[data-v-58f2854d] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\r\n  padding: 4px 8px;\r\n  border-radius: 3px;\r\n  font-size: 11px;\r\n  color: #c8d0e0;\r\n  cursor: pointer;\r\n  white-space: nowrap;\n}\n.nkd-pv-ac-item[data-v-58f2854d]:hover,\r\n.nkd-pv-ac-item.active[data-v-58f2854d] {\r\n  background: rgba(74, 180, 255, 0.18);\r\n  color: #fff;\n}\n.nkd-pv-dot-off[data-v-58f2854d] {\r\n  background: transparent !important;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\r\n\n.nkd-pv-chip {\r\n  display: inline-flex;\r\n  align-items: center;\r\n  gap: 5px;\r\n  background: rgba(74, 180, 255, 0.14);\r\n  border: 1px solid rgba(74, 180, 255, 0.75);\r\n  color: #bfe3ff;\r\n  border-radius: 999px;\r\n  padding: 0 9px 0 7px;\r\n  margin: 0 2px;\r\n  font-size: 10px;\r\n  font-weight: 600;\r\n  letter-spacing: 0.2px;\r\n  line-height: 15px;\r\n  vertical-align: text-bottom;\r\n  user-select: none;\r\n  cursor: grab;\r\n  white-space: nowrap;\r\n  transform: translateY(-1px);\n}\n.nkd-pv-chip:active {\r\n  cursor: grabbing;\n}\n.nkd-pv-chip::selection,\r\n.nkd-pv-chip *::selection {\r\n  background: transparent;\n}\n.nkd-pv-dot {\r\n  width: 6px;\r\n  height: 6px;\r\n  border-radius: 50%;\r\n  background: #4ab4ff;\r\n  flex: 0 0 auto;\n}\n.nkd-pv-chip-saved {\r\n  border-color: rgba(180, 140, 255, 0.8);\r\n  color: #e0d2ff;\r\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pv-chip-saved .nkd-pv-dot {\r\n  background: #b48cff;\n}\n.nkd-pv-chip-off {\r\n  border-style: dashed;\r\n  border-color: rgba(255, 255, 255, 0.32);\r\n  color: rgba(255, 255, 255, 0.5);\r\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pv-chip-rand {\r\n  border-color: rgba(255, 209, 102, 0.85);\r\n  color: #ffe3a8;\r\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pv-chip-rand::after {\r\n  content: "🎲";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-rand .nkd-pv-dot {\r\n  background: #ffd166;\n}\n.nkd-pv-chip-rand.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pv-chip-cycle {\r\n  border-color: rgba(102, 224, 170, 0.85);\r\n  color: #b6f2d8;\r\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pv-chip-cycle::after {\r\n  content: "🔁";\r\n  font-size: 10px;\r\n  line-height: 1;\n}\n.nkd-pv-chip-cycle .nkd-pv-dot {\r\n  background: #66e0aa;\n}\n.nkd-pv-chip-cycle.nkd-pv-chip-off .nkd-pv-dot {\r\n  background: transparent;\r\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\r\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-e1c1838f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-e1c1838f], .nkd-root[data-v-e1c1838f] *, .nkd-root[data-v-e1c1838f] *::before, .nkd-root[data-v-e1c1838f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-e1c1838f] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-e1c1838f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-e1c1838f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-e1c1838f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-e1c1838f] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-e1c1838f] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-e1c1838f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-e1c1838f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-e1c1838f] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-e1c1838f] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-e1c1838f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-e1c1838f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-e1c1838f] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pvar[data-v-2b845a08] {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pvar-editor[data-v-2b845a08] {\n  height: 150px;\n  min-height: 90px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 6px 8px;\n  color: #c8d0e0;\n  font-size: 11.5px;\n  line-height: 1.55;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pvar-editor[data-v-2b845a08]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-editor[data-v-2b845a08]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pvar-bar[data-v-2b845a08] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pvar-add[data-v-2b845a08] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pvar-add[data-v-2b845a08]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pvar-add.connected[data-v-2b845a08] {\n  color: #4ab4ff;\n}\n.nkd-pvar-lib-toggle[data-v-2b845a08] {\n  margin-left: auto;\n}\n.nkd-pvar-lib-toggle.active[data-v-2b845a08],\n.nkd-pvar-lib-toggle[data-v-2b845a08]:hover {\n  border-color: #b48cff;\n  color: #d6c2ff;\n}\n.nkd-pvar-lib[data-v-2b845a08] {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  flex: 1 1 auto;\n  min-width: 0;\n  overflow-y: auto;\n  padding: 14px;\n  box-sizing: border-box;\n}\n.nkd-pvar-lib-row[data-v-2b845a08] {\n  display: flex;\n  flex-direction: column;\n  gap: 3px;\n}\n.nkd-pvar-lib-head[data-v-2b845a08] {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n.nkd-pvar-lib-at[data-v-2b845a08] {\n  color: #b48cff;\n  font-size: 11px;\n  font-weight: 600;\n}\n.nkd-pvar-lib-name[data-v-2b845a08],\n.nkd-pvar-lib-value[data-v-2b845a08] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 12px;\n  font-family: inherit;\n  padding: 4px 8px;\n  outline: none;\n}\n.nkd-pvar-lib-name[data-v-2b845a08] {\n  flex: 1 1 auto;\n  min-width: 0;\n}\n.nkd-pvar-lib-value[data-v-2b845a08] {\n  resize: vertical;\n  min-height: 34px;\n  line-height: 1.45;\n}\n.nkd-pvar-lib-name[data-v-2b845a08]:focus,\n.nkd-pvar-lib-value[data-v-2b845a08]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-lib-name.nkd-pvar-lib-bad[data-v-2b845a08] {\n  border-color: #ff5c5c;\n}\n.nkd-pvar-lib-empty[data-v-2b845a08] {\n  color: rgba(255, 255, 255, 0.4);\n  font-size: 12px;\n}\n.nkd-pvar-ac[data-v-2b845a08] {\n  position: absolute;\n  z-index: 100;\n  background: #1e2028;\n  border: 1px solid #3a3d46;\n  border-radius: 5px;\n  padding: 3px;\n  min-width: 120px;\n  max-height: 160px;\n  overflow-y: auto;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pvar-ac-item[data-v-2b845a08] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  color: #c8d0e0;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.nkd-pvar-ac-item[data-v-2b845a08]:hover,\n.nkd-pvar-ac-item.active[data-v-2b845a08] {\n  background: rgba(74, 180, 255, 0.18);\n  color: #fff;\n}\n.nkd-pvar-dot-off[data-v-2b845a08] {\n  background: transparent !important;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n\n.nkd-pvar-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 15px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pvar-chip:active {\n  cursor: grabbing;\n}\n.nkd-pvar-chip::selection,\n.nkd-pvar-chip *::selection {\n  background: transparent;\n}\n.nkd-pvar-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pvar-chip-saved {\n  border-color: rgba(180, 140, 255, 0.8);\n  color: #e0d2ff;\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pvar-chip-saved .nkd-pvar-dot {\n  background: #b48cff;\n}\n.nkd-pvar-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pvar-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pvar-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-rand .nkd-pvar-dot {\n  background: #ffd166;\n}\n.nkd-pvar-chip-rand.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pvar-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pvar-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-cycle .nkd-pvar-dot {\n  background: #66e0aa;\n}\n.nkd-pvar-chip-cycle.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-c321596f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-c321596f], .nkd-root[data-v-c321596f] *, .nkd-root[data-v-c321596f] *::before, .nkd-root[data-v-c321596f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-c321596f] {\r\n  width: 100%;\r\n  aspect-ratio: 380 / 64;\r\n  height: auto;\r\n  display: block;\r\n  cursor: crosshair;\r\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-c321596f] {\r\n  position: absolute;\r\n  width: 1px;\r\n  height: 1px;\r\n  opacity: 0;\r\n  pointer-events: none;\n}\n.nkd-bar[data-v-c321596f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-c321596f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-c321596f] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-c321596f]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-c321596f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-c321596f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-c321596f] {\r\n  font-size: 10px;\r\n  color: var(--descrip-text, rgba(255,255,255,0.45));\r\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-c321596f] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-c321596f] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-c321596f], .nkd-select[data-v-c321596f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-c321596f]:hover, .nkd-select[data-v-c321596f]:hover, .nkd-select[data-v-c321596f]:focus {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-c321596f]:disabled {\r\n  opacity: 0.35;\r\n  cursor: not-allowed;\n}\r\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-76fe8be0] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-76fe8be0], .nkd-root[data-v-76fe8be0] *, .nkd-root[data-v-76fe8be0] *::before, .nkd-root[data-v-76fe8be0] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-76fe8be0] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-76fe8be0] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-76fe8be0] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-76fe8be0] { padding: 5px 8px;\n}\n.nkd-hint[data-v-76fe8be0] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\r\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-e1c1838f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-e1c1838f], .nkd-root[data-v-e1c1838f] *, .nkd-root[data-v-e1c1838f] *::before, .nkd-root[data-v-e1c1838f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-e1c1838f] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-e1c1838f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-e1c1838f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-e1c1838f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-e1c1838f] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-e1c1838f] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-e1c1838f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-e1c1838f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-e1c1838f] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-e1c1838f] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-e1c1838f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-e1c1838f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-e1c1838f] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
