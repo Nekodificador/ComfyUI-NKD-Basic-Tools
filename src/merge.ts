@@ -17,6 +17,7 @@ import { api } from "../../scripts/api.js";
 import { findW, hideWidget, mountDomWidget } from "./domHost";
 import { checker } from "./paint";
 import { FINE_GAIN } from "./fine_drag";
+import { blendFrame, isBlended } from "./merge_blend";
 
 const NODE_NAME = "NKDMerge";
 const EXT_NAME = "NKD.BasicTools.Merge";
@@ -247,6 +248,8 @@ function setupMergeWidget(node: any): void {
   };
 
   // ── Drawing ────────────────────────────────────────────────────────────────
+  const scratchBg = document.createElement("canvas");
+  const scratchFg = document.createElement("canvas");
   let hover = "";
   let guides: { x?: number; y?: number } = {};
 
@@ -282,6 +285,30 @@ function setupMergeWidget(node: any): void {
     ctx.rotate(p.a);
     if (fgIm?.complete) ctx.drawImage(fgIm, (-p.w * k) / 2, (-p.h * k) / 2, p.w * k, p.h * k);
     ctx.restore();
+
+    const mode = findW(node, "blend_mode")?.value ?? "normal";
+    if (isBlended(mode) && bgIm?.complete && fgIm?.complete) {
+      // The render blends inside the background only; redraw that area with the real maths,
+      // on a scratch canvas at the preview's own resolution.
+      const ow = bgIm.naturalWidth, oh = bgIm.naturalHeight, f = ow / s.bgW;
+      const mk = (c: HTMLCanvasElement) => {
+        c.width = ow; c.height = oh;
+        return c.getContext("2d", { willReadFrequently: true })!;
+      };
+      const bctx = mk(scratchBg), fctx = mk(scratchFg);
+      bctx.drawImage(bgIm, 0, 0);
+      fctx.translate(p.cx * f, p.cy * f);
+      fctx.rotate(p.a);
+      fctx.drawImage(fgIm, (-p.w * f) / 2, (-p.h * f) / 2, p.w * f, p.h * f);
+      const bd = bctx.getImageData(0, 0, ow, oh);
+      const out = new ImageData(ow, oh);
+      blendFrame(mode, bd.data, fctx.getImageData(0, 0, ow, oh).data,
+                 findW(node, "opacity")?.value ?? 1, out.data);
+      bctx.putImageData(out, 0, 0);
+      ctx.fillStyle = checker(ctx);
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.drawImage(scratchBg, x0, y0, x1 - x0, y1 - y0);
+    }
 
     // What falls outside the background is cropped by the render: dim it.
     ctx.fillStyle = C.dim;
@@ -533,7 +560,7 @@ function setupMergeWidget(node: any): void {
     scheduleDraw();
   });
 
-  for (const name of ["fit", "opacity"]) {
+  for (const name of ["fit", "opacity", "blend_mode"]) {
     const w = findW(node, name);
     if (!w || w._nkdMergeCb) continue;
     const orig = w.callback;
