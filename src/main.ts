@@ -20,6 +20,7 @@ import { registerCrop, cropSource } from "./crop";
 import { registerMerge, mergeSource } from "./merge";
 import { registerPaint, paintSource } from "./paint";
 import { registerLoraControl } from "./loraBlocks";
+import { registerLoader } from "./loader";
 
 // Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
 // skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
@@ -38,6 +39,7 @@ registerCrop();
 registerMerge();
 registerPaint();
 registerLoraControl();
+registerLoader();
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";

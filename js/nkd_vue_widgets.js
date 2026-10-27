@@ -1889,13 +1889,13 @@ function formatTrace(trace) {
 function formatTraceEntry({ vnode, recurseCount }) {
   const postfix = recurseCount > 0 ? `... (${recurseCount} recursive calls)` : ``;
   const isRoot = vnode.component ? vnode.component.parent == null : false;
-  const open = ` at <${formatComponentName(
+  const open2 = ` at <${formatComponentName(
     vnode.component,
     vnode.type,
     isRoot
   )}`;
   const close = `>` + postfix;
-  return vnode.props ? [open, ...formatProps(vnode.props), close] : [open + close];
+  return vnode.props ? [open2, ...formatProps(vnode.props), close] : [open2 + close];
 }
 function formatProps(props) {
   const res = [];
@@ -5156,7 +5156,7 @@ function baseCreateRenderer(options, createHydrationFns) {
       let j;
       let patched = 0;
       const toBePatched = e2 - s2 + 1;
-      let moved = false;
+      let moved2 = false;
       let maxNewIndexSoFar = 0;
       const newIndexToOldIndexMap = new Array(toBePatched);
       for (i = 0; i < toBePatched; i++) newIndexToOldIndexMap[i] = 0;
@@ -5184,7 +5184,7 @@ function baseCreateRenderer(options, createHydrationFns) {
           if (newIndex >= maxNewIndexSoFar) {
             maxNewIndexSoFar = newIndex;
           } else {
-            moved = true;
+            moved2 = true;
           }
           patch(
             prevChild,
@@ -5200,7 +5200,7 @@ function baseCreateRenderer(options, createHydrationFns) {
           patched++;
         }
       }
-      const increasingNewIndexSequence = moved ? getSequence(newIndexToOldIndexMap) : EMPTY_ARR;
+      const increasingNewIndexSequence = moved2 ? getSequence(newIndexToOldIndexMap) : EMPTY_ARR;
       j = increasingNewIndexSequence.length - 1;
       for (i = toBePatched - 1; i >= 0; i--) {
         const nextIndex = s2 + i;
@@ -5222,7 +5222,7 @@ function baseCreateRenderer(options, createHydrationFns) {
             slotScopeIds,
             optimized
           );
-        } else if (moved) {
+        } else if (moved2) {
           if (j < 0 || i !== increasingNewIndexSequence[j]) {
             move(nextChild, container, anchor, 2);
           } else {
@@ -6941,19 +6941,19 @@ function ensureNkdModalStyles() {
   el.textContent = CSS$1;
   document.head.appendChild(el);
 }
-function div(cls) {
+function div$1(cls) {
   const d = document.createElement("div");
   d.className = cls;
   return d;
 }
 function openNkdModal(opts) {
   ensureNkdModalStyles();
-  const overlay = div("nkd-modal-overlay");
-  const panel = div("nkd-modal-panel");
+  const overlay = div$1("nkd-modal-overlay");
+  const panel = div$1("nkd-modal-panel");
   panel.style.width = opts.width ?? "92vw";
   panel.style.height = opts.height ?? "92vh";
   panel.style.maxWidth = opts.maxWidth ?? "1800px";
-  const head = div("nkd-modal-head");
+  const head = div$1("nkd-modal-head");
   const titleEl = document.createElement("span");
   titleEl.textContent = opts.title;
   const hintEl = document.createElement("span");
@@ -6963,12 +6963,12 @@ function openNkdModal(opts) {
   xBtn.className = "nkd-modal-x";
   xBtn.textContent = "✕";
   xBtn.title = "Close (Esc)";
-  head.append(titleEl, hintEl, div("nkd-modal-spacer"), xBtn);
-  const body = div("nkd-modal-body");
-  const footer = div("nkd-modal-foot");
-  const footerLeft = div("nkd-modal-foot-left");
-  const footerRight = div("nkd-modal-foot-right");
-  footer.append(footerLeft, div("nkd-modal-spacer"), footerRight);
+  head.append(titleEl, hintEl, div$1("nkd-modal-spacer"), xBtn);
+  const body = div$1("nkd-modal-body");
+  const footer = div$1("nkd-modal-foot");
+  const footerLeft = div$1("nkd-modal-foot-left");
+  const footerRight = div$1("nkd-modal-foot-right");
+  footer.append(footerLeft, div$1("nkd-modal-spacer"), footerRight);
   panel.append(head, body, footer);
   overlay.append(panel);
   document.body.appendChild(overlay);
@@ -7122,6 +7122,27 @@ function nkdSlider(label, cfg, onInput, title) {
     wrap.style.opacity = off ? "0.45" : "";
   };
   return wrap;
+}
+function nkdSelect(options, value, onChange, title) {
+  const sel = document.createElement("select");
+  sel.className = "nkd-modal-sel";
+  for (const o of options) {
+    const opt = document.createElement("option");
+    opt.value = o.value;
+    opt.textContent = o.label;
+    sel.appendChild(opt);
+  }
+  sel.value = value;
+  sel.onchange = () => onChange(sel.value);
+  sel.addEventListener("wheel", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const i = sel.selectedIndex + (e.deltaY < 0 ? 1 : -1);
+    if (i < 0 || i >= sel.options.length) return;
+    sel.selectedIndex = i;
+    sel.dispatchEvent(new Event("change"));
+  }, { passive: false });
+  return sel;
 }
 const _hoisted_1$6 = ["onMousedown"];
 const _hoisted_2$6 = { class: "nkd-pvar-bar" };
@@ -7347,7 +7368,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
     function onInput() {
       const el = editor.value;
       if (el && !el.textContent && !el.querySelector(".nkd-pvar-chip")) el.textContent = "";
-      saveSelection();
+      saveSelection2();
       emitChange();
       checkAutocomplete();
     }
@@ -7382,7 +7403,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
       }
       if (e.key === "Enter") {
         e.preventDefault();
-        saveSelection();
+        saveSelection2();
         const nl = document.createTextNode("\n");
         insertAtCursor(nl);
         if (isLast(nl)) addTail();
@@ -7469,7 +7490,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
       acMenu.anchorRange = null;
     }
     function onBlur() {
-      saveSelection();
+      saveSelection2();
       setTimeout(acClose, 150);
     }
     function onPaste(e) {
@@ -7489,7 +7510,7 @@ const _sfc_main$6 = /* @__PURE__ */ defineComponent({
       applyMode(chip, NEXT_MODE[chip.dataset.mode ?? ""]);
       emitChange();
     }
-    function saveSelection() {
+    function saveSelection2() {
       var _a;
       const sel = window.getSelection();
       if (sel && sel.rangeCount > 0 && ((_a = editor.value) == null ? void 0 : _a.contains(sel.anchorNode))) {
@@ -7662,8 +7683,8 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
           onCut: _cache[1] || (_cache[1] = withModifiers(() => {
           }, ["stop"])),
           onBlur,
-          onKeyup: saveSelection,
-          onMouseup: saveSelection,
+          onKeyup: saveSelection2,
+          onMouseup: saveSelection2,
           onDragover: withModifiers(onDragOver, ["prevent"]),
           onDrop: withModifiers(onDrop, ["prevent"]),
           onClick: onEditorClick,
@@ -7903,7 +7924,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     let hoverMid = null;
     let dragging = false;
     let dragOffsetX = 0;
-    let downX = 0, downY = 0, moved = false;
+    let downX = 0, downY = 0, moved2 = false;
     function clamp012(v) {
       return Math.max(0, Math.min(1, v));
     }
@@ -8028,12 +8049,12 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       const sorted = sortedStops();
       for (let i = 0; i < sorted.length - 1; i++) {
         const a = sorted[i], b = sorted[i + 1];
-        const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
-        if (mx - toCanvasX(a.pos) < 5 || toCanvasX(b.pos) - mx < 5) continue;
+        const mx2 = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
+        if (mx2 - toCanvasX(a.pos) < 5 || toCanvasX(b.pos) - mx2 < 5) continue;
         const on = a === draggingMid || a === hoverMid;
         const r = on ? 4.5 : 3.5;
         ctx.save();
-        ctx.translate(mx, BAR_MID);
+        ctx.translate(mx2, BAR_MID);
         ctx.rotate(Math.PI / 4);
         ctx.beginPath();
         ctx.rect(-r, -r, r * 2, r * 2);
@@ -8050,8 +8071,8 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       const sorted = sortedStops();
       for (let i = 0; i < sorted.length - 1; i++) {
         const a = sorted[i], b = sorted[i + 1];
-        const mx = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
-        if (Math.abs(mx - x) <= HIT_R$2) return a;
+        const mx2 = toCanvasX(a.pos + (b.pos - a.pos) * (a.mid ?? 0.5));
+        if (Math.abs(mx2 - x) <= HIT_R$2) return a;
       }
       return null;
     }
@@ -8089,7 +8110,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
       const { x, y } = eventToLogical(e);
       downX = x;
       downY = y;
-      moved = false;
+      moved2 = false;
       const hit = stopAt(x);
       if (hit && e.shiftKey) {
         if (stops.value.length > 2) {
@@ -8126,7 +8147,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     }
     function onMove(e) {
       const { x, y } = eventToLogical(e);
-      if (Math.abs(x - downX) > 3 || Math.abs(y - downY) > 3) moved = true;
+      if (Math.abs(x - downX) > 3 || Math.abs(y - downY) > 3) moved2 = true;
       if (draggingMid) {
         const sorted = sortedStops();
         const i = sorted.indexOf(draggingMid);
@@ -8158,7 +8179,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
         redraw();
         return;
       }
-      if (dragging && activeStop && !moved) {
+      if (dragging && activeStop && !moved2) {
         openPickerFor(activeStop);
       }
       dragging = false;
@@ -8400,7 +8421,7 @@ const _sfc_main$5 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-c321596f"]]);
+const ColorRampWidget = /* @__PURE__ */ _export_sfc(_sfc_main$5, [["__scopeId", "data-v-3d741d05"]]);
 const _hoisted_1$4 = { class: "nkd-bar" };
 const _hoisted_2$4 = { class: "nkd-row nkd-row--controls" };
 const _hoisted_3$4 = { class: "nkd-hint" };
@@ -9363,7 +9384,7 @@ const _sfc_main$2 = /* @__PURE__ */ defineComponent({
     };
   }
 });
-const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-76fe8be0"]]);
+const NoisePreviewWidget = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["__scopeId", "data-v-773b27a5"]]);
 const EPS = 1e-6;
 const LUMA_R$1 = 0.2126, LUMA_G$1 = 0.7152, LUMA_B$1 = 0.0722;
 function srgbToLinear$1(v) {
@@ -10033,9 +10054,9 @@ const _sfc_main = /* @__PURE__ */ defineComponent({
         h.rgb[Math.round(d[i] * LUMA_R + d[i + 1] * LUMA_G + d[i + 2] * LUMA_B)]++;
       }
       for (const c of CHANNELS) {
-        let mx = 1;
-        for (let i = 1; i < 255; i++) mx = Math.max(mx, h[c][i]);
-        for (let i = 0; i < 256; i++) h[c][i] = Math.min(1, h[c][i] / mx);
+        let mx2 = 1;
+        for (let i = 1; i < 255; i++) mx2 = Math.max(mx2, h[c][i]);
+        for (let i = 0; i < 256; i++) h[c][i] = Math.min(1, h[c][i] / mx2);
       }
       hist = h;
     }
@@ -10591,18 +10612,18 @@ function oklchToOklab(lch) {
 }
 function srgbToHsl(rgb) {
   const [r, g, b] = rgb;
-  const mx = Math.max(r, g, b);
-  const mn = Math.min(r, g, b);
-  const d = mx - mn;
-  const L = (mx + mn) / 2;
+  const mx2 = Math.max(r, g, b);
+  const mn2 = Math.min(r, g, b);
+  const d = mx2 - mn2;
+  const L = (mx2 + mn2) / 2;
   const S = d === 0 ? 0 : d / (1 - Math.abs(2 * L - 1) + 1e-12);
   let h = 0;
   if (d !== 0) {
-    if (mx === r) {
+    if (mx2 === r) {
       h = mod((g - b) / (d + 1e-12), 6);
-    } else if (mx === g) {
+    } else if (mx2 === g) {
       h = (b - r) / (d + 1e-12) + 2;
-    } else if (mx === b) {
+    } else if (mx2 === b) {
       h = (r - g) / (d + 1e-12) + 4;
     }
   }
@@ -16826,8 +16847,8 @@ function mountFaceRig(host, opts) {
         prevX = ev.clientX;
         prevY = ev.clientY;
       } else {
-        const [mx, my] = canvasXY(ev);
-        const angle = Math.atan2(mx - gx, -(my - gy));
+        const [mx2, my] = canvasXY(ev);
+        const angle = Math.atan2(mx2 - gx, -(my - gy));
         let d = angle - prevAngle;
         if (d > Math.PI) d -= 2 * Math.PI;
         if (d < -Math.PI) d += 2 * Math.PI;
@@ -17302,7 +17323,7 @@ function attachFineRange(root) {
     root.removeEventListener("dblclick", onDblClick, true);
   };
 }
-const NODE_NAME$4 = "NKDPaint";
+const NODE_NAME$5 = "NKDPaint";
 const EXT_NAME$4 = "NKD.BasicTools.Paint";
 console.log("[NKD Paint] rev 1");
 const CANVAS_W$2 = 240;
@@ -17328,7 +17349,7 @@ function registerPaint() {
   app.registerExtension({
     name: EXT_NAME$4,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$4) return;
+      if (nodeData.name !== NODE_NAME$5) return;
       if (nodeType.prototype.__nkdPaintWrapped) return;
       nodeType.prototype.__nkdPaintWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -18123,7 +18144,7 @@ function setupPaintWidget(node) {
     draw();
   });
 }
-const NODE_NAME$3 = "NKDCrop";
+const NODE_NAME$4 = "NKDCrop";
 const EXT_NAME$3 = "NKD.BasicTools.Crop";
 console.log("[NKD Crop] rev 1.1.0");
 const frames = /* @__PURE__ */ new Map();
@@ -18296,7 +18317,7 @@ function registerCrop() {
   app.registerExtension({
     name: EXT_NAME$3,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$3) return;
+      if (nodeData.name !== NODE_NAME$4) return;
       if (nodeType.prototype.__nkdCropWrapped) return;
       nodeType.prototype.__nkdCropWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -18957,7 +18978,107 @@ function setupCropWidget(node) {
     draw();
   });
 }
-const NODE_NAME$2 = "NKDMerge";
+const E = 1e-6;
+const LUM = [0.2224884, 0.71690369, 0.06060791];
+const div = (a, b) => Math.abs(b) >= E ? a / b : 0;
+const toLin = (c) => c <= 0.04045 ? c / 12.92 : Math.pow((Math.max(c, 0) + 0.055) / 1.055, 2.4);
+const toSrgb = (c) => c <= 31308e-7 ? 12.92 * c : 1.055 * Math.pow(Math.max(c, 0), 1 / 2.4) - 0.055;
+const CHANNEL = {
+  multiply: (i, l) => i * l,
+  screen: (i, l) => 1 - (1 - i) * (1 - l),
+  overlay: (i, l) => i < 0.5 ? 2 * i * l : 1 - 2 * (1 - l) * (1 - i),
+  darken: (i, l) => Math.min(i, l),
+  lighten: (i, l) => Math.max(i, l),
+  "color-dodge": (i, l) => i <= 0 ? 0 : 1 - l <= E ? 1 : Math.min(div(i, 1 - l), 1),
+  "color-burn": (i, l) => i >= 1 ? 1 : l <= E ? 0 : 1 - Math.min(div(1 - i, l), 1),
+  "hard-light": (i, l) => l > 0.5 ? Math.min(1 - (1 - i) * (1 - (l - 0.5) * 2), 1) : Math.min(i * l * 2, 1),
+  "soft-light": (i, l) => (1 - i) * (i * l) + i * (1 - (1 - i) * (1 - l)),
+  difference: (i, l) => Math.abs(i - l),
+  exclusion: (i, l) => 0.5 - 2 * (i - 0.5) * (l - 0.5),
+  "linear-dodge": (i, l) => i + l,
+  "linear-burn": (i, l) => i + l - 1,
+  "vivid-light": (i, l) => l <= 0.5 ? i >= 1 ? 1 : 2 * l <= E ? 0 : Math.max(1 - div(1 - i, 2 * l), 0) : i <= 0 ? 0 : 2 * (1 - l) <= E ? 1 : Math.min(div(i, 2 * (1 - l)), 1),
+  "pin-light": (i, l) => l > 0.5 ? Math.max(i, 2 * (l - 0.5)) : Math.min(i, 2 * l),
+  "linear-light": (i, l) => i + 2 * l - 1,
+  "hard-mix": (i, l) => i + l < 1 ? 0 : 1,
+  subtract: (i, l) => Math.max(i - l, 0),
+  divide: (i, l) => Math.min(Math.max(i / Math.max(l, E), 0), 1),
+  "grain-extract": (i, l) => i - l + 0.5,
+  "grain-merge": (i, l) => i + l - 0.5
+};
+const lum = (c) => c[0] * LUM[0] + c[1] * LUM[1] + c[2] * LUM[2];
+const mx = (c) => Math.max(c[0], c[1], c[2]);
+const mn = (c) => Math.min(c[0], c[1], c[2]);
+const HSL = {
+  hue(i, l, o) {
+    const sd = mx(l) - mn(l);
+    if (sd <= E) {
+      o[0] = i[0];
+      o[1] = i[1];
+      o[2] = i[2];
+      return;
+    }
+    const dm = mx(i), ds = dm !== 0 ? (dm - mn(i)) / dm : 0;
+    const ratio = ds * dm / sd, off = dm - mx(l) * ratio;
+    for (let k = 0; k < 3; k++) o[k] = l[k] * ratio + off;
+  },
+  saturation(i, l, o) {
+    const dm = mx(i), dd = dm - mn(i);
+    if (dd <= E) {
+      o[0] = o[1] = o[2] = dm;
+      return;
+    }
+    const sm = mx(l), ss = sm !== 0 ? (sm - mn(l)) / sm : 0;
+    const ratio = ss * dm / dd, off = (1 - ratio) * dm;
+    for (let k = 0; k < 3; k++) o[k] = i[k] * ratio + off;
+  },
+  color(i, l, o) {
+    const dl = (mn(i) + mx(i)) / 2, sl = (mn(l) + mx(l)) / 2;
+    if (Math.abs(sl) <= E || Math.abs(1 - sl) <= E) {
+      o[0] = o[1] = o[2] = dl;
+      return;
+    }
+    const d = Math.min(dl, 1 - dl), s = Math.min(sl, 1 - sl), ratio = d / s;
+    const off = (dl > 0.5 ? 1 - 2 * d : 0) + (sl > 0.5 ? 2 * d - ratio : 0);
+    for (let k = 0; k < 3; k++) o[k] = l[k] * ratio + off;
+  },
+  luminosity(i, l, o) {
+    const li = lum(i), ll = lum(l);
+    if (li <= E) {
+      o[0] = o[1] = o[2] = ll;
+      return;
+    }
+    const ratio = ll / li;
+    for (let k = 0; k < 3; k++) o[k] = i[k] * ratio;
+  }
+};
+const LINEAR = /* @__PURE__ */ new Set(["multiply", "darken", "lighten", "linear-dodge", "subtract", "divide", "luminosity"]);
+const blendFrame = (mode, bg, fg, opacity, out) => {
+  const fn = CHANNEL[mode], hsl = HSL[mode], linear = LINEAR.has(mode);
+  const i = [0, 0, 0], l = [0, 0, 0], c = [0, 0, 0], bl = [0, 0, 0];
+  for (let p2 = 0; p2 < bg.length; p2 += 4) {
+    out[p2] = bg[p2];
+    out[p2 + 1] = bg[p2 + 1];
+    out[p2 + 2] = bg[p2 + 2];
+    out[p2 + 3] = bg[p2 + 3];
+    const la = fg[p2 + 3] / 255 * opacity;
+    if (bg[p2 + 3] === 0 || la === 0) continue;
+    for (let k = 0; k < 3; k++) {
+      bl[k] = toLin(bg[p2 + k] / 255);
+      i[k] = linear ? bl[k] : bg[p2 + k] / 255;
+      l[k] = linear ? toLin(fg[p2 + k] / 255) : fg[p2 + k] / 255;
+    }
+    if (hsl) hsl(i, l, c);
+    else for (let k = 0; k < 3; k++) c[k] = fn(i[k], l[k]);
+    for (let k = 0; k < 3; k++) {
+      const comp = linear ? c[k] : toLin(c[k]);
+      const mixed = comp * la + bl[k] * (1 - la);
+      out[p2 + k] = toSrgb(Math.min(Math.max(mixed, 0), 1)) * 255 + 0.5;
+    }
+  }
+};
+const isBlended = (mode) => mode in CHANNEL || mode in HSL;
+const NODE_NAME$3 = "NKDMerge";
 const EXT_NAME$2 = "NKD.BasicTools.Merge";
 console.log("[NKD Merge] rev 1.0.0");
 const DEFAULT = { x: 0.5, y: 0.5, scale: 1, angle: 0 };
@@ -19040,7 +19161,7 @@ function registerMerge() {
   app.registerExtension({
     name: EXT_NAME$2,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeData.name !== NODE_NAME$3) return;
       if (nodeType.prototype.__nkdMergeWrapped) return;
       nodeType.prototype.__nkdMergeWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -19185,10 +19306,12 @@ function setupMergeWidget(node) {
     const p2 = placed();
     return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([sx, sy]) => fromLocal(sx * p2.w / 2, sy * p2.h / 2));
   };
+  const scratchBg = document.createElement("canvas");
+  const scratchFg = document.createElement("canvas");
   let hover = "";
   let guides = {};
   function draw() {
-    var _a;
+    var _a, _b, _c;
     const { cw, ch, k } = view();
     const d = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     const w = Math.round(cw * d), h = Math.round(ch * d);
@@ -19223,6 +19346,33 @@ function setupMergeWidget(node) {
     ctx.rotate(p2.a);
     if (fgIm == null ? void 0 : fgIm.complete) ctx.drawImage(fgIm, -p2.w * k / 2, -p2.h * k / 2, p2.w * k, p2.h * k);
     ctx.restore();
+    const mode = ((_b = findW(node, "blend_mode")) == null ? void 0 : _b.value) ?? "normal";
+    if (isBlended(mode) && (bgIm == null ? void 0 : bgIm.complete) && (fgIm == null ? void 0 : fgIm.complete)) {
+      const ow = bgIm.naturalWidth, oh = bgIm.naturalHeight, f = ow / s.bgW;
+      const mk = (c) => {
+        c.width = ow;
+        c.height = oh;
+        return c.getContext("2d", { willReadFrequently: true });
+      };
+      const bctx = mk(scratchBg), fctx = mk(scratchFg);
+      bctx.drawImage(bgIm, 0, 0);
+      fctx.translate(p2.cx * f, p2.cy * f);
+      fctx.rotate(p2.a);
+      fctx.drawImage(fgIm, -p2.w * f / 2, -p2.h * f / 2, p2.w * f, p2.h * f);
+      const bd = bctx.getImageData(0, 0, ow, oh);
+      const out = new ImageData(ow, oh);
+      blendFrame(
+        mode,
+        bd.data,
+        fctx.getImageData(0, 0, ow, oh).data,
+        ((_c = findW(node, "opacity")) == null ? void 0 : _c.value) ?? 1,
+        out.data
+      );
+      bctx.putImageData(out, 0, 0);
+      ctx.fillStyle = checker(ctx);
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.drawImage(scratchBg, x0, y0, x1 - x0, y1 - y0);
+    }
     ctx.fillStyle = C$1.dim;
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
@@ -19511,7 +19661,7 @@ function setupMergeWidget(node) {
     (_a = mounted.resizeToContent) == null ? void 0 : _a.call(mounted);
     scheduleDraw();
   });
-  for (const name of ["fit", "opacity"]) {
+  for (const name of ["fit", "opacity", "blend_mode"]) {
     const w = findW(node, name);
     if (!w || w._nkdMergeCb) continue;
     const orig = w.callback;
@@ -19655,7 +19805,7 @@ function rowsFrom(analysis) {
 }
 const openPanels = /* @__PURE__ */ new Set();
 const refreshAllPresets = () => Promise.all([...openPanels].map((f) => f()));
-const NODE_NAME$1 = "NKDLoraControl";
+const NODE_NAME$2 = "NKDLoraControl";
 const EXT_NAME$1 = "NKD.BasicTools.LoraControl";
 const ROW_H = 17;
 const PAD = 6;
@@ -20250,35 +20400,28 @@ No: only the block shape is saved, and you set the strength on the loader.`
     const r = origConfigure == null ? void 0 : origConfigure.apply(this, args);
     loaded = "";
     refresh();
-    syncCurveSockets();
+    dropConditioningSockets();
     return r;
   };
-  const findSlot = (list, name) => (list == null ? void 0 : list.findIndex((s) => s.name === name)) ?? -1;
-  const wired = (s) => !!(s && (s.link != null || s.links && s.links.length));
-  function syncCurveSockets() {
+  function dropConditioningSockets() {
     var _a, _b;
-    const curve = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === "curve");
-    const want = !!(curve && curve.link != null);
-    for (const name of ["positive", "negative"]) {
-      const inIdx = findSlot(node.inputs, name);
-      const outIdx = findSlot(node.outputs, name);
-      if (want) {
-        if (inIdx < 0) node.addInput(name, "CONDITIONING");
-        if (outIdx < 0) node.addOutput(name, "CONDITIONING");
-      } else {
-        if (inIdx >= 0 && !wired(node.inputs[inIdx])) node.removeInput(inIdx);
-        if (outIdx >= 0 && !wired(node.outputs[outIdx])) node.removeOutput(outIdx);
+    const graph = node.graph;
+    if (!graph) return;
+    for (const name of ["negative", "positive"]) {
+      const inIdx = ((_a = node.inputs) == null ? void 0 : _a.findIndex((i) => i.name === name)) ?? -1;
+      const outIdx = ((_b = node.outputs) == null ? void 0 : _b.findIndex((o) => o.name === name)) ?? -1;
+      const src = inIdx >= 0 ? graph.getLink(node.inputs[inIdx].link) : null;
+      if (src && outIdx >= 0) {
+        const from = graph.getNodeById(src.origin_id);
+        for (const id of [...node.outputs[outIdx].links ?? []]) {
+          const l = graph.getLink(id);
+          if (from && l) from.connect(src.origin_slot, graph.getNodeById(l.target_id), l.target_slot);
+        }
       }
+      if (outIdx >= 0) node.removeOutput(outIdx);
+      if (inIdx >= 0) node.removeInput(inIdx);
     }
-    node.setSize([Math.max(node.size[0], ((_b = mounted == null ? void 0 : mounted.minNodeWidth) == null ? void 0 : _b.call(mounted)) ?? 0), node.computeSize()[1]]);
-    node.setDirtyCanvas(true, true);
   }
-  const origConn = node.onConnectionsChange;
-  node.onConnectionsChange = function(...args) {
-    const r = origConn == null ? void 0 : origConn.apply(this, args);
-    syncCurveSockets();
-    return r;
-  };
   const onExecuted = (e) => {
     var _a, _b;
     const detail = e.detail;
@@ -20300,7 +20443,7 @@ No: only the block shape is saved, and you set the strength on the loader.`
   openPanels.add(loadPresets);
   loadPresets();
   requestAnimationFrame(() => {
-    syncCurveSockets();
+    dropConditioningSockets();
     refresh();
     commit();
   });
@@ -20423,13 +20566,493 @@ function registerLoraControl() {
   app.registerExtension({
     name: EXT_NAME$1,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeData.name !== NODE_NAME$2) return;
       if (nodeType.prototype.__nkdLoraWrapped) return;
       nodeType.prototype.__nkdLoraWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function(...args) {
         const r = origCreated == null ? void 0 : origCreated.apply(this, args);
         setup(this);
+        return r;
+      };
+    }
+  });
+}
+const NODE_NAME$1 = "NKDLoader";
+const SETTING = "NKD.Loader.Presets";
+const MAX_OUTPUTS = 10;
+console.log("[NKD Loader] rev 1.0.0");
+const TYPE_RANK = ["MODEL", "CLIP", "VAE"];
+const rank = (t) => {
+  const i = TYPE_RANK.indexOf(t);
+  return i < 0 ? TYPE_RANK.length : i;
+};
+const getPresets = () => app.extensionManager.setting.get(SETTING) ?? {};
+const setPresets = (p2) => app.extensionManager.setting.set(SETTING, p2);
+const toast = (severity, detail) => app.extensionManager.toast.add({ severity, summary: "NKD Loader", detail, life: 5e3 });
+const presetNames = [];
+function refreshNames() {
+  presetNames.splice(0, presetNames.length, ...Object.keys(getPresets()));
+}
+const isLink = (v) => Array.isArray(v) && v.length === 2 && typeof v[0] === "string" && typeof v[1] === "number";
+async function capture(selected, keep = /* @__PURE__ */ new Set()) {
+  const { output } = await app.graphToPrompt();
+  const ids = new Set(selected.map((n) => String(n.id)));
+  const order = [];
+  const visit = (id) => {
+    var _a;
+    if (order.includes(id)) return;
+    for (const v of Object.values(((_a = output[id]) == null ? void 0 : _a.inputs) ?? {}))
+      if (isLink(v) && ids.has(v[0])) visit(v[0]);
+    order.push(id);
+  };
+  for (const id of ids) {
+    if (!output[id]) return `"${selected.find((n) => String(n.id) === id).title}" is muted, bypassed or inside a subgraph.`;
+    visit(id);
+  }
+  const consumed = /* @__PURE__ */ new Set();
+  const nodes = [];
+  for (const id of order) {
+    const inputs = {};
+    for (const [k, v] of Object.entries(output[id].inputs)) {
+      if (!isLink(v)) {
+        inputs[k] = v;
+        continue;
+      }
+      if (!ids.has(v[0])) return `"${app.graph.getNodeById(id).title}" takes "${k}" from a node outside the selection.`;
+      inputs[k] = { from: order.indexOf(v[0]), out: v[1] };
+      consumed.add(`${v[0]}:${v[1]}`);
+    }
+    nodes.push({ class_type: output[id].class_type, inputs });
+  }
+  const outputs = [];
+  order.forEach((id, i) => {
+    var _a;
+    const node = app.graph.getNodeById(id);
+    (_a = node.outputs) == null ? void 0 : _a.forEach((o, j) => {
+      const src = `${id}:${j}`;
+      if (!consumed.has(src) || keep.has(src))
+        outputs.push({ node: i, out: j, type: o.type, label: (o.label || o.localized_name || o.name).toLowerCase(), pos: node.pos, src });
+    });
+  });
+  outputs.sort((a, b) => rank(a.type) - rank(b.type) || a.pos[1] - b.pos[1] || a.pos[0] - b.pos[0] || a.out - b.out);
+  if (!outputs.length) return "The selection has no outputs to expose.";
+  if (outputs.length > MAX_OUTPUTS) return `A preset can expose at most ${MAX_OUTPUTS} outputs.`;
+  return {
+    recipe: { name: "", nodes, outputs: outputs.map(({ pos, src, ...o }) => o) },
+    sources: outputs.map((o) => o.src)
+  };
+}
+function keepOutputLayout(recipe, old) {
+  const seen = {};
+  const nth = (o) => old.outputs.filter((p2) => p2.type === o.type)[seen[o.type] = (seen[o.type] ?? -1) + 1];
+  const place = new Map(recipe.outputs.map((o) => {
+    const prev = nth(o);
+    if (prev) o.label = prev.label;
+    return [o, prev ? old.outputs.indexOf(prev) : Infinity];
+  }));
+  recipe.outputs.sort((a, b) => place.get(a) - place.get(b));
+}
+async function savePreset(recipe, defaultName) {
+  var _a;
+  const name = (_a = await app.extensionManager.dialog.prompt({
+    title: "Save NKD Loader preset",
+    message: "Preset name (an existing name updates that preset)",
+    defaultValue: defaultName
+  })) == null ? void 0 : _a.trim();
+  if (!name) return null;
+  recipe.name = name;
+  const presets = getPresets();
+  const existed = name in presets;
+  if (existed) keepOutputLayout(recipe, presets[name]);
+  await setPresets({ ...presets, [name]: recipe });
+  if (existed) applyToNodes(name, recipe);
+  toast("success", `${existed ? "Updated" : "Saved"} "${name}" — ${recipe.outputs.map((o) => o.label).join(", ")}`);
+  return name;
+}
+async function saveSelection() {
+  var _a;
+  const got = await capture(Object.values(app.canvas.selected_nodes ?? {}));
+  if (typeof got === "string") return toast("warn", got);
+  const { recipe } = got;
+  const firstFile = Object.values(recipe.nodes[recipe.outputs[0].node].inputs).find((v) => typeof v === "string" && /\.(safetensors|gguf|ckpt|pt|pth|bin|sft)$/i.test(v));
+  await savePreset(recipe, ((_a = firstFile == null ? void 0 : firstFile.split(/[\\/]/).pop()) == null ? void 0 : _a.replace(/\.[^.]+$/, "")) ?? "");
+}
+const LG = () => window.LiteGraph;
+const GROUP_FLAG = "nkdLoader";
+function unpack(node) {
+  var _a, _b;
+  const recipe = parse((_a = findW(node, "recipe")) == null ? void 0 : _a.value);
+  if (!recipe) return toast("warn", "Choose a preset first.");
+  const missing = recipe.nodes.find((n) => !LG().registered_node_types[n.class_type]);
+  if (missing) return toast("warn", `${missing.class_type} is not installed.`);
+  const graph = node.graph;
+  let y = node.pos[1];
+  const made = recipe.nodes.map((n) => {
+    const m = LG().createNode(n.class_type);
+    graph.add(m);
+    m.pos = [node.pos[0], y];
+    y += m.size[1] + 50;
+    for (const [k, v] of Object.entries(n.inputs)) {
+      const w = findW(m, k);
+      if (w && !(v && typeof v === "object")) w.value = v;
+    }
+    return m;
+  });
+  recipe.nodes.forEach((n, i) => {
+    for (const [k, v] of Object.entries(n.inputs))
+      if (v && typeof v === "object") made[v.from].connect(v.out, made[i], k);
+  });
+  (_b = node.outputs) == null ? void 0 : _b.forEach((o, i) => {
+    const ref2 = recipe.outputs[i];
+    for (const id of [...o.links ?? []]) {
+      const l = graph.getLink(id);
+      if (l) made[ref2.node].connect(ref2.out, graph.getNodeById(l.target_id), l.target_slot);
+    }
+  });
+  graph.remove(node);
+  const group = new (LG()).LGraphGroup(`😺 ${recipe.name}`);
+  group.flags[GROUP_FLAG] = recipe.name;
+  graph.add(group);
+  const pad = 20, top = LG().NODE_TITLE_HEIGHT;
+  const x0 = Math.min(...made.map((m) => m.pos[0])) - pad;
+  const y0 = Math.min(...made.map((m) => m.pos[1])) - top - pad - group.titleHeight;
+  group.pos = [x0, y0];
+  group.size = [
+    Math.max(...made.map((m) => m.pos[0] + m.size[0])) + pad - x0,
+    Math.max(...made.map((m) => m.pos[1] + m.size[1])) + pad - y0
+  ];
+  app.canvas.setDirty(true, true);
+}
+async function repack(group) {
+  var _a;
+  const graph = group.graph;
+  const inside = graph.nodes.filter((n) => group.isPointInside(n.pos[0] + n.size[0] / 2, n.pos[1] + n.size[1] / 2));
+  const ids = new Set(inside.map((n) => n.id));
+  const external = [];
+  for (const n of inside) (_a = n.outputs) == null ? void 0 : _a.forEach((o, j) => {
+    for (const id of o.links ?? []) {
+      const l = graph.getLink(id);
+      if (l && !ids.has(l.target_id)) external.push({ src: `${n.id}:${j}`, target: graph.getNodeById(l.target_id), slot: l.target_slot });
+    }
+  });
+  const got = await capture(inside, new Set(external.map((e) => e.src)));
+  if (typeof got === "string") return toast("warn", got);
+  if (!await savePreset(got.recipe, group.flags[GROUP_FLAG])) return;
+  const loader = LG().createNode(NODE_NAME$1);
+  graph.add(loader);
+  loader.pos = [group.pos[0], group.pos[1] + group.titleHeight];
+  applyRecipe(loader, got.recipe);
+  for (const e of external) loader.connect(got.sources.indexOf(e.src), e.target, e.slot);
+  for (const n of inside) graph.remove(n);
+  graph.remove(group);
+  app.canvas.setDirty(true, true);
+}
+function packedGroup() {
+  var _a, _b;
+  const c = app.canvas;
+  const sel = [...c.selectedItems ?? []].find((g2) => {
+    var _a2;
+    return (_a2 = g2.flags) == null ? void 0 : _a2[GROUP_FLAG];
+  });
+  if (sel) return sel;
+  const g = (_a = c.graph) == null ? void 0 : _a.getGroupOnPos(c.graph_mouse[0], c.graph_mouse[1]);
+  return ((_b = g == null ? void 0 : g.flags) == null ? void 0 : _b[GROUP_FLAG]) ? g : null;
+}
+function syncOutputs(node, recipe) {
+  var _a;
+  const want = (recipe == null ? void 0 : recipe.outputs) ?? [];
+  for (let i = (((_a = node.outputs) == null ? void 0 : _a.length) ?? 0) - 1; i >= want.length; i--) node.removeOutput(i);
+  want.forEach((o, i) => {
+    var _a2;
+    const slot = (_a2 = node.outputs) == null ? void 0 : _a2[i];
+    if (!slot) {
+      node.addOutput(o.label, o.type, { label: o.label });
+      return;
+    }
+    if (slot.type !== o.type) {
+      node.disconnectOutput(i);
+      slot.type = o.type;
+    }
+    slot.name = slot.label = o.label;
+  });
+  node.setSize([node.size[0], node.computeSize()[1]]);
+  node.setDirtyCanvas(true, true);
+}
+const parse = (s) => {
+  try {
+    return s ? JSON.parse(s) : null;
+  } catch {
+    return null;
+  }
+};
+function applyRecipe(node, recipe) {
+  findW(node, "recipe").value = JSON.stringify(recipe);
+  const combo = findW(node, "preset");
+  if (combo) combo.value = recipe.name;
+  node.title = `😺NKD Loader · ${recipe.name}`;
+  syncOutputs(node, recipe);
+}
+function applyToNodes(name, recipe) {
+  var _a, _b, _c, _d, _e, _f, _g;
+  const graphs = [app.rootGraph, ...((_b = (_a = app.rootGraph) == null ? void 0 : _a.subgraphs) == null ? void 0 : _b.values()) ?? []];
+  let hit = false;
+  for (const g of graphs) for (const node of (g == null ? void 0 : g.nodes) ?? []) {
+    if (node.type !== NODE_NAME$1 || ((_d = parse((_c = findW(node, "recipe")) == null ? void 0 : _c.value)) == null ? void 0 : _d.name) !== name) continue;
+    applyRecipe(node, recipe);
+    hit = true;
+  }
+  if (hit) (_g = (_f = (_e = app.extensionManager.workflow) == null ? void 0 : _e.activeWorkflow) == null ? void 0 : _f.changeTracker) == null ? void 0 : _g.checkState();
+}
+const FIELD = "background:#252830;border:1px solid #3a3d46;border-radius:4px;color:#c8d0e0;padding:3px 8px;font-size:12px;min-width:0;width:100%;box-sizing:border-box";
+function inputControl(spec, value, onChange) {
+  var _a, _b;
+  const options = Array.isArray(spec == null ? void 0 : spec[0]) ? spec[0] : (_a = spec == null ? void 0 : spec[1]) == null ? void 0 : _a.options;
+  if (options) {
+    const opts = options.map((o) => ({ value: String(o), label: String(o) }));
+    if (!options.includes(value)) opts.unshift({ value: String(value), label: `missing: ${value}` });
+    const sel = nkdSelect(opts, String(value), onChange);
+    sel.style.cssText = FIELD;
+    return sel;
+  }
+  const el = document.createElement("input");
+  el.style.cssText = FIELD;
+  if ((spec == null ? void 0 : spec[0]) === "BOOLEAN") {
+    el.type = "checkbox";
+    el.checked = !!value;
+    el.style.width = "auto";
+    el.onchange = () => onChange(el.checked);
+    return el;
+  }
+  const numeric = (spec == null ? void 0 : spec[0]) === "INT" || (spec == null ? void 0 : spec[0]) === "FLOAT";
+  el.type = numeric ? "number" : "text";
+  for (const k of ["min", "max", "step"]) if (numeric && ((_b = spec[1]) == null ? void 0 : _b[k]) != null) el.setAttribute(k, String(spec[1][k]));
+  el.value = String(value ?? "");
+  el.onchange = () => onChange(numeric ? Number(el.value) : el.value);
+  return el;
+}
+function reorderable(row, handle, kind, i, move) {
+  handle.draggable = true;
+  handle.style.cursor = "grab";
+  handle.ondragstart = (e) => {
+    e.dataTransfer.setData(kind, String(i));
+    e.dataTransfer.setDragImage(row, 0, 0);
+  };
+  row.ondragover = (e) => {
+    if (e.dataTransfer.types.includes(kind)) e.preventDefault();
+  };
+  row.ondrop = (e) => {
+    if (!e.dataTransfer.types.includes(kind)) return;
+    e.preventDefault();
+    const from = Number(e.dataTransfer.getData(kind));
+    if (from !== i) move(from, i);
+  };
+}
+const grip = () => {
+  const g = document.createElement("i");
+  g.className = "pi pi-bars";
+  g.title = "Drag to reorder";
+  g.style.cssText = "opacity:.45;padding:4px";
+  return g;
+};
+const moved = (list, from, to) => {
+  const out = [...list];
+  out.splice(to, 0, ...out.splice(from, 1));
+  return out;
+};
+function recipeEditor(recipe, onChange) {
+  const box = document.createElement("div");
+  box.style.cssText = "display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;align-items:center;padding:6px 0 10px 12px;border-left:2px solid #3a3d46;margin-left:4px";
+  const outHead = document.createElement("div");
+  outHead.style.cssText = "grid-column:1/-1;font-weight:600";
+  outHead.textContent = "Outputs";
+  outHead.title = "Order and names of the node's outputs. Reordering outputs of different types drops their links in the open workflow.";
+  box.append(outHead);
+  recipe.outputs.forEach((o, i) => {
+    const row = document.createElement("div");
+    row.style.cssText = "grid-column:1/-1;display:grid;grid-template-columns:subgrid;align-items:center";
+    const type = document.createElement("div");
+    type.style.cssText = "display:flex;align-items:center;gap:2px;opacity:.6";
+    const g = grip();
+    type.append(g, o.type);
+    const name = document.createElement("input");
+    name.style.cssText = FIELD;
+    name.value = o.label;
+    name.onchange = () => {
+      o.label = name.value.trim() || o.type.toLowerCase();
+      name.value = o.label;
+      onChange();
+    };
+    row.append(type, name);
+    reorderable(row, g, "nkd-loader-output", i, (from, to) => {
+      recipe.outputs = moved(recipe.outputs, from, to);
+      onChange(true);
+    });
+    box.append(row);
+  });
+  recipe.nodes.forEach((n) => {
+    var _a, _b, _c, _d, _e;
+    const def2 = (_c = (_b = (_a = window.LiteGraph) == null ? void 0 : _a.registered_node_types) == null ? void 0 : _b[n.class_type]) == null ? void 0 : _c.nodeData;
+    const head = document.createElement("div");
+    head.style.cssText = "grid-column:1/-1;font-weight:600;margin-top:4px";
+    head.textContent = (def2 == null ? void 0 : def2.display_name) ?? n.class_type;
+    box.append(head);
+    if (!def2) {
+      const warn = document.createElement("div");
+      warn.style.cssText = "grid-column:1/-1;color:#ff6b6b";
+      warn.textContent = "Node not installed.";
+      box.append(warn);
+      return;
+    }
+    const specs = { ...(_d = def2.input) == null ? void 0 : _d.required, ...(_e = def2.input) == null ? void 0 : _e.optional };
+    for (const [k, v] of Object.entries(n.inputs)) {
+      const lbl = document.createElement("div");
+      lbl.style.cssText = "opacity:.6";
+      lbl.textContent = k;
+      let ctl;
+      if (v && typeof v === "object") {
+        const src = v;
+        ctl = document.createElement("div");
+        ctl.style.cssText = "opacity:.45";
+        ctl.textContent = `← ${recipe.nodes[src.from].class_type} · output ${src.out}`;
+      } else {
+        ctl = inputControl(specs[k], v, (nv) => {
+          n.inputs[k] = nv;
+          onChange();
+        });
+      }
+      box.append(lbl, ctl);
+    }
+  });
+  return box;
+}
+const open = /* @__PURE__ */ new Set();
+function renderManager(_name, setter, value) {
+  const root = document.createElement("div");
+  root.style.cssText = "display:flex;flex-direction:column;gap:6px;min-width:320px";
+  ensureNkdModalStyles();
+  let presets = structuredClone(value ?? {});
+  const commit = () => {
+    setter(structuredClone(presets));
+    draw();
+  };
+  const draw = () => {
+    root.replaceChildren();
+    const names = Object.keys(presets);
+    if (!names.length) {
+      root.textContent = 'No presets yet. Select loader nodes, right-click and choose "Save as NKD Loader preset".';
+      root.style.opacity = "0.6";
+      return;
+    }
+    root.style.opacity = "";
+    for (const name of names) {
+      const row = document.createElement("div");
+      row.style.cssText = "display:flex;align-items:center;gap:8px";
+      const g = grip();
+      row.append(g);
+      reorderable(row, g, "nkd-loader-preset", names.indexOf(name), (from, to) => {
+        presets = Object.fromEntries(moved(Object.entries(presets), from, to));
+        commit();
+      });
+      const label = document.createElement("div");
+      label.style.cssText = "flex:1;min-width:0";
+      label.innerHTML = `<div style="font-weight:600"></div><div style="opacity:.55;font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>`;
+      label.children[0].textContent = name;
+      label.children[1].textContent = presets[name].outputs.map((o) => o.label).join(" · ");
+      label.title = presets[name].nodes.map((n) => n.class_type).join(", ");
+      const btn = (icon, title, fn) => {
+        const b = document.createElement("button");
+        b.className = "p-button p-button-text p-button-sm";
+        b.title = title;
+        b.innerHTML = `<i class="pi ${icon}"></i>`;
+        b.onclick = fn;
+        return b;
+      };
+      row.append(
+        label,
+        btn(open.has(name) ? "pi-chevron-up" : "pi-sliders-h", "Edit models", () => {
+          open.has(name) ? open.delete(name) : open.add(name);
+          draw();
+        }),
+        btn("pi-pencil", "Rename", async () => {
+          var _a;
+          const to = (_a = await app.extensionManager.dialog.prompt({ title: "Rename preset", message: "New name", defaultValue: name })) == null ? void 0 : _a.trim();
+          if (!to || to === name) return;
+          presets = Object.fromEntries(Object.entries(presets).map(([k, r]) => k === name ? [to, { ...r, name: to }] : [k, r]));
+          if (open.delete(name)) open.add(to);
+          commit();
+          applyToNodes(name, presets[to]);
+        }),
+        btn("pi-trash", "Delete", async () => {
+          if (!await app.extensionManager.dialog.confirm({ title: "Delete preset", message: `Delete "${name}"? Workflows that use it keep working.` })) return;
+          delete presets[name];
+          commit();
+        })
+      );
+      root.append(row);
+      if (open.has(name)) root.append(recipeEditor(presets[name], (redraw) => {
+        redraw ? commit() : setter(structuredClone(presets));
+        applyToNodes(name, presets[name]);
+      }));
+    }
+  };
+  draw();
+  return root;
+}
+function registerLoader() {
+  app.registerExtension({
+    name: "NKD.BasicTools.Loader",
+    settings: [{
+      id: SETTING,
+      category: ["NKD Basic Tools", "Loader", "Presets"],
+      name: "NKD Loader presets",
+      tooltip: 'Select loader nodes, right-click and choose "Save as NKD Loader preset".',
+      type: renderManager,
+      defaultValue: {},
+      onChange: refreshNames
+    }],
+    getCanvasMenuItems() {
+      const n = Object.keys(app.canvas.selected_nodes ?? {}).length;
+      const group = packedGroup();
+      return [
+        null,
+        ...group ? [{ content: "Repack NKD Loader", callback: () => repack(group) }] : [],
+        { content: "Save as NKD Loader preset", disabled: !n, callback: saveSelection }
+      ];
+    },
+    getNodeMenuItems(node) {
+      var _a;
+      const items = [];
+      if (node.type === NODE_NAME$1) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
+      if ((_a = app.canvas.selected_nodes) == null ? void 0 : _a[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
+      return items.length ? [null, ...items] : [];
+    },
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeType.prototype.__nkdWrapped) return;
+      nodeType.prototype.__nkdWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        const recipeW = findW(this, "recipe");
+        hideWidget(recipeW);
+        refreshNames();
+        const combo = this.addWidget("combo", "preset", "", (name) => {
+          const recipe = getPresets()[name];
+          if (recipe) applyRecipe(this, recipe);
+        }, { values: presetNames, serialize: false });
+        combo.value = presetNames.length ? "" : "(no presets — see Settings)";
+        syncOutputs(this, null);
+        return r;
+      };
+      const origConfigure = nodeType.prototype.onConfigure;
+      nodeType.prototype.onConfigure = function() {
+        var _a;
+        const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+        const recipe = parse((_a = findW(this, "recipe")) == null ? void 0 : _a.value);
+        const combo = findW(this, "preset");
+        if (combo) combo.value = (recipe == null ? void 0 : recipe.name) ?? "";
+        syncOutputs(this, recipe);
         return r;
       };
     }
@@ -20468,6 +21091,7 @@ registerCrop();
 registerMerge();
 registerPaint();
 registerLoraControl();
+registerLoader();
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;
@@ -20662,15 +21286,15 @@ app.registerExtension({
         () => MIN_EDITOR_H,
         { growOnly: true }
       );
-      const BASE_EDITOR_H = 150;
+      const EDITOR_MIN_H = 90;
       const innerComputeSize = domWidget.computeSize;
       domWidget.computeSize = (width) => {
         const result2 = innerComputeSize(width);
         const root = container.firstElementChild;
         if (root && root.offsetHeight > 0) result2[1] = root.offsetHeight + ROW_SAFETY;
         const editorEl = container.querySelector(".nkd-pvar-editor");
-        if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
-          result2[1] = result2[1] - editorEl.offsetHeight + BASE_EDITOR_H;
+        if (editorEl && editorEl.offsetHeight > 0) {
+          result2[1] = result2[1] - editorEl.offsetHeight + EDITOR_MIN_H;
         }
         return result2;
       };
@@ -20681,8 +21305,8 @@ app.registerExtension({
         const editorEl = container.querySelector(".nkd-pvar-editor");
         if (!editorEl) return;
         const computed2 = this.computeSize();
-        const overhead = computed2[1] - BASE_EDITOR_H;
-        const available = Math.max(90, size[1] - overhead);
+        const overhead = computed2[1] - EDITOR_MIN_H;
+        const available = Math.max(EDITOR_MIN_H, size[1] - overhead);
         if (Math.abs(available - editorEl.offsetHeight) > 2) {
           editorEl.style.height = available + "px";
         }
@@ -21882,7 +22506,7 @@ console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DE
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pvar[data-v-2b845a08] {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pvar-editor[data-v-2b845a08] {\n  height: 150px;\n  min-height: 90px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 6px 8px;\n  color: #c8d0e0;\n  font-size: 11.5px;\n  line-height: 1.55;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pvar-editor[data-v-2b845a08]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-editor[data-v-2b845a08]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pvar-bar[data-v-2b845a08] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pvar-add[data-v-2b845a08] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pvar-add[data-v-2b845a08]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pvar-add.connected[data-v-2b845a08] {\n  color: #4ab4ff;\n}\n.nkd-pvar-lib-toggle[data-v-2b845a08] {\n  margin-left: auto;\n}\n.nkd-pvar-lib-toggle.active[data-v-2b845a08],\n.nkd-pvar-lib-toggle[data-v-2b845a08]:hover {\n  border-color: #b48cff;\n  color: #d6c2ff;\n}\n.nkd-pvar-lib[data-v-2b845a08] {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  flex: 1 1 auto;\n  min-width: 0;\n  overflow-y: auto;\n  padding: 14px;\n  box-sizing: border-box;\n}\n.nkd-pvar-lib-row[data-v-2b845a08] {\n  display: flex;\n  flex-direction: column;\n  gap: 3px;\n}\n.nkd-pvar-lib-head[data-v-2b845a08] {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n.nkd-pvar-lib-at[data-v-2b845a08] {\n  color: #b48cff;\n  font-size: 11px;\n  font-weight: 600;\n}\n.nkd-pvar-lib-name[data-v-2b845a08],\n.nkd-pvar-lib-value[data-v-2b845a08] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 12px;\n  font-family: inherit;\n  padding: 4px 8px;\n  outline: none;\n}\n.nkd-pvar-lib-name[data-v-2b845a08] {\n  flex: 1 1 auto;\n  min-width: 0;\n}\n.nkd-pvar-lib-value[data-v-2b845a08] {\n  resize: vertical;\n  min-height: 34px;\n  line-height: 1.45;\n}\n.nkd-pvar-lib-name[data-v-2b845a08]:focus,\n.nkd-pvar-lib-value[data-v-2b845a08]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-lib-name.nkd-pvar-lib-bad[data-v-2b845a08] {\n  border-color: #ff5c5c;\n}\n.nkd-pvar-lib-empty[data-v-2b845a08] {\n  color: rgba(255, 255, 255, 0.4);\n  font-size: 12px;\n}\n.nkd-pvar-ac[data-v-2b845a08] {\n  position: absolute;\n  z-index: 100;\n  background: #1e2028;\n  border: 1px solid #3a3d46;\n  border-radius: 5px;\n  padding: 3px;\n  min-width: 120px;\n  max-height: 160px;\n  overflow-y: auto;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pvar-ac-item[data-v-2b845a08] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  color: #c8d0e0;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.nkd-pvar-ac-item[data-v-2b845a08]:hover,\n.nkd-pvar-ac-item.active[data-v-2b845a08] {\n  background: rgba(74, 180, 255, 0.18);\n  color: #fff;\n}\n.nkd-pvar-dot-off[data-v-2b845a08] {\n  background: transparent !important;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n\n.nkd-pvar-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 15px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pvar-chip:active {\n  cursor: grabbing;\n}\n.nkd-pvar-chip::selection,\n.nkd-pvar-chip *::selection {\n  background: transparent;\n}\n.nkd-pvar-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pvar-chip-saved {\n  border-color: rgba(180, 140, 255, 0.8);\n  color: #e0d2ff;\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pvar-chip-saved .nkd-pvar-dot {\n  background: #b48cff;\n}\n.nkd-pvar-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pvar-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pvar-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-rand .nkd-pvar-dot {\n  background: #ffd166;\n}\n.nkd-pvar-chip-rand.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pvar-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pvar-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-cycle .nkd-pvar-dot {\n  background: #66e0aa;\n}\n.nkd-pvar-chip-cycle.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-c321596f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-c321596f], .nkd-root[data-v-c321596f] *, .nkd-root[data-v-c321596f] *::before, .nkd-root[data-v-c321596f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-c321596f] {\r\n  width: 100%;\r\n  aspect-ratio: 380 / 64;\r\n  height: auto;\r\n  display: block;\r\n  cursor: crosshair;\r\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-c321596f] {\r\n  position: absolute;\r\n  width: 1px;\r\n  height: 1px;\r\n  opacity: 0;\r\n  pointer-events: none;\n}\n.nkd-bar[data-v-c321596f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-c321596f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-c321596f] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-c321596f]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-c321596f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-c321596f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-c321596f] {\r\n  font-size: 10px;\r\n  color: var(--descrip-text, rgba(255,255,255,0.45));\r\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-c321596f] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-c321596f] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-c321596f], .nkd-select[data-v-c321596f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-c321596f]:hover, .nkd-select[data-v-c321596f]:hover, .nkd-select[data-v-c321596f]:focus {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-c321596f]:disabled {\r\n  opacity: 0.35;\r\n  cursor: not-allowed;\n}\r\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-76fe8be0] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-76fe8be0], .nkd-root[data-v-76fe8be0] *, .nkd-root[data-v-76fe8be0] *::before, .nkd-root[data-v-76fe8be0] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-76fe8be0] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-76fe8be0] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-76fe8be0] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-76fe8be0] { padding: 5px 8px;\n}\n.nkd-hint[data-v-76fe8be0] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\r\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-e1c1838f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-e1c1838f], .nkd-root[data-v-e1c1838f] *, .nkd-root[data-v-e1c1838f] *::before, .nkd-root[data-v-e1c1838f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-e1c1838f] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-e1c1838f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-e1c1838f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-e1c1838f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-e1c1838f] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-e1c1838f] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-e1c1838f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-e1c1838f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-e1c1838f] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-e1c1838f] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-e1c1838f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-e1c1838f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-e1c1838f] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pvar[data-v-2b845a08] {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pvar-editor[data-v-2b845a08] {\n  height: 150px;\n  min-height: 90px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 6px 8px;\n  color: #c8d0e0;\n  font-size: 11.5px;\n  line-height: 1.55;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pvar-editor[data-v-2b845a08]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-editor[data-v-2b845a08]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pvar-bar[data-v-2b845a08] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pvar-add[data-v-2b845a08] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pvar-add[data-v-2b845a08]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pvar-add.connected[data-v-2b845a08] {\n  color: #4ab4ff;\n}\n.nkd-pvar-lib-toggle[data-v-2b845a08] {\n  margin-left: auto;\n}\n.nkd-pvar-lib-toggle.active[data-v-2b845a08],\n.nkd-pvar-lib-toggle[data-v-2b845a08]:hover {\n  border-color: #b48cff;\n  color: #d6c2ff;\n}\n.nkd-pvar-lib[data-v-2b845a08] {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  flex: 1 1 auto;\n  min-width: 0;\n  overflow-y: auto;\n  padding: 14px;\n  box-sizing: border-box;\n}\n.nkd-pvar-lib-row[data-v-2b845a08] {\n  display: flex;\n  flex-direction: column;\n  gap: 3px;\n}\n.nkd-pvar-lib-head[data-v-2b845a08] {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n.nkd-pvar-lib-at[data-v-2b845a08] {\n  color: #b48cff;\n  font-size: 11px;\n  font-weight: 600;\n}\n.nkd-pvar-lib-name[data-v-2b845a08],\n.nkd-pvar-lib-value[data-v-2b845a08] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 12px;\n  font-family: inherit;\n  padding: 4px 8px;\n  outline: none;\n}\n.nkd-pvar-lib-name[data-v-2b845a08] {\n  flex: 1 1 auto;\n  min-width: 0;\n}\n.nkd-pvar-lib-value[data-v-2b845a08] {\n  resize: vertical;\n  min-height: 34px;\n  line-height: 1.45;\n}\n.nkd-pvar-lib-name[data-v-2b845a08]:focus,\n.nkd-pvar-lib-value[data-v-2b845a08]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-lib-name.nkd-pvar-lib-bad[data-v-2b845a08] {\n  border-color: #ff5c5c;\n}\n.nkd-pvar-lib-empty[data-v-2b845a08] {\n  color: rgba(255, 255, 255, 0.4);\n  font-size: 12px;\n}\n.nkd-pvar-ac[data-v-2b845a08] {\n  position: absolute;\n  z-index: 100;\n  background: #1e2028;\n  border: 1px solid #3a3d46;\n  border-radius: 5px;\n  padding: 3px;\n  min-width: 120px;\n  max-height: 160px;\n  overflow-y: auto;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pvar-ac-item[data-v-2b845a08] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  color: #c8d0e0;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.nkd-pvar-ac-item[data-v-2b845a08]:hover,\n.nkd-pvar-ac-item.active[data-v-2b845a08] {\n  background: rgba(74, 180, 255, 0.18);\n  color: #fff;\n}\n.nkd-pvar-dot-off[data-v-2b845a08] {\n  background: transparent !important;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n\n.nkd-pvar-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 15px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pvar-chip:active {\n  cursor: grabbing;\n}\n.nkd-pvar-chip::selection,\n.nkd-pvar-chip *::selection {\n  background: transparent;\n}\n.nkd-pvar-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pvar-chip-saved {\n  border-color: rgba(180, 140, 255, 0.8);\n  color: #e0d2ff;\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pvar-chip-saved .nkd-pvar-dot {\n  background: #b48cff;\n}\n.nkd-pvar-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pvar-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pvar-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-rand .nkd-pvar-dot {\n  background: #ffd166;\n}\n.nkd-pvar-chip-rand.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pvar-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pvar-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-cycle .nkd-pvar-dot {\n  background: #66e0aa;\n}\n.nkd-pvar-chip-cycle.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-e1c1838f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-e1c1838f], .nkd-root[data-v-e1c1838f] *, .nkd-root[data-v-e1c1838f] *::before, .nkd-root[data-v-e1c1838f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-e1c1838f] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-e1c1838f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-e1c1838f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-e1c1838f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-e1c1838f] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-e1c1838f] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-e1c1838f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-e1c1838f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-e1c1838f] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-e1c1838f] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-e1c1838f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-e1c1838f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-e1c1838f] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {
