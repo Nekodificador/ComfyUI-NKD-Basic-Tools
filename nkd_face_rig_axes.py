@@ -589,18 +589,6 @@ def library_dir() -> str:
     return osp.join(root, "nkd_axes")
 
 
-def save_axis(ax: Axis, directory=None) -> str:
-    directory = directory or library_dir()
-    os.makedirs(directory, exist_ok=True)
-    path = osp.join(directory, "{}.json".format(ax.name))
-    with open(path, "w", encoding="utf-8") as fh:
-        json.dump({"v": STATE_V, "name": ax.name, "label": ax.label, "au": ax.au,
-                   "group": ax.group, "side": ax.side, "lo": ax.lo, "hi": ax.hi,
-                   "exp": ax.exp.reshape(-1).round(8).tolist(),
-                   "rot": ax.rot.round(8).tolist()}, fh)
-    return path
-
-
 def load_axes(directory=None) -> list:
     """The built-ins plus anything recorded, with recorded axes winning by name."""
     axes = default_axes()

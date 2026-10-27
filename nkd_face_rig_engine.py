@@ -71,17 +71,8 @@ _MASK = osp.join(_HERE, "nkd_liveportrait", "utils", "mask_template.png")
 
 
 def _load_state(path: str):
-    """`weights_only=True` first — these checkpoints are plain state dicts.
-
-    The fallback is not paranoia: torch >= 2.6 flipped the default and strands
-    any loader that never chose. If a checkpoint ever does carry a pickled
-    object we still load it, rather than dying on an `Unsupported global`
-    traceback the user cannot act on.
-    """
-    try:
-        return torch.load(path, map_location="cpu", weights_only=True)
-    except Exception:
-        return torch.load(path, map_location="cpu", weights_only=False)
+    """These checkpoints are plain state dicts: never unpickle arbitrary objects."""
+    return torch.load(path, map_location="cpu", weights_only=True)
 
 
 @dataclass
