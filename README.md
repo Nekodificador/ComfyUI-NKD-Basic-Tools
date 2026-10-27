@@ -111,6 +111,14 @@ https://github.com/user-attachments/assets/ce3f916a-3a41-4848-be44-9636dc7477bb
 
 ---
 
+## Loading models
+
+| Node | What it does |
+|---|---|
+| [😺NKD Loader](docs/loader.md) | Saves a set of loader nodes (model, text encoders, VAE, upscaler…) as a preset, so one dropdown switches model families and your cables stay put. |
+
+---
+
 ## LoRAs
 
 See which blocks of a LoRA actually do the work, then shape it block by block.
