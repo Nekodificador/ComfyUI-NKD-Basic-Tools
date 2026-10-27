@@ -42,9 +42,13 @@ flowchart LR
 
 **Chained detailing.** Turn on `Separate Regions` and every separate blob of the
 mask gets its own crop at its own resolution. Your sampler runs once per region
-with no extra wiring, and Stitch composites them all back in one pass. It also
-takes mask batches from segmentation nodes, one region per mask. You can filter
-by minimum area, cap the count and choose the order.
+with no extra wiring, and Stitch composites them all back in one pass. You can
+filter by minimum area, cap the count and choose the order.
+
+**Mask batches.** A batch of masks with one image, such as the `masks` output of
+😺NKD Mask Picker or a segmentation node, gets one crop per mask, in the order
+they come, with or without `Separate Regions`: nothing is filtered or capped.
+A batch of images (a video) still gets one crop over all its frames.
 
 ## Stitch
 

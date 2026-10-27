@@ -148,7 +148,8 @@ class NKDInpaintCrop(io.ComfyNode):
                                  tooltip="Detail several areas in one go: each separate area "
                                          "of the mask gets its own crop, your sampler runs "
                                          "once per area automatically, and Stitch puts them "
-                                         "all back."),
+                                         "all back. A batch of masks always gets one crop per "
+                                         "mask, with or without this."),
                 io.Float.Input("region_min_area", default=0.1, min=0.0, max=100.0, step=0.05,
                                display_name="Min Region Area %",
                                tooltip="Ignore areas smaller than this percentage of the "
@@ -191,9 +192,12 @@ class NKDInpaintCrop(io.ComfyNode):
         if fill_holes:
             m = _mask_fill_holes(m)
 
-        if separate_regions:
-            regions = _separate_regions(m, region_min_area / 100.0, max_regions,
-                                        region_order)
+        # One image with a mask batch (one mask per object, e.g. from a picker): a crop per mask, as given,
+        # whatever Separate Regions says. Image batches (video) keep one crop over all frames.
+        per_mask = image.shape[0] == 1 and m.shape[0] > 1
+        if per_mask or separate_regions:
+            regions = ([r for r in m if r.any()] if per_mask else
+                       _separate_regions(m, region_min_area / 100.0, max_regions, region_order))
             if not regions:
                 regions = [m[0]]
             # One grow pass over the whole stack — GPU-batched.
