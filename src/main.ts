@@ -277,18 +277,20 @@ comfyApp.registerExtension({
       const promptRo = sizeDomWidgetToContent(this, domWidget, container, MIN_W,
         () => MIN_EDITOR_H, { growOnly: true });
 
-      // Override computeSize so LiteGraph's minimum-drag uses the BASE editor
-      // height (150px), not the current (possibly user-grown) editor height.
+      // Override computeSize so LiteGraph's minimum-drag counts the editor at its
+      // CSS min-height, not its current height. Always swapping out the REAL
+      // editor height keeps onResize's overhead exact at any size — otherwise a
+      // short editor is counted as overhead and the button bar overflows the node.
       // growOnly in apply() prevents auto-shrinking; this lets the user drag smaller.
-      const BASE_EDITOR_H = 150;
+      const EDITOR_MIN_H = 90;
       const innerComputeSize = domWidget.computeSize;
       domWidget.computeSize = (width: number) => {
         const result = innerComputeSize(width);
         const root = container.firstElementChild as HTMLElement | null;
         if (root && root.offsetHeight > 0) result[1] = root.offsetHeight + ROW_SAFETY;
         const editorEl = container.querySelector<HTMLElement>(".nkd-pvar-editor");
-        if (editorEl && editorEl.offsetHeight > BASE_EDITOR_H) {
-          result[1] = result[1] - editorEl.offsetHeight + BASE_EDITOR_H;
+        if (editorEl && editorEl.offsetHeight > 0) {
+          result[1] = result[1] - editorEl.offsetHeight + EDITOR_MIN_H;
         }
         return result;
       };
@@ -301,8 +303,8 @@ comfyApp.registerExtension({
         const editorEl = container.querySelector<HTMLElement>(".nkd-pvar-editor");
         if (!editorEl) return;
         const computed = this.computeSize();
-        const overhead = computed[1] - BASE_EDITOR_H;
-        const available = Math.max(90, size[1] - overhead);
+        const overhead = computed[1] - EDITOR_MIN_H;
+        const available = Math.max(EDITOR_MIN_H, size[1] - overhead);
         if (Math.abs(available - editorEl.offsetHeight) > 2) {
           editorEl.style.height = available + "px";
         }
