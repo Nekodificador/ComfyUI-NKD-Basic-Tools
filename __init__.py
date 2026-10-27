@@ -29,6 +29,12 @@ from .nkd_loader import NKDLoader
 from . import nkd_spline_preview  # noqa: F401 — registers /nkd/spline/preview
 
 try:
+    from .nkd_mask_picker import NKDMaskPicker
+except Exception as exc:  # needs ComfyUI's native SAM3 (late 2026)
+    NKDMaskPicker = None
+    logging.warning("[NKD Basic Tools] 😺NKD Mask Picker unavailable: %s", exc)
+
+try:
     from .nkd_face_crop import NKDFaceCrop, NKDFaceMask, NKDFaceStitch
 except Exception as exc:  # onnxruntime and friends are optional
     NKDFaceCrop = NKDFaceMask = NKDFaceStitch = None
@@ -81,6 +87,8 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDResolutionSelector,
             NKDLoader,
         ]
+        if NKDMaskPicker is not None:
+            nodes.append(NKDMaskPicker)
         if NKDFaceCrop is not None:
             nodes += [NKDFaceCrop, NKDFaceMask, NKDFaceStitch]
         if NKDFaceRig is not None:
@@ -158,6 +166,10 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDResolutionSelector": "😺NKD Resolution Selector",
     "NKDLoader": "😺NKD Loader",
 }
+
+if NKDMaskPicker is not None:
+    NODE_CLASS_MAPPINGS["NKDMaskPicker"] = NKDMaskPicker
+    NODE_DISPLAY_NAME_MAPPINGS["NKDMaskPicker"] = "😺NKD Mask Picker"
 
 if NKDFaceCrop is not None:
     NODE_CLASS_MAPPINGS["NKDFaceCrop"] = NKDFaceCrop

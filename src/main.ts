@@ -21,6 +21,7 @@ import { registerMerge, mergeSource } from "./merge";
 import { registerPaint, paintSource } from "./paint";
 import { registerLoraControl } from "./loraBlocks";
 import { registerLoader } from "./loader";
+import { registerMaskPicker } from "./maskPicker";
 
 // Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
 // skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
@@ -33,11 +34,13 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDMaskPainter: 1, NKDVectorMask: 1, NKDFieldBlur: 1, NKDPathBlur: 1,
   NKDFaceRig: 1, NKDCrop: 1, NKDPaint: 1, NKDLoraControl: 1,
   NKDResolutionSelector: 1, NKDAlphaMatte: 1, NKDMerge: 1, NKDCurves: 1,
+  NKDMaskPicker: 1,
 });
 
 registerCrop();
 registerMerge();
 registerPaint();
+registerMaskPicker();
 registerLoraControl();
 registerLoader();
 
