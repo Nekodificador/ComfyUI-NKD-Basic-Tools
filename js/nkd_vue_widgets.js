@@ -7100,6 +7100,11 @@ function nkdSlider(label, cfg, onInput, title) {
     rng.addEventListener("pointerup", up);
     rng.addEventListener("pointercancel", up);
   });
+  rng.addEventListener("dblclick", (e) => {
+    if (cfg.def == null || rng.disabled) return;
+    e.preventDefault();
+    apply2(cfg.def, false);
+  });
   rng.addEventListener("keydown", (e) => {
     const dir = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
     if (!dir) return;
@@ -15825,6 +15830,7 @@ function openSplineOverlay(opts) {
           value: 0,
           width: 220,
           fine: 0.05,
+          def: 0,
           format: (v) => `${v.toFixed(2)} px`
         },
         (v) => editor.setActiveProp("feather", v),
@@ -15869,6 +15875,7 @@ function openSplineOverlay(opts) {
           step: 0.05,
           value: 1,
           width: 180,
+          def: 1,
           format: (v) => `x${v.toFixed(2)}`
         },
         (v) => editor.setActiveProp("speed", v),
@@ -15912,6 +15919,7 @@ function openSplineOverlay(opts) {
         step: 1,
         value: editor.maxBlur,
         width: 180,
+        def: 48,
         format: (v) => `${Math.round(v)} px`
       },
       (v) => setNumber("max_blur", v),
@@ -15925,6 +15933,7 @@ function openSplineOverlay(opts) {
         step: 0.1,
         value: editor.falloff,
         width: 140,
+        def: 2,
         format: (v) => v.toFixed(2)
       },
       (v) => setNumber("falloff", v),

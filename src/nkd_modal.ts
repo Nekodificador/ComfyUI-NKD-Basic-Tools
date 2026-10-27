@@ -260,6 +260,9 @@ export type NkdSliderCfg = {
   width?: number;
   /** Quantum while Shift is held. Defaults to a tenth of `step`. */
   fine?: number;
+  /** Value a double-click restores. Omit and double-click does nothing, rather
+   *  than guessing that the value it opened with was the default. */
+  def?: number;
   /** Render the value beside the track. Give it units — a bare number next to a
    *  slider called "Feather" does not say pixels, and pixels is the question. */
   format?: (v: number) => string;
@@ -349,6 +352,15 @@ export function nkdSlider(label: string, cfg: NkdSliderCfg,
     rng.addEventListener("pointermove", move);
     rng.addEventListener("pointerup", up);
     rng.addEventListener("pointercancel", up);
+  });
+
+  // Double-click restores the default — the same gesture the pack's sliders in
+  // other packs use, driven from `def` rather than from a data attribute
+  // because here the caller is already handing us a config object.
+  rng.addEventListener("dblclick", (e) => {
+    if (cfg.def == null || rng.disabled) return;
+    e.preventDefault();
+    apply(cfg.def, false);
   });
 
   // step="any" would otherwise leave the arrow keys moving by a hundredth of the

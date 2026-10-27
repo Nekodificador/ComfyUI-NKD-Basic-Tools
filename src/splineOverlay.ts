@@ -192,7 +192,7 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
       right.append(add, sub);
 
       const feather = nkdSlider("Feather",
-        { min: 0, max: 128, step: 0.5, value: 0, width: 220, fine: 0.05,
+        { min: 0, max: 128, step: 0.5, value: 0, width: 220, fine: 0.05, def: 0,
           format: (v) => `${v.toFixed(2)} px` },
         (v) => editor.setActiveProp("feather", v),
         "Soften this shape's edge evenly, before it is combined with the others. " +
@@ -224,7 +224,7 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
       };
     } else {
       const speed = nkdSlider("Speed",
-        { min: 0, max: 2, step: 0.05, value: 1, width: 180,
+        { min: 0, max: 2, step: 0.05, value: 1, width: 180, def: 1,
           format: (v) => `x${v.toFixed(2)}` },
         (v) => editor.setActiveProp("speed", v),
         "How fast this stroke moves, relative to the others. The node's Strength " +
@@ -260,12 +260,12 @@ export function openSplineOverlay(opts: SplineOverlayOpts): SplineOverlayHandle 
       refreshBar();
     };
     const maxBlur = nkdSlider("Max Blur",
-      { min: 0, max: 512, step: 1, value: editor.maxBlur, width: 180,
+      { min: 0, max: 512, step: 1, value: editor.maxBlur, width: 180, def: 48,
         format: (v) => `${Math.round(v)} px` },
       (v) => setNumber("max_blur", v),
       "What a pin turned all the way up means, in pixels.");
     const falloff = nkdSlider("Falloff",
-      { min: 0.5, max: 8, step: 0.1, value: editor.falloff, width: 140,
+      { min: 0.5, max: 8, step: 0.1, value: editor.falloff, width: 140, def: 2,
         format: (v) => v.toFixed(2) },
       (v) => setNumber("falloff", v),
       "How tightly each pin holds its own area. Raise it to stop a sharp pin " +
