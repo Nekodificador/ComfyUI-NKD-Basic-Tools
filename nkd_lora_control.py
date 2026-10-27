@@ -4,8 +4,8 @@ Blocks are read from the LoRA file itself, so any architecture works with no
 preset table. Each block can be muted or rescaled, and the whole LoRA can be
 driven over sampling time by a curve (any FLOAT list, e.g. 😺NKD Sigmas Curve).
 
-Block shape is baked into the weights; the curve rides on top as a hook, so the
-two multiply: shape x time.
+Block shape is baked into the LoRA tensors; the curve scales them per step, so
+the two multiply: shape x time.
 """
 from __future__ import annotations
 
@@ -14,10 +14,13 @@ import logging
 import os
 import re
 
-import comfy.hooks
+import comfy.lora
+import comfy.patcher_extension
 import comfy.sd
 import comfy.utils
 import folder_paths
+import torch
+from comfy import weight_adapter
 from comfy.utils import load_torch_file
 from comfy_api.latest import io
 
@@ -48,21 +51,61 @@ def analyse_path(path: str) -> dict:
     return hit
 
 
-def _keyframes(curve: list[float], strength: float):
-    """Turn a FLOAT list into hook keyframes, one per point.
+def _to_device(value, device):
+    if isinstance(value, torch.Tensor):
+        return value.to(device)
+    if isinstance(value, weight_adapter.WeightAdapterBase):
+        return type(value)(value.loaded_keys, _to_device(value.weights, device))
+    if isinstance(value, (tuple, list)):
+        return type(value)(_to_device(v, device) for v in value)
+    return value
 
-    The list already has the sampler's resolution, so there is nothing to
-    interpolate — unlike a keyframe string, which has to guess a point count.
-    """
+
+class _CurveWeight:
+    """Weight function that adds the LoRA delta on every forward, scaled by the
+    curve value of the current step. Quantized layers dequantize before their
+    weight functions run, so this works on int8/fp8/nvfp4 models too, where
+    ComfyUI's weight hooks break."""
+
+    def __init__(self, key, offset, function, adapter, state):
+        self.key, self.offset, self.function = key, offset, function
+        self.adapter, self.state = adapter, state
+
+    def move_to(self, device=None):
+        self.adapter = _to_device(self.adapter, device)
+        return 0   # ponytail: LoRA tensors are small next to the model; report them if VRAM estimates drift
+
+    def __call__(self, weight):
+        s = self.state["strength"]
+        if s == 0.0:
+            return weight
+        # calculate_weight adds in place, and unquantized layers hand us the live
+        # parameter, so without the copy the delta piles up on every forward.
+        return comfy.lora.calculate_weight([(s, self.adapter, 1.0, self.offset, self.function)],
+                                           weight.clone(), self.key, intermediate_dtype=weight.dtype)
+
+
+def _curve_on_the_fly(model, shaped, curve, strength):
+    """Per-step LoRA strength: the delta is applied as a weight function, and an
+    apply_model wrapper picks the curve value for the current sigma. Keyframes are
+    placed by percent -> sigma, so chained samplers share one schedule."""
+    out = model.clone()
+    loaded = comfy.lora.load_lora(shaped, comfy.lora.model_lora_keys_unet(out.model, {}))
+    sampling = out.get_model_object("model_sampling")
     last = len(curve) - 1
-    group = comfy.hooks.HookKeyframeGroup()
-    for i, value in enumerate(curve):
-        group.add(comfy.hooks.HookKeyframe(
-            strength=float(value) * strength,
-            start_percent=i / last,
-            guarantee_steps=1 if i == 0 else 0,
-        ))
-    return group
+    frames = [(float(sampling.percent_to_sigma(i / last)), float(v) * strength) for i, v in enumerate(curve)]
+    state = {"strength": frames[0][1]}
+
+    def pick_strength(executor, x, t, *args, **kwargs):
+        sigma = float(t.max())
+        state["strength"] = next((s for sig, s in reversed(frames) if sig >= sigma), frames[0][1])
+        return executor(x, t, *args, **kwargs)
+
+    out.add_wrapper_with_key(comfy.patcher_extension.WrappersMP.APPLY_MODEL, "nkd_lora_curve", pick_strength)
+    for k, adapter in loaded.items():
+        key, offset, function = (k, None, None) if isinstance(k, str) else (k[0], k[1], k[2] if len(k) > 2 else None)
+        out.add_weight_wrapper(key, _CurveWeight(key, offset, function, adapter, state))
+    return out
 
 
 class NKDLoraControl(io.ComfyNode):
@@ -98,25 +141,13 @@ class NKDLoraControl(io.ComfyNode):
                     tooltip="Strength over sampling steps, as a float list "
                             "(e.g. the 'floats' output of 😺NKD Sigmas Curve).",
                 ),
-                # LAST on purpose. Hooks hang off the CONDITIONING, not the model
-                # — set_hooks_for_conditioning is what makes a schedule happen —
-                # so these only matter with a curve, and the widget shows/hides
-                # them with it. Links are addressed by INDEX, so the pair has to
-                # sit at the tail: then appearing and disappearing is a push and a
-                # pop, and nothing before them can be renumbered.
-                io.Conditioning.Input("positive", optional=True),
-                io.Conditioning.Input("negative", optional=True),
             ],
-            outputs=[
-                io.Model.Output(),
-                io.Conditioning.Output(display_name="positive"),
-                io.Conditioning.Output(display_name="negative"),
-            ],
+            outputs=[io.Model.Output()],
         )
 
     @classmethod
     def execute(cls, model, lora_name: str, strength: float, blocks: str = "",
-                positive=None, negative=None, curve=None) -> io.NodeOutput:
+                curve=None) -> io.NodeOutput:
         path = _resolve(lora_name)
         state_dict = load_torch_file(path, safe_load=True)
         analysis = analyse_path(path)
@@ -131,33 +162,12 @@ class NKDLoraControl(io.ComfyNode):
         if curve is not None and len(curve) < 2:
             notes.append("curve needs at least 2 points - ignored")
             curve = None
-        if curve is not None and (positive is None or negative is None):
-            raise ValueError(
-                "A strength curve needs positive and negative conditioning wired through "
-                "this node: the schedule is carried by hooks attached to the conditioning, "
-                "not by the model."
-            )
-        if curve is not None:
-            quantized, label = core.is_quantized(model)
-            if quantized:
-                # Hooks walk weights assuming plain nn.Linear and blow up on
-                # quantized layers at sample time, so fall back to a flat apply.
-                notes.append(f"curve skipped: {label} model, applied flat instead")
-                curve = None
-
         if curve is None:
             out_model, _ = comfy.sd.load_lora_for_models(model, None, shaped, strength, 0.0)
-            out_positive, out_negative = positive, negative
         else:
             # ponytail: model-only, like every selective loader out there. Wire a
             # CLIP input if an SDXL-era LoRA ever needs its text encoder shaped.
-            hooks = comfy.hooks.create_hook_lora(lora=shaped, strength_model=1.0, strength_clip=0.0)
-            hooks.set_keyframes_on_hooks(_keyframes(list(curve), strength))
-            out_model = model.clone()
-            out_model.register_all_hook_patches(
-                hooks, comfy.hooks.create_target_dict(comfy.hooks.EnumWeightTarget.Model))
-            out_positive = comfy.hooks.set_hooks_for_conditioning(positive, hooks)
-            out_negative = comfy.hooks.set_hooks_for_conditioning(negative, hooks)
+            out_model = _curve_on_the_fly(model, shaped, list(curve), strength)
             notes.append(f"curve: {len(curve)} steps, {min(curve):.2f} to {max(curve):.2f}, "
                          f"x{strength} overall")
 
@@ -168,7 +178,7 @@ class NKDLoraControl(io.ComfyNode):
         # log AND back to the widget's status line.
         for n in notes:
             logging.warning("[NKD LoRA Control] %s", n)
-        return io.NodeOutput(out_model, out_positive, out_negative, ui={"nkd_note": [note]})
+        return io.NodeOutput(out_model, ui={"nkd_note": [note]})
 
 
 # ---------------------------------------------------------------------------

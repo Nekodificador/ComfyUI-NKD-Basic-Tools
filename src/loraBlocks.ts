@@ -665,46 +665,32 @@ function setup(node: any): void {
     refresh();
     // After configure, not before: LiteGraph restores the saved sockets and their
     // links here, and touching the arrays earlier would drop them.
-    syncCurveSockets();
+    dropConditioningSockets();
     return r;
   };
 
-  // ── curve sockets ──────────────────────────────────────────────────────────
-  // positive/negative only mean something with a curve, so they follow it. They
-  // are declared LAST in the schema so this is a push/pop at the tail: links are
-  // addressed by index, and anything spliced out of the middle would silently
-  // renumber every socket after it.
-  const findSlot = (list: any[], name: string) => list?.findIndex((s: any) => s.name === name) ?? -1;
-  const wired = (s: any) => !!(s && (s.link != null || (s.links && s.links.length)));
-
-  function syncCurveSockets() {
-    const curve = node.inputs?.find((i: any) => i.name === "curve");
-    const want = !!(curve && curve.link != null);
-
-    for (const name of ["positive", "negative"]) {
-      const inIdx = findSlot(node.inputs, name);
-      const outIdx = findSlot(node.outputs, name);
-      if (want) {
-        if (inIdx < 0) node.addInput(name, "CONDITIONING");
-        if (outIdx < 0) node.addOutput(name, "CONDITIONING");
-      } else {
-        // Never remove a socket somebody has wired — dropping the curve would
-        // then silently destroy their conditioning route. Unplug it first and it
-        // tidies itself away.
-        if (inIdx >= 0 && !wired(node.inputs[inIdx])) node.removeInput(inIdx);
-        if (outIdx >= 0 && !wired(node.outputs[outIdx])) node.removeOutput(outIdx);
+  // ── legacy curve sockets ───────────────────────────────────────────────────
+  // The curve used to ride on conditioning hooks, so older workflows route
+  // positive/negative through this node. The schedule now lives on the model:
+  // splice each pair out, wiring the source straight to whatever it fed.
+  function dropConditioningSockets() {
+    const graph = node.graph;
+    if (!graph) return;
+    for (const name of ["negative", "positive"]) {
+      const inIdx = node.inputs?.findIndex((i: any) => i.name === name) ?? -1;
+      const outIdx = node.outputs?.findIndex((o: any) => o.name === name) ?? -1;
+      const src = inIdx >= 0 ? graph.getLink(node.inputs[inIdx].link) : null;
+      if (src && outIdx >= 0) {
+        const from = graph.getNodeById(src.origin_id);
+        for (const id of [...(node.outputs[outIdx].links ?? [])]) {
+          const l = graph.getLink(id);
+          if (from && l) from.connect(src.origin_slot, graph.getNodeById(l.target_id), l.target_slot);
+        }
       }
+      if (outIdx >= 0) node.removeOutput(outIdx);
+      if (inIdx >= 0) node.removeInput(inIdx);
     }
-    node.setSize([Math.max(node.size[0], mounted?.minNodeWidth?.() ?? 0), node.computeSize()[1]]);
-    node.setDirtyCanvas(true, true);
   }
-
-  const origConn = node.onConnectionsChange;
-  node.onConnectionsChange = function (this: any, ...args: any[]) {
-    const r = origConn?.apply(this, args);
-    syncCurveSockets();
-    return r;
-  };
 
   // The backend has no report output any more; it sends its notes back as UI
   // metadata on its own executed event.
@@ -731,7 +717,7 @@ function setup(node: any): void {
 
   openPanels.add(loadPresets);
   loadPresets();
-  requestAnimationFrame(() => { syncCurveSockets(); refresh(); commit(); });
+  requestAnimationFrame(() => { dropConditioningSockets(); refresh(); commit(); });
 }
 
 /**

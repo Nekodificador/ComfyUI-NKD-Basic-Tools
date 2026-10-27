@@ -25,11 +25,9 @@ flowchart LR
     classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
-Without a curve it's a plain model in, model out. Connect a curve and the
-`positive` and `negative` sockets appear, because that's what carries the
-schedule to the sampler. Unplug the curve and they tidy themselves away, unless
-you've wired them, in which case they stay put rather than taking your cables
-with them.
+It's model in, model out, with or without a curve. Workflows saved with the
+old `positive`/`negative` sockets are rewired on load: the conditioning goes
+straight from its source to the sampler.
 
 ## The block panel
 
@@ -89,9 +87,9 @@ Per-block shaping and the curve are independent and multiply together, so you
 can keep a block at half strength and still ramp the LoRA across the sampling
 run.
 
-Scheduling doesn't work on GGUF or fp8 models. The node detects those, applies
-the LoRA at a flat strength instead of failing mid-render, and says so on a
-line under the panel.
+The curve works on quantized models (int8, fp8) as well as full-precision ones.
+It adds the LoRA on every model call, so sampling with a curve is slower than a
+flat strength: about 50% on SDXL and 70% on an int8 Z-Image in testing.
 
 ## Saving a shaped LoRA
 
@@ -119,13 +117,10 @@ file has nowhere to put that, so a saved file carries the block shape only.
 - `strength`: overall strength, -10 to 10. Multiplies the curve when one is
   connected.
 - `curve` (optional): a list of floats, strength per sampling step.
-- `positive`, `negative` (appear with a curve): conditioning to carry the
-  schedule.
 
 ## Outputs
 
 - `model`
-- `positive`, `negative`: present only while a curve is connected.
 
 ---
 
