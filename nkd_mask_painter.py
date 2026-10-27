@@ -12,7 +12,7 @@ folder are all unchanged, so saved workflows resolve and masks already painted
 survive the move.
 """
 import os
-from .helpers import _safe_join, same_origin_only
+from .helpers import _safe_join, _safe_name, same_origin_only
 import re
 
 import folder_paths
@@ -84,17 +84,21 @@ def _valid_node_id(node_id: str) -> bool:
         and _NODE_ID_RE.match(node_id) is not None
 
 
-def _backup_path(node_id: str) -> str:
-    return os.path.join(_backup_dir(), f"{node_id}_mask.png")
+def _backup_path(node_id: str) -> str | None:
+    # A bare file name inside the backup folder, never a path: subgraph ids carry
+    # a ":", which Windows reads as a drive or a stream.
+    return _safe_join(_backup_dir(), _safe_name(node_id.replace(":", "_"), "node") + "_mask.png")
 
 def _save_backup(node_id: str, mask_2d: np.ndarray) -> None:
     """Persist a 2D uint8 mask (255=masked, 0=unmasked) to input/nkd_masks/."""
-    PILImage.fromarray(mask_2d, "L").save(_backup_path(node_id))
+    p = _backup_path(node_id)
+    if p:
+        PILImage.fromarray(mask_2d, "L").save(p)
 
 def _load_backup(node_id: str) -> np.ndarray | None:
     """Return the persisted mask as 2D uint8 (255=masked) or None if missing."""
     p = _backup_path(node_id)
-    if not os.path.exists(p):
+    if not p or not os.path.exists(p):
         return None
     try:
         return np.array(PILImage.open(p).convert("L"), dtype=np.uint8)
@@ -103,7 +107,7 @@ def _load_backup(node_id: str) -> np.ndarray | None:
 
 def _delete_backup(node_id: str) -> None:
     p = _backup_path(node_id)
-    if os.path.exists(p):
+    if p and os.path.exists(p):
         try:
             os.remove(p)
         except OSError:
@@ -302,12 +306,9 @@ async def _nkd_bridge_clear(request: web.Request) -> web.Response:
     for k in candidate_keys:
         _, _item, _clean = _pb_id_map[k]
         if _clean is not None:
-            clean_path = os.path.join(
-                folder_paths.get_temp_directory(),
-                _clean.get("subfolder", ""),
-                _clean.get("filename", ""),
-            )
-            if os.path.isfile(clean_path):
+            clean_path = _safe_join(folder_paths.get_temp_directory(),
+                                    _clean.get("subfolder", ""), _clean.get("filename", ""))
+            if clean_path and os.path.isfile(clean_path):
                 clean_item = _clean
                 break
 
@@ -325,12 +326,9 @@ async def _nkd_bridge_clear(request: web.Request) -> web.Response:
     # alpha channel server-side; pointing it at the clean RGB makes alpha = 255).
     new_pb_id: str | None = None
     if clean_item is not None:
-        clean_path = os.path.join(
-            folder_paths.get_temp_directory(),
-            clean_item.get("subfolder", ""),
-            clean_item.get("filename", ""),
-        )
-        if os.path.isfile(clean_path):
+        clean_path = _safe_join(folder_paths.get_temp_directory(),
+                                clean_item.get("subfolder", ""), clean_item.get("filename", ""))
+        if clean_path and os.path.isfile(clean_path):
             new_pb_id = _set_pb_image(node_id, clean_path, clean_item)
 
     return web.json_response({"clean": clean_item, "pb_id": new_pb_id})
