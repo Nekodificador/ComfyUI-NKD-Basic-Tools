@@ -20,13 +20,18 @@ const NODE_NAME = "NKDMaskPicker";
 const EXT_NAME = "NKD.BasicTools.MaskPicker";
 console.log("[NKD Mask Picker] rev 2");
 
-// a mask comes from a grid point (x, y) or, when forced where nothing was listed, from its own points
-type Prompt = { x?: number; y?: number; points?: number[][]; level: number };
+// a mask comes from a grid point (x, y) or, when forced where nothing was listed, from its own points.
+// In points mode each object is one pick whose points carry labels (1 positive, 0 negative); SAM picks its level
+type Prompt = { x?: number; y?: number; points?: number[][]; labels?: number[]; level: number };
 type Seg = Prompt & { score: number; area: number; rle: number[] };
 type Payload = { w: number; h: number; image: string; image_hd?: string; masks: Seg[] };
 type Pick = Prompt & { mode: "add" | "sub"; group?: number };
 
-const HOVER: RGB = [74, 180, 255], PICKED: RGB = [124, 255, 107], CUT: RGB = [70, 70, 70];   // CUT: the dots of cut points
+const HOVER: RGB = [74, 180, 255], CUT: RGB = [70, 70, 70];   // CUT: the dots of cut points
+const NEGATIVE: RGB = [255, 80, 80];
+// one colour per group (a drag, a points-mode object), none close to HOVER, NEGATIVE or CUT
+const GROUPS: RGB[] = [[124, 255, 107], [255, 214, 64], [235, 90, 255], [255, 150, 50], [60, 230, 190], [160, 120, 255], [255, 120, 180]];
+const colorOf = (group?: number) => GROUPS[(((group ?? 0) % GROUPS.length) + GROUPS.length) % GROUPS.length];
 type RGB = [number, number, number];
 
 function unrle(runs: number[], n: number): Uint8Array {
@@ -39,10 +44,11 @@ function unrle(runs: number[], n: number): Uint8Array {
 const pointsOf = (p: Prompt) => p.points ?? [[p.x!, p.y!]];
 const samePick = (p: Pick, s: Seg) => {
   const a = pointsOf(p), b = pointsOf(s);
-  return p.level === s.level && !p.points === !s.points && a.length === b.length &&
+  return (!!p.labels || p.level === s.level) && `${p.labels}` === `${s.labels}` && !p.points === !s.points && a.length === b.length &&
     a.every((q, i) => Math.abs(q[0] - b[i][0]) < 1e-3 && Math.abs(q[1] - b[i][1]) < 1e-3);
 };
 const DRAG = 4, POINT_STEP = 24, MAX_POINTS = 8;   // preview px
+const GRAB = 8;   // screen px: points mode grabs a point this close
 type Stroke = { x: number; y: number; hover: number; cut: boolean; keep: boolean; group: number;
   dragging: boolean; points: number[][]; before: Pick[]; seen: Set<number> };
 
@@ -60,6 +66,11 @@ class PickerState {
   canAutoAnalyze = () => true;   // false inside a subgraph, where Analyze runs the whole workflow
   stroke: Stroke | null = null;
   showMask = false;
+  pointsOnly = () => false;
+  live = true;            // points mode: analyze after every change
+  saveLive = () => {};
+  current = 0;            // points mode: the object new points go to
+  grabbed: { pick: Pick; i: number; moved: boolean; right: boolean } | null = null;
   // ponytail: ~0.7 MB per hovered mask per colour at 512 px; upgrade: one white canvas per mask, tinted on draw
   private tints = new Map<string, HTMLCanvasElement>();
   readonly views = new Set<() => void>();
@@ -233,7 +244,44 @@ class PickerState {
     this.redraw();
   }
 
-  clear() { this.picks = []; this.save(this.picks); this.redraw(); }
+  clear() { this.picks = []; this.current = 0; this.save(this.picks); this.redraw(); }
+
+  /** Points mode: the objects, and the point within GRAB screen px of (x, y) in 0..1, for a w x h px view. */
+  objects() { return this.picks.filter((p) => p.labels); }
+  pointAt(x: number, y: number, w: number, h: number): [Pick, number] | null {
+    for (const p of this.objects()) {
+      const i = p.points!.findIndex((q) => Math.hypot((q[0] - x) * w, (q[1] - y) * h) <= GRAB);
+      if (i >= 0) return [p, i];
+    }
+    return null;
+  }
+
+  addPoint(x: number, y: number, label: number) {
+    let p = this.objects().find((pk) => pk.group === this.current);
+    if (!p) this.picks.push(p = { points: [], labels: [], level: 0, mode: "add", group: this.current });
+    p.points!.push([x, y]); p.labels!.push(label);
+    this.changed();
+  }
+
+  /** Release a grabbed point: moved, it stays there; right-clicked in place, it goes. */
+  drop() {
+    const g = this.grabbed;
+    if (!g) return;
+    this.grabbed = null;
+    if (g.moved) return this.changed();
+    if (!g.right) return this.redraw();
+    g.pick.points!.splice(g.i, 1); g.pick.labels!.splice(g.i, 1);
+    if (!g.pick.points!.length) this.picks.splice(this.picks.indexOf(g.pick), 1);
+    this.changed();
+  }
+
+  /** Points mode: save, and with Live on analyze now or right after the run in progress. */
+  changed() {
+    this.save(this.picks);
+    if (!this.live || !this.canAutoAnalyze()) this.redraw();
+    else if (this.analyzing) this.again = true;
+    else this.analyze();
+  }
 
   tint(k: number, rgb: RGB, alpha: number): HTMLCanvasElement {
     const key = `${k}/${rgb}/${alpha}`;
@@ -255,17 +303,23 @@ class PickerState {
   }
 
   /** Listed masks for the current picks, in order. */
-  pickedSegs(): Array<{ k: number; mode: "add" | "sub" }> {
+  pickedSegs(): Array<{ k: number; mode: "add" | "sub"; group?: number }> {
     const masks = this.payload?.masks ?? [];
-    return this.picks.map((p) => ({ k: masks.findIndex((s) => samePick(p, s)), mode: p.mode }))
+    return this.picks.map((p) => ({ k: masks.findIndex((s) => samePick(p, s)), mode: p.mode, group: p.group }))
       .filter((x) => x.k >= 0);
   }
 
   status(): string {
     if (this.analyzing) return "Analyzing…";
+    if (this.pointsOnly()) {
+      const objs = this.objects(), n = objs.reduce((a, p) => a + p.points!.length, 0);
+      const seen = objs.every((pk) => this.payload?.masks.some((s) => samePick(pk, s)));
+      return `${objs.length} objects · ${n} points` + (seen ? "" : " · Analyze or Run to see them");
+    }
     if (!this.payload) return "Press Analyze to find the objects";
     if (this.picks.some((pk) => pk.points && !this.payload!.masks.some((s) => samePick(pk, s))))
       return "Press Analyze to look at the new spots";
+    if (!this.payload.masks.length) return "Click or drag where SAM should look";
     return `${this.payload.masks.length} objects · ${this.picks.length} picked`;
   }
 }
@@ -296,7 +350,13 @@ function makeView(state: PickerState, actions: { analyze: () => void; expand?: (
   const status = document.createElement("span");
   status.style.cssText = "flex:1;font:11px sans-serif;color:rgba(255,255,255,0.45);white-space:nowrap;" +
     "overflow:hidden;text-overflow:ellipsis;";
-  bar.append(imgBtn, maskBtn, status,
+  const objBtn = button("pi-plus", "Object", () => { state.current = state.nextGroup(); state.redraw(); },
+    "Start another object: the next points make their own mask");
+  const liveBtn = button("pi-bolt", "Live", () => {
+    state.live = !state.live; state.saveLive();
+    if (state.live && state.objects().length) state.changed(); else state.redraw();
+  }, "Show the mask after every point. Off: only when the workflow runs");
+  bar.append(imgBtn, maskBtn, status, objBtn, liveBtn,
     button("pi-refresh", "Analyze", actions.analyze, "Find every object in the image"),
     button("pi-times", "", () => state.clear(), "Clear the selection"));
   if (actions.expand) bar.append(button("pi-expand", "", actions.expand, "Open full screen"));
@@ -318,8 +378,22 @@ function makeView(state: PickerState, actions: { analyze: () => void; expand?: (
     const p = state.payload!;
     return [Math.floor(((e.clientX - r.left) / r.width) * p.w), Math.floor(((e.clientY - r.top) / r.height) * p.h)];
   };
+  // points mode: 0..1 of the image, plus the view's size for grabbing
+  const toImage = (e: PointerEvent): [number, number, number, number] => {
+    const r = canvas.getBoundingClientRect();
+    const c = (v: number) => +Math.min(1, Math.max(0, v)).toFixed(5);
+    return [c((e.clientX - r.left) / r.width), c((e.clientY - r.top) / r.height), r.width, r.height];
+  };
   canvas.addEventListener("pointermove", (e) => {
-    if (!state.payload) return;
+    const g = state.grabbed;
+    if (g) {
+      e.stopPropagation();
+      const [x, y] = toImage(e);
+      g.pick.points![g.i] = [x, y]; g.moved = true;
+      state.redraw();
+      return;
+    }
+    if (!state.payload || state.pointsOnly()) return;
     if (state.stroke) {
       e.stopPropagation();
       if (!(e.buttons & 1)) state.abort();   // its release went elsewhere, e.g. the modal closed mid-drag
@@ -331,16 +405,30 @@ function makeView(state: PickerState, actions: { analyze: () => void; expand?: (
     state.hover = -1; state.under = []; state.redraw();
   });
   canvas.addEventListener("pointerdown", (e) => {
+    if (state.pointsOnly()) {
+      if (e.button !== 0 && e.button !== 2) return;
+      e.stopPropagation();
+      const [x, y, w, h] = toImage(e);
+      const hit = state.pointAt(x, y, w, h);
+      if (!hit) return state.addPoint(x, y, e.button === 2 || e.altKey ? 0 : 1);
+      state.current = hit[0].group!;
+      state.grabbed = { pick: hit[0], i: hit[1], moved: false, right: e.button === 2 };
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
     if (e.button !== 0) return;
     e.stopPropagation();                       // or LiteGraph starts dragging the node
     if (!state.payload) return;
     canvas.setPointerCapture(e.pointerId);     // the stroke gets its moves and release outside the canvas too
     state.press(...toPreview(e), e.altKey, e.shiftKey);
   });
-  const end = (e: PointerEvent) => { if (state.stroke) { e.stopPropagation(); state.release(); } };
+  const end = (e: PointerEvent) => {
+    if (state.grabbed) { e.stopPropagation(); state.drop(); }
+    if (state.stroke) { e.stopPropagation(); state.release(); }
+  };
   canvas.addEventListener("pointerup", end);
-  canvas.addEventListener("pointercancel", () => state.abort());
-  canvas.addEventListener("lostpointercapture", () => state.abort());   // after pointerup the stroke is already gone
+  canvas.addEventListener("pointercancel", () => { state.drop(); state.abort(); });
+  canvas.addEventListener("lostpointercapture", () => { state.drop(); state.abort(); });   // after pointerup both are gone
   canvas.addEventListener("wheel", (e) => {
     if (!state.payload || !state.under.length) return;
     state.step(e.deltaY < 0 ? 1 : -1);
@@ -353,6 +441,9 @@ function makeView(state: PickerState, actions: { analyze: () => void; expand?: (
     status.textContent = status.title = state.status();
     imgBtn.style.cssText = BTN + (state.showMask ? "" : ON);
     maskBtn.style.cssText = BTN + (state.showMask ? ON : "");
+    const po = state.pointsOnly();
+    objBtn.style.cssText = BTN + (po ? "" : "display:none;");
+    liveBtn.style.cssText = BTN + (po ? "" : "display:none;") + (state.live ? ON : "");
     const p = state.payload;
     const b = state.backdrop, k = b ? Math.min(1, 512 / Math.max(b.naturalWidth, b.naturalHeight)) : 1;
     const w = p?.w ?? Math.round((b?.naturalWidth ?? 512) * k), h = p?.h ?? Math.round((b?.naturalHeight ?? 288) * k);
@@ -383,25 +474,29 @@ function makeView(state: PickerState, actions: { analyze: () => void; expand?: (
       ctx.globalCompositeOperation = "source-over";
     } else {
       if (state.backdrop) ctx.drawImage(state.backdrop, 0, 0, w, h);
-      // the selection as one green layer, cuts as holes in it
+      ctx.fillStyle = "rgba(0,0,0,0.45)"; ctx.fillRect(0, 0, w, h);   // dimmed, so the picks stand out
+      // the selection as one layer, each group in its own colour, cuts as holes in it
       if (layer.width !== w || layer.height !== h) { layer.width = w; layer.height = h; }
       const lc = layer.getContext("2d")!;
       lc.clearRect(0, 0, w, h);
-      for (const { k, mode } of picked) {
+      for (const { k, mode, group } of picked) {
         lc.globalCompositeOperation = mode === "add" ? "source-over" : "destination-out";
-        lc.drawImage(state.tint(k, PICKED, 1), 0, 0);
+        lc.drawImage(state.tint(k, colorOf(group), 1), 0, 0);
       }
-      ctx.globalAlpha = 0.45; ctx.drawImage(layer, 0, 0); ctx.globalAlpha = 1;
+      ctx.globalAlpha = 0.6; ctx.drawImage(layer, 0, 0); ctx.globalAlpha = 1;
     }
     if (state.hover >= 0) ctx.drawImage(state.tint(state.hover, HOVER, 0.4), 0, 0);
     // forced points, and the ones a stroke on nothing is collecting
-    const dots: Array<[number, number, boolean]> = state.picks.flatMap((pk) =>
-      (pk.points ?? []).map((q): [number, number, boolean] => [q[0] * w, q[1] * h, pk.mode === "add"]));
+    // in their group's colour; points mode: red negative, the current object's ringed in white
+    const dots: Array<[number, number, RGB, boolean]> = (po ? state.objects() : state.picks).flatMap((pk) =>
+      (pk.points ?? []).map((q, i): [number, number, RGB, boolean] => [q[0] * w, q[1] * h,
+        pk.labels ? (pk.labels[i] ? colorOf(pk.group) : NEGATIVE) : pk.mode === "add" ? colorOf(pk.group) : CUT,
+        !!pk.labels && pk.group === state.current]));
     const st = state.stroke;
-    if (st && st.hover < 0) for (const q of st.points) dots.push([q[0] + 0.5, q[1] + 0.5, !st.cut]);
-    ctx.lineWidth = dot * 0.4; ctx.strokeStyle = "#000";
-    for (const [x, y, add] of dots) {
-      ctx.fillStyle = `rgb(${add ? PICKED : CUT})`;
+    if (st && st.hover < 0) for (const q of st.points) dots.push([q[0] + 0.5, q[1] + 0.5, st.cut ? CUT : colorOf(st.group), false]);
+    ctx.lineWidth = dot * 0.4;
+    for (const [x, y, rgb, ring] of dots) {
+      ctx.fillStyle = `rgb(${rgb})`; ctx.strokeStyle = ring ? "#fff" : "#000";
       ctx.beginPath(); ctx.arc(x, y, dot, 0, 2 * Math.PI); ctx.fill(); ctx.stroke();
     }
   };
@@ -451,9 +546,18 @@ function setup(node: any): void {
     comfyApp.extensionManager?.workflow?.activeWorkflow?.changeTracker?.checkState?.();
   });
   node.__nkdPicker = state;
+  const poW = findW(node, "points_only");
+  state.pointsOnly = () => !!poW?.value;
+  if (poW) {
+    const cb = poW.callback;
+    poW.callback = function (this: any) { state.abort(); state.grabbed = null; state.hover = -1; state.redraw(); return cb?.apply(this, arguments); };
+  }
+  state.saveLive = () => { node.properties.nkd_live = state.live; };
 
   const load = () => {
     try { state.picks = selW.value ? JSON.parse(selW.value).picks ?? [] : []; } catch { state.picks = []; }
+    state.live = node.properties?.nkd_live !== false;
+    state.current = state.nextGroup();
     const ref = resolveSource(node, "image");
     if (ref) state.setBackdropUrl(viewUrl(ref));
     state.redraw();
@@ -479,8 +583,11 @@ function setup(node: any): void {
     let big: ReturnType<typeof makeView>;
     modal = openNkdModal({
       title: "😺 Mask Picker",
-      hint: "hover to see objects · click to pick · drag to pick several as one · Shift+click adds only · " +
-        "Alt cuts holes · click or drag on nothing to make SAM look there · wheel: bigger / smaller",
+      hint: state.pointsOnly()
+        ? "click: positive point · right click or Alt+click: negative point · drag a point to move it · " +
+          "right click a point to delete it · + Object starts another object · Live shows the mask after every point"
+        : "hover to see objects · click to pick · drag to pick several as one · Shift+click adds only · " +
+          "Alt cuts holes · click or drag on nothing to make SAM look there · wheel: bigger / smaller",
       onClose: () => { big.release(); modal = null; },
     });
     big = makeView(state, { analyze }, modal.body);

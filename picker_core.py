@@ -12,13 +12,16 @@ from scipy.ndimage import distance_transform_edt, label, maximum_filter, minimum
 def parse_selection(text: str) -> list[dict]:
     """The editor's hidden widget: {"picks": [{"x", "y", "level", "mode", "group"}]}, x and y in 0..1 of the
     image, level 0..2 (SAM's fine / middle / whole mask for that point), mode add or sub. A forced pick has
-    "points": [[x, y], ...] (one prompt) instead of x and y. Picks sharing a group are one object; a pick
+    "points": [[x, y], ...] (one prompt) instead of x and y; a points-mode object also has "labels" (1 positive,
+    0 negative, one per point) and its level is SAM's choice. Picks sharing a group are one object; a pick
     without one (older workflows) is its own."""
     if not text.strip():
         return []
     picks = []
     for i, p in enumerate(json.loads(text).get("picks", [])):
         pick = {"points": [[float(x), float(y)] for x, y in p["points"]]} if "points" in p else {"x": float(p["x"]), "y": float(p["y"])}
+        if "labels" in p:
+            pick["labels"] = [int(v) for v in p["labels"]]
         pick.update(level=int(p["level"]), mode="sub" if p.get("mode") == "sub" else "add", group=int(p.get("group", -1 - i)))
         picks.append(pick)
     return picks
@@ -120,15 +123,26 @@ def compose(masks: list[torch.Tensor], modes: list[str], base: torch.Tensor) -> 
     return mask, [a for a in added if a.any()]
 
 
-def drop_specks(mask: torch.Tensor, frac: float = 0.01) -> torch.Tensor:
-    """Keep the 8-connected regions of mask > 0.5 that are at least frac of its total area (SAM's own small-region cleanup)."""
-    regions, count = label((mask > 0.5).cpu().numpy(), structure=np.ones((3, 3)))
+def clean(mask: np.ndarray, frac: float = 0.01) -> np.ndarray:
+    """bool mask without its specks, SAM's own small-region cleanup: drops 8-connected islands under frac of its
+    area and fills holes under frac of it. Background that reaches the image border is never a hole."""
+    regions, count = label(mask, structure=np.ones((3, 3)))
     if not count:
         return mask
     areas = np.bincount(regions.ravel())
-    keep = areas >= frac * (regions > 0).sum()
+    keep = areas >= frac * mask.sum()
     keep[0] = False
-    return torch.from_numpy(keep[regions]).to(mask.device, mask.dtype)
+    mask = keep[regions]
+    holes, count = label(~mask)
+    fill = np.bincount(holes.ravel()) < frac * mask.sum()
+    fill[0] = False
+    fill[np.unique(np.concatenate([holes[0], holes[-1], holes[:, 0], holes[:, -1]]))] = False
+    return mask | fill[holes]
+
+
+def drop_specks(mask: torch.Tensor, frac: float = 0.01) -> torch.Tensor:
+    """clean() on mask > 0.5, as a 0/1 mask of mask's dtype and device."""
+    return torch.from_numpy(clean((mask > 0.5).cpu().numpy(), frac)).to(mask.device, mask.dtype)
 
 
 def trimap(mask: np.ndarray, margin: float) -> np.ndarray:

@@ -24,7 +24,9 @@ def test_parse_selection():
     picks = core.parse_selection('{"picks": [{"x": 0.5, "y": 0.5, "level": 1, "mode": "add", "group": 3},'
                                  ' {"points": [[0.1, 0.2], [0.3, 0.4]], "level": 1, "mode": "add", "group": 3}]}')
     assert picks[0]["group"] == picks[1]["group"] == 3 and "x" not in picks[1]
-    assert picks[1]["points"] == [[0.1, 0.2], [0.3, 0.4]]
+    assert picks[1]["points"] == [[0.1, 0.2], [0.3, 0.4]] and "labels" not in picks[1]
+    picks = core.parse_selection('{"picks": [{"points": [[0.1, 0.2], [0.3, 0.4]], "labels": [1, 0], "level": 0, "group": 0}]}')
+    assert picks[0]["labels"] == [1, 0]
 
 
 def test_rle_roundtrip():
@@ -98,6 +100,11 @@ def test_drop_specks():
     out = core.drop_specks(m)
     assert out.dtype == m.dtype and out.sum() == 400 and out[5, 10] == 1 and out[0, 59] == 0
     assert not core.drop_specks(torch.zeros(4, 4)).any()
+    m[10, 20] = 0; m[24, 29] = 0                                      # a pinhole inside, a notch on the edge
+    out = core.drop_specks(m)
+    assert out[10, 20] == 1 and out[24, 29] == 0 and out.sum() == 399   # the notch is open background
+    ring = np.zeros((40, 40), bool); ring[5:35, 5:35] = True; ring[15:25, 15:25] = False   # a big hole stays
+    assert not core.clean(ring)[20, 20]
 
 
 def test_trimap():

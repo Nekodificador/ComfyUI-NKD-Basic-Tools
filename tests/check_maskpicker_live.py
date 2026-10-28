@@ -51,7 +51,7 @@ H, W = image.shape[1:3]
 def picker(iters, edges, sel, img=None):
     """The node with edges "sam" + refine_iterations, or "vitmatte" (its refine is fixed at 2)"""
     opt = {"edges": "sam", "refine_iterations": iters} if edges == "sam" else {"edges": "vitmatte", "edge_margin": 0.08}
-    return NKDMaskPicker.execute(image if img is None else img, model, opt, 0.9, 0.8, sel)
+    return NKDMaskPicker.execute(image if img is None else img, model, opt, False, "normal", sel)
 
 for run in ("warmup", "timed"):
     torch.cuda.synchronize(); t = time.perf_counter()

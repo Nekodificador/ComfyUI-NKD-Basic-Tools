@@ -33,11 +33,15 @@ from comfy_extras.nodes_sam3 import _refine_mask
 
 from . import picker_core as core
 
-GRID = 32            # 32x32 points -> 3072 candidate masks
 BATCH = 128          # points per decoder call  # ponytail: fixed; 256 measured 6 GB peak with the model
 PREVIEW = 512        # long side of what the widget hit-tests against
 BACKDROP = 2048      # long side of the photo the full-screen view shows
-IOU_MIN, NMS_IOU, AREA_MIN = 0.8, 0.7, 0.0005  # IoU is the head's logit: ComfyUI's SAM3 applies no sigmoid
+AREA_MIN = 0.0005
+# detail -> grid points per side, stability a mask needs, its IoU bar (the head's logit: ComfyUI's SAM3 applies no
+# sigmoid), box NMS IoU, and the mask IoU past which a weaker mask is a copy. Measured on 3 photos: low 10-16 objects,
+# normal 16-22, high 25-34 (all ~0.2 s), max 67-127 (~0.9 s, the 64x64 grid)
+DETAIL = {"low": (32, 0.95, 0.8, 0.7, 0.7), "normal": (32, 0.9, 0.8, 0.7, 0.8),
+          "high": (32, 0.8, 0.6, 0.85, 0.9), "max": (64, 0.7, 0.4, 0.95, 0.95)}
 # SAM scores whole figures low on busy or stylized images (sequins, fur): masks over 1 % of the image get a looser bar,
 # unless they touch 2+ image borders -- those are speckled patches of background, not figures
 BIG_AREA, BIG_IOU_MIN, BIG_STABLE_GAP = 0.01, -1.0, 0.2   # big masks: stability may be this much lower
@@ -77,11 +81,11 @@ def _encode(sam, frame):
     return feat, high_res
 
 
-def _decode(sam, feat, high_res, points):
-    """points [N, P, 2] in 0..1 -> ([N, 3, h, w] mask logits, [N, 3] predicted IoU), one prompt of P positive clicks each."""
+def _decode(sam, feat, high_res, points, labels):
+    """points [N, P, 2] in 0..1, labels [N, P] (1 positive, 0 negative) -> ([N, 3, h, w] mask logits, [N, 3] predicted IoU)."""
     penc, mdec = _heads(sam)
     coords = (points * sam.tracker.image_size).to(feat.device)
-    labels = torch.ones(points.shape[:2], dtype=torch.int32, device=feat.device)
+    labels = labels.to(feat.device, torch.int32)
     sparse, dense = penc(points=(coords, labels), boxes=None, masks=None)
     logits, iou, _, _ = mdec(image_embeddings=feat, image_pe=cast_to_input(penc.get_dense_pe(), feat),
                              sparse_prompt_embeddings=cast_to_input(sparse, feat),
@@ -100,26 +104,27 @@ def _boxes(masks):
     return torch.stack([x1, y1, x2, y2], 1).float()
 
 
-def _everything(sam, feat, high_res, min_quality, merge_similar):
-    """-> (logits [M, h, w], score [M], point [M, 2] in 0..1, level [M]) after quality filter, NMS and dedupe.
-    min_quality: the stability a mask needs; merge_similar: the mask IoU past which a weaker mask is a copy."""
-    g = (torch.arange(GRID, dtype=torch.float32) + 0.5) / GRID
+def _everything(sam, feat, high_res, detail):
+    """-> (logits [M, h, w], score [M], point [M, 2] in 0..1, level [M]) after quality filter, NMS and dedupe."""
+    grid_n, min_quality, iou_min, nms_iou, merge_similar = DETAIL[detail]
+    g = (torch.arange(grid_n, dtype=torch.float32) + 0.5) / grid_n
     grid = torch.stack(torch.meshgrid(g, g, indexing="xy"), -1).reshape(-1, 2)
     kept, scores, sources = [], [], []
     for start in range(0, len(grid), BATCH):
-        logits, score = _decode(sam, feat, high_res, grid[start:start + BATCH, None])
+        points = grid[start:start + BATCH, None]
+        logits, score = _decode(sam, feat, high_res, points, torch.ones(points.shape[:2]))
         logits, score = logits.flatten(0, 1), score.flatten()
         # stability: how much the mask changes when its threshold moves by +-1 logit
         stable = (logits > 1).flatten(1).sum(1) / (logits > -1).flatten(1).sum(1).clamp(min=1)
         on = logits > 0
         area = on.flatten(1).float().mean(1)
         borders = on[:, 0].any(1).int() + on[:, -1].any(1).int() + on[:, :, 0].any(1).int() + on[:, :, -1].any(1).int()
-        keep = ((score > IOU_MIN) & (stable > min_quality) & (area > AREA_MIN)) | \
+        keep = ((score > iou_min) & (stable > min_quality) & (area > AREA_MIN)) | \
                ((score > BIG_IOU_MIN) & (stable > min_quality - BIG_STABLE_GAP) & (area > BIG_AREA) & (borders <= 1))
         kept.append(logits[keep]); scores.append(score[keep])
         sources.append(torch.nonzero(keep)[:, 0] + start * 3)
     logits, score, source = torch.cat(kept), torch.cat(scores), torch.cat(sources)
-    keep = nms(_boxes(logits > 0), score, NMS_IOU)
+    keep = nms(_boxes(logits > 0), score, nms_iou)
     logits, score, source = logits[keep], score[keep], source[keep].cpu()
     # box NMS misses near-duplicates whose boxes differ (one stray pixel moves a box): compare the masks, best score first
     on = (logits > 0).flatten(1).half()
@@ -137,6 +142,7 @@ def _everything(sam, feat, high_res, min_quality, merge_similar):
 def _entries(logits, score, keys, ph, pw) -> list[dict]:
     """Payload masks: keys[i] (the prompt and level behind mask i) + its score, area and run lengths at ph x pw."""
     masks = (F.interpolate(logits[None], size=(ph, pw), mode="bilinear", align_corners=False)[0] > 0).cpu().numpy() if len(logits) else []
+    masks = [core.clean(m) for m in masks]   # what the outputs get, so the preview shows no specks they won't have
     return [{**k, "score": round(float(sc), 3), "area": int(m.sum()), "rle": core.rle(m)} for k, sc, m in zip(keys, score, masks)]
 
 
@@ -216,7 +222,7 @@ class NKDMaskPicker(io.ComfyNode):
             description="Press Analyze, then hover the preview to see what can be masked and click to pick it. "
                         "Drag across objects to pick them as one entry of separated masks and bboxes. Shift adds, Alt+click or Alt+drag cuts holes in what is marked, "
                         "the mouse wheel steps to a bigger or smaller object. Click or drag where nothing is listed to "
-                        "make SAM look there.",
+                        "make SAM look there. points_only: no automatic objects, place positive and negative points yourself.",
             inputs=[
                 io.Image.Input("image", tooltip="Only the first image of a batch is used."),
                 io.Model.Input("model", tooltip="SAM3 or SAM3.1, from Load Checkpoint."),
@@ -233,12 +239,13 @@ class NKDMaskPicker(io.ComfyNode):
                     ]),
                 ], tooltip="vitmatte: an alpha matte of each object's edge, so hair, fur and soft borders come out "
                            "soft. sam: SAM's hard edge."),
-                io.Float.Input("min_quality", default=0.9, min=0.5, max=1.0, step=0.01, advanced=True,
-                               tooltip="How sure SAM must be of an object to list it. Lower lists more, doubtful ones "
-                                       "too; higher lists fewer, cleaner ones. Press Analyze again after changing it."),
-                io.Float.Input("merge_similar", default=0.8, min=0.5, max=1.0, step=0.01, advanced=True,
-                               tooltip="How much two objects must overlap to count as the same one; the weaker goes. "
-                                       "Lower merges more look-alikes. Press Analyze again after changing it."),
+                io.Boolean.Input("points_only", default=False,
+                                 tooltip="Place SAM's points yourself instead of picking found objects: click for a "
+                                         "positive point, right click for a negative one, + Object starts another object."),
+                io.Combo.Input("detail", options=list(DETAIL), default="normal",
+                               tooltip="How many objects Analyze lists. Higher finds smaller parts and odder zones, "
+                                       "doubtful ones too, and gives the wheel more sizes to step through; max takes "
+                                       "about 1 s. Press Analyze again after changing it."),
                 io.String.Input("selection", default="", multiline=False, socketless=True,
                                 tooltip="Written by the preview when you click."),
             ],
@@ -252,7 +259,7 @@ class NKDMaskPicker(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, image, model, edges, min_quality, merge_similar, selection) -> io.NodeOutput:
+    def execute(cls, image, model, edges, points_only, detail, selection) -> io.NodeOutput:
         # vitmatte refines the shape with SAM's default 2 passes first: past that the matte decides the edge anyway
         refine_iterations = edges.get("refine_iterations", 2)
         edge_margin = edges.get("edge_margin", 0.0)
@@ -265,7 +272,10 @@ class NKDMaskPicker(io.ComfyNode):
         size = sam.tracker.image_size
         frame = comfy.utils.common_upscale(image[..., :3].movedim(-1, 1), size, size, "bilinear", "disabled").to(device, dtype)
         feat, high_res = _encode(sam, frame)
-        found = _everything(sam, feat, high_res, min_quality, merge_similar)
+        if points_only:
+            found = torch.empty(0), torch.empty(0), torch.empty(0, 2), torch.empty(0, dtype=torch.long)
+        else:
+            found = _everything(sam, feat, high_res, detail)
         payload = _payload(image, *found)
 
         # grid picks from another image no longer match a listed mask: drop them instead of decoding arbitrary ones.
@@ -280,18 +290,25 @@ class NKDMaskPicker(io.ComfyNode):
                 hit = next(([[x, y]] for x, y, lv in listed if abs(p["x"] - x) < 1e-3 and abs(p["y"] - y) < 1e-3 and p["level"] == lv), None)
             if hit:
                 picks.append(p)
-                prompts.append(hit)
+                prompts.append((hit, p.get("labels", [1] * len(hit))))
         if len(requested) > len(picks):
             logging.warning("[NKD Mask Picker] %d picks no longer match this image and were skipped", len(requested) - len(picks))
         lows = [None] * len(picks)
-        for n in {len(pr) for pr in prompts}:   # one decoder call per prompt size
-            idx = [i for i, pr in enumerate(prompts) if len(pr) == n]
-            logits, score = _decode(sam, feat, high_res, torch.tensor([prompts[i] for i in idx]))
+        for n in {len(pr) for pr, _ in prompts}:   # one decoder call per prompt size
+            idx = [i for i, (pr, _) in enumerate(prompts) if len(pr) == n]
+            logits, score = _decode(sam, feat, high_res, torch.tensor([prompts[i][0] for i in idx]),
+                                    torch.tensor([prompts[i][1] for i in idx]))
             for i, lg, sc in zip(idx, logits, score):
                 lows[i] = lg, sc
         forced = set()
         for p, (lg, sc) in zip(picks, lows):
-            if "points" in p and str(p["points"]) not in forced:
+            if "labels" in p:
+                # a points-mode object: SAM's most confident of its 3 levels
+                p["level"] = int(sc.argmax())
+                payload["masks"] += _entries(lg[p["level"]][None], sc[p["level"]][None],
+                                             [{"points": p["points"], "labels": p["labels"], "level": p["level"]}],
+                                             payload["h"], payload["w"])
+            elif "points" in p and str(p["points"]) not in forced:
                 forced.add(str(p["points"]))
                 payload["masks"] += _entries(lg, sc, [{"points": p["points"], "level": lv} for lv in range(3)],
                                              payload["h"], payload["w"])

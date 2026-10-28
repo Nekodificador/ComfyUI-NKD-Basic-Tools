@@ -51,6 +51,8 @@ flowchart LR
   until **✕**, also when the image changes.
 - **✕** clears every pick.
 - **Image / Mask** switches the preview between the photo and the mask you've built.
+  On the photo, dimmed so the picks stand out, each drag or points object has its
+  own colour.
 - The full-screen button opens the same picker in a large view, with the photo at
   up to 2048 px.
 
@@ -60,6 +62,22 @@ console; clear them with **✕** to be sure.
 
 Inside a subgraph, **Analyze** runs the whole workflow instead of just this node,
 so clicking where nothing is listed only marks the spot: press **Analyze** yourself.
+
+## Points mode
+
+`points_only` turns the preview into a point editor, for busy images with odd
+objects that the automatic search splits up or misses. No objects are listed: you
+place SAM's points yourself, and each object's points make one mask.
+
+- Click adds a positive point, right click or Alt+click a negative one.
+- Drag a point to move it. Right click a point to delete it.
+- **+ Object** starts another object; the next points make their own mask, its own
+  entry of `separated masks` and its own box. Without it, every point is one object.
+  Clicking a point makes its object the current one, ringed in white.
+- **Live** (on by default) analyzes after every change and shows the mask. Off,
+  only the points show until you press **Analyze** or run the workflow.
+
+SAM picks the most confident of its three sizes for each object.
 
 ## Edges
 
@@ -88,15 +106,21 @@ one drag are joined into a single object before their edge is made, so a sofa
 picked with its cushions has no seams where the pieces touch: thin gaps between
 them and small holes are filled, large holes stay.
 
-## Advanced settings
+## Detail
 
-Both apply on the next Analyze.
+`detail` sets how many objects Analyze lists, and applies on the next Analyze.
+Higher finds smaller parts and odder zones, doubtful ones too, and gives the
+wheel more sizes to step through. On three test photos:
 
-- `min_quality` (default 0.9) is how sure SAM must be of an object to list it.
-  Lower it to list more, doubtful ones too; raise it for fewer, cleaner ones. Big
-  objects get a slightly lower bar, so whole figures SAM is unsure about still show.
-- `merge_similar` (default 0.8) is how much two objects must overlap to count as
-  the same one; the weaker goes. Lower it when the wheel steps through look-alikes.
+| detail | objects | Analyze |
+|---|---|---|
+| `low` | 10 to 16 | 0.2 s |
+| `normal` (default) | 16 to 22 | 0.2 s |
+| `high` | 25 to 34 | 0.2 s |
+| `max` | 67 to 127 | 0.9 s |
+
+Past `max`, SAM's automatic search has nothing more to give: for a zone it still
+misses, use `points_only`.
 
 ## Outputs
 
@@ -112,10 +136,9 @@ Both apply on the next Analyze.
 
 Measured on an RTX 5090 with ComfyUI 0.42 and frontend 1.57:
 
-- Analyze with the model already loaded took about 0.6 to 0.75 s to find 50 to 60
-  objects on a 1536×1024 photo, and 0.5 s to find about 130 on a busy 2752×1536
-  illustration. The first Analyze also loads SAM 3, which adds a
-  few seconds.
+- Analyze with the model already loaded takes about 0.2 s, 0.9 s at `detail` max
+  (see the table above). The first Analyze also loads SAM 3, which adds a few
+  seconds.
 - Analyze again with nothing changed is instant, and brings the preview back.
 - Hover is worked out in the browser, about 0.1 ms per mouse move, so the server
   does nothing while you move.
