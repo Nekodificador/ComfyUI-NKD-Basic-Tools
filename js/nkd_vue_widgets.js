@@ -17332,12 +17332,189 @@ function attachFineRange(root) {
     root.removeEventListener("dblclick", onDblClick, true);
   };
 }
+const SIZE_MAX = 400;
+const coreRadius = (r, hardness) => r * (0.5 + 0.5 * hardness);
+const fringeBlur = (r, hardness) => r * (1 - hardness) * 0.3;
+function radiusFor(size, e) {
+  if (e.pointerType === "pen" && e.pressure > 0) size *= 0.25 + 0.75 * e.pressure;
+  return size / 2;
+}
+function stepSize(size, dir) {
+  return dir < 0 ? Math.max(1, Math.round(size * 0.9) || 1) : Math.min(SIZE_MAX, Math.max(size + 1, Math.round(size * 1.1)));
+}
+function adjustBrush(size0, hard0, dx, dy, scale) {
+  return {
+    size: Math.max(1, Math.min(SIZE_MAX, Math.round(size0 + dx / scale))),
+    hardness: Math.max(0, Math.min(1, hard0 + dy / 150))
+  };
+}
+function hexToRgb(hex) {
+  const h = hex.replace("#", "");
+  if (h.length !== 6) return [255, 255, 255];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function mkCanvas(w, h, doc2 = document) {
+  const c = doc2.createElement("canvas");
+  c.width = Math.max(1, w);
+  c.height = Math.max(1, h);
+  return c;
+}
+class BrushLayer {
+  // brush radius of the stroke in progress, for the blur at composite time
+  /** `onChange` runs after a committed stroke, undo or redo: the owner saves and redraws. */
+  constructor(w, h, params, onChange = () => {
+  }, doc2 = document, undoBudget = 256 * 1024 * 1024) {
+    __publicField(this, "layer");
+    __publicField(this, "stroke");
+    __publicField(this, "comp");
+    __publicField(this, "hasStrokes", false);
+    __publicField(this, "stroking", false);
+    __publicField(this, "undoStack", []);
+    __publicField(this, "redoStack", []);
+    __publicField(this, "last", null);
+    __publicField(this, "strokeR", 0);
+    this.params = params;
+    this.onChange = onChange;
+    this.doc = doc2;
+    this.undoBudget = undoBudget;
+    this.layer = mkCanvas(w, h, doc2);
+    this.stroke = mkCanvas(w, h, doc2);
+    this.comp = mkCanvas(w, h, doc2);
+  }
+  get width() {
+    return this.layer.width;
+  }
+  get height() {
+    return this.layer.height;
+  }
+  get canUndo() {
+    return this.undoStack.length > 0;
+  }
+  get canRedo() {
+    return this.redoStack.length > 0;
+  }
+  /** New size. The strokes are rescaled when `keep`; undo history is dropped either way
+   *  (its snapshots are the old size). */
+  resize(w, h, keep = true) {
+    if (this.width === w && this.height === h) return;
+    const old = this.layer;
+    this.layer = mkCanvas(w, h, this.doc);
+    if (keep && this.hasStrokes) this.layer.getContext("2d").drawImage(old, 0, 0, w, h);
+    else this.hasStrokes = false;
+    this.stroke = mkCanvas(w, h, this.doc);
+    this.comp = mkCanvas(w, h, this.doc);
+    this.undoStack.length = 0;
+    this.redoStack.length = 0;
+  }
+  /** Replace the layer with a picture, scaled to the layer. */
+  load(img) {
+    const lctx = this.layer.getContext("2d");
+    lctx.clearRect(0, 0, this.width, this.height);
+    lctx.drawImage(img, 0, 0, this.width, this.height);
+    this.hasStrokes = true;
+  }
+  begin(x, y, r) {
+    this.stroking = true;
+    this.last = null;
+    this.strokeR = 0;
+    this.to(x, y, r);
+  }
+  to(x, y, r) {
+    if (!this.stroking) return;
+    const p2 = this.params();
+    const sctx = this.stroke.getContext("2d");
+    const [cr, cg, cb] = hexToRgb(p2.tool === "eraser" ? "#000000" : p2.color);
+    sctx.strokeStyle = sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+    sctx.lineCap = sctx.lineJoin = "round";
+    const rc = Math.max(0.5, coreRadius(r, p2.hardness));
+    this.strokeR = Math.max(this.strokeR, r);
+    if (!this.last) {
+      sctx.beginPath();
+      sctx.arc(x, y, rc, 0, Math.PI * 2);
+      sctx.fill();
+    } else {
+      sctx.lineWidth = rc * 2;
+      sctx.beginPath();
+      sctx.moveTo(this.last[0], this.last[1]);
+      sctx.lineTo(x, y);
+      sctx.stroke();
+    }
+    this.last = [x, y];
+  }
+  /** Bake the stroke in progress into the layer. */
+  end() {
+    if (!this.stroking) return;
+    this.stroking = false;
+    this.last = null;
+    this.snapshot();
+    this.composite(this.comp.getContext("2d"), true);
+    const lctx = this.layer.getContext("2d");
+    lctx.clearRect(0, 0, this.width, this.height);
+    lctx.drawImage(this.comp, 0, 0);
+    this.stroke.getContext("2d").clearRect(0, 0, this.width, this.height);
+    this.hasStrokes = true;
+    this.onChange();
+  }
+  /** layer ⊕ current stroke, with the brush opacity - the same op end() bakes in. */
+  composite(target, withStroke) {
+    target.globalCompositeOperation = "source-over";
+    target.globalAlpha = 1;
+    target.clearRect(0, 0, this.width, this.height);
+    target.drawImage(this.layer, 0, 0);
+    if (!withStroke) return;
+    const p2 = this.params();
+    target.globalAlpha = p2.opacity;
+    target.globalCompositeOperation = p2.tool === "eraser" ? "destination-out" : "source-over";
+    const blur = fringeBlur(this.strokeR, p2.hardness);
+    target.filter = blur >= 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
+    target.drawImage(this.stroke, 0, 0);
+    target.filter = "none";
+    target.globalCompositeOperation = "source-over";
+    target.globalAlpha = 1;
+  }
+  /** What to draw on screen right now: the live composite mid-stroke, else the layer. */
+  current() {
+    if (!this.stroking) return this.layer;
+    this.composite(this.comp.getContext("2d"), true);
+    return this.comp;
+  }
+  /** Wipe the layer (undoable). False when there was nothing to wipe. */
+  clear() {
+    if (!this.hasStrokes) return false;
+    this.snapshot();
+    this.layer.getContext("2d").clearRect(0, 0, this.width, this.height);
+    this.hasStrokes = false;
+    return true;
+  }
+  undo() {
+    this.restore(this.undoStack, this.redoStack);
+  }
+  redo() {
+    this.restore(this.redoStack, this.undoStack);
+  }
+  snapshot() {
+    const lctx = this.layer.getContext("2d");
+    this.undoStack.push(lctx.getImageData(0, 0, this.width, this.height));
+    this.redoStack.length = 0;
+    const per = this.width * this.height * 4;
+    const max = Math.max(3, Math.min(20, Math.floor(this.undoBudget / per)));
+    while (this.undoStack.length > max) this.undoStack.shift();
+  }
+  restore(from, to) {
+    const img = from.pop();
+    if (!img) return;
+    const lctx = this.layer.getContext("2d");
+    to.push(lctx.getImageData(0, 0, this.width, this.height));
+    lctx.putImageData(img, 0, 0);
+    this.hasStrokes = true;
+    this.onChange();
+  }
+}
 const NODE_NAME$6 = "NKDPaint";
 const EXT_NAME$5 = "NKD.BasicTools.Paint";
 console.log("[NKD Paint] rev 1");
 const CANVAS_W$2 = 240;
 const MAX_SIDE = 2048;
-const UNDO_BUDGET = 256 * 1024 * 1024;
 const ZOOM_MIN = 0.25, ZOOM_MAX = 16;
 const SUBFOLDER = "nkd_paint";
 const frames$1 = /* @__PURE__ */ new Map();
@@ -17370,12 +17547,6 @@ function registerPaint() {
     }
   });
 }
-function mkCanvas(w, h) {
-  const c = document.createElement("canvas");
-  c.width = Math.max(1, w);
-  c.height = Math.max(1, h);
-  return c;
-}
 function capSize(w, h) {
   const m = Math.max(w, h);
   if (m > MAX_SIDE) {
@@ -17384,11 +17555,6 @@ function capSize(w, h) {
     h = Math.round(h * k);
   }
   return [Math.max(1, w | 0), Math.max(1, h | 0)];
-}
-function hexToRgb(hex) {
-  const h = hex.replace("#", "");
-  if (h.length !== 6) return [255, 255, 255];
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 const toHex = (r, g, b) => "#" + [r, g, b].map((v) => Math.max(0, Math.min(255, v | 0)).toString(16).padStart(2, "0")).join("");
 let checkerPattern = null;
@@ -17427,14 +17593,20 @@ function setupPaintWidget(node) {
   const tool = () => P.nkdPaintTool;
   const controlnet = () => !!(cnW == null ? void 0 : cnW.value);
   const brushColor = () => controlnet() ? "#ffffff" : String(P.nkdPaintColor);
-  let layerCv = mkCanvas(1024, 1024);
-  let strokeCv = mkCanvas(1024, 1024);
-  let compCv = mkCanvas(1024, 1024);
-  let hasStrokes = false;
+  const L = new BrushLayer(1024, 1024, () => ({
+    size: P.nkdPaintSize,
+    opacity: P.nkdPaintOpacity,
+    hardness: P.nkdPaintHardness,
+    tool: tool(),
+    color: brushColor()
+  }), () => {
+    scheduleSave();
+    syncToolbar();
+    scheduleDraw();
+  });
   let base = null;
   let lastRef = null;
   let zoom = 1, panX = 0, panY = 0;
-  const undo = [], redo = [];
   const root = document.createElement("div");
   root.className = "nkd-paint-wrap";
   root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
@@ -17496,7 +17668,7 @@ function setupPaintWidget(node) {
   const clearBtn = btn("pi-trash", "Clear the layer", "Clear");
   clearBtn.style.marginLeft = "auto";
   row1.append(brushBtn, eraserBtn, colorIn, whiteSw, blackSw, undoBtn, redoBtn, clearBtn);
-  const sizeR = range("Size", 1, 400, 1, () => P.nkdPaintSize, (v) => {
+  const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => {
     P.nkdPaintSize = v;
   });
   const opR = range("Opacity", 0.05, 1, 0.01, () => P.nkdPaintOpacity, (v) => {
@@ -17537,8 +17709,8 @@ function setupPaintWidget(node) {
     }
     if (cn) colorIn.value = "#ffffff";
     else colorIn.value = P.nkdPaintColor;
-    undoBtn.style.opacity = undo.length ? "1" : "0.3";
-    redoBtn.style.opacity = redo.length ? "1" : "0.3";
+    undoBtn.style.opacity = L.canUndo ? "1" : "0.3";
+    redoBtn.style.opacity = L.canRedo ? "1" : "0.3";
     baseR.style.display = base ? "" : "none";
   }
   brushBtn.addEventListener("click", () => {
@@ -17549,14 +17721,12 @@ function setupPaintWidget(node) {
     P.nkdPaintTool = "eraser";
     syncToolbar();
   });
-  undoBtn.addEventListener("click", () => doUndo());
-  redoBtn.addEventListener("click", () => doRedo());
+  undoBtn.addEventListener("click", () => L.undo());
+  redoBtn.addEventListener("click", () => L.redo());
   clearBtn.addEventListener("click", () => {
-    if (!hasStrokes) return;
-    snapshot();
-    layerCv.getContext("2d").clearRect(0, 0, layerCv.width, layerCv.height);
-    hasStrokes = false;
+    if (!L.clear()) return;
     setLayerValue("");
+    syncToolbar();
     scheduleDraw();
   });
   const detachFine = attachFineRange(bar);
@@ -17566,14 +17736,8 @@ function setupPaintWidget(node) {
   }
   function ensureLayerSize() {
     const [w, h] = targetSize();
-    if (layerCv.width === w && layerCv.height === h) return;
-    const old = layerCv;
-    layerCv = mkCanvas(w, h);
-    if (hasStrokes) layerCv.getContext("2d").drawImage(old, 0, 0, w, h);
-    strokeCv = mkCanvas(w, h);
-    compCv = mkCanvas(w, h);
-    undo.length = 0;
-    redo.length = 0;
+    if (L.width === w && L.height === h) return;
+    L.resize(w, h);
     cv.style.aspectRatio = `${w}/${h}`;
     zoom = 1;
     panX = panY = 0;
@@ -17582,9 +17746,9 @@ function setupPaintWidget(node) {
   }
   function view() {
     const W = cv.clientWidth, H = cv.clientHeight;
-    const fit = Math.min(W / layerCv.width, H / layerCv.height);
+    const fit = Math.min(W / L.width, H / L.height);
     const s = fit * zoom;
-    return { W, H, s, ox: (W - layerCv.width * s) / 2 + panX, oy: (H - layerCv.height * s) / 2 + panY };
+    return { W, H, s, ox: (W - L.width * s) / 2 + panX, oy: (H - L.height * s) / 2 + panY };
   }
   function eventDisp(e) {
     const r = cv.getBoundingClientRect();
@@ -17614,20 +17778,6 @@ function setupPaintWidget(node) {
   }
   let sizePreview = null;
   let hardPreview = null;
-  function composite(target, withStroke) {
-    target.globalCompositeOperation = "source-over";
-    target.globalAlpha = 1;
-    target.clearRect(0, 0, layerCv.width, layerCv.height);
-    target.drawImage(layerCv, 0, 0);
-    target.globalAlpha = P.nkdPaintOpacity;
-    target.globalCompositeOperation = tool() === "eraser" ? "destination-out" : "source-over";
-    const blur = fringeBlur(strokeR);
-    target.filter = blur >= 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
-    target.drawImage(strokeCv, 0, 0);
-    target.filter = "none";
-    target.globalCompositeOperation = "source-over";
-    target.globalAlpha = 1;
-  }
   function draw() {
     const { W, H, s, ox, oy } = view();
     if (W < 1 || H < 1) return;
@@ -17640,7 +17790,7 @@ function setupPaintWidget(node) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#111318";
     ctx.fillRect(0, 0, W, H);
-    const lw = layerCv.width * s, lh = layerCv.height * s;
+    const lw = L.width * s, lh = L.height * s;
     ctx.save();
     ctx.beginPath();
     ctx.rect(ox, oy, lw, lh);
@@ -17656,10 +17806,7 @@ function setupPaintWidget(node) {
       ctx.fillStyle = String(bgW.value);
       ctx.fillRect(ox, oy, lw, lh);
     }
-    if (stroking) {
-      composite(compCv.getContext("2d"));
-      ctx.drawImage(compCv, ox, oy, lw, lh);
-    } else ctx.drawImage(layerCv, ox, oy, lw, lh);
+    ctx.drawImage(L.current(), ox, oy, lw, lh);
     ctx.restore();
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.lineWidth = 1;
@@ -17684,81 +17831,20 @@ function setupPaintWidget(node) {
       }
     }
   }
-  let stroking = false, panning = false, picking = false;
-  let last = null;
+  let panning = false, picking = false;
   let sizeDrag = null;
   let panDrag = null;
   let spaceHeld = false;
-  const coreRadius = (r) => r * (0.5 + 0.5 * P.nkdPaintHardness);
-  const fringeBlur = (r) => r * (1 - P.nkdPaintHardness) * 0.3;
-  let strokeR = 0;
-  function radiusFor(e) {
-    let size = P.nkdPaintSize;
-    if (e.pointerType === "pen" && e.pressure > 0) size *= 0.25 + 0.75 * e.pressure;
-    return size / 2;
-  }
-  function strokeTo(x, y, r) {
-    const sctx = strokeCv.getContext("2d");
-    const [cr, cg, cb] = hexToRgb(tool() === "eraser" ? "#000000" : brushColor());
-    sctx.strokeStyle = sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
-    sctx.lineCap = sctx.lineJoin = "round";
-    const rc = Math.max(0.5, coreRadius(r));
-    strokeR = Math.max(strokeR, r);
-    if (!last) {
-      sctx.beginPath();
-      sctx.arc(x, y, rc, 0, Math.PI * 2);
-      sctx.fill();
-    } else {
-      sctx.lineWidth = rc * 2;
-      sctx.beginPath();
-      sctx.moveTo(last[0], last[1]);
-      sctx.lineTo(x, y);
-      sctx.stroke();
-    }
-    last = [x, y];
-  }
-  function snapshot() {
-    const lctx = layerCv.getContext("2d");
-    undo.push(lctx.getImageData(0, 0, layerCv.width, layerCv.height));
-    redo.length = 0;
-    const per = layerCv.width * layerCv.height * 4;
-    const max = Math.max(3, Math.min(20, Math.floor(UNDO_BUDGET / per)));
-    while (undo.length > max) undo.shift();
-    syncToolbar();
-  }
-  function restore(from, to) {
-    const img = from.pop();
-    if (!img) return;
-    const lctx = layerCv.getContext("2d");
-    to.push(lctx.getImageData(0, 0, layerCv.width, layerCv.height));
-    lctx.putImageData(img, 0, 0);
-    hasStrokes = true;
-    scheduleSave();
-    syncToolbar();
-    scheduleDraw();
-  }
-  const doUndo = () => restore(undo, redo);
-  const doRedo = () => restore(redo, undo);
-  function commit() {
-    snapshot();
-    composite(compCv.getContext("2d"));
-    const lctx = layerCv.getContext("2d");
-    lctx.clearRect(0, 0, layerCv.width, layerCv.height);
-    lctx.drawImage(compCv, 0, 0);
-    strokeCv.getContext("2d").clearRect(0, 0, strokeCv.width, strokeCv.height);
-    hasStrokes = true;
-    scheduleSave();
-  }
   function pick(px, py) {
     const [lx, ly] = dispToLayer(px, py);
-    if (lx < 0 || ly < 0 || lx >= layerCv.width || ly >= layerCv.height) return;
+    if (lx < 0 || ly < 0 || lx >= L.width || ly >= L.height) return;
     const c = mkCanvas(1, 1), x = c.getContext("2d");
-    if (base) x.drawImage(base.el, lx * base.w / layerCv.width, ly * base.h / layerCv.height, 1, 1, 0, 0, 1, 1);
+    if (base) x.drawImage(base.el, lx * base.w / L.width, ly * base.h / L.height, 1, 1, 0, 0, 1, 1);
     else if (bgW == null ? void 0 : bgW.value) {
       x.fillStyle = String(bgW.value);
       x.fillRect(0, 0, 1, 1);
     }
-    x.drawImage(layerCv, lx | 0, ly | 0, 1, 1, 0, 0, 1, 1);
+    x.drawImage(L.layer, lx | 0, ly | 0, 1, 1, 0, 0, 1, 1);
     const d = x.getImageData(0, 0, 1, 1).data;
     if (d[3] === 0) return;
     setColor(toHex(d[0], d[1], d[2]));
@@ -17799,11 +17885,8 @@ function setupPaintWidget(node) {
       return;
     }
     if (e.button !== 0) return;
-    stroking = true;
-    last = null;
-    strokeR = 0;
     const [lx, ly] = dispToLayer(px, py);
-    strokeTo(lx, ly, radiusFor(e));
+    L.begin(lx, ly, radiusFor(P.nkdPaintSize, e));
     scheduleDraw();
   });
   cv.addEventListener("pointermove", (e) => {
@@ -17815,25 +17898,22 @@ function setupPaintWidget(node) {
       panX = panDrag.px + (px - panDrag.x0);
       panY = panDrag.py + (py - panDrag.y0);
     } else if (sizeDrag) {
-      sizePreview = Math.max(1, Math.min(400, Math.round(sizeDrag.size0 + (px - sizeDrag.x0) / view().s)));
-      hardPreview = Math.max(0, Math.min(1, sizeDrag.hard0 + (py - sizeDrag.y0) / 150));
+      const a = adjustBrush(sizeDrag.size0, sizeDrag.hard0, px - sizeDrag.x0, py - sizeDrag.y0, view().s);
+      sizePreview = a.size;
+      hardPreview = a.hardness;
       sizeInp.value = String(sizePreview);
       hardInp.value = hardPreview.toFixed(2);
     } else if (picking) {
       pick(px, py);
-    } else if (stroking) {
+    } else if (L.stroking) {
       const [lx, ly] = dispToLayer(px, py);
-      strokeTo(lx, ly, radiusFor(e));
+      L.to(lx, ly, radiusFor(P.nkdPaintSize, e));
     }
     scheduleDraw();
   });
   const endPointer = (e) => {
     e.stopPropagation();
-    if (stroking) {
-      stroking = false;
-      last = null;
-      commit();
-    }
+    L.end();
     if (sizeDrag) {
       if (sizePreview != null) {
         P.nkdPaintSize = sizePreview;
@@ -17863,8 +17943,8 @@ function setupPaintWidget(node) {
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * (e.deltaY < 0 ? 1.15 : 1 / 1.15)));
     const after = view();
     const ox = px - lx * after.s, oy = py - ly * after.s;
-    panX = ox - (after.W - layerCv.width * after.s) / 2;
-    panY = oy - (after.H - layerCv.height * after.s) / 2;
+    panX = ox - (after.W - L.width * after.s) / 2;
+    panY = oy - (after.H - L.height * after.s) / 2;
     scheduleDraw();
   }, { passive: false });
   let hovering = false;
@@ -17887,14 +17967,14 @@ function setupPaintWidget(node) {
       return;
     }
     if ((e.ctrlKey || e.metaKey) && (k === "z" || k === "Z")) {
-      if (e.shiftKey) doRedo();
-      else doUndo();
+      if (e.shiftKey) L.redo();
+      else L.undo();
       e.preventDefault();
       e.stopPropagation();
       return;
     }
     if ((e.ctrlKey || e.metaKey) && (k === "y" || k === "Y")) {
-      doRedo();
+      L.redo();
       e.preventDefault();
       e.stopPropagation();
       return;
@@ -17915,10 +17995,10 @@ function setupPaintWidget(node) {
         setColor(P.nkdPaintColor.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff");
         break;
       case "[":
-        P.nkdPaintSize = Math.max(1, Math.round(P.nkdPaintSize * 0.9) || 1);
+        P.nkdPaintSize = stepSize(P.nkdPaintSize, -1);
         break;
       case "]":
-        P.nkdPaintSize = Math.min(400, Math.max(P.nkdPaintSize + 1, Math.round(P.nkdPaintSize * 1.1)));
+        P.nkdPaintSize = stepSize(P.nkdPaintSize, 1);
         break;
       case "0":
         zoom = 1;
@@ -17964,7 +18044,7 @@ function setupPaintWidget(node) {
     }
     saving = true;
     try {
-      const blob = await new Promise((r) => layerCv.toBlob(r, "image/png"));
+      const blob = await new Promise((r) => L.layer.toBlob(r, "image/png"));
       if (!blob) return;
       const name = await sha1Name(blob);
       const fd = new FormData();
@@ -17993,8 +18073,8 @@ function setupPaintWidget(node) {
   }
   function loadLayer(v) {
     if (!v) {
-      layerCv.getContext("2d").clearRect(0, 0, layerCv.width, layerCv.height);
-      hasStrokes = false;
+      L.layer.getContext("2d").clearRect(0, 0, L.width, L.height);
+      L.hasStrokes = false;
       scheduleDraw();
       return;
     }
@@ -18008,18 +18088,13 @@ function setupPaintWidget(node) {
     };
     const img = new Image();
     img.onload = () => {
-      if (!base && (layerCv.width !== img.naturalWidth || layerCv.height !== img.naturalHeight) && !imageLinked()) {
+      if (!base && (L.width !== img.naturalWidth || L.height !== img.naturalHeight) && !imageLinked()) {
         const [w, h] = capSize(img.naturalWidth, img.naturalHeight);
-        layerCv = mkCanvas(w, h);
-        strokeCv = mkCanvas(w, h);
-        compCv = mkCanvas(w, h);
+        L.resize(w, h, false);
         cv.style.aspectRatio = `${w}/${h}`;
         mounted == null ? void 0 : mounted.resizeToContent();
       }
-      const lctx = layerCv.getContext("2d");
-      lctx.clearRect(0, 0, layerCv.width, layerCv.height);
-      lctx.drawImage(img, 0, 0, layerCv.width, layerCv.height);
-      hasStrokes = true;
+      L.load(img);
       scheduleDraw();
     };
     img.src = viewUrl$1(ref2);
@@ -18107,7 +18182,7 @@ function setupPaintWidget(node) {
     root,
     minWidth: 120,
     minWidthOf: barMinWidth,
-    estimate: () => (bar.offsetHeight || 60) + Math.round(CANVAS_W$2 * layerCv.height / layerCv.width),
+    estimate: () => (bar.offsetHeight || 60) + Math.round(CANVAS_W$2 * L.height / L.width),
     getValue: () => layerW.value,
     setValue: (v) => {
       layerW.value = v;
@@ -18144,7 +18219,7 @@ function setupPaintWidget(node) {
     mounted.release();
     origRemoved == null ? void 0 : origRemoved.apply(this, args);
   };
-  node.__nkdPaint = { layer: () => layerCv, hasStrokes: () => hasStrokes, base: () => base, draw };
+  node.__nkdPaint = { layer: () => L.layer, hasStrokes: () => L.hasStrokes, base: () => base, draw };
   syncToolbar();
   requestAnimationFrame(() => {
     syncDims();
