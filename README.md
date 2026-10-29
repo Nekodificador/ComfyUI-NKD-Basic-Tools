@@ -173,4 +173,4 @@ See which blocks of a LoRA actually do the work, then shape it block by block.
 
 ## License
 
-MIT
+GPL-3.0. See [LICENSE](LICENSE).
