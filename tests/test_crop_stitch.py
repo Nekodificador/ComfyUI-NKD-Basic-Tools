@@ -175,5 +175,49 @@ def demo():
     print("crop/stitch self-check OK — box:", box, "crop:", tuple(crop.shape))
 
 
+def transparent_original():
+    """Match Colors on an RGBA original must read colour only where the original
+    has colour, and must still blend everywhere the mask says.
+
+    Left in, the see-through pixels drag the reference so far that the match ends
+    up WORSE than not correcting at all — measured below. Fixing it by shrinking
+    the mask handed to `_post_blend` instead would fix the statistics and break
+    the blend: the patch would vanish wherever the original was see-through.
+
+    Textured, not flat: a uniform patch makes the generated standard deviation
+    zero, the transform explodes on the division and the result is decided by
+    clipping, which hides the whole effect.
+    """
+    torch.manual_seed(0)
+    H = W = 64
+    orig = torch.empty(1, H, W, 4)
+    orig[..., :3] = (0.35 + 0.08 * torch.randn(1, H, W, 3)).clamp(0, 1)
+    orig[:, 20:30, :, :3] = (0.95 + 0.03 * torch.randn(1, 10, W, 3)).clamp(0, 1)
+    orig[..., 3] = 1.0
+    orig[:, 20:30, :, 3] = 0.0          # bright junk, and it is transparent
+
+    mask = torch.zeros(1, H, W)
+    mask[:, 20:44, 20:44] = 1.0         # straddles the transparent band and the rest
+    composite = orig.clone()
+    composite[:, 20:44, 20:44, :3] = (0.50 + 0.12 * torch.randn(1, 24, 24, 3)).clamp(0, 1)
+
+    opaque = (slice(None), slice(30, 44), slice(20, 44))
+    reference = orig[opaque + (slice(0, 3),)].mean().item()
+    drift = abs(composite[opaque + (slice(0, 3),)].mean().item() - reference)
+
+    out = _post_blend(orig, composite, mask, 1.0, False)
+    error = abs(out[opaque + (slice(0, 3),)].mean().item() - reference)
+    assert error < drift / 4, (
+        "Match Colors did not pull the patch back: off by %.3f, and simply leaving it "
+        "alone was off by %.3f" % (error, drift))
+
+    see_through = out[0, 20:30, 20:44, :3]
+    assert not torch.allclose(see_through, orig[0, 20:30, 20:44, :3]), \
+        "the blend stopped covering the transparent part of the mask"
+    print("transparent-original self-check OK — off by %.4f, uncorrected %.4f"
+          % (error, drift))
+
+
 if __name__ == "__main__":
     demo()
+    transparent_original()

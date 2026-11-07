@@ -983,15 +983,21 @@ def _lab_to_rgb(lab):
     return np.clip(rgb, 0.0, 1.0).astype(np.float32)
 
 
-def _reinhard_match(orig_rgb, gen_rgb, mask, strength):
+def _reinhard_match(orig_rgb, gen_rgb, mask, strength, valid=None):
     """Pull the edited region's colour statistics toward the original's, over the
     EDITED (masked) region — that's where the model's drift lives. Measuring the
     background instead is a no-op whenever the composite keeps the original outside
     the mask (the inpaint/stitch case), so match the foreground. Returns gen
-    unchanged when the edit region is too small to estimate statistics reliably."""
+    unchanged when the edit region is too small to estimate statistics reliably.
+
+    `valid` narrows the pixels the statistics are read from without narrowing
+    what gets blended — an RGBA original carries no meaningful colour under its
+    transparent pixels, and averaging them in drags the match off."""
     if strength <= 0.0:
         return gen_rgb
     fg = mask > 0.5
+    if valid is not None:
+        fg = fg & (valid > 0.5)
     if fg.sum() < 100:
         return gen_rgb
     orig_lab = _rgb_to_lab(orig_rgb)
@@ -1035,7 +1041,9 @@ def _post_blend(orig: torch.Tensor, composite: torch.Tensor, mask: torch.Tensor,
     """Re-blend composite over orig with Reinhard color match + optional Poisson.
     `mask` is the full-res alpha [B, H, W]. Per-item loop: cv2/numpy domain.
     An empty mask returns the composite unchanged so seamlessClone never hits a
-    zero rect."""
+    zero rect. An RGBA original carries no meaningful color under its transparent
+    pixels, so those are left out of the color statistics — but not out of the
+    blend, which still covers the whole mask."""
     out = composite.clone()
     for i in range(composite.shape[0]):
         m = mask[min(i, mask.shape[0] - 1)].detach().clamp(0, 1).cpu().numpy().astype(np.float32)
@@ -1043,7 +1051,11 @@ def _post_blend(orig: torch.Tensor, composite: torch.Tensor, mask: torch.Tensor,
             continue
         o = orig[min(i, orig.shape[0] - 1), :, :, :3].detach().clamp(0, 1).cpu().numpy().astype(np.float32)
         c = composite[i, :, :, :3].detach().clamp(0, 1).cpu().numpy().astype(np.float32)
-        matched = _reinhard_match(o, c, m, match_strength)
+        v = None
+        if orig.shape[-1] == 4:
+            v = (orig[min(i, orig.shape[0] - 1), :, :, 3].detach().clamp(0, 1)
+                 .cpu().numpy().astype(np.float32))
+        matched = _reinhard_match(o, c, m, match_strength, v)
         if seamless:
             res = _seamless_clone(o, matched, m)
         else:
