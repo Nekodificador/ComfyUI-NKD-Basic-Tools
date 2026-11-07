@@ -27,6 +27,31 @@ from nkdbt.nkd_crop import (  # noqa: E402
 )
 
 
+def test_uncrop_manual_returns_the_alpha_the_finishing_pass_needs():
+    """Same contract as its sibling `_uncrop`: (composite, alpha).
+
+    Crop / Outpaint Stitch feeds that alpha to `_post_blend` for Match Colors, so
+    it has to cover the pasted box and nothing else — an alpha of the wrong shape
+    or all zeros would make the finishing pass a silent no-op.
+    """
+    from helpers import _post_blend
+    torch.manual_seed(0)
+    bg = torch.rand(1, 64, 64, 3) * 0.3 + 0.1          # dark background
+    patch = torch.ones(1, 20, 20, 3) * 0.9             # bright patch: obvious drift
+    out, alpha = _uncrop_manual(patch, bg, (20, 20, 40, 40), 0.0, feather=4, hardness=0.0)
+
+    assert alpha.shape == (1, 64, 64)
+    assert alpha[0, 30, 30] > 0.9        # middle of the box is solid
+    assert alpha[0, 5, 5] == 0.0         # well outside is empty
+
+    inside = (slice(None), slice(25, 35), slice(25, 35))
+    pasted = out[inside].mean().item()
+    full = _post_blend(bg, out, alpha, 1.0, False)[inside].mean().item()
+    half = _post_blend(bg, out, alpha, 0.5, False)[inside].mean().item()
+    # Match Colors pulls the patch back toward the background, and does it by halves.
+    assert full < pasted and abs(half - (pasted + full) / 2) < 0.1 * pasted
+
+
 def rotated_bounds(x0, y0, x1, y1, angle):
     """Test helper: the rotated box's own axis-aligned bounding extent."""
     cx, cy = (x0 + x1) / 2.0, (y0 + y1) / 2.0
@@ -256,7 +281,7 @@ def test_crop_pad_rotated_flat_fill_entirely_outside_source():
 def test_uncrop_manual_pastes_the_patch_back_at_the_original_box():
     bg = torch.zeros(1, 40, 40, 3)
     patch = torch.ones(1, 10, 10, 3)
-    out = _uncrop_manual(patch, bg, (15, 15, 25, 25), 0.0, feather=0, hardness=0.0)
+    out, _ = _uncrop_manual(patch, bg, (15, 15, 25, 25), 0.0, feather=0, hardness=0.0)
     assert torch.allclose(out[:, 15:25, 15:25, :], torch.ones(1, 10, 10, 3), atol=0.02)
     assert torch.allclose(out[:, 0:15, 0:15, :], torch.zeros(1, 15, 15, 3))
 
@@ -264,13 +289,13 @@ def test_uncrop_manual_pastes_the_patch_back_at_the_original_box():
 def test_uncrop_manual_mixes_rgb_and_rgba():
     """RGBA source, RGB patch back from a VAE (and vice versa) used to raise a size mismatch."""
     bg = torch.zeros(1, 40, 40, 4)
-    out = _uncrop_manual(torch.ones(1, 10, 10, 3), bg, (15, 15, 25, 25), 0.0, feather=0,
-                         hardness=0.0)
+    out, _ = _uncrop_manual(torch.ones(1, 10, 10, 3), bg, (15, 15, 25, 25), 0.0, feather=0,
+                            hardness=0.0)
     assert out.shape == (1, 40, 40, 4)
     assert torch.allclose(out[:, 15:25, 15:25, 3], torch.ones(1, 10, 10), atol=0.02)
     assert torch.allclose(out[:, 0:15, 0:15, 3], torch.zeros(1, 15, 15))
-    out = _uncrop_manual(torch.ones(1, 10, 10, 4), torch.zeros(1, 40, 40, 3), (15, 15, 25, 25),
-                         0.0, feather=0, hardness=0.0)
+    out, _ = _uncrop_manual(torch.ones(1, 10, 10, 4), torch.zeros(1, 40, 40, 3), (15, 15, 25, 25),
+                            0.0, feather=0, hardness=0.0)
     assert out.shape == (1, 40, 40, 3)
 
 
@@ -305,7 +330,7 @@ def test_uncrop_manual_feather_only_erodes_inward_never_bleeds_outside():
     the pasted area. Feather must only erode the patch's OWN edge inward."""
     bg = torch.full((1, 40, 40, 3), 0.5)   # mid-gray, distinguishable from the black bleed
     patch = torch.ones(1, 10, 10, 3)
-    out = _uncrop_manual(patch, bg, (15, 15, 25, 25), 0.0, feather=8, hardness=0.0)
+    out, _ = _uncrop_manual(patch, bg, (15, 15, 25, 25), 0.0, feather=8, hardness=0.0)
     # Well outside the patch box, even with an 8px feather: exactly the background, not a
     # black-tinted blend.
     assert torch.allclose(out[:, 5, 5, :], bg[:, 5, 5, :], atol=1e-4)
@@ -329,7 +354,7 @@ def test_crop_then_uncrop_round_trips_at_an_angle():
     x0, y0, x1, y1 = 20, 20, 60, 60
     angle = 30.0
     patch, _mask = _crop_pad_rotated(img, x0, y0, x1, y1, angle, "edge", "#000000")
-    out = _uncrop_manual(patch, img.clone(), (x0, y0, x1, y1), angle, feather=0, hardness=0.0)
+    out, _ = _uncrop_manual(patch, img.clone(), (x0, y0, x1, y1), angle, feather=0, hardness=0.0)
     diff = (out[:, y0:y1, x0:x1, :] - img[:, y0:y1, x0:x1, :]).abs().mean().item()
     assert diff < 0.02
 
@@ -392,8 +417,8 @@ def test_execute_crop_mode_rotated_with_grid_snap_never_pastes_a_fill_border():
     region = json.dumps({"x": 0.05, "y": 0.05, "w": 0.9, "h": 0.9, "angle": 20.0})
     out = NKDCrop.execute(img, region=region, mode="Crop", divisible_by="32")
     patch, crop_data = out.args[0], out.args[4]
-    stitched = _uncrop_manual(patch, img.clone(), crop_data.crop_box, crop_data.angle,
-                              feather=0, hardness=0.0)
+    stitched, _ = _uncrop_manual(patch, img.clone(), crop_data.crop_box, crop_data.angle,
+                                 feather=0, hardness=0.0)
     # Mean, not a per-pixel allclose: a sharp (feather=0) rotated edge always aliases by up
     # to a pixel right AT the boundary line — real, and irrelevant to the bug this test
     # guards (a whole extra border of fill colour, which would blow up the MEAN, not one

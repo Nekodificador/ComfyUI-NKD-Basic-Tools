@@ -11,6 +11,7 @@ adapter here).
 from __future__ import annotations
 
 import json
+import logging
 import math
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -26,9 +27,11 @@ from typing_extensions import override
 from .helpers import node_id, push_source
 
 try:
-    from .helpers import _alpha_hardness, _mask_grow, _resize_auto  # ComfyUI (package)
+    from .helpers import (_alpha_hardness, _HAS_CV2, _mask_grow,  # ComfyUI (package)
+                          _post_blend, _resize_auto)
 except ImportError:
-    from helpers import _alpha_hardness, _mask_grow, _resize_auto   # standalone tests (sys.path)
+    from helpers import (_alpha_hardness, _HAS_CV2, _mask_grow,    # standalone tests (sys.path)
+                         _post_blend, _resize_auto)
 
 
 # ── Region parsing ──────────────────────────────────────────────────────────
@@ -427,7 +430,7 @@ class NKDManualCropDataType(ComfyTypeIO):
 
 def _uncrop_manual(patch: torch.Tensor, background: torch.Tensor,
                    crop_box: tuple[int, int, int, int], angle: float,
-                   feather: int, hardness: float) -> torch.Tensor:
+                   feather: int, hardness: float) -> tuple[torch.Tensor, torch.Tensor]:
     """Composite `patch` back onto `background` at `crop_box`'s original position and
     rotation — the inverse of `_crop_pad`/`_crop_pad_rotated`.
 
@@ -484,7 +487,8 @@ def _uncrop_manual(patch: torch.Tensor, background: torch.Tensor,
     valid = _alpha_hardness(valid, hardness)
 
     alpha = valid.unsqueeze(-1)
-    return (warped * alpha + background * (1.0 - alpha)).clamp(0.0, 1.0)
+    composite = (warped * alpha + background * (1.0 - alpha)).clamp(0.0, 1.0)
+    return composite, valid
 
 
 # ── Video: decode only the part of each frame the crop reads ────────────────
@@ -579,29 +583,35 @@ class NKDCrop(io.ComfyNode):
                     tooltip="Managed by the crop editor on the node — no need to edit by hand."),
                 io.Combo.Input(
                     "fill", options=FILL_MODES, default="edge",
+                    display_name="Outpaint Fill",
                     tooltip="How the outpainted area is filled before generation: edge "
                             "replicates the border pixel, reflect mirrors it, pick a flat "
                             "colour, or leave it transparent (the image gains an alpha "
                             "channel)."),
                 io.Color.Input(
                     "fill_color", default="#000000",
+                    display_name="Fill Color",
                     tooltip="Colour used when fill = color."),
                 io.Float.Input(
                     "max_megapixels", default=0.0, min=0.0, max=128.0, step=0.01,
+                    display_name="Max Megapixels",
                     tooltip="Resize the result to this many megapixels — up as well as down, "
                             "so a small crop reaches the target too, not just a big one "
                             "getting capped. 0 disables."),
                 io.Combo.Input(
                     "divisible_by", options=DIVISIBLE_BY, default="disabled",
+                    display_name="Divisible By",
                     tooltip="Align the crop rectangle itself to a multiple of 8/16/32/64 "
                             "(grown, not resized) — the pixel grid models like MiniMax need. "
                             "Also snaps the final size after a megapixel resize."),
                 io.Combo.Input(
                     "mode", options=MODES, default="Crop",
+                    display_name="Mode",
                     tooltip="Crop: the rectangle stays inside the source. Outpaint: it can "
                             "extend past the edge to grow the canvas."),
                 io.Combo.Input(
                     "resize_method", options=RESIZE_METHODS, default="lanczos",
+                    display_name="Resize Method",
                     tooltip="Filter used when max_megapixels or divisible_by actually "
                             "resizes the result. Masks always use bilinear regardless."),
             ],
@@ -699,11 +709,25 @@ class NKDCropStitch(io.ComfyNode):
                 io.Image.Input("image", tooltip="The processed crop."),
                 NKDManualCropDataType.Input("crop_data"),
                 io.Int.Input("feather", default=10, min=0, max=256,
+                             display_name="Feather",
                              tooltip="Softens the edge of the pasted area, in pixels."),
                 io.Float.Input("edge_hardness", default=0.0, min=0.0, max=1.0, step=0.05,
+                               display_name="Edge Hardness",
                                tooltip="Firms up the blend edge to stop the original "
                                        "background from ghosting through as a halo. "
                                        "0 = off, 1 = hard edge."),
+                io.Float.Input("match_colors", default=0.0, min=0.0, max=1.0, step=0.05,
+                               optional=True, display_name="Match Colors",
+                               tooltip="Pulls the colors of the regenerated area back toward "
+                                       "the original image, correcting the slight color and "
+                                       "brightness drift models introduce. 0 = off, "
+                                       "1 = full match."),
+                io.Boolean.Input("seamless_edges", default=False, optional=True,
+                                 display_name="Seamless Edges",
+                                 tooltip="Extra pass that erases any remaining color or "
+                                         "lighting seam at the edge. Heavier, and can smear "
+                                         "fine texture — use only if a seam is still visible "
+                                         "after Match Colors. Requires OpenCV."),
             ],
             outputs=[
                 io.Image.Output(display_name="image",
@@ -713,7 +737,8 @@ class NKDCropStitch(io.ComfyNode):
 
     @classmethod
     def execute(cls, image, crop_data: NKDManualCropData, feather: int,
-               edge_hardness: float) -> io.NodeOutput:
+               edge_hardness: float, match_colors: float = 0.0,
+               seamless_edges: bool = False) -> io.NodeOutput:
         bg = crop_data.background
         if not isinstance(bg, torch.Tensor):
             # A video Crop only decoded a window of: the result is the whole clip anyway.
@@ -721,8 +746,14 @@ class NKDCropStitch(io.ComfyNode):
         bg = bg.to(image.device)
         if bg.shape[0] == 1 and image.shape[0] > 1:
             bg = bg.repeat(image.shape[0], 1, 1, 1)
-        out = _uncrop_manual(image, bg, crop_data.crop_box, crop_data.angle,
-                             feather, edge_hardness)
+        if seamless_edges and not _HAS_CV2:
+            logging.warning("NKD Crop / Outpaint Stitch: seamless_edges requires OpenCV "
+                            "(pip install opencv-python) — falling back to alpha blend.")
+            seamless_edges = False
+        out, alpha = _uncrop_manual(image, bg, crop_data.crop_box, crop_data.angle,
+                                    feather, edge_hardness)
+        if match_colors > 0.0 or seamless_edges:
+            out = _post_blend(bg, out, alpha, match_colors, seamless_edges)
         return io.NodeOutput(out)
 
 

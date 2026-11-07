@@ -125,10 +125,12 @@ class NKDLoraControl(io.ComfyNode):
                 io.Combo.Input(
                     "lora_name",
                     options=folder_paths.get_filename_list("loras"),
+                    display_name="LoRA",
                     tooltip="LoRA file to load and analyse",
                 ),
                 io.Float.Input(
                     "strength", default=1.0, min=-10.0, max=10.0, step=0.05,
+                    display_name="Strength",
                     tooltip="Overall LoRA strength. Multiplies the curve when one is connected.",
                 ),
                 # Driven by the block panel. multiline=False on purpose: a
@@ -138,6 +140,7 @@ class NKDLoraControl(io.ComfyNode):
                                 tooltip="Per-block rules, written by the panel"),
                 io.Float.Input(
                     "curve", optional=True, force_input=True,
+                    display_name="Curve",
                     tooltip="Strength over sampling steps, as a float list "
                             "(e.g. the 'floats' output of 😺NKD Sigmas Curve).",
                 ),
@@ -393,6 +396,7 @@ def _register_routes() -> None:
         return web.json_response(result, status=200 if "path" in result else 400)
 
     @PromptServer.instance.routes.get("/nkd/lora/blocks")
+    @same_origin_only
     async def _blocks(request):
         name = request.query.get("name", "")
         try:
