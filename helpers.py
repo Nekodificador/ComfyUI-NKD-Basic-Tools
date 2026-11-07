@@ -427,7 +427,9 @@ def _resize_mask(mask: torch.Tensor, width: int, height: int) -> torch.Tensor:
 def _mask_grow(mask: torch.Tensor, expand: int, blur: int) -> torch.Tensor:
     if mask.dim() == 2:
         mask = mask.unsqueeze(0)
-    if expand <= 0 and blur <= 0:
+    # Negative expand shrinks (mask_core.expand erodes it), so only an expand
+    # of exactly zero is the no-op.
+    if expand == 0 and blur <= 0:
         return mask.float()
     # One implementation of mask morphology for the whole pack: see mask_core.
     return _mask_process(mask.float(), expand_px=expand, feather_px=blur)
@@ -779,43 +781,94 @@ def _label_boxes(frame: torch.Tensor, boxes, accent: torch.Tensor) -> torch.Tens
         return frame
 
 
-def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
-                 boxes, max_side: int = 768) -> torch.Tensor:
+def _region_preview(image: torch.Tensor, tint: Optional[torch.Tensor],
+                    keep: torch.Tensor, edge: torch.Tensor, max_side: int = 768,
+                    label_boxes=None) -> torch.Tensor:
     """Render an in-node preview: original with the mask tinted in the NKD
-    accent color, everything outside the crop box(es) dimmed, and each box
-    outlined. First batch item only, downscaled to keep the payload small."""
-    if isinstance(boxes, tuple):
-        boxes = [boxes]
+    accent color, everything outside the crop dimmed, and the crop outlined.
+    First batch item only, downscaled to keep the payload small.
+
+    `tint`, `keep` and `edge` are [H, W] in 0..1 — an axis-aligned box fills
+    them from slices, a rotated crop from its own affine — so both kinds of
+    crop get the same picture.
+    """
     img = image[:1, :, :, :3].clone()
     _, h, w, _ = img.shape
     accent = torch.tensor([0.29, 0.706, 1.0], device=img.device, dtype=img.dtype)
 
-    if mask is not None:
-        m = mask if mask.dim() == 3 else mask.unsqueeze(0)
-        a = (m[0].to(img.device, img.dtype).clamp(0, 1) * 0.85).unsqueeze(-1)
+    if tint is not None:
+        a = (tint.to(img.device, img.dtype).clamp(0, 1) * 0.85).unsqueeze(-1)
         img[0] = img[0] * (1.0 - a) + accent * a
 
-    dim = torch.full((h, w, 1), 0.45, device=img.device, dtype=img.dtype)
-    for x1, y1, x2, y2 in boxes:
-        dim[y1:y2, x1:x2] = 1.0
-    img[0] = img[0] * dim
+    k = keep.to(img.device, img.dtype).clamp(0, 1).unsqueeze(-1)
+    img[0] = img[0] * (0.45 + 0.55 * k)
 
-    t = max(2, min(h, w) // 300)
-    for x1, y1, x2, y2 in boxes:
-        img[0, y1:min(y1 + t, h), x1:x2] = accent
-        img[0, max(y2 - t, 0):y2, x1:x2] = accent
-        img[0, y1:y2, x1:min(x1 + t, w)] = accent
-        img[0, y1:y2, max(x2 - t, 0):x2] = accent
+    e = edge.to(img.device, img.dtype).clamp(0, 1).unsqueeze(-1)
+    img[0] = img[0] * (1.0 - e) + accent * e
 
-    # With several regions the order matters — they are cropped, sampled and
-    # stitched back in this order — so label each box with its place in it.
-    if len(boxes) > 1:
-        img[0] = _label_boxes(img[0], boxes, accent)
+    if label_boxes:
+        img[0] = _label_boxes(img[0], label_boxes, accent)
 
     if max(h, w) > max_side:
         scale = max_side / max(h, w)
         img = _resize_auto(img, max(1, int(w * scale)), max(1, int(h * scale)))
     return img
+
+
+def _box_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
+                 boxes, max_side: int = 768) -> torch.Tensor:
+    """`_region_preview` for axis-aligned crop boxes (x1, y1, x2, y2)."""
+    if isinstance(boxes, tuple):
+        boxes = [boxes]
+    _, h, w, _ = image.shape
+    keep = torch.zeros((h, w))
+    edge = torch.zeros((h, w))
+    t = max(2, min(h, w) // 300)
+    for x1, y1, x2, y2 in boxes:
+        keep[y1:y2, x1:x2] = 1.0
+        edge[y1:min(y1 + t, h), x1:x2] = 1.0
+        edge[max(y2 - t, 0):y2, x1:x2] = 1.0
+        edge[y1:y2, x1:min(x1 + t, w)] = 1.0
+        edge[y1:y2, max(x2 - t, 0):x2] = 1.0
+
+    tint = None
+    if mask is not None:
+        tint = mask[0] if mask.dim() == 3 else mask
+    # With several regions the order matters — they are cropped, sampled and
+    # stitched back in this order — so label each box with its place in it.
+    return _region_preview(image, tint, keep, edge, max_side,
+                           label_boxes=boxes if len(boxes) > 1 else None)
+
+
+def _quad_preview(image: torch.Tensor, mask: Optional[torch.Tensor],
+                  transform, size: int, max_side: int = 768) -> torch.Tensor:
+    """`_region_preview` for a crop that carries a rotation, where `transform`
+    is the 3x3 crop -> original affine and the crop is `size` square.
+
+    Everything is drawn in the crop's own square and warped back along that
+    same affine, so the outline lands exactly where the crop was taken from
+    however far the region was tilted. `mask` is in crop coordinates too.
+    """
+    import cv2
+    _, h, w, _ = image.shape
+    m = np.asarray(transform, np.float32)[:2]
+
+    def back(a: np.ndarray) -> torch.Tensor:
+        return torch.from_numpy(cv2.warpAffine(a, m, (w, h), flags=cv2.INTER_LINEAR,
+                                               borderMode=cv2.BORDER_CONSTANT))
+
+    # Outline thickness is measured on the original, so it has to be converted
+    # to crop pixels before being drawn there.
+    scale = float(np.sqrt(abs(np.linalg.det(m[:, :2])))) or 1.0
+    t = max(1, min(size // 2, round(max(2, min(h, w) // 300) / scale)))
+
+    square = np.ones((size, size), np.float32)
+    ring = square.copy()
+    ring[t:size - t, t:size - t] = 0.0
+    tint = None
+    if mask is not None:
+        tint = back(mask.detach().cpu().numpy().astype(np.float32))
+    return _region_preview(image, tint, back(square), back(ring), max_side)
 
 
 def _alpha_hardness(alpha: torch.Tensor, hardness: float) -> torch.Tensor:

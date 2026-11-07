@@ -33,6 +33,11 @@ def demo():
     assert processed.max() <= 1.0 and processed.min() >= 0.0
     assert processed.sum() > mask.sum()  # grew outward
 
+    # A negative expand shrinks, with or without a feather — Face Mask's Expand
+    # goes down to -256, and an early return on "expand <= 0" ate it.
+    assert _mask_grow(mask, -10, 0).sum() < mask.sum()
+    assert torch.equal(_mask_grow(mask, 0, 0), mask)  # only 0/0 is the no-op
+
     crop, crop_mask, box, orig = _crop_by_mask(image, processed, 50, _megapixels_to_pixels(1.0))
     x1, y1, x2, y2 = box
     assert orig == (H, W)

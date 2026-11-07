@@ -236,6 +236,36 @@ def test_refine_keeps_the_face_and_returns_a_mask():
     assert float(r[10, 10]) < 0.5, "refining leaked into the background"
 
 
+def test_crop_preview_follows_the_rotation():
+    """The in-node preview keeps the crop's tilt: an undimmed rotated square,
+    with the corners of its bounding box left dark."""
+    import torch
+    from nkdbt.helpers import _quad_preview
+
+    size = 256
+    # Face centred in a canvas wide enough that the tilted crop lands inside
+    # it, corners and all — otherwise there is no "outside the crop" to check.
+    lmk = rotate(synthetic_face(), 25.0) + 256.0
+    a = fc.align(picture(1024), lmk, size=size, padding=1.7, upright=True)
+    image = torch.full((1, 1024, 1024, 3), 0.8)
+    mask = fc.region_mask(a["lmk_crop"], size, size, "face", 1.0)
+
+    prev = _quad_preview(image, mask, a["M_c2o"], size, max_side=400)
+    assert prev.shape[0] == 1 and prev.shape[-1] == 3
+    assert max(prev.shape[1], prev.shape[2]) <= 400
+    assert prev.min() >= 0.0 and prev.max() <= 1.0
+
+    # Full size, so pixel coordinates are the original's: the crop centre is
+    # bright, the corners of the crop's bounding box are dimmed.
+    full = _quad_preview(image, None, a["M_c2o"], size, max_side=4096)[0]
+    corners = np.array([[0, 0, 1], [size, 0, 1], [size, size, 1], [0, size, 1]], np.float64)
+    pts = corners @ np.asarray(a["M_c2o"], np.float64).T
+    cx, cy = pts[:, 0].mean(), pts[:, 1].mean()
+    assert float(full[int(cy), int(cx), 0]) > 0.7, "inside the crop must stay bright"
+    x0, y0 = pts[:, 0].min(), pts[:, 1].min()
+    assert float(full[int(y0) + 2, int(x0) + 2, 0]) < 0.5, "bbox corner must be dimmed"
+
+
 def test_refine_declines_an_empty_mask():
     import torch
     empty = torch.zeros(512, 512)

@@ -27,11 +27,11 @@ import numpy as np
 import torch
 from typing_extensions import override
 
-from comfy_api.latest import ComfyExtension, io
+from comfy_api.latest import ComfyExtension, io, ui
 from comfy_api.latest._io import ComfyTypeIO, comfytype
 
 from . import nkd_face_core as fc
-from .helpers import _alpha_hardness, _mask_grow, _post_blend
+from .helpers import _alpha_hardness, _mask_grow, _post_blend, _quad_preview
 
 
 def _to_numpy(image: torch.Tensor) -> np.ndarray:
@@ -128,6 +128,7 @@ class NKDFaceCrop(io.ComfyNode):
                 "Feed the result to 😺NKD Face Stitch to put it back at its "
                 "original angle."
             ),
+            is_output_node=True,
             inputs=[
                 io.Image.Input("image"),
                 io.Int.Input("size", default=512, min=64, max=4096, step=64,
@@ -186,7 +187,9 @@ class NKDFaceCrop(io.ComfyNode):
         paste = mask if mask_region != "none" else torch.ones_like(mask)
         data = NKDFaceData(background=image.cpu(), transforms=transforms,
                            size=int(size), masks=paste)
-        return io.NodeOutput(out, mask, data, rolls[0] if rolls else 0.0)
+        preview = _quad_preview(image, mask[0], transforms[0], int(size))
+        return io.NodeOutput(out, mask, data, rolls[0] if rolls else 0.0,
+                             ui=ui.PreviewImage(preview, cls=cls))
 
 
 class NKDFaceMask(io.ComfyNode):

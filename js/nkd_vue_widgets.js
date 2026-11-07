@@ -21859,7 +21859,14 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDAlphaMatte: 1,
   NKDMerge: 1,
   NKDCurves: 1,
-  NKDMaskPicker: 1
+  NKDMaskPicker: 1,
+  NKDFaceCrop: 1,
+  NKDFaceMask: 1,
+  NKDFaceStitch: 1,
+  NKDCropStitch: 1,
+  NKDLoader: 1,
+  NKDMiniMaxGuides: 1,
+  NKDAVLatentExtend: 1
 });
 registerCrop();
 registerMerge();

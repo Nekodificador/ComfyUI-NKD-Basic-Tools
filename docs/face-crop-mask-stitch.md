@@ -32,6 +32,9 @@ flowchart LR
 - `Face` picks which face when there's more than one.
 - The `roll` output tells you how far the head was tilted, which is handy for
   skipping the frames you'd rather not touch.
+- The node previews the mask and the crop region on itself, tilt included, and
+  its blue play button runs just that branch, so you can frame the crop without
+  running the whole graph.
 
 The face mask comes with it, no segmentation model and no extra download. And it
 finds the face wherever it is: a head that's a small part of a wide shot works
