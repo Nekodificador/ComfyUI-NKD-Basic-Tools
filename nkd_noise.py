@@ -28,8 +28,8 @@ class NKDNoise(io.ComfyNode):
                 "Outputs an image and a mask; feed it into Gradient Map to tint it."
             ),
             inputs=[
-                io.Int.Input("width", default=1024, min=8, max=8192, step=8),
-                io.Int.Input("height", default=1024, min=8, max=8192, step=8),
+                io.Int.Input("width", default=1024, min=8, max=8192, step=8, display_name="Width"),
+                io.Int.Input("height", default=1024, min=8, max=8192, step=8, display_name="Height"),
                 io.Int.Input("frames", default=1, min=1, max=1000,
                              display_name="Frames",
                              tooltip="Batch length. >1 makes an animated sequence."),

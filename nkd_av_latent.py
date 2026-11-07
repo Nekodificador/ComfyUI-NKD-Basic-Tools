@@ -222,6 +222,7 @@ class NKDAVLatent(io.ComfyNode):
                 # widget in the middle repoints every saved value after it. Appended, an
                 # existing workflow just gains the default.
                 io.Float.Input("fps", default=24.0, min=1.0, max=240.0, step=0.01,
+                               display_name="FPS",
                                tooltip="Frame rate of the video going in — MiniMax H3 is 24. "
                                        "It is the only thing needed to know how long the "
                                        "soundtrack should be: the sound is cut or padded to "

@@ -234,18 +234,21 @@ class NKDMerge(io.ComfyNode):
                               tooltip="Optional matte for the foreground, 1 = opaque. "
                                       "Replaces the foreground's own alpha."),
                 io.Combo.Input("fit", options=list(FITS), default="fit",
+                               display_name="Fit",
                                tooltip="What scale 1 means. fit: the whole foreground fits "
                                        "inside the background. fill: it covers the "
                                        "background, overflow cropped. pixels: its own size "
                                        "in pixels."),
-                io.Float.Input("opacity", default=1.0, min=0.0, max=1.0, step=0.01),
+                io.Float.Input("opacity", default=1.0, min=0.0, max=1.0, step=0.01, display_name="Opacity"),
                 io.Combo.Input("blend_mode", options=list(_LAYER_MODES), default="normal",
+                               display_name="Blend Mode",
                                tooltip="Same modes as core's Create Layered Image."),
                 io.String.Input("transform", default=json.dumps(DEFAULT_TRANSFORM),
                                 multiline=False, socketless=True,
                                 tooltip="Position, scale and rotation, set by dragging in "
                                         "the node."),
                 io.Boolean.Input("invert_alpha", default=False,
+                                 display_name="Invert Alpha",
                                  tooltip="Flip the foreground's matte, whether it comes from "
                                          "the alpha input or the foreground itself: what "
                                          "was see-through becomes solid and the other way "

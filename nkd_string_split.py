@@ -34,6 +34,7 @@ class NKDStringSplit(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.String.Input("text", multiline=True, default="",
+                                display_name="Text",
                                 tooltip="The text to split."),
                 io.Combo.Input("delimiter",
                                options=[*_DELIMITERS.keys(), "Custom"],

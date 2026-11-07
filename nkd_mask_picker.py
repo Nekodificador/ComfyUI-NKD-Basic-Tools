@@ -229,20 +229,24 @@ class NKDMaskPicker(io.ComfyNode):
                 io.DynamicCombo.Input("edges", options=[
                     io.DynamicCombo.Option("vitmatte", [
                         io.Float.Input("edge_margin", default=0.08, min=0.0, max=0.3, step=0.01,
+                                       display_name="Edge Margin",
                                        tooltip="How far past SAM's edge the matte may look, as a fraction of the "
                                                "object's size. Raise it for hair and fur, lower it for low-contrast parts."),
                     ]),
                     io.DynamicCombo.Option("sam", [
                         io.Int.Input("refine_iterations", default=2, min=0, max=5,
+                                     display_name="Refine Passes",
                                      tooltip="SAM passes that re-segment each picked object in a crop around it, like "
                                              "SAM3 Detect's option. 0: the mask as previewed."),
                     ]),
                 ], tooltip="vitmatte: an alpha matte of each object's edge, so hair, fur and soft borders come out "
                            "soft. sam: SAM's hard edge."),
                 io.Boolean.Input("points_only", default=False,
+                                 display_name="Points Only",
                                  tooltip="Place SAM's points yourself instead of picking found objects: click for a "
                                          "positive point, right click for a negative one, + Object starts another object."),
                 io.Combo.Input("detail", options=list(DETAIL), default="normal",
+                               display_name="Detail Level",
                                tooltip="How many objects Analyze lists. Higher finds smaller parts and odder zones, "
                                        "doubtful ones too, and gives the wheel more sizes to step through; max takes "
                                        "about 1 s. Press Analyze again after changing it."),

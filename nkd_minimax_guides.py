@@ -91,6 +91,7 @@ class NKDMiniMaxGuides(io.ComfyNode):
                              tooltip="Audio VAE, for the slots that carry sound."),
                 io.Latent.Input("latent"),
                 io.Boolean.Input("snap_positions", default=True,
+                                 display_name="Snap Positions",
                                  tooltip="Move every guide onto the nearest frame H3 starts a "
                                          "video token on, a multiple of 17. Off-grid guides sit "
                                          "between the video's tokens and that frame flashes like "

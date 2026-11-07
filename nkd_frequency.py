@@ -198,25 +198,31 @@ class NKDFrequencySeparate(io.ComfyNode):
                 io.Combo.Input("method",
                                options=["Gaussian", "Guided", "Rolling Guidance", "Median"],
                                default="Guided",
+                               display_name="Method",
                                tooltip="How the base is smoothed. Guided keeps edges "
                                        "clean without the halo Gaussian leaves; Rolling "
                                        "Guidance erases texture by size while keeping "
                                        "shapes; Median is for spot blemishes."),
                 io.Int.Input("radius", default=8, min=1, max=128,
+                             display_name="Radius",
                              tooltip="Detail scale. Larger = coarser base, more goes "
                                      "into the detail layer."),
                 io.Float.Input("edge_threshold", default=0.1, min=0.0, max=1.0, step=0.01,
+                               display_name="Edge Threshold",
                                tooltip="How strongly edges are protected (Guided / "
                                        "Rolling Guidance). Lower = sharper edges kept."),
                 io.Combo.Input("mode", options=["Divide", "Subtract"], default="Divide",
+                               display_name="Mode",
                                tooltip="How detail is encoded. Divide (ratio) is "
                                        "lighting-invariant — best for transferring "
                                        "detail between differently-lit images."),
                 io.Combo.Input("detail", options=["Luminance", "RGB"], default="Luminance",
+                               display_name="Detail Channel",
                                tooltip="Luminance keeps detail achromatic so a Divide "
                                        "recombine never touches color. RGB carries the "
                                        "chromatic detail too."),
                 io.Boolean.Input("linear", default=True,
+                                 display_name="Linear Light",
                                  tooltip="Process in linear light (correct). Turn off "
                                          "to work in gamma like classic Photoshop."),
                 io.Mask.Input("mask", optional=True,
@@ -305,16 +311,20 @@ class NKDFrequencyCombine(io.ComfyNode):
                                tooltip="Base image the detail lands on (e.g. the relit "
                                        "result)."),
                 io.Combo.Input("mode", options=["Divide", "Subtract"], default="Divide",
+                               display_name="Mode",
                                tooltip="Must match the Separate that made the HF."),
                 io.Boolean.Input("linear", default=True,
+                                 display_name="Linear Light",
                                  tooltip="Must match the Separate that made the HF."),
                 io.Float.Input("detail_strength", default=1.0, min=0.0, max=2.0, step=0.01,
+                               display_name="Detail Strength",
                                tooltip="Attenuate (<1) or boost (>1) the transferred "
                                        "detail. 1.0 restores it faithfully."),
                 io.Mask.Input("mask", optional=True,
                               tooltip="Optional — apply the detail only inside the mask "
                                       "(feathered by its values)."),
                 io.Float.Input("mask_feather", default=0.0, min=0.0, max=64.0, step=1.0,
+                               display_name="Mask Feather",
                                tooltip="Soften the mask edge before applying."),
             ],
             outputs=[

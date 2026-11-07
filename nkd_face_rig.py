@@ -179,15 +179,18 @@ class NKDFaceRig(io.ComfyNode):
                             "allowed but the editor is easier."),
                 io.Float.Input(
                     "crop_factor", default=2.0, min=1.5, max=3.0, step=0.05,
+                    display_name="Crop Factor",
                     tooltip="How much around the face to take in. Larger keeps more hair "
                             "and shoulders but gives the model less face to work with."),
                 io.Float.Input(
                     "src_ratio", default=1.0, min=0.0, max=1.0, step=0.01,
+                    display_name="Keep Expression",
                     tooltip="How much of the expression already in the photo to keep. "
                             "Lower it to neutralise a face that is already smiling before "
                             "posing it."),
                 io.Boolean.Input(
                     "stitching", default=True,
+                    display_name="Blend Back",
                     tooltip="Blend the posed face back into the original shoulders. Turn it "
                             "off only to see the raw crop."),
                 io.Int.Input(

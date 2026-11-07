@@ -48,10 +48,10 @@ class NKDGradientGenerate(io.ComfyNode):
                 "preview to set direction and extent; edit the ramp below."
             ),
             inputs=[
-                io.Int.Input("width", default=1024, min=8, max=8192, step=8),
-                io.Int.Input("height", default=1024, min=8, max=8192, step=8),
+                io.Int.Input("width", default=1024, min=8, max=8192, step=8, display_name="Width"),
+                io.Int.Input("height", default=1024, min=8, max=8192, step=8, display_name="Height"),
                 io.Combo.Input("shape", options=["Linear", "Radial", "Angular", "Diamond"],
-                               default="Linear"),
+                               default="Linear", display_name="Shape"),
                 io.String.Input("handles", multiline=False, default=_DEFAULT_HANDLES,
                                 socketless=True,
                                 tooltip="Gradient handles, dragged on the preview above."),
@@ -66,10 +66,12 @@ class NKDGradientGenerate(io.ComfyNode):
                 io.Combo.Input("blend_mode",
                                options=["none"] + list(_BLEND_MODES),
                                default="none",
+                               display_name="Blend Mode",
                                tooltip="How the gradient composites over the optional "
                                        "image. 'none' outputs the bare gradient (the "
                                        "image only sets the size)."),
                 io.Float.Input("opacity", default=1.0, min=0.0, max=1.0, step=0.01,
+                               display_name="Opacity",
                                tooltip="How much of the composited gradient shows "
                                        "through. Ignored when blend_mode is 'none'."),
             ],

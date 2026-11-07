@@ -371,6 +371,7 @@ class NKDMaskPainter(io.ComfyNode):
                     "on_image_change",
                     options=["clear_mask", "keep_mask"],
                     default="clear_mask",
+                    display_name="On Image Change",
                     tooltip="clear_mask: wipe the painted mask when the input image changes.\n"
                             "keep_mask: keep the painted mask even when the input image changes.",
                 ),
@@ -379,6 +380,7 @@ class NKDMaskPainter(io.ComfyNode):
                     options=["Use as start", "Replace", "Add",
                              "Subtract", "Intersect", "Disconnected"],
                     default="Use as start",
+                    display_name="Mask Input Mode",
                     tooltip=(
                         "How to combine the optional `mask` input with what you have "
                         "painted (all modes only act when the upstream content "
