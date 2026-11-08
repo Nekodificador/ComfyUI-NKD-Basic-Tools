@@ -161,6 +161,30 @@ export class BrushLayer {
     this.onChange();
   }
 
+  /** Lasso: fill a closed outline as one stroke, so opacity, softness (the brush's own
+   *  fringe at radius `r`), the eraser and undo all behave as for a brush stroke. */
+  fill(pts: Array<[number, number]>, r: number): void {
+    if (pts.length < 3) return;
+    const p = this.params();
+    const sctx = this.stroke.getContext("2d")!;
+    const [cr, cg, cb] = hexToRgb(p.tool === "eraser" ? "#000000" : p.color);
+    sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+    sctx.beginPath();
+    sctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) sctx.lineTo(pts[i][0], pts[i][1]);
+    sctx.closePath(); sctx.fill();
+    this.stroking = true; this.last = null; this.strokeR = r;
+    this.end();
+  }
+
+  /** Draw a picture over the layer (undoable, reported through onChange). */
+  paste(img: CanvasImageSource): void {
+    this.snapshot();
+    this.layer.getContext("2d")!.drawImage(img, 0, 0, this.width, this.height);
+    this.hasStrokes = true;
+    this.onChange();
+  }
+
   /** layer ⊕ current stroke, with the brush opacity - the same op end() bakes in. */
   composite(target: CanvasRenderingContext2D, withStroke: boolean): void {
     target.globalCompositeOperation = "source-over";

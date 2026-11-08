@@ -39,7 +39,9 @@ export function resolveSource(node: any, slotName: string, maxDepth = 6,
 
   for (const name of FILE_WIDGETS) {
     const w = src.widgets?.find((x: any) => x.name === name);
-    if (w && looksLikeFile(w.value)) {
+    // Hidden = a tracking widget (Mask Painter's mask file sits in one called `image`), not
+    // the node's source: walk past it.
+    if (w && !w.hidden && looksLikeFile(w.value)) {
       const raw = String(w.value);
       const m = /^(.*?)\s*\[(\w+)\]$/.exec(raw);
       const clean = m ? m[1] : raw;

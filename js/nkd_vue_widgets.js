@@ -15948,7 +15948,7 @@ function openSplineOverlay(opts) {
     };
   }
   const VIEWS = opts.mode === "shape" ? ["result", "matte", "source"] : opts.mode === "pin" ? ["result", "field", "source"] : ["result", "source"];
-  const VIEW_LABEL = {
+  const VIEW_LABEL2 = {
     result: opts.mode === "shape" ? "View: masked" : "View: result",
     matte: "View: matte",
     field: "View: blur field",
@@ -15977,7 +15977,7 @@ function openSplineOverlay(opts) {
     if (e.key === "v" || e.key === "V") viewBtn.click();
   }
   function setStatus(text) {
-    viewBtn.textContent = VIEW_LABEL[editor.view];
+    viewBtn.textContent = VIEW_LABEL2[editor.view];
     viewBtn.classList.toggle("on", editor.view !== "source");
     const picked = editor.selectionSize ? ` · ${editor.selectionSize} point${editor.selectionSize === 1 ? "" : "s"} selected` : "";
     const mismatch = savedAspect != null && Math.abs(savedAspect - editor.aspect) > 0.01;
@@ -17020,7 +17020,7 @@ function resolveSource(node, slotName, maxDepth = 6, depth = 0) {
   if (!src) return null;
   for (const name of FILE_WIDGETS) {
     const w = (_d = src.widgets) == null ? void 0 : _d.find((x) => x.name === name);
-    if (w && looksLikeFile(w.value)) {
+    if (w && !w.hidden && looksLikeFile(w.value)) {
       const raw = String(w.value);
       const m = /^(.*?)\s*\[(\w+)\]$/.exec(raw);
       const clean = m ? m[1] : raw;
@@ -17455,6 +17455,31 @@ class BrushLayer {
     this.hasStrokes = true;
     this.onChange();
   }
+  /** Lasso: fill a closed outline as one stroke, so opacity, softness (the brush's own
+   *  fringe at radius `r`), the eraser and undo all behave as for a brush stroke. */
+  fill(pts, r) {
+    if (pts.length < 3) return;
+    const p2 = this.params();
+    const sctx = this.stroke.getContext("2d");
+    const [cr, cg, cb] = hexToRgb(p2.tool === "eraser" ? "#000000" : p2.color);
+    sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+    sctx.beginPath();
+    sctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) sctx.lineTo(pts[i][0], pts[i][1]);
+    sctx.closePath();
+    sctx.fill();
+    this.stroking = true;
+    this.last = null;
+    this.strokeR = r;
+    this.end();
+  }
+  /** Draw a picture over the layer (undoable, reported through onChange). */
+  paste(img) {
+    this.snapshot();
+    this.layer.getContext("2d").drawImage(img, 0, 0, this.width, this.height);
+    this.hasStrokes = true;
+    this.onChange();
+  }
   /** layer ⊕ current stroke, with the brush opacity - the same op end() bakes in. */
   composite(target, withStroke) {
     target.globalCompositeOperation = "source-over";
@@ -17510,15 +17535,33 @@ class BrushLayer {
     this.onChange();
   }
 }
-const NODE_NAME$6 = "NKDPaint";
+const NODE_NAME$7 = "NKDPaint";
 const EXT_NAME$5 = "NKD.BasicTools.Paint";
-console.log("[NKD Paint] rev 1");
+console.log("[NKD Paint] rev 2");
 const CANVAS_W$2 = 240;
 const MAX_SIDE = 2048;
 const ZOOM_MIN = 0.25, ZOOM_MAX = 16;
-const SUBFOLDER = "nkd_paint";
+const LASSO_SNAP = 8;
+const MASK_VIEWS = ["overlay", "dim", "mask"];
+const VIEW_LABEL = { overlay: "Overlay", dim: "Dim", mask: "Mask" };
+const MASK_TINT = "#4ab4ff";
+const PAINT_OPTS = {
+  widget: "layer",
+  input: "image",
+  subfolder: "nkd_paint",
+  prefix: "nkd_paint_",
+  title: "😺 Painter Node",
+  mask: false
+};
 const frames$1 = /* @__PURE__ */ new Map();
 const live$2 = /* @__PURE__ */ new Map();
+window.addEventListener("pointerdown", (e) => {
+  var _a;
+  const down = (_a = e.target) == null ? void 0 : _a._nkdAltDown;
+  if (!down || !e.altKey) return;
+  e.stopImmediatePropagation();
+  down(e);
+}, true);
 function paintSource(nodeId, canvas, fullW, fullH) {
   var _a;
   const b = {
@@ -17535,13 +17578,13 @@ function registerPaint() {
   app.registerExtension({
     name: EXT_NAME$5,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$6) return;
+      if (nodeData.name !== NODE_NAME$7) return;
       if (nodeType.prototype.__nkdPaintWrapped) return;
       nodeType.prototype.__nkdPaintWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function() {
         const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
-        setupPaintWidget(this);
+        setupPaintWidget(this, PAINT_OPTS);
         return r;
       };
     }
@@ -17570,19 +17613,31 @@ function checker(ctx) {
   checkerPattern = ctx.createPattern(c, "repeat");
   return checkerPattern;
 }
-async function sha1Name(blob) {
-  if (!crypto.subtle) return `nkd_paint_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.png`;
+function greyToAlpha(img, w, h) {
+  const c = mkCanvas(w, h), x = c.getContext("2d");
+  x.drawImage(img, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h);
+  for (let i = 0; i < d.data.length; i += 4) {
+    d.data[i + 3] = d.data[i];
+    d.data[i] = d.data[i + 1] = d.data[i + 2] = 255;
+  }
+  x.putImageData(d, 0, 0);
+  return c;
+}
+async function sha1Name(blob, prefix) {
+  if (!crypto.subtle) return `${prefix}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.png`;
   const d = new Uint8Array(await crypto.subtle.digest("SHA-1", await blob.arrayBuffer()));
-  return "nkd_paint_" + Array.from(d.slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("") + ".png";
+  return prefix + Array.from(d.slice(0, 8), (b) => b.toString(16).padStart(2, "0")).join("") + ".png";
 }
 const BTN_CSS = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 7px;cursor:pointer;flex:0 0 auto;height:22px;display:inline-flex;align-items:center;gap:4px;";
 const ON_CSS = "border-color:#4ab4ff;color:#4ab4ff;";
-function setupPaintWidget(node) {
-  const layerW = findW(node, "layer");
+function setupPaintWidget(node, o) {
+  const layerW = findW(node, o.widget);
   if (!layerW) return;
   hideWidget(layerW);
   const widthW = findW(node, "width"), heightW = findW(node, "height");
   const cnW = findW(node, "controlnet"), bgW = findW(node, "bg_color");
+  const modeW = findW(node, "mask_input_mode");
   const P = node.properties;
   P.nkdPaintTool = P.nkdPaintTool ?? "brush";
   P.nkdPaintColor = P.nkdPaintColor ?? "#ffffff";
@@ -17590,14 +17645,18 @@ function setupPaintWidget(node) {
   P.nkdPaintOpacity = P.nkdPaintOpacity ?? 1;
   P.nkdPaintHardness = P.nkdPaintHardness ?? 0.8;
   P.nkdPaintBase = P.nkdPaintBase ?? 1;
+  P.nkdPaintLasso = P.nkdPaintLasso ?? false;
+  if (o.mask && !MASK_VIEWS.includes(P.nkdMaskView)) P.nkdMaskView = "overlay";
+  let maskHidden = false;
   const tool = () => P.nkdPaintTool;
   const controlnet = () => !!(cnW == null ? void 0 : cnW.value);
-  const brushColor = () => controlnet() ? "#ffffff" : String(P.nkdPaintColor);
+  const brushColor = () => o.mask || controlnet() ? "#ffffff" : String(P.nkdPaintColor);
+  let eraseNow = false;
   const L = new BrushLayer(1024, 1024, () => ({
     size: P.nkdPaintSize,
     opacity: P.nkdPaintOpacity,
     hardness: P.nkdPaintHardness,
-    tool: tool(),
+    tool: eraseNow ? "eraser" : tool(),
     color: brushColor()
   }), () => {
     scheduleSave();
@@ -17606,6 +17665,7 @@ function setupPaintWidget(node) {
   });
   let base = null;
   let lastRef = null;
+  let upstream = null;
   let zoom = 1, panX = 0, panY = 0;
   const root = document.createElement("div");
   root.className = "nkd-paint-wrap";
@@ -17619,7 +17679,7 @@ function setupPaintWidget(node) {
     const b = document.createElement("button");
     b.style.cssText = BTN_CSS;
     b.title = title;
-    b.innerHTML = `<i class="pi ${icon}" style="font-size:11px;color:inherit"></i>${label ? `<span>${label}</span>` : ""}`;
+    b.innerHTML = `${icon ? `<i class="pi ${icon}" style="font-size:11px;color:inherit"></i>` : ""}${label ? `<span>${label}</span>` : ""}`;
     return b;
   }
   function range(label, min, max, step, get, set, width = 54) {
@@ -17645,7 +17705,12 @@ function setupPaintWidget(node) {
     return wrap;
   }
   const brushBtn = btn("pi-pencil", "Brush (B)");
-  const eraserBtn = btn("pi-eraser", "Eraser (E)");
+  const eraserBtn = btn("pi-eraser", "Eraser (E). The right button erases with any tool");
+  const lassoBtn = btn(
+    "",
+    o.mask ? "Lasso fill (L): drag to draw a shape, or click corners and close on the first point, double-click or Enter. Alt, the right button or the eraser takes it away." : "Lasso fill (L): drag to draw a shape, or click corners and close on the first point, double-click or Enter. With the eraser or the right button it erases.",
+    "Lasso"
+  );
   const colorIn = document.createElement("input");
   colorIn.type = "color";
   colorIn.value = P.nkdPaintColor;
@@ -17667,7 +17732,10 @@ function setupPaintWidget(node) {
   const redoBtn = btn("pi-refresh", "Redo (Ctrl+Shift+Z)");
   const clearBtn = btn("pi-trash", "Clear the layer", "Clear");
   clearBtn.style.marginLeft = "auto";
-  row1.append(brushBtn, eraserBtn, colorIn, whiteSw, blackSw, undoBtn, redoBtn, clearBtn);
+  const expandBtn = btn("pi-window-maximize", "Full-screen view");
+  row1.append(brushBtn, eraserBtn, lassoBtn);
+  if (!o.mask) row1.append(colorIn, whiteSw, blackSw);
+  row1.append(undoBtn, redoBtn, clearBtn, expandBtn);
   const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => {
     P.nkdPaintSize = v;
   });
@@ -17680,7 +17748,8 @@ function setupPaintWidget(node) {
   const baseR = range("Base", 0, 1, 0.01, () => P.nkdPaintBase, (v) => {
     P.nkdPaintBase = v;
   });
-  row2.append(sizeR, opR, hardR, baseR);
+  const viewBtn = btn("pi-eye", "View (V): mask over the image, outside dimmed, mask alone. Shift+click or Shift+V hides the mask", "Overlay");
+  row2.append(sizeR, opR, hardR, o.mask ? viewBtn : baseR);
   const sizeInp = sizeR._inp;
   const hardInp = hardR._inp;
   const barMinWidth = () => {
@@ -17695,6 +17764,8 @@ function setupPaintWidget(node) {
   cv.tabIndex = -1;
   root.append(bar, cv);
   const ctx = cv.getContext("2d");
+  const cvObserver = new ResizeObserver(() => scheduleDraw());
+  cvObserver.observe(cv);
   function setColor(hex) {
     P.nkdPaintColor = hex;
     colorIn.value = hex;
@@ -17702,6 +17773,7 @@ function setupPaintWidget(node) {
   function syncToolbar() {
     brushBtn.style.cssText = BTN_CSS + (tool() === "brush" ? ON_CSS : "");
     eraserBtn.style.cssText = BTN_CSS + (tool() === "eraser" ? ON_CSS : "");
+    lassoBtn.style.cssText = BTN_CSS + (P.nkdPaintLasso ? ON_CSS : "");
     const cn = controlnet();
     for (const el of [colorIn, whiteSw, blackSw]) {
       el.style.opacity = cn ? "0.3" : "1";
@@ -17712,6 +17784,19 @@ function setupPaintWidget(node) {
     undoBtn.style.opacity = L.canUndo ? "1" : "0.3";
     redoBtn.style.opacity = L.canRedo ? "1" : "0.3";
     baseR.style.display = base ? "" : "none";
+    if (o.mask) {
+      viewBtn.lastElementChild.textContent = maskHidden ? "Hidden" : VIEW_LABEL[P.nkdMaskView];
+      viewBtn.style.cssText = BTN_CSS + (maskHidden ? "border-color:#e0a040;color:#e0a040;" : "");
+    }
+    cv.style.cursor = altHeld && !o.mask ? PIPETTE : P.nkdPaintLasso ? "crosshair" : "none";
+  }
+  function cycleView(shift) {
+    if (shift || maskHidden) {
+      maskHidden = shift && !maskHidden;
+      return;
+    }
+    const i = MASK_VIEWS.indexOf(P.nkdMaskView);
+    P.nkdMaskView = MASK_VIEWS[(i + 1) % MASK_VIEWS.length];
   }
   brushBtn.addEventListener("click", () => {
     P.nkdPaintTool = "brush";
@@ -17721,15 +17806,59 @@ function setupPaintWidget(node) {
     P.nkdPaintTool = "eraser";
     syncToolbar();
   });
+  lassoBtn.addEventListener("click", () => {
+    P.nkdPaintLasso = !P.nkdPaintLasso;
+    lasso = null;
+    syncToolbar();
+    scheduleDraw();
+  });
+  viewBtn.addEventListener("click", (e) => {
+    cycleView(e.shiftKey);
+    syncToolbar();
+    scheduleDraw();
+  });
   undoBtn.addEventListener("click", () => L.undo());
   redoBtn.addEventListener("click", () => L.redo());
   clearBtn.addEventListener("click", () => {
+    var _a;
     if (!L.clear()) return;
     setLayerValue("");
     syncToolbar();
     scheduleDraw();
+    (_a = o.onClear) == null ? void 0 : _a.call(o);
   });
+  expandBtn.addEventListener("click", () => expand());
   const detachFine = attachFineRange(bar);
+  function expand() {
+    const keepH = root.offsetHeight;
+    root.style.height = `${keepH}px`;
+    const holder = document.createElement("div");
+    holder.style.cssText = "display:flex;flex-direction:column;flex:1;width:100%;height:100%;min-width:0;min-height:0;";
+    const m = openNkdModal({
+      title: o.title,
+      hint: "wheel: zoom · Space or middle drag: pan · 0: fit · [ ]: size · Alt+right drag: size and hardness" + (o.mask ? " · Alt: erase · V: view" : ""),
+      onClose: () => {
+        root.append(bar, cv);
+        cv.style.flex = "";
+        cv.style.minHeight = "";
+        cv.style.aspectRatio = `${L.width}/${L.height}`;
+        root.style.height = "";
+        zoom = 1;
+        panX = panY = 0;
+        mounted.resizeToContent();
+        scheduleDraw();
+      }
+    });
+    cv.style.aspectRatio = "auto";
+    cv.style.flex = "1";
+    cv.style.minHeight = "0";
+    holder.append(bar, cv);
+    m.body.appendChild(holder);
+    m.addPrimary("Done");
+    zoom = 1;
+    panX = panY = 0;
+    requestAnimationFrame(draw);
+  }
   function targetSize() {
     if (base) return capSize(base.fullW, base.fullH);
     return capSize(Number(widthW == null ? void 0 : widthW.value) || 1024, Number(heightW == null ? void 0 : heightW.value) || 1024);
@@ -17738,7 +17867,7 @@ function setupPaintWidget(node) {
     const [w, h] = targetSize();
     if (L.width === w && L.height === h) return;
     L.resize(w, h);
-    cv.style.aspectRatio = `${w}/${h}`;
+    if (cv.parentElement === root) cv.style.aspectRatio = `${w}/${h}`;
     zoom = 1;
     panX = panY = 0;
     mounted == null ? void 0 : mounted.resizeToContent();
@@ -17758,6 +17887,64 @@ function setupPaintWidget(node) {
     const v = view();
     return [(px - v.ox) / v.s, (py - v.oy) / v.s];
   }
+  const mc = mkCanvas(1, 1), dc = mkCanvas(1, 1);
+  const COMBINE = { Add: "source-over", Subtract: "destination-out", Intersect: "destination-in" };
+  function maskComposite() {
+    for (const c of [mc, dc]) if (c.width !== L.width || c.height !== L.height) {
+      c.width = L.width;
+      c.height = L.height;
+    }
+    const x = mc.getContext("2d");
+    x.globalCompositeOperation = "source-over";
+    x.clearRect(0, 0, L.width, L.height);
+    x.drawImage(L.current(), 0, 0);
+    const op = COMBINE[String(modeW == null ? void 0 : modeW.value)];
+    if (upstream && op) {
+      x.globalCompositeOperation = op;
+      x.drawImage(upstream, 0, 0, L.width, L.height);
+      x.globalCompositeOperation = "source-over";
+    }
+    return mc;
+  }
+  function tint(c, color) {
+    const x = c.getContext("2d");
+    x.globalCompositeOperation = "source-in";
+    x.fillStyle = color;
+    x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = "source-over";
+  }
+  function drawMask(ox, oy, lw, lh) {
+    const mode = P.nkdMaskView;
+    if (maskHidden) {
+      if (base) ctx.drawImage(base.el, ox, oy, lw, lh);
+      return;
+    }
+    const m = maskComposite();
+    if (mode === "mask") {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(ox, oy, lw, lh);
+      tint(m, "#ffffff");
+      ctx.drawImage(m, ox, oy, lw, lh);
+      return;
+    }
+    if (base) ctx.drawImage(base.el, ox, oy, lw, lh);
+    if (mode === "overlay") {
+      tint(m, MASK_TINT);
+      ctx.globalAlpha = 0.55;
+      ctx.drawImage(m, ox, oy, lw, lh);
+      ctx.globalAlpha = 1;
+    } else if (mode === "dim") {
+      const x = dc.getContext("2d");
+      x.globalCompositeOperation = "source-over";
+      x.clearRect(0, 0, dc.width, dc.height);
+      x.fillStyle = "rgba(0,0,0,0.75)";
+      x.fillRect(0, 0, dc.width, dc.height);
+      x.globalCompositeOperation = "destination-out";
+      x.drawImage(m, 0, 0);
+      x.globalCompositeOperation = "source-over";
+      ctx.drawImage(dc, ox, oy, lw, lh);
+    }
+  }
   let raf = 0;
   const scheduleDraw = () => {
     if (!raf) raf = requestAnimationFrame(() => {
@@ -17773,7 +17960,7 @@ function setupPaintWidget(node) {
   function setAlt(on) {
     if (altHeld === on) return;
     altHeld = on;
-    cv.style.cursor = on ? PIPETTE : "none";
+    syncToolbar();
     scheduleDraw();
   }
   let sizePreview = null;
@@ -17798,20 +17985,25 @@ function setupPaintWidget(node) {
     ctx.fillStyle = checker(ctx);
     ctx.fillRect(ox, oy, lw, lh);
     ctx.imageSmoothingEnabled = s < 3;
-    if (base) {
-      ctx.globalAlpha = P.nkdPaintBase;
-      ctx.drawImage(base.el, ox, oy, lw, lh);
-      ctx.globalAlpha = 1;
-    } else if (bgW == null ? void 0 : bgW.value) {
-      ctx.fillStyle = String(bgW.value);
-      ctx.fillRect(ox, oy, lw, lh);
+    if (o.mask) {
+      drawMask(ox, oy, lw, lh);
+    } else {
+      if (base) {
+        ctx.globalAlpha = P.nkdPaintBase;
+        ctx.drawImage(base.el, ox, oy, lw, lh);
+        ctx.globalAlpha = 1;
+      } else if (bgW == null ? void 0 : bgW.value) {
+        ctx.fillStyle = String(bgW.value);
+        ctx.fillRect(ox, oy, lw, lh);
+      }
+      ctx.drawImage(L.current(), ox, oy, lw, lh);
     }
-    ctx.drawImage(L.current(), ox, oy, lw, lh);
     ctx.restore();
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.lineWidth = 1;
     ctx.strokeRect(ox + 0.5, oy + 0.5, lw - 1, lh - 1);
-    if (hover && !panning && (!altHeld || sizeDrag)) {
+    if (lasso) drawLasso(s, ox, oy);
+    else if (hover && !panning && !P.nkdPaintLasso && (o.mask || !altHeld || sizeDrag)) {
       const r = Math.max(1.5, (sizePreview ?? P.nkdPaintSize) * s / 2);
       ctx.beginPath();
       ctx.arc(hover[0], hover[1], r, 0, Math.PI * 2);
@@ -17821,15 +18013,59 @@ function setupPaintWidget(node) {
       ctx.strokeStyle = "rgba(255,255,255,0.9)";
       ctx.lineWidth = 1;
       ctx.stroke();
-      if (hardPreview != null) {
+      const hard = hardPreview ?? P.nkdPaintHardness;
+      if (hard < 0.99) {
         ctx.beginPath();
-        ctx.arc(hover[0], hover[1], Math.max(0.5, r * hardPreview), 0, Math.PI * 2);
+        ctx.arc(hover[0], hover[1], Math.max(0.5, r * hard), 0, Math.PI * 2);
         ctx.setLineDash([3, 3]);
         ctx.strokeStyle = "rgba(255,255,255,0.7)";
         ctx.stroke();
         ctx.setLineDash([]);
       }
     }
+  }
+  let lasso = null;
+  let lassoDrag = null;
+  let lassoErase = false;
+  function drawLasso(s, ox, oy) {
+    if (!lasso) return;
+    const pts = lasso.map(([x, y]) => [x * s + ox, y * s + oy]);
+    if (hover && !lassoDrag) pts.push(hover);
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = lassoErase || eraserOn() ? "rgba(255,80,80,0.18)" : "rgba(74,180,255,0.18)";
+    ctx.fill();
+    ctx.setLineDash([4, 3]);
+    ctx.strokeStyle = "rgba(0,0,0,0.8)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.95)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(pts[0][0], pts[0][1], 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = "#fff";
+    ctx.fill();
+  }
+  const eraserOn = () => tool() === "eraser";
+  function closeLasso(alt) {
+    if (!lasso) return;
+    const pts = lasso;
+    lasso = null;
+    lassoDrag = null;
+    eraseNow = lassoErase || o.mask && alt;
+    L.fill(pts, P.nkdPaintSize / 2);
+    eraseNow = false;
+    lassoErase = false;
+    scheduleDraw();
+  }
+  function nearFirst(px, py) {
+    if (!lasso || lasso.length < 3) return false;
+    const v = view();
+    return Math.hypot(lasso[0][0] * v.s + v.ox - px, lasso[0][1] * v.s + v.oy - py) <= LASSO_SNAP;
   }
   let panning = false, picking = false;
   let sizeDrag = null;
@@ -17859,7 +18095,7 @@ function setupPaintWidget(node) {
     hover = null;
     scheduleDraw();
   });
-  cv.addEventListener("pointerdown", (e) => {
+  const onDown = (e) => {
     e.stopPropagation();
     e.preventDefault();
     try {
@@ -17879,16 +18115,34 @@ function setupPaintWidget(node) {
       hardPreview = P.nkdPaintHardness;
       return;
     }
-    if (e.altKey && e.button === 0) {
+    if (!o.mask && e.altKey && e.button === 0) {
       picking = true;
       pick(px, py);
       return;
     }
-    if (e.button !== 0) return;
-    const [lx, ly] = dispToLayer(px, py);
-    L.begin(lx, ly, radiusFor(P.nkdPaintSize, e));
+    if (e.button !== 0 && e.button !== 2) return;
+    const erase = e.button === 2 || o.mask && e.altKey;
+    const pt = dispToLayer(px, py);
+    if (P.nkdPaintLasso) {
+      if (nearFirst(px, py)) {
+        closeLasso(erase);
+        return;
+      }
+      const startedHere = !lasso;
+      if (startedHere) {
+        lasso = [pt];
+        lassoErase = erase;
+      } else lasso.push(pt);
+      lassoDrag = { startedHere, moved: false, last: [px, py] };
+      scheduleDraw();
+      return;
+    }
+    eraseNow = erase;
+    L.begin(pt[0], pt[1], radiusFor(P.nkdPaintSize, e));
     scheduleDraw();
-  });
+  };
+  cv.addEventListener("pointerdown", onDown);
+  cv._nkdAltDown = onDown;
   cv.addEventListener("pointermove", (e) => {
     e.stopPropagation();
     const [px, py] = eventDisp(e);
@@ -17905,6 +18159,12 @@ function setupPaintWidget(node) {
       hardInp.value = hardPreview.toFixed(2);
     } else if (picking) {
       pick(px, py);
+    } else if (lasso && lassoDrag) {
+      if (Math.hypot(px - lassoDrag.last[0], py - lassoDrag.last[1]) >= 2) {
+        lasso.push(dispToLayer(px, py));
+        lassoDrag.last = [px, py];
+        lassoDrag.moved = true;
+      }
     } else if (L.stroking) {
       const [lx, ly] = dispToLayer(px, py);
       L.to(lx, ly, radiusFor(P.nkdPaintSize, e));
@@ -17914,6 +18174,12 @@ function setupPaintWidget(node) {
   const endPointer = (e) => {
     e.stopPropagation();
     L.end();
+    eraseNow = false;
+    if (lasso && lassoDrag) {
+      const freehand = lassoDrag.startedHere && lassoDrag.moved;
+      lassoDrag = null;
+      if (freehand) closeLasso(e.button === 2 || e.altKey);
+    }
     if (sizeDrag) {
       if (sizePreview != null) {
         P.nkdPaintSize = sizePreview;
@@ -17934,6 +18200,10 @@ function setupPaintWidget(node) {
   };
   cv.addEventListener("pointerup", endPointer);
   cv.addEventListener("pointercancel", endPointer);
+  cv.addEventListener("dblclick", (e) => {
+    e.stopPropagation();
+    if (lasso) closeLasso(e.altKey);
+  });
   cv.addEventListener("wheel", (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -17958,6 +18228,17 @@ function setupPaintWidget(node) {
     const k = e.key;
     if (k === "Alt") {
       setAlt(true);
+      return;
+    }
+    if (lasso && (k === "Escape" || k === "Enter")) {
+      if (k === "Enter") closeLasso(altHeld);
+      else {
+        lasso = null;
+        lassoDrag = null;
+        scheduleDraw();
+      }
+      e.preventDefault();
+      e.stopImmediatePropagation();
       return;
     }
     if (k === " ") {
@@ -17990,9 +18271,20 @@ function setupPaintWidget(node) {
       case "E":
         P.nkdPaintTool = "eraser";
         break;
+      case "l":
+      case "L":
+        P.nkdPaintLasso = !P.nkdPaintLasso;
+        lasso = null;
+        break;
+      case "v":
+      case "V":
+        if (o.mask) cycleView(e.shiftKey);
+        else handled = false;
+        break;
       case "x":
       case "X":
-        setColor(P.nkdPaintColor.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff");
+        if (!o.mask) setColor(P.nkdPaintColor.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff");
+        else handled = false;
         break;
       case "[":
         P.nkdPaintSize = stepSize(P.nkdPaintSize, -1);
@@ -18018,12 +18310,13 @@ function setupPaintWidget(node) {
     if (e.key === " ") spaceHeld = false;
     if (e.key === "Alt") setAlt(false);
   };
-  window.addEventListener("keydown", onKeyDown, true);
-  window.addEventListener("keyup", onKeyUp, true);
-  window.addEventListener("blur", () => {
+  const onBlur = () => {
     spaceHeld = false;
     setAlt(false);
-  });
+  };
+  window.addEventListener("keydown", onKeyDown, true);
+  window.addEventListener("keyup", onKeyUp, true);
+  window.addEventListener("blur", onBlur);
   function setLayerValue(v) {
     var _a, _b, _c;
     if (layerW.value === v) return;
@@ -18046,10 +18339,10 @@ function setupPaintWidget(node) {
     try {
       const blob = await new Promise((r) => L.layer.toBlob(r, "image/png"));
       if (!blob) return;
-      const name = await sha1Name(blob);
+      const name = await sha1Name(blob, o.prefix);
       const fd = new FormData();
       fd.append("image", blob, name);
-      fd.append("subfolder", SUBFOLDER);
+      fd.append("subfolder", o.subfolder);
       fd.append("overwrite", "true");
       const res = await api.fetchApi("/upload/image", { method: "POST", body: fd });
       if (!res.ok) throw new Error(`upload ${res.status}`);
@@ -18059,7 +18352,7 @@ function setupPaintWidget(node) {
       console.warn("[NKD Paint] layer upload failed", err);
       (_c = (_b = (_a = app.extensionManager) == null ? void 0 : _a.toast) == null ? void 0 : _b.add) == null ? void 0 : _c.call(_b, {
         severity: "warn",
-        summary: "NKD Paint",
+        summary: o.title.replace("😺 ", "NKD "),
         detail: "Could not upload the painted layer.",
         life: 5e3
       });
@@ -18078,13 +18371,14 @@ function setupPaintWidget(node) {
       scheduleDraw();
       return;
     }
+    const legacy = o.mask && v.startsWith("$");
     const m = /^(.*?)\s*\[(\w+)\]$/.exec(v);
-    const clean = m ? m[1] : v;
+    const clean = legacy ? `${o.subfolder}/${String(node.id).replace(/:/g, "_")}_mask.png` : m ? m[1] : v;
     const cut = clean.lastIndexOf("/");
     const ref2 = {
       filename: cut >= 0 ? clean.slice(cut + 1) : clean,
       subfolder: cut >= 0 ? clean.slice(0, cut) : "",
-      type: m ? m[2] : "input"
+      type: m && !legacy ? m[2] : "input"
     };
     const img = new Image();
     img.onload = () => {
@@ -18094,14 +18388,14 @@ function setupPaintWidget(node) {
         cv.style.aspectRatio = `${w}/${h}`;
         mounted == null ? void 0 : mounted.resizeToContent();
       }
-      L.load(img);
+      L.load(legacy ? greyToAlpha(img, img.naturalWidth, img.naturalHeight) : img);
       scheduleDraw();
     };
     img.src = viewUrl$1(ref2);
   }
   const imageLinked = () => {
     var _a, _b;
-    return ((_b = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === "image")) == null ? void 0 : _b.link) != null;
+    return ((_b = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === o.input)) == null ? void 0 : _b.link) != null;
   };
   function setBase(b) {
     base = b;
@@ -18109,7 +18403,7 @@ function setupPaintWidget(node) {
     syncToolbar();
     scheduleDraw();
   }
-  const directRef = () => resolveSource(node, "image", 0);
+  const directRef = () => resolveSource(node, o.input, 0);
   function loadFile(ref2) {
     if (lastRef && ref2.filename === lastRef.filename && ref2.subfolder === lastRef.subfolder && ref2.type === lastRef.type) return;
     lastRef = ref2;
@@ -18142,7 +18436,7 @@ function setupPaintWidget(node) {
       if (base !== f) setBase(f);
       return;
     }
-    const far = resolveSource(node, "image");
+    const far = resolveSource(node, o.input);
     if (far) loadFile(far);
   }
   live$2.set(String(node.id), (b) => {
@@ -18176,6 +18470,7 @@ function setupPaintWidget(node) {
     scheduleDraw();
   });
   wrapCallback(bgW, scheduleDraw);
+  wrapCallback(modeW, scheduleDraw);
   const mounted = mountDomWidget(node, {
     name: "nkd_paint_editor",
     type: "NKD_PAINT",
@@ -18203,17 +18498,24 @@ function setupPaintWidget(node) {
   };
   const origConnChange = node.onConnectionsChange;
   node.onConnectionsChange = function(...args) {
+    var _a, _b;
     origConnChange == null ? void 0 : origConnChange.apply(this, args);
     syncDims();
     refreshSource();
+    if (o.mask && ((_b = (_a = node.inputs) == null ? void 0 : _a.find((i) => i.name === "mask")) == null ? void 0 : _b.link) == null && upstream) {
+      upstream = null;
+      scheduleDraw();
+    }
   };
   const refreshPoll = window.setInterval(refreshSource, 500);
   const origRemoved = node.onRemoved;
   node.onRemoved = function(...args) {
     clearInterval(refreshPoll);
+    cvObserver.disconnect();
     if (raf) cancelAnimationFrame(raf);
     window.removeEventListener("keydown", onKeyDown, true);
     window.removeEventListener("keyup", onKeyUp, true);
+    window.removeEventListener("blur", onBlur);
     live$2.delete(String(node.id));
     detachFine();
     mounted.release();
@@ -18227,8 +18529,23 @@ function setupPaintWidget(node) {
     ensureLayerSize();
     draw();
   });
+  return {
+    L,
+    row1,
+    adopt: (v) => {
+      clearTimeout(saveTimer2);
+      setLayerValue(v);
+      loadLayer(v);
+    },
+    setUpstream: (c) => {
+      upstream = c;
+      scheduleDraw();
+    },
+    upstream: () => upstream,
+    redraw: scheduleDraw
+  };
 }
-const NODE_NAME$5 = "NKDCrop";
+const NODE_NAME$6 = "NKDCrop";
 const EXT_NAME$4 = "NKD.BasicTools.Crop";
 console.log("[NKD Crop] rev 1.1.0");
 const frames = /* @__PURE__ */ new Map();
@@ -18401,7 +18718,7 @@ function registerCrop() {
   app.registerExtension({
     name: EXT_NAME$4,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$5) return;
+      if (nodeData.name !== NODE_NAME$6) return;
       if (nodeType.prototype.__nkdCropWrapped) return;
       nodeType.prototype.__nkdCropWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -19162,7 +19479,7 @@ const blendFrame = (mode, bg, fg, opacity, out) => {
   }
 };
 const isBlended = (mode) => mode in CHANNEL || mode in HSL;
-const NODE_NAME$4 = "NKDMerge";
+const NODE_NAME$5 = "NKDMerge";
 const EXT_NAME$3 = "NKD.BasicTools.Merge";
 console.log("[NKD Merge] rev 1.0.0");
 const DEFAULT = { x: 0.5, y: 0.5, scale: 1, angle: 0 };
@@ -19245,7 +19562,7 @@ function registerMerge() {
   app.registerExtension({
     name: EXT_NAME$3,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$4) return;
+      if (nodeData.name !== NODE_NAME$5) return;
       if (nodeType.prototype.__nkdMergeWrapped) return;
       nodeType.prototype.__nkdMergeWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -19889,7 +20206,7 @@ function rowsFrom(analysis) {
 }
 const openPanels = /* @__PURE__ */ new Set();
 const refreshAllPresets = () => Promise.all([...openPanels].map((f) => f()));
-const NODE_NAME$3 = "NKDLoraControl";
+const NODE_NAME$4 = "NKDLoraControl";
 const EXT_NAME$2 = "NKD.BasicTools.LoraControl";
 const ROW_H = 17;
 const PAD = 6;
@@ -19910,7 +20227,7 @@ const C = {
   handle: "#e8edf5",
   hint: "rgba(255,255,255,0.35)"
 };
-function setup$1(node) {
+function setup$2(node) {
   const blocksW = findW(node, "blocks");
   const loraW = findW(node, "lora_name");
   const strengthW = findW(node, "strength");
@@ -20650,19 +20967,19 @@ function registerLoraControl() {
   app.registerExtension({
     name: EXT_NAME$2,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$3) return;
+      if (nodeData.name !== NODE_NAME$4) return;
       if (nodeType.prototype.__nkdLoraWrapped) return;
       nodeType.prototype.__nkdLoraWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function(...args) {
         const r = origCreated == null ? void 0 : origCreated.apply(this, args);
-        setup$1(this);
+        setup$2(this);
         return r;
       };
     }
   });
 }
-const NODE_NAME$2 = "NKDLoader";
+const NODE_NAME$3 = "NKDLoader";
 const SETTING = "NKD.Loader.Presets";
 const MAX_OUTPUTS = 10;
 console.log("[NKD Loader] rev 1.0.0");
@@ -20823,7 +21140,7 @@ async function repack(group) {
   const got = await capture(inside, new Set(external.map((e) => e.src)));
   if (typeof got === "string") return toast("warn", got);
   if (!await savePreset(got.recipe, group.flags[GROUP_FLAG])) return;
-  const loader = LG().createNode(NODE_NAME$2);
+  const loader = LG().createNode(NODE_NAME$3);
   graph.add(loader);
   loader.pos = [group.pos[0], group.pos[1] + group.titleHeight];
   applyRecipe(loader, got.recipe);
@@ -20882,7 +21199,7 @@ function applyToNodes(name, recipe) {
   const graphs = [app.rootGraph, ...((_b = (_a = app.rootGraph) == null ? void 0 : _a.subgraphs) == null ? void 0 : _b.values()) ?? []];
   let hit = false;
   for (const g of graphs) for (const node of (g == null ? void 0 : g.nodes) ?? []) {
-    if (node.type !== NODE_NAME$2 || ((_d = parse((_c = findW(node, "recipe")) == null ? void 0 : _c.value)) == null ? void 0 : _d.name) !== name) continue;
+    if (node.type !== NODE_NAME$3 || ((_d = parse((_c = findW(node, "recipe")) == null ? void 0 : _c.value)) == null ? void 0 : _d.name) !== name) continue;
     applyRecipe(node, recipe);
     hit = true;
   }
@@ -21107,12 +21424,12 @@ function registerLoader() {
     getNodeMenuItems(node) {
       var _a;
       const items = [];
-      if (node.type === NODE_NAME$2) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
+      if (node.type === NODE_NAME$3) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
       if ((_a = app.canvas.selected_nodes) == null ? void 0 : _a[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
       return items.length ? [null, ...items] : [];
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeData.name !== NODE_NAME$3) return;
       if (nodeType.prototype.__nkdWrapped) return;
       nodeType.prototype.__nkdWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -21142,7 +21459,7 @@ function registerLoader() {
     }
   });
 }
-const NODE_NAME$1 = "NKDMaskPicker";
+const NODE_NAME$2 = "NKDMaskPicker";
 const EXT_NAME$1 = "NKD.BasicTools.MaskPicker";
 console.log("[NKD Mask Picker] rev 2");
 const HOVER = [74, 180, 255], CUT = [70, 70, 70];
@@ -21707,13 +22024,13 @@ function registerMaskPicker() {
       }
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeData.name !== NODE_NAME$2) return;
       if (nodeType.prototype.__nkdMaskPickerWrapped) return;
       nodeType.prototype.__nkdMaskPickerWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function() {
         const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
-        setup(this);
+        setup$1(this);
         return r;
       };
       const origExecuted = nodeType.prototype.onExecuted;
@@ -21726,7 +22043,7 @@ function registerMaskPicker() {
     }
   });
 }
-function setup(node) {
+function setup$1(node) {
   const selW = findW(node, "selection");
   if (!selW) return;
   hideWidget(selW);
@@ -21831,6 +22148,84 @@ function setup(node) {
   };
   load();
 }
+const NODE_NAME$1 = "NKDMaskPainter";
+const MASK_COLOR = "#1e3a1e", MASK_BG = "#0f1f0f";
+function runNode(node) {
+  if (node.graph === app.rootGraph) app.queuePrompt(0, 1, { queueNodeIds: [String(node.id)] });
+  else app.queuePrompt(0, 1);
+}
+function setup(node) {
+  const h = setupPaintWidget(node, {
+    widget: "image",
+    input: "images",
+    subfolder: "nkd_masks",
+    prefix: "nkd_mask_",
+    title: "😺 Mask Painter",
+    mask: true,
+    onClear: () => runNode(node)
+  });
+  if (!h) return;
+  const layerW = node.widgets.find((w) => w.name === "image");
+  const reseed = document.createElement("button");
+  reseed.title = "Copy the upstream mask into the canvas, on top of what you painted (undoable)";
+  reseed.textContent = "Reseed";
+  reseed.style.cssText = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 7px;cursor:pointer;flex:0 0 auto;height:22px;";
+  reseed.addEventListener("click", () => {
+    var _a, _b, _c;
+    const up = h.upstream();
+    if (up) {
+      h.L.paste(up);
+      return;
+    }
+    (_c = (_b = (_a = app.extensionManager) == null ? void 0 : _a.toast) == null ? void 0 : _b.add) == null ? void 0 : _c.call(_b, {
+      severity: "info",
+      summary: "NKD Mask Painter",
+      detail: "Run the node once with a mask connected first.",
+      life: 4e3
+    });
+  });
+  h.row1.insertBefore(reseed, h.row1.querySelector("button[title='Clear the layer']"));
+  const origExecuted = node.onExecuted;
+  node.onExecuted = function(out) {
+    var _a;
+    origExecuted == null ? void 0 : origExecuted.apply(this, arguments);
+    if (out == null ? void 0 : out.nkd_layer) h.adopt(String(out.nkd_layer[0] ?? ""));
+    const ref2 = (_a = out == null ? void 0 : out.nkd_upstream) == null ? void 0 : _a[0];
+    if (!ref2) {
+      h.setUpstream(null);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => h.setUpstream(greyToAlpha(img, img.naturalWidth, img.naturalHeight));
+    img.src = `${viewUrl$1(ref2)}&t=${Date.now()}`;
+  };
+  const origBg = node.onDrawBackground;
+  node.onDrawBackground = function(...args) {
+    origBg == null ? void 0 : origBg.apply(this, args);
+    if (layerW == null ? void 0 : layerW.value) {
+      node.color = MASK_COLOR;
+      node.bgcolor = MASK_BG;
+    } else if (node.color === MASK_COLOR) {
+      delete node.color;
+      delete node.bgcolor;
+    }
+  };
+}
+function registerMaskPainter() {
+  app.registerExtension({
+    name: "NKD.BasicTools.MaskPainter",
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$1 || nodeType.prototype.__nkdMaskPainterWrapped) return;
+      nodeType.prototype.__nkdMaskPainterWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        setup(this);
+        return r;
+      };
+    }
+  });
+}
 guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDInpaintCrop: 1,
   NKDInpaintStitch: 1,
@@ -21872,6 +22267,7 @@ registerCrop();
 registerMerge();
 registerPaint();
 registerMaskPicker();
+registerMaskPainter();
 registerLoraControl();
 registerLoader();
 const NODE_NAME = "NKDPromptVariables";

@@ -53,7 +53,8 @@ flowchart LR
 
 ## Painting
 
-- `Brush` and `Eraser` buttons, or `B` and `E`.
+- `Brush` and `Eraser` buttons, or `B` and `E`. The right button erases with
+  either.
 - The colour swatch opens a picker. Two quick swatches sit next to it for white
   and black, and `X` swaps between them.
 - `Alt` + left click picks the colour under the cursor, image and strokes
@@ -69,8 +70,11 @@ flowchart LR
 - `Shift` while dragging any slider moves it at a tenth of the speed.
 - A pen's pressure scales the brush size.
 - `Ctrl+Z` undoes, `Ctrl+Shift+Z` or `Ctrl+Y` redoes. `Clear` wipes the layer.
+- `Lasso` (`L`) fills a shape instead of stroking. Drag to draw it freehand and it
+  fills when you let go, or click corner by corner and close it on the first point,
+  with a double-click or with `Enter`. `Esc` drops it. With the eraser it erases.
 - Mouse wheel zooms at the cursor, `Space` + drag or the middle button pans, `0`
-  fits the canvas again.
+  fits the canvas again. The full-screen button opens the same canvas large.
 
 ## Where the strokes live
 

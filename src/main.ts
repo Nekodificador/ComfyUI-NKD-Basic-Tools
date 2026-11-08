@@ -22,6 +22,7 @@ import { registerPaint, paintSource } from "./paint";
 import { registerLoraControl } from "./loraBlocks";
 import { registerLoader } from "./loader";
 import { registerMaskPicker } from "./maskPicker";
+import { registerMaskPainter } from "./maskPainter";
 
 // Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
 // skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
@@ -42,6 +43,7 @@ registerCrop();
 registerMerge();
 registerPaint();
 registerMaskPicker();
+registerMaskPainter();
 registerLoraControl();
 registerLoader();
 
@@ -1226,9 +1228,6 @@ api.addEventListener("nkd-source", (e: any) => {
  *
  * `app.queuePrompt` has no "just this node" form, so the serialised graph is
  * intercepted for a single call and trimmed to the node plus whatever feeds it.
- * The same trick as `js/mask_painter.js`, which cannot be imported from here —
- * it is a hand-written vanilla extension outside the Vite bundle, and wiring a
- * runtime import across that boundary is more fragile than the duplication.
  */
 function collectUpstream(nodeId: string, output: any, into: any): void {
   if (into[nodeId] || !output[nodeId]) return;

@@ -168,8 +168,6 @@ See which blocks of a LoRA actually do the work, then shape it block by block.
   😺NKD Film Grain shimmers on a video batch instead of sitting frozen on top.
 - [**KJNodes**](https://github.com/kijai/ComfyUI-KJNodes) — the mask nodes
   everyone reaches for first, and the bar 😺NKD Mask Ops had to clear.
-- [**rgthree-comfy**](https://github.com/rgthree/rgthree-comfy) — its widgets are
-  why the buttons in 😺NKD Mask Painter sit where they do.
 
 ## License
 

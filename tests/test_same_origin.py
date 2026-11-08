@@ -31,7 +31,6 @@ READ_ONLY = {
     "/nkd/colorwarp/source",
     "/nkd/merge/source",
     "/nkd/facerig/library",
-    "/nkd/paint/get",
 }
 _ROUTE = re.compile(r'routes\.(?:get|post|put|delete|route)\(\s*(?:"\*",\s*)?"([^"]+)"')
 
