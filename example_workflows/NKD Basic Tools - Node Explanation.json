@@ -1,0 +1,5472 @@
+{
+  "id": "bc520b6c-ca48-41f0-8fd1-2940d50d1d44",
+  "revision": 0,
+  "last_node_id": 136,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "NKDInpaintCrop",
+      "pos": [
+        60,
+        120
+      ],
+      "size": [
+        210,
+        330
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "localized_name": "Invert Mask",
+          "name": "invert_mask",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "invert_mask"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Fill Mask Holes",
+          "name": "fill_holes",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "fill_holes"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mask Expand",
+          "name": "mask_expand",
+          "type": "INT",
+          "widget": {
+            "name": "mask_expand"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mask Blur",
+          "name": "mask_blur",
+          "type": "INT",
+          "widget": {
+            "name": "mask_blur"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Inpaint Blend",
+          "name": "inpaint_blend",
+          "type": "FLOAT",
+          "widget": {
+            "name": "inpaint_blend"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Context Padding",
+          "name": "padding",
+          "type": "INT",
+          "widget": {
+            "name": "padding"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Resize Mode",
+          "name": "resize_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "resize_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Megapixels",
+          "name": "megapixels",
+          "type": "FLOAT",
+          "widget": {
+            "name": "megapixels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Longest Side",
+          "name": "longest_side",
+          "type": "INT",
+          "widget": {
+            "name": "longest_side"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Min Resolution",
+          "name": "min_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "min_resolution"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Max Resolution",
+          "name": "max_resolution",
+          "type": "INT",
+          "widget": {
+            "name": "max_resolution"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Separate Regions",
+          "name": "separate_regions",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "separate_regions"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Min Region Area %",
+          "name": "region_min_area",
+          "type": "FLOAT",
+          "widget": {
+            "name": "region_min_area"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Max Regions",
+          "name": "max_regions",
+          "type": "INT",
+          "widget": {
+            "name": "max_regions"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Region Order",
+          "name": "region_order",
+          "type": "COMBO",
+          "widget": {
+            "name": "region_order"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "links": null
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 6,
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 6,
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "shape": 6,
+          "type": "LATENT",
+          "links": null
+        },
+        {
+          "localized_name": "crop_data",
+          "name": "crop_data",
+          "shape": 6,
+          "type": "NKD_CROPDATA",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDInpaintCrop",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        false,
+        true,
+        20,
+        10,
+        1,
+        50,
+        "Automatic",
+        1,
+        1024,
+        768,
+        2048,
+        false,
+        0.1,
+        8,
+        "Largest First"
+      ],
+      "widgets_values_named": {
+        "invert_mask": false,
+        "fill_holes": true,
+        "mask_expand": 20,
+        "mask_blur": 10,
+        "inpaint_blend": 1,
+        "padding": 50,
+        "resize_mode": "Automatic",
+        "megapixels": 1,
+        "longest_side": 1024,
+        "min_resolution": 768,
+        "max_resolution": 2048,
+        "separate_regions": false,
+        "region_min_area": 0.1,
+        "max_regions": 8,
+        "region_order": "Largest First"
+      }
+    },
+    {
+      "id": 101,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Inpaint Crop\nCrops the masked area and hands it to the sampler at the resolution the model likes, so you can retouch one part of the image without regenerating the rest.\n\n### Mask cleanup\n`Invert Mask`, `Fill Mask Holes`, `Mask Expand` and `Mask Blur` save you the four nodes that would normally go in front.\n\n### Context Padding\nHow much of the surrounding image goes into the crop. More context helps the edit fit the scene.\n\n### Resize Mode\n- **Automatic**: keeps the native resolution and only rescales when the crop falls outside `Min Resolution` / `Max Resolution`.\n- **Megapixels**: the crop always has the same pixel budget.\n- **Longest Side**: the long side is exactly what you set.\n\nThe crop always contains the whole mask, however elongated it is.\n\n### Separate Regions\nEach separate blob of the mask gets its own crop at its own resolution. The sampler runs once per region with no extra wiring, and the Stitch puts them all back at once. Connect a batch of masks (the Mask Picker's `separated masks`, for example) and it makes one crop per mask.\n\n### model and vae\nOptional. Connect them and you get back a prepared model and a `latent` ready to sample, with nothing between this node and the KSampler.\n\nThe blue play button runs only this branch, so you can frame the crop without running the whole workflow.",
+        "targets": [
+          {
+            "node": "1",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 1,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Inpaint Crop\nRecorta la zona de la máscara y se la pasa al sampler a la resolución que le gusta al modelo, para retocar una parte de la imagen sin volver a generar el resto.\n\n### Limpieza de máscara\n`Invert Mask`, `Fill Mask Holes`, `Mask Expand` y `Mask Blur` te ahorran los cuatro nodos que normalmente irían delante.\n\n### Context Padding\nCuánta imagen de alrededor entra en el recorte. Más contexto ayuda a que la edición encaje con la escena.\n\n### Resize Mode\n- **Automatic**: mantiene la resolución nativa y solo reescala si el recorte se sale de `Min Resolution` / `Max Resolution`.\n- **Megapixels**: el recorte siempre tiene el mismo presupuesto de píxeles.\n- **Longest Side**: el lado largo mide exactamente lo que digas.\n\nEl recorte siempre contiene la máscara entera, aunque sea muy alargada.\n\n### Separate Regions\nCada mancha separada de la máscara tiene su propio recorte a su propia resolución. El sampler se ejecuta una vez por región sin cableado extra y el Stitch las devuelve todas de una vez. Si le conectas un batch de máscaras (por ejemplo las `separated masks` del Mask Picker) hace un recorte por máscara.\n\n### model y vae\nOpcionales. Si los conectas, te devuelve un modelo preparado y un `latent` listo para samplear, sin nada entre este nodo y el KSampler.\n\nEl botón azul de play ejecuta solo esta rama, para que puedas encuadrar el recorte sin lanzar todo el workflow."
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "NKDInpaintStitch",
+      "pos": [
+        510,
+        120
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "crop_data",
+          "name": "crop_data",
+          "type": "NKD_CROPDATA",
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Edge Hardness",
+          "name": "edge_hardness",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edge_hardness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Match Colors",
+          "name": "match_colors",
+          "type": "FLOAT",
+          "widget": {
+            "name": "match_colors"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Seamless Edges",
+          "name": "seamless_edges",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "seamless_edges"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDInpaintStitch",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        10,
+        0,
+        0,
+        false
+      ],
+      "widgets_values_named": {
+        "feather": 10,
+        "edge_hardness": 0,
+        "match_colors": 0,
+        "seamless_edges": false
+      }
+    },
+    {
+      "id": 102,
+      "type": "NKDHint",
+      "pos": [
+        470,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Inpaint Stitch\nPuts the sampled crop back into the original image at full resolution, with no visible seam.\n\n### Feather / Edge Hardness\n`Feather` softens the edge of the patch. Raise `Edge Hardness` if you see the original background showing through as a halo.\n\n### Match Colors\nCorrects the slight colour and brightness drift models introduce, so the patch belongs to the same scene.\n\n### Seamless Edges\nAn extra pass for stubborn seams. Needs OpenCV.",
+        "targets": [
+          {
+            "node": "2",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 2,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Inpaint Stitch\nDevuelve el recorte ya sampleado a la imagen original a resolución completa, sin que se note la costura.\n\n### Feather / Edge Hardness\n`Feather` suaviza el borde del parche. Sube `Edge Hardness` si ves el fondo original asomando como un halo.\n\n### Match Colors\nCorrige la pequeña deriva de color y brillo que meten los modelos, para que el parche pertenezca a la misma escena.\n\n### Seamless Edges\nUna pasada extra para las costuras que se resisten. Necesita OpenCV."
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "NKDCrop",
+      "pos": [
+        920,
+        120
+      ],
+      "size": [
+        210,
+        456
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE,MASK,VIDEO",
+          "link": null
+        },
+        {
+          "localized_name": "region",
+          "name": "region",
+          "type": "STRING",
+          "widget": {
+            "name": "region"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Outpaint Fill",
+          "name": "fill",
+          "type": "COMBO",
+          "widget": {
+            "name": "fill"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Fill Color",
+          "name": "fill_color",
+          "type": "COLOR",
+          "widget": {
+            "name": "fill_color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Max Megapixels",
+          "name": "max_megapixels",
+          "type": "FLOAT",
+          "widget": {
+            "name": "max_megapixels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Divisible By",
+          "name": "divisible_by",
+          "type": "COMBO",
+          "widget": {
+            "name": "divisible_by"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mode",
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Resize Method",
+          "name": "resize_method",
+          "type": "COMBO",
+          "widget": {
+            "name": "resize_method"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "localized_name": "crop_data",
+          "name": "crop_data",
+          "type": "NKD_MANUAL_CROPDATA",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDCrop",
+        "nkdSchema": 1,
+        "nkdCropAspect": "Free"
+      },
+      "widgets_values": [
+        "",
+        "edge",
+        "#000000",
+        0,
+        "disabled",
+        "Crop",
+        "lanczos",
+        ""
+      ],
+      "widgets_values_named": {
+        "region": "",
+        "fill": "edge",
+        "fill_color": "#000000",
+        "max_megapixels": 0,
+        "divisible_by": "disabled",
+        "mode": "Crop",
+        "resize_method": "lanczos",
+        "nkd_crop_editor": ""
+      }
+    },
+    {
+      "id": 103,
+      "type": "NKDHint",
+      "pos": [
+        880,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Crop / Outpaint\nDraw the crop on the image itself instead of typing four numbers. Works with images, masks and video.\n\n### In the preview\n- Drag on empty space to draw a rectangle, inside it to move it and on the handles to resize it.\n- The top handle rotates; with `Shift` it snaps in 15° steps.\n- Edges snap to the image's edges; `Alt` turns that off.\n- **Aspect** locks the proportion (1:1, 4:5, 9:16…). On video you get a scrub bar to check the framing holds for the whole shot.\n\n### Mode\n- **Crop**: the rectangle stays inside the image.\n- **Outpaint**: you can drag it past the edge to extend the canvas. The new area comes out white in `mask`, ready to generate.\n\n### Outpaint Fill\nWhat sits under the extended area so the sampler has something to start from: **edge** repeats the border, **reflect** mirrors the image, a flat colour, or **transparent**.\n\n### Divisible By / Max Megapixels\n`Divisible By` fits the rectangle to the model's pixel grid, so it doesn't rescale every frame behind your back. `Max Megapixels` brings the result to that budget, up or down.",
+        "targets": [
+          {
+            "node": "3",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 3,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Crop / Outpaint\nDibuja el recorte sobre la propia imagen en vez de escribir cuatro números. Funciona con imágenes, máscaras y vídeo.\n\n### En el preview\n- Arrastra en vacío para dibujar un rectángulo, dentro para moverlo y por los tiradores para redimensionarlo.\n- El tirador de arriba rota; con `Shift` salta de 15° en 15°.\n- Los bordes se pegan a los de la imagen; `Alt` lo desactiva.\n- **Aspect** bloquea la proporción (1:1, 4:5, 9:16…). En vídeo tienes una barra para comprobar que el encuadre aguanta todo el plano.\n\n### Mode\n- **Crop**: el rectángulo se queda dentro de la imagen.\n- **Outpaint**: puedes sacarlo fuera del borde para ampliar el lienzo. La zona nueva sale en `mask` en blanco, lista para generar.\n\n### Outpaint Fill\nQué hay debajo de la zona ampliada para que el sampler tenga de dónde partir: **edge** repite el borde, **reflect** refleja la imagen, un color plano o **transparent**.\n\n### Divisible By / Max Megapixels\n`Divisible By` ajusta el rectángulo a la rejilla de píxeles del modelo, para que no reescale cada frame a tus espaldas. `Max Megapixels` lleva el resultado a ese presupuesto, hacia arriba o hacia abajo."
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "NKDCropStitch",
+      "pos": [
+        1430,
+        120
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "crop_data",
+          "name": "crop_data",
+          "type": "NKD_MANUAL_CROPDATA",
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Edge Hardness",
+          "name": "edge_hardness",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edge_hardness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Match Colors",
+          "name": "match_colors",
+          "shape": 7,
+          "type": "FLOAT",
+          "widget": {
+            "name": "match_colors"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Seamless Edges",
+          "name": "seamless_edges",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "seamless_edges"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDCropStitch",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        10,
+        0,
+        0,
+        false
+      ],
+      "widgets_values_named": {
+        "feather": 10,
+        "edge_hardness": 0,
+        "match_colors": 0,
+        "seamless_edges": false
+      }
+    },
+    {
+      "id": 104,
+      "type": "NKDHint",
+      "pos": [
+        1390,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Crop / Outpaint Stitch\nPuts the patch back into the original: it undoes the rotation and rescaling and composites it at full resolution. A tilted crop comes back with the same tilt.\n\n### Feather / Edge Hardness\n`Feather` softens the edge, always inwards, so no frame is left around it. `Edge Hardness` hardens the blend if the original background shows through as a halo.\n\n### Match Colors / Seamless Edges\nSame as in Inpaint Stitch: they match the patch's colour to the scene and hide stubborn seams.",
+        "targets": [
+          {
+            "node": "4",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 4,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Crop / Outpaint Stitch\nDevuelve el parche al original: deshace la rotación y el reescalado y lo compone a resolución completa. Un recorte inclinado vuelve con la misma inclinación.\n\n### Feather / Edge Hardness\n`Feather` suaviza el borde, siempre hacia dentro, para que no quede un marco alrededor. `Edge Hardness` endurece la mezcla si el fondo original asoma como un halo.\n\n### Match Colors / Seamless Edges\nIgual que en Inpaint Stitch: igualan el color del parche con la escena y disimulan las costuras que se resisten."
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "NKDFrequencySeparate",
+      "pos": [
+        1840,
+        120
+      ],
+      "size": [
+        320,
+        466
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Method",
+          "name": "method",
+          "type": "COMBO",
+          "widget": {
+            "name": "method"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Radius",
+          "name": "radius",
+          "type": "INT",
+          "widget": {
+            "name": "radius"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Edge Threshold",
+          "name": "edge_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edge_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mode",
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Detail Channel",
+          "name": "detail",
+          "type": "COMBO",
+          "widget": {
+            "name": "detail"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Linear Light",
+          "name": "linear",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "linear"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "high_frequency",
+          "name": "high_frequency",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "low_frequency",
+          "name": "low_frequency",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "high_frequency_masked",
+          "name": "high_frequency_masked",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFrequencySeparate",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "Guided",
+        8,
+        0.1,
+        "Divide",
+        "Luminance",
+        true,
+        ""
+      ],
+      "widgets_values_named": {
+        "method": "Guided",
+        "radius": 8,
+        "edge_threshold": 0.1,
+        "mode": "Divide",
+        "detail": "Luminance",
+        "linear": true,
+        "freq_preview": ""
+      }
+    },
+    {
+      "id": 105,
+      "type": "NKDHint",
+      "pos": [
+        1800,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Frequency Separate\nSplits an image into a smooth base (low frequency) and a detail layer (high frequency). The typical use is getting skin or fabric texture back after a relight.\n\n### Method\n- **Gaussian**: the classic, fast.\n- **Guided**: respects edges and leaves no halos.\n- **Rolling Guidance**: removes texture by size while keeping the shapes.\n- **Median**: for spot blemishes.\n\n`Radius` decides at what scale the detail lives.\n\n### Mode / Detail Channel / Linear Light\n**Divide** doesn't depend on lighting, so it's the one for moving detail between differently lit images. **Luminance** keeps the detail colourless so recombining doesn't shift the hue. These settings must match the Combine's.\n\n### Preview\nThe slider splits high and low frequency so you can see what each layer holds. The `1:1` button shows the detail at real resolution, the only way to judge it properly.",
+        "targets": [
+          {
+            "node": "5",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 5,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Frequency Separate\nSepara una imagen en una base suave (baja frecuencia) y una capa de detalle (alta frecuencia). El uso típico es recuperar la textura de piel o tela después de un relight.\n\n### Method\n- **Gaussian**: el clásico, rápido.\n- **Guided**: respeta los bordes y no hace halos.\n- **Rolling Guidance**: borra textura por tamaño manteniendo las formas.\n- **Median**: para imperfecciones puntuales.\n\n`Radius` decide a qué escala está el detalle.\n\n### Mode / Detail Channel / Linear Light\n**Divide** no depende de la iluminación, así que es la buena para pasar detalle entre imágenes iluminadas distinto. **Luminance** mantiene el detalle sin color para que al recombinar no cambie el tono. Estos ajustes tienen que coincidir con los del Combine.\n\n### Preview\nLa barra separa alta y baja frecuencia para que veas qué tiene cada capa. El botón `1:1` muestra el detalle a resolución real, la única forma de juzgarlo bien."
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "NKDFrequencyCombine",
+      "pos": [
+        2330,
+        120
+      ],
+      "size": [
+        320,
+        220
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "high_frequency",
+          "name": "high_frequency",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "low_frequency",
+          "name": "low_frequency",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Mode",
+          "name": "mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Linear Light",
+          "name": "linear",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "linear"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Detail Strength",
+          "name": "detail_strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "detail_strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mask Feather",
+          "name": "mask_feather",
+          "type": "FLOAT",
+          "widget": {
+            "name": "mask_feather"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFrequencyCombine",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "Divide",
+        true,
+        1,
+        0
+      ],
+      "widgets_values_named": {
+        "mode": "Divide",
+        "linear": true,
+        "detail_strength": 1,
+        "mask_feather": 0
+      }
+    },
+    {
+      "id": 106,
+      "type": "NKDHint",
+      "pos": [
+        2290,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Frequency Combine\nPuts the two layers back together. Connect the original's `high_frequency` and the relit image's `low_frequency` and you get the new image with its micro-detail intact.\n\n### Detail Strength\nHow much detail comes back. Below 1 softens, above 1 sharpens it.\n\n### mask / Mask Feather\nOptional: limits the detail to one area, only the skin for example, with a soft edge.\n\n`Mode` and `Linear Light` must be the same as in the Separate.",
+        "targets": [
+          {
+            "node": "6",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 6,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Frequency Combine\nVuelve a juntar las dos capas. Conecta la `high_frequency` del original y la `low_frequency` de la imagen reiluminada y recuperas la imagen nueva con su microdetalle intacto.\n\n### Detail Strength\nCuánto detalle vuelve. Por debajo de 1 suaviza, por encima lo marca más.\n\n### mask / Mask Feather\nOpcional: limita el detalle a una zona, solo la piel por ejemplo, con un borde suave.\n\n`Mode` y `Linear Light` tienen que ser los mismos que en el Separate."
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "NKDMaskOps",
+      "pos": [
+        60,
+        990
+      ],
+      "size": [
+        210,
+        386
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "vae",
+          "name": "vae",
+          "shape": 7,
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "localized_name": "Invert",
+          "name": "invert",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "invert"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Black Point",
+          "name": "black_point",
+          "type": "FLOAT",
+          "widget": {
+            "name": "black_point"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "White Point",
+          "name": "white_point",
+          "type": "FLOAT",
+          "widget": {
+            "name": "white_point"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Remove Specks",
+          "name": "despeckle",
+          "type": "INT",
+          "widget": {
+            "name": "despeckle"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Fill Holes",
+          "name": "fill_holes",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "fill_holes"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Close Gaps",
+          "name": "close_gaps",
+          "type": "INT",
+          "widget": {
+            "name": "close_gaps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Expand In Time",
+          "name": "temporal_expand",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_expand"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Smooth In Time",
+          "name": "temporal_smooth",
+          "type": "INT",
+          "widget": {
+            "name": "temporal_smooth"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Expand / Contract",
+          "name": "expand",
+          "type": "INT",
+          "widget": {
+            "name": "expand"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Blockify",
+          "name": "blockify",
+          "type": "INT",
+          "widget": {
+            "name": "blockify"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Block Coverage",
+          "name": "blockify_threshold",
+          "type": "FLOAT",
+          "widget": {
+            "name": "blockify_threshold"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Edge Low",
+          "name": "edge_low",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edge_low"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Edge High",
+          "name": "edge_high",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edge_high"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "mask_inverted",
+          "name": "mask_inverted",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "latent_mask",
+          "name": "latent_mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDMaskOps",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        false,
+        0,
+        1,
+        0,
+        false,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0.5,
+        0,
+        0,
+        1
+      ],
+      "widgets_values_named": {
+        "invert": false,
+        "black_point": 0,
+        "white_point": 1,
+        "despeckle": 0,
+        "fill_holes": false,
+        "close_gaps": 0,
+        "temporal_expand": 0,
+        "temporal_smooth": 0,
+        "expand": 0,
+        "blockify": 0,
+        "blockify_threshold": 0.5,
+        "feather": 0,
+        "edge_low": 0,
+        "edge_high": 1
+      }
+    },
+    {
+      "id": 107,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        920
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Mask Ops\nPrepares a mask in one node instead of six, without mask cleanup being the slow part of a video workflow: the whole batch goes to the GPU at once. Anything left at 0 is skipped.\n\n### Black Point / White Point\nRemoves the haze a segmentation model leaves. Set both to the same value for a hard threshold.\n\n### Remove Specks / Fill Holes / Close Gaps\nRemoves specks, fills holes and closes cracks. What survives keeps its exact outline, so fingers and hair aren't lost.\n\n### Expand / Contract and Feather\nGrows or shrinks the mask and softens its edge.\n\n### Blockify\nFits the mask to a grid of squares so it survives the trip to latent space without bleeding into neighbouring blocks. Connect your `vae` and it sets itself up.\n\n### Expand In Time / Smooth In Time\nFor video: covers what the mask covered a few frames before and after, and stops the edge from flickering.\n\n### latent_mask\nWith a VAE connected, the same mask already reduced to latent resolution. Use it in Set Latent Noise Mask on video so it arrives exactly as you built it.",
+        "targets": [
+          {
+            "node": "7",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 7,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Mask Ops\nPrepara una máscara en un nodo en vez de seis, y sin que la limpieza de máscaras sea lo lento de un workflow de vídeo: todo el batch va a la GPU de una vez. Lo que dejes a 0 se salta.\n\n### Black Point / White Point\nQuita el halo que deja un modelo de segmentación. Pon los dos al mismo valor para un umbral duro.\n\n### Remove Specks / Fill Holes / Close Gaps\nElimina motas, rellena agujeros y cierra grietas. Lo que sobrevive mantiene su contorno exacto, así que dedos y pelo no se pierden.\n\n### Expand / Contract y Feather\nCrece o encoge la máscara y suaviza su borde.\n\n### Blockify\nAjusta la máscara a una rejilla de cuadrados para que sobreviva al paso a espacio latente sin invadir los bloques vecinos. Si conectas tu `vae` se configura solo.\n\n### Expand In Time / Smooth In Time\nPara vídeo: cubre lo que la máscara cubría unos frames antes y después, y evita que el borde parpadee.\n\n### latent_mask\nCon un VAE conectado, la misma máscara ya reducida a resolución latente. Úsala en Set Latent Noise Mask con vídeo para que llegue tal y como la construiste."
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "NKDMaskOpsLean",
+      "pos": [
+        490,
+        990
+      ],
+      "size": [
+        320,
+        140
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Fill Holes",
+          "name": "fill_holes",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "fill_holes"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Expand / Contract",
+          "name": "expand",
+          "type": "INT",
+          "widget": {
+            "name": "expand"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "mask_inverted",
+          "name": "mask_inverted",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDMaskOpsLean",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        false,
+        0,
+        0
+      ],
+      "widgets_values_named": {
+        "fill_holes": false,
+        "expand": 0,
+        "feather": 0
+      }
+    },
+    {
+      "id": 108,
+      "type": "NKDHint",
+      "pos": [
+        450,
+        920
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Mask Ops Lean\nThe three settings a composite really needs: `Fill Holes`, `Expand / Contract` and `Feather`. Same engine and same speed as Mask Ops, without the rest of the panel.\n\nExpanding 200 px costs almost the same as expanding 8, and 81 frames take under half a second.\n\nUse the full Mask Ops when you need levels, speck removal, blockify or the time steps.",
+        "targets": [
+          {
+            "node": "8",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 8,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Mask Ops Lean\nLos tres ajustes que de verdad necesita una composición: `Fill Holes`, `Expand / Contract` y `Feather`. Mismo motor y misma velocidad que Mask Ops, sin el resto del panel.\n\nExpandir 200 px cuesta casi lo mismo que expandir 8, y 81 frames tardan menos de medio segundo.\n\nUsa el Mask Ops completo cuando necesites niveles, quitar motas, blockify o los pasos temporales."
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "NKDMaskPainter",
+      "pos": [
+        900,
+        990
+      ],
+      "size": [
+        376,
+        561
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "STRING",
+          "widget": {
+            "name": "image"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "On Image Change",
+          "name": "on_image_change",
+          "type": "COMBO",
+          "widget": {
+            "name": "on_image_change"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mask Input Mode",
+          "name": "mask_input_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "mask_input_mode"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "MASK",
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "MASK (inverted)",
+          "name": "MASK (inverted)",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDMaskPainter",
+        "nkdSchema": 1,
+        "nkdPaintTool": "brush",
+        "nkdPaintColor": "#ffffff",
+        "nkdPaintSize": 24,
+        "nkdPaintOpacity": 1,
+        "nkdPaintHardness": 0.8,
+        "nkdPaintBase": 1,
+        "nkdPaintLasso": false,
+        "nkdMaskView": "overlay"
+      },
+      "widgets_values": [
+        "",
+        "clear_mask",
+        "Use as start",
+        ""
+      ],
+      "widgets_values_named": {
+        "image": "",
+        "on_image_change": "clear_mask",
+        "mask_input_mode": "Use as start",
+        "nkd_paint_editor": ""
+      },
+      "color": "#1e3a1e",
+      "bgcolor": "#0f1f0f"
+    },
+    {
+      "id": 109,
+      "type": "NKDHint",
+      "pos": [
+        860,
+        920
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Mask Painter\nLets you paint a mask straight onto your image and, more importantly, keep everything that came before. Use this node to combine and edit several masks in a chain, or to branch off alternative paths with different settings in complex inpainting workflows that start from a single image.\n\n### Painting\n- **Brush** and **Eraser** (`B`, `E`). The right button erases, and so does either tool with `Alt` held.\n- **Lasso** (`L`) fills a shape: drag it freehand, or click corner by corner and close it on the first point, with a double-click or with `Enter`.\n- **Size**, **Opacity** and **Hard** work for the lasso too: hardness softens its edge.\n- `V` switches the view: mask over the image, outside dimmed, or mask alone. `Shift+V` hides the mask so you can judge an edge.\n\n### mask / Mask Input Mode\nYou can start from a mask that comes from earlier (a detector, a segmenter, a Vector Mask) and retouch it by hand:\n- **Use as start**: copies it into the canvas when nothing is painted yet, and then your retouches rule.\n- **Replace**: copies it into the canvas every time it changes.\n- **Add** / **Subtract** / **Intersect**: combines it with what you painted without touching it. The canvas shows you the result.\n- **Disconnected**: ignores it.\n\n**Reseed** copies the input mask on top of what you painted, and can be undone.\n\n### On Image Change\nIf the image changes, **clear_mask** wipes the mask and **keep_mask** keeps it.\n\nIt's the node for stacking masks: chain several and every step stays editable. The node turns green when it carries a mask.",
+        "targets": [
+          {
+            "node": "9",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 9,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Mask Painter\nTe permite pintar una máscara directamente sobre tu imagen, pero mucho más importante, respetando todo lo anterior. Usa este nodo para combinar y editar múltiples máscaras en cadena o crear caminos alternativos con ajustes distintos en workflows complejos de inpainting partiendo de una sola imagen.\n\n### Pintar\n- **Brush** y **Eraser** (`B`, `E`). El botón derecho borra, y también cualquiera de los dos con `Alt` pulsado.\n- **Lasso** (`L`) rellena una forma: arrástrala a mano alzada o ve haciendo clic esquina a esquina y ciérrala en el primer punto, con doble clic o con `Enter`.\n- **Size**, **Opacity** y **Hard** valen también para el lazo: la dureza le suaviza el borde.\n- `V` cambia la vista: máscara sobre la imagen, fuera oscurecido o máscara sola. `Shift+V` oculta la máscara para juzgar un borde.\n\n### mask / Mask Input Mode\nPuedes partir de una máscara que venga de antes (un detector, un segmentador, un Vector Mask) y retocarla a mano:\n- **Use as start**: la copia al lienzo si no hay nada pintado y luego mandan tus retoques.\n- **Replace**: la copia al lienzo cada vez que cambia.\n- **Add** / **Subtract** / **Intersect**: la combina con lo que hayas pintado sin tocarlo. El lienzo te enseña el resultado.\n- **Disconnected**: la ignora.\n\n**Reseed** copia la máscara de entrada encima de lo que hayas pintado, y se puede deshacer.\n\n### On Image Change\nSi la imagen cambia, **clear_mask** borra la máscara y **keep_mask** la conserva.\n\nEs el nodo para apilar máscaras: encadena varios y cada paso sigue siendo editable. El nodo se pone verde cuando lleva una máscara."
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "NKDMaskPicker",
+      "pos": [
+        1330,
+        990
+      ],
+      "size": [
+        420,
+        448
+      ],
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "localized_name": "edges",
+          "name": "edges",
+          "type": "COMFY_DYNAMICCOMBO_V3",
+          "widget": {
+            "name": "edges"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "edge_margin",
+          "name": "edges.edge_margin",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edges.edge_margin"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Points Only",
+          "name": "points_only",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "points_only"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Detail Level",
+          "name": "detail",
+          "type": "COMBO",
+          "widget": {
+            "name": "detail"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "selection",
+          "name": "selection",
+          "type": "STRING",
+          "widget": {
+            "name": "selection"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "combined mask",
+          "name": "combined mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "separated masks",
+          "name": "separated masks",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "bboxes",
+          "name": "bboxes",
+          "type": "BOUNDING_BOX",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDMaskPicker",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "vitmatte",
+        0.08,
+        false,
+        "normal",
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "edges": "vitmatte",
+        "edges.edge_margin": 0.08,
+        "points_only": false,
+        "detail": "normal",
+        "selection": "",
+        "picker": ""
+      }
+    },
+    {
+      "id": 110,
+      "type": "NKDHint",
+      "pos": [
+        1290,
+        920
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Mask Picker\nPick objects for a mask by pointing at them. Needs a SAM 3 checkpoint connected to `model`.\n\n### In the preview\n- **Analyze** finds every object in the image.\n- Hover to see what's underneath and click to pick it. Another click removes it.\n- The wheel steps to a bigger or smaller object under the cursor.\n- `Shift` adds, `Alt` subtracts, and dragging picks everything you cross.\n- If SAM hasn't found anything in an area, you can click to drop a point and force it to look right there.\n\n### Points Only\nFor difficult images: you place each object's positive and negative points yourself.\n\n### edges\n**vitmatte** gives soft edges on hair and fur; **sam** keeps SAM's hard edge.\n\n### Detail Level\nHow many objects Analyze lists. Higher finds smaller parts (but takes longer to compute, of course).\n\n### Outputs\n- `combined mask`: everything picked in one mask.\n- `separated masks`: one mask per object. Connected to Inpaint Crop, each gets its own crop.\n- `bboxes`: one box per object.",
+        "targets": [
+          {
+            "node": "10",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 10,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Mask Picker\nElige objetos para una máscara señalándolos. Necesita un checkpoint de SAM 3 conectado a `model`.\n\n### En el preview\n- **Analyze** encuentra todos los objetos de la imagen.\n- Pasa el ratón para ver qué hay debajo y haz clic para elegirlo. Otro clic lo quita.\n- La rueda pasa a un objeto más grande o más pequeño bajo el cursor.\n- `Shift` suma, `Alt` resta, y arrastrar elige todo lo que cruzas.\n- Si SAM no ha detectado nada en una zona, puedes hacer clic para crear un punto y forzarle a buscar justo ahí.\n\n### Points Only\nPara imágenes complicadas: colocas tú los puntos positivos y negativos de cada objeto.\n\n### edges\n**vitmatte** saca bordes suaves en pelo y pelaje; **sam** deja el borde duro de SAM.\n\n### Detail Level\nCuántos objetos lista Analyze. Más alto encuentra piezas más pequeñas (pero tarda más en calcular, claro).\n\n### Salidas\n- `combined mask`: todo lo elegido en una máscara.\n- `separated masks`: una máscara por objeto. Conectadas al Inpaint Crop, cada una tiene su recorte.\n- `bboxes`: una caja por objeto."
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "NKDVectorMask",
+      "pos": [
+        1840,
+        990
+      ],
+      "size": [
+        320,
+        220
+      ],
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "shapes",
+          "name": "shapes",
+          "type": "STRING",
+          "widget": {
+            "name": "shapes"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Expand / Contract",
+          "name": "expand",
+          "type": "INT",
+          "widget": {
+            "name": "expand"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Invert",
+          "name": "invert",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "invert"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDVectorMask",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"v\":1,\"shapes\":[]}",
+        0,
+        0,
+        false
+      ],
+      "widgets_values_named": {
+        "shapes": "{\"v\":1,\"shapes\":[]}",
+        "expand": 0,
+        "feather": 0,
+        "invert": false
+      }
+    },
+    {
+      "id": 111,
+      "type": "NKDHint",
+      "pos": [
+        1800,
+        920
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Vector Mask\nHand roto with a pen, like in Nuke. What's saved is the control points, so the mask is still editable next week. Press **Draw mask shapes** to open the editor.\n\n### Drawing\n- Click to place points; click the first one or double-click empty space to close the shape.\n- **Bezier** puts the point on the curve with handles; **B-spline** stays smooth with fewer points.\n- Double-click a point for a hard corner.\n- Subtract shapes cut holes in the ones before them.\n\n### Feather\n`Ctrl` + drag a point pulls out a feather clone you place by hand: that way one side can fade softly while the side next to it stays sharp.\n\n### Expand / Contract / Feather / Invert\nGrow or shrink every shape, soften the edge of the whole mask and invert what's masked.\n\n### Viewing\n`H` hides the curves to judge the edge, `V` toggles masked image, mask and original image.\n\nIts `mask` goes straight into the Mask Painter if you want to combine it with others.",
+        "targets": [
+          {
+            "node": "11",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 11,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Vector Mask\nRoto a mano con una pluma, como en Nuke. Lo que se guarda son los puntos de control, así que la máscara sigue siendo editable la semana que viene. Pulsa **Draw mask shapes** para abrir el editor.\n\n### Dibujar\n- Clic para poner puntos; clic en el primero o doble clic en vacío para cerrar la forma.\n- **Bezier** pone el punto sobre la curva con tiradores; **B-spline** queda suave con menos puntos.\n- Doble clic en un punto para una esquina dura.\n- Las formas de resta abren agujeros en las anteriores.\n\n### Feather\n`Ctrl` + arrastrar un punto saca un clon de feather que colocas a mano: así un lado puede fundirse suave y el de al lado quedar nítido.\n\n### Expand / Contract / Feather / Invert\nCrecen o encogen todas las formas, suavizan el borde de toda la máscara e invierten lo enmascarado.\n\n### Ver\n`H` oculta las curvas para juzgar el borde, `V` alterna imagen enmascarada, máscara e imagen original.\n\nSu `mask` entra directamente en el Mask Painter si quieres combinarla con otras."
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "NKDPaint",
+      "pos": [
+        2250,
+        990
+      ],
+      "size": [
+        377,
+        641
+      ],
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "layer",
+          "name": "layer",
+          "type": "STRING",
+          "widget": {
+            "name": "layer"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Background",
+          "name": "bg_color",
+          "type": "COLOR",
+          "widget": {
+            "name": "bg_color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Scribble Mode",
+          "name": "controlnet",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "controlnet"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "painted",
+          "name": "painted",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "strokes",
+          "name": "strokes",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "inverted mask",
+          "name": "inverted mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDPaint",
+        "nkdSchema": 1,
+        "nkdPaintTool": "brush",
+        "nkdPaintColor": "#ffffff",
+        "nkdPaintSize": 24,
+        "nkdPaintOpacity": 1,
+        "nkdPaintHardness": 0.8,
+        "nkdPaintBase": 1,
+        "nkdPaintLasso": false
+      },
+      "widgets_values": [
+        "",
+        1024,
+        1024,
+        "#000000",
+        false,
+        ""
+      ],
+      "widgets_values_named": {
+        "layer": "",
+        "width": 1024,
+        "height": 1024,
+        "bg_color": "#000000",
+        "controlnet": false,
+        "nkd_paint_editor": ""
+      }
+    },
+    {
+      "id": 112,
+      "type": "NKDHint",
+      "pos": [
+        2210,
+        920
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 23,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Painter Node\nA brush on the node itself, over the image or over a blank canvas. Made for a quick scribble for ControlNet without leaving for an external editor.\n\n### image / Width / Height / Background\nConnect an image and the canvas takes its size and shows it behind. With no image, it uses `Width` and `Height` with the `Background` colour.\n\n### Scribble Mode\nThe brush is always white and `strokes` comes out white on black, ready for a Scribble ControlNet.\n\n### Painting\n`B` brush, `E` eraser, `X` swaps between white and black, `Alt` + click picks a colour. `Alt` + right drag changes size and hardness, like in Photoshop. `Ctrl+Z` undoes.\n\n### Outputs\n- `image`: the image just as it came in.\n- `painted`: the strokes over the image.\n- `strokes`: the strokes alone.\n- `mask` / `inverted mask`: the exact mask of what you painted. With `strokes` and `inverted mask` in Join Image with Alpha you get a transparent PNG of the strokes.",
+        "targets": [
+          {
+            "node": "12",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 12,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Painter Node\nUn pincel en el propio nodo, sobre la imagen o sobre un lienzo vacío. Pensado para hacer un garabato rápido para ControlNet sin salir a un editor externo.\n\n### image / Width / Height / Background\nSi conectas una imagen, el lienzo toma su tamaño y la muestra detrás. Sin imagen, usa `Width` y `Height` con el color de `Background`.\n\n### Scribble Mode\nEl pincel siempre es blanco y `strokes` sale blanco sobre negro, listo para un ControlNet Scribble.\n\n### Pintar\n`B` pincel, `E` goma, `X` cambia entre blanco y negro, `Alt` + clic coge un color. `Alt` + arrastrar con el botón derecho cambia tamaño y dureza, como en Photoshop. `Ctrl+Z` deshace.\n\n### Salidas\n- `image`: la imagen tal cual entró.\n- `painted`: los trazos sobre la imagen.\n- `strokes`: solo los trazos.\n- `mask` / `inverted mask`: la máscara exacta de lo que has pintado. Con `strokes` e `inverted mask` en Join Image with Alpha sacas un PNG transparente de los trazos."
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "NKDAVLatent",
+      "pos": [
+        60,
+        1860
+      ],
+      "size": [
+        320,
+        300
+      ],
+      "flags": {},
+      "order": 24,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "images",
+          "name": "images",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "audio",
+          "name": "audio",
+          "type": "AUDIO",
+          "link": null
+        },
+        {
+          "localized_name": "video vae",
+          "name": "video_vae",
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "localized_name": "audio vae",
+          "name": "audio_vae",
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "localized_name": "latent mask",
+          "name": "latent_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "audio mask",
+          "name": "audio_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Audio",
+          "name": "audio_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "audio_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "FPS",
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Ramp In",
+          "name": "ramp_ticks",
+          "type": "INT",
+          "widget": {
+            "name": "ramp_ticks"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Ramp Out",
+          "name": "ramp_out_ticks",
+          "type": "INT",
+          "widget": {
+            "name": "ramp_out_ticks"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Ramp Shape",
+          "name": "ramp_shape",
+          "type": "COMBO",
+          "widget": {
+            "name": "ramp_shape"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDAVLatent",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "keep",
+        24,
+        0,
+        0,
+        "cosine"
+      ],
+      "widgets_values_named": {
+        "audio_mode": "keep",
+        "fps": 24,
+        "ramp_ticks": 0,
+        "ramp_out_ticks": 0,
+        "ramp_shape": "cosine"
+      }
+    },
+    {
+      "id": 113,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        1790
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 25,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# AV Latent\nFor inpainting a video that carries its own audio without wiring the same six nodes every time, and without the sound being regenerated behind your back.\n\n### Audio\n- **keep**: leaves the original sound untouched. Usually what you want.\n- **regenerate**: regenerates all of it.\n- **follow mask**: only regenerates the sound during the stretch of time where the image mask is.\n\n### Ramp In / Ramp Out / Ramp Shape\nEase in and out of the regenerated stretch of audio, so there are no abrupt cuts.\n\n### latent mask\nOptional. Left unconnected, the whole image is generated. Connect the Mask Ops `latent_mask` so the edit lands on the model's own grid.\n\n### audio mask\nOptional. It doesn't change the `Audio` setting: it only tells **follow mask** which moments to follow instead of the image mask.",
+        "targets": [
+          {
+            "node": "13",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 13,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# AV Latent\nPara hacer inpaint en un vídeo que trae su propio audio sin cablear los mismos seis nodos cada vez y sin que el sonido se regenere a tus espaldas.\n\n### Audio\n- **keep**: deja el sonido original intacto. Normalmente es lo que quieres.\n- **regenerate**: lo vuelve a generar entero.\n- **follow mask**: solo regenera el sonido durante el tramo de tiempo en que está la máscara de imagen.\n\n### Ramp In / Ramp Out / Ramp Shape\nSuavizan la entrada y salida del tramo de audio que se regenera, para que no haya cortes bruscos.\n\n### latent mask\nOpcional. Sin conectar se genera toda la imagen. Conéctale la `latent_mask` del Mask Ops para que la edición caiga en la rejilla del propio modelo.\n\n### audio mask\nOpcional. No cambia el ajuste de `Audio`: solo le dice a **follow mask** qué momentos seguir en lugar de la máscara de imagen."
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "NKDAVLatentExtend",
+      "pos": [
+        470,
+        1860
+      ],
+      "size": [
+        320,
+        130
+      ],
+      "flags": {},
+      "order": 26,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "previous",
+          "name": "previous",
+          "type": "LATENT",
+          "link": null
+        },
+        {
+          "localized_name": "new (empty)",
+          "name": "new_latent",
+          "type": "LATENT",
+          "link": null
+        },
+        {
+          "localized_name": "Overlap Chunks",
+          "name": "overlap_chunks",
+          "type": "INT",
+          "widget": {
+            "name": "overlap_chunks"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": null
+        },
+        {
+          "localized_name": "overlap_frames",
+          "name": "overlap_frames",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "localized_name": "trim_seconds",
+          "name": "trim_seconds",
+          "type": "FLOAT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDAVLatentExtend",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        2
+      ],
+      "widgets_values_named": {
+        "overlap_chunks": 2
+      }
+    },
+    {
+      "id": 114,
+      "type": "NKDHint",
+      "pos": [
+        430,
+        1790
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 27,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# AV Latent Extend\nContinues a MiniMax H3 clip into a new one, sound included, to build a long take out of several short ones. Chain it once per stretch.\n\n### previous / new (empty)\n`previous` is the KSampler output of the previous stretch, **before decoding**. `new (empty)` is the empty latent of the next stretch.\n\n### Overlap Chunks\nHow much of the previous clip the model sees to carry on from there. More overlap gives more continuity but less new footage per stretch.\n\n### Outputs\n- `latent`: to the KSampler.\n- `overlap_frames`: to Image Batch Extend With Overlap, to drop the regenerated start from the image.\n- `trim_seconds`: to the `start_index` of Trim Audio Duration, to cut the sound exactly the same.",
+        "targets": [
+          {
+            "node": "14",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 14,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# AV Latent Extend\nContinúa un clip de MiniMax H3 en uno nuevo, sonido incluido, para construir una toma larga a partir de varias cortas. Encadénalo una vez por tramo.\n\n### previous / new (empty)\n`previous` es la salida del KSampler del tramo anterior, **antes de decodificar**. `new (empty)` es el latent vacío del siguiente tramo.\n\n### Overlap Chunks\nCuánto del clip anterior ve el modelo para seguir desde ahí. Más solape da más continuidad pero menos metraje nuevo por tramo.\n\n### Salidas\n- `latent`: al KSampler.\n- `overlap_frames`: a Image Batch Extend With Overlap, para quitar el principio regenerado de la imagen.\n- `trim_seconds`: al `start_index` de Trim Audio Duration, para cortar el sonido exactamente igual."
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "NKDAudioMask",
+      "pos": [
+        880,
+        1860
+      ],
+      "size": [
+        320,
+        170
+      ],
+      "flags": {},
+      "order": 28,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "audio_latent",
+          "name": "audio_latent",
+          "type": "LATENT",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Ramp In",
+          "name": "ramp_ticks",
+          "type": "INT",
+          "widget": {
+            "name": "ramp_ticks"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Ramp Out",
+          "name": "ramp_out_ticks",
+          "type": "INT",
+          "widget": {
+            "name": "ramp_out_ticks"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Ramp Shape",
+          "name": "ramp_shape",
+          "type": "COMBO",
+          "widget": {
+            "name": "ramp_shape"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "audio_latent",
+          "name": "audio_latent",
+          "type": "LATENT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDAudioMask",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        0,
+        0,
+        "cosine"
+      ],
+      "widgets_values_named": {
+        "ramp_ticks": 0,
+        "ramp_out_ticks": 0,
+        "ramp_shape": "cosine"
+      }
+    },
+    {
+      "id": 115,
+      "type": "NKDHint",
+      "pos": [
+        840,
+        1790
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 29,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Audio Mask\nThe audio half of AV Latent on its own, for when you'd rather keep the chain in view. It replaces the audio's Set Latent Noise Mask and the Solid Mask feeding it.\n\nConnect the audio latent and a video mask: the sound is only regenerated during the stretch of time where the mask is, already matched to the soundtrack's real timing.\n\n### Ramp In / Ramp Out / Ramp Shape\nEase in and out of the regenerated stretch.\n\nIf you give a video mask to the normal Set Latent Noise Mask, the whole sound is regenerated without warning. This node exists to avoid that.",
+        "targets": [
+          {
+            "node": "15",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 15,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Audio Mask\nLa parte de audio del AV Latent por separado, para cuando prefieres tener la cadena a la vista. Sustituye al Set Latent Noise Mask del audio y al Solid Mask que lo alimenta.\n\nConecta el latent de audio y una máscara de vídeo: el sonido se regenera solo durante el tramo de tiempo en que está la máscara, ya ajustado al ritmo real de la banda sonora.\n\n### Ramp In / Ramp Out / Ramp Shape\nSuavizan la entrada y salida del tramo regenerado.\n\nSi le pasas una máscara de vídeo al Set Latent Noise Mask normal, el sonido se regenera entero sin avisar. Este nodo existe para evitarlo."
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "NKDMiniMaxGuides",
+      "pos": [
+        1290,
+        1860
+      ],
+      "size": [
+        210,
+        158
+      ],
+      "flags": {},
+      "order": 30,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "link": null
+        },
+        {
+          "localized_name": "video vae",
+          "name": "vae",
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "localized_name": "audio vae",
+          "name": "audio_vae",
+          "type": "VAE",
+          "link": null
+        },
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "link": null
+        },
+        {
+          "localized_name": "guide_1",
+          "name": "guides.guide_1",
+          "shape": 7,
+          "type": "IMAGE,AUDIO,VIDEO",
+          "link": null
+        },
+        {
+          "localized_name": "guide_2",
+          "name": "guides.guide_2",
+          "shape": 7,
+          "type": "IMAGE,AUDIO,VIDEO",
+          "link": null
+        },
+        {
+          "localized_name": "Snap Positions",
+          "name": "snap_positions",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "snap_positions"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 1",
+          "name": "position_1",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_1"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 2",
+          "name": "position_2",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_2"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 3",
+          "name": "position_3",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_3"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 4",
+          "name": "position_4",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_4"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 5",
+          "name": "position_5",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_5"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 6",
+          "name": "position_6",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_6"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 7",
+          "name": "position_7",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_7"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 8",
+          "name": "position_8",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_8"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 9",
+          "name": "position_9",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_9"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 10",
+          "name": "position_10",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_10"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 11",
+          "name": "position_11",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_11"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "position 12",
+          "name": "position_12",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "position_12"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "positive",
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": null
+        },
+        {
+          "localized_name": "latent",
+          "name": "latent",
+          "type": "LATENT",
+          "links": null
+        },
+        {
+          "localized_name": "video vae",
+          "name": "video vae",
+          "type": "VAE",
+          "links": null
+        },
+        {
+          "localized_name": "audio vae",
+          "name": "audio vae",
+          "type": "VAE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDMiniMaxGuides",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        true,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "widgets_values_named": {
+        "snap_positions": true,
+        "position_1": 0,
+        "position_2": 0,
+        "position_3": 0,
+        "position_4": 0,
+        "position_5": 0,
+        "position_6": 0,
+        "position_7": 0,
+        "position_8": 0,
+        "position_9": 0,
+        "position_10": 0,
+        "position_11": 0,
+        "position_12": 0
+      }
+    },
+    {
+      "id": 116,
+      "type": "NKDHint",
+      "pos": [
+        1250,
+        1790
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 31,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# MiniMax Guides\nAll the guides of a MiniMax H3 shot from a single node, instead of a row of Add Guide nodes dragging the same four wires.\n\n### guides\nThe list grows as you fill it. Each slot takes an image, a sequence, a video with its sound, or audio alone. Next to it a `position` appears with the frame where it lands. Negatives count from the end: **-1** is the last frame; put the starting image there and the shot loops.\n\n### Snap Positions\nKeeps each guide on a multiple of 17, the only place where it fits H3's time grid. Anywhere else that frame flickers like a cut. Turn it off if you want to place it by hand.\n\n### Outputs\n`latent`, `video vae` and `audio vae` come out as they are so the sampler hangs off this node and you don't have to cross the workflow again.",
+        "targets": [
+          {
+            "node": "16",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 16,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# MiniMax Guides\nTodas las guías de un plano de MiniMax H3 desde un solo nodo, en vez de una fila de Add Guide arrastrando los mismos cuatro cables.\n\n### guides\nLa lista crece a medida que la llenas. Cada hueco acepta una imagen, una secuencia, un vídeo con su sonido o solo audio. Al lado aparece un `position` con el frame donde cae. Los negativos cuentan desde el final: **-1** es el último frame; pon ahí la imagen inicial y el plano hace loop.\n\n### Snap Positions\nMantiene cada guía en un múltiplo de 17, el único sitio donde encaja con la rejilla temporal de H3. Fuera de ahí ese frame parpadea como un corte. Desactívalo si quieres colocarla a mano.\n\n### Salidas\n`latent`, `video vae` y `audio vae` salen tal cual para que el sampler cuelgue de este nodo y no tengas que volver a cruzar el workflow."
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "NKDAlphaMatte",
+      "pos": [
+        60,
+        2410
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 32,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Mask Is Subject",
+          "name": "mask_is_subject",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "mask_is_subject"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Black Point",
+          "name": "black_point",
+          "type": "FLOAT",
+          "widget": {
+            "name": "black_point"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "White Point",
+          "name": "white_point",
+          "type": "FLOAT",
+          "widget": {
+            "name": "white_point"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Expand / Choke",
+          "name": "expand",
+          "type": "INT",
+          "widget": {
+            "name": "expand"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Smooth In Time",
+          "name": "smooth_in_time",
+          "type": "INT",
+          "widget": {
+            "name": "smooth_in_time"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Decontaminate Edges",
+          "name": "decontaminate",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "decontaminate"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "alpha",
+          "name": "alpha",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDAlphaMatte",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        true,
+        0,
+        1,
+        0,
+        0,
+        0,
+        true
+      ],
+      "widgets_values_named": {
+        "mask_is_subject": true,
+        "black_point": 0,
+        "white_point": 1,
+        "expand": 0,
+        "feather": 0,
+        "smooth_in_time": 0,
+        "decontaminate": true
+      }
+    },
+    {
+      "id": 117,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        2340
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 33,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Alpha Matte\nTurns an image and a roto mask into a transparent cut-out. One frame or a whole video.\n\n### Mask Is Subject\nOn, the white of the mask is what you keep, which is how SAM outputs them. Turn it off for masks that already mean transparency, like Load Image's.\n\n### Black Point / White Point\nClean up the haze a roto model leaves around the subject, and make a slightly transparent subject solid.\n\n### Expand / Choke / Feather\nGrow or tighten the matte to get rid of a fringe of the old background, and soften the edge.\n\n### Smooth In Time\nFor video: stops the edge from boiling between frames.\n\n### Decontaminate Edges\nThe reason to use this node. On soft edges (hair, motion blur) it cleans the old background's colour out so it doesn't halo when you put it over another background.\n\n`image` comes out as RGBA and `alpha` is the applied matte.",
+        "targets": [
+          {
+            "node": "17",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 17,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Alpha Matte\nConvierte una imagen y una máscara de roto en un recorte transparente. Un frame o un vídeo entero.\n\n### Mask Is Subject\nActivado, lo blanco de la máscara es lo que te quedas, que es como las saca SAM. Desactívalo para máscaras que ya significan transparencia, como la de Load Image.\n\n### Black Point / White Point\nLimpian la neblina que deja un modelo de roto alrededor del sujeto y hacen sólido un sujeto ligeramente transparente.\n\n### Expand / Choke / Feather\nCrece o estrecha el mate para quitar un borde del fondo antiguo, y suaviza el borde.\n\n### Smooth In Time\nPara vídeo: evita que el borde hierva entre frames.\n\n### Decontaminate Edges\nLa razón para usar este nodo. En los bordes suaves (pelo, desenfoque de movimiento) limpia el color del fondo antiguo para que no haga halo al ponerlo sobre otro fondo.\n\n`image` sale en RGBA y `alpha` es el mate aplicado."
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "NKDMerge",
+      "pos": [
+        470,
+        2410
+      ],
+      "size": [
+        440,
+        487
+      ],
+      "flags": {},
+      "order": 34,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "background",
+          "name": "background",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "foreground",
+          "name": "foreground",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "alpha",
+          "name": "alpha",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Fit",
+          "name": "fit",
+          "type": "COMBO",
+          "widget": {
+            "name": "fit"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Opacity",
+          "name": "opacity",
+          "type": "FLOAT",
+          "widget": {
+            "name": "opacity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Blend Mode",
+          "name": "blend_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "blend_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "transform",
+          "name": "transform",
+          "type": "STRING",
+          "widget": {
+            "name": "transform"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Invert Alpha",
+          "name": "invert_alpha",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "invert_alpha"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDMerge",
+        "nkdSchema": 1,
+        "nkdMergePreview": true
+      },
+      "widgets_values": [
+        "fit",
+        1,
+        "normal",
+        "{\"x\": 0.5, \"y\": 0.5, \"scale\": 1.0, \"angle\": 0.0}",
+        false,
+        "{\"x\": 0.5, \"y\": 0.5, \"scale\": 1.0, \"angle\": 0.0}"
+      ],
+      "widgets_values_named": {
+        "fit": "fit",
+        "opacity": 1,
+        "blend_mode": "normal",
+        "transform": "{\"x\": 0.5, \"y\": 0.5, \"scale\": 1.0, \"angle\": 0.0}",
+        "invert_alpha": false,
+        "nkd_merge_editor": "{\"x\": 0.5, \"y\": 0.5, \"scale\": 1.0, \"angle\": 0.0}"
+      }
+    },
+    {
+      "id": 118,
+      "type": "NKDHint",
+      "pos": [
+        430,
+        2340
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 35,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Merge\nPuts a transparent cut-out over a background, frame by frame, and you place it by dragging it on the node. Works with a still background under a video and the other way round.\n\n### Placing\nRun the node once with its play button and you'll see both. Drag inside the frame to move it, a corner to scale and the top handle to rotate. `Shift` for fine adjustment, `Alt` turns off snapping. In the top bar you can type position, scale and angle.\n\n### Fit\nWhat a scale of 100% means: **fit** fits entirely inside the background, **fill** covers it and crops what's left over, **pixels** keeps its size.\n\n### Opacity / Blend Mode\nFades the cut-out and picks the blend mode, the same ones as Create Layered Image.\n\n### alpha / Invert Alpha\n`alpha` is an optional matte that replaces the cut-out's own. `Invert Alpha` flips it if it arrives the wrong way round.\n\nThe output has as many frames as the longest input, and `mask` is the cut-out's matte where it landed.",
+        "targets": [
+          {
+            "node": "18",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 18,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Merge\nPone un recorte transparente sobre un fondo, frame a frame, y lo colocas arrastrándolo en el nodo. Sirve con un fondo fijo bajo un vídeo y al revés.\n\n### Colocar\nEjecuta el nodo una vez con su play y verás los dos. Arrastra dentro del marco para moverlo, una esquina para escalar y el tirador de arriba para rotar. `Shift` para ajuste fino, `Alt` desactiva el imán. En la barra de arriba puedes escribir posición, escala y ángulo.\n\n### Fit\nQué significa una escala de 100%: **fit** cabe entero en el fondo, **fill** lo cubre y recorta lo que sobra, **pixels** mantiene su tamaño.\n\n### Opacity / Blend Mode\nFunde el recorte y elige el modo de fusión, los mismos que Create Layered Image.\n\n### alpha / Invert Alpha\n`alpha` es un mate opcional que sustituye al del recorte. `Invert Alpha` le da la vuelta si llega al revés.\n\nLa salida tiene tantos frames como la entrada más larga, y `mask` es el mate del recorte donde ha caído."
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "NKDFaceRig",
+      "pos": [
+        60,
+        3220
+      ],
+      "size": [
+        460,
+        692
+      ],
+      "flags": {},
+      "order": 36,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "expression",
+          "name": "expression",
+          "shape": 7,
+          "type": "NKD_EXPRESSION",
+          "link": null
+        },
+        {
+          "localized_name": "rig",
+          "name": "rig",
+          "type": "STRING",
+          "widget": {
+            "name": "rig"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Crop Factor",
+          "name": "crop_factor",
+          "type": "FLOAT",
+          "widget": {
+            "name": "crop_factor"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Keep Expression",
+          "name": "src_ratio",
+          "type": "FLOAT",
+          "widget": {
+            "name": "src_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Blend Back",
+          "name": "stitching",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "stitching"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Face",
+          "name": "face_index",
+          "type": "INT",
+          "widget": {
+            "name": "face_index"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "face_mask",
+          "name": "face_mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "expression",
+          "name": "expression",
+          "type": "NKD_EXPRESSION",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFaceRig",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"v\":1,\"w\":{}}",
+        2,
+        1,
+        true,
+        0
+      ],
+      "widgets_values_named": {
+        "rig": "{\"v\":1,\"w\":{}}",
+        "crop_factor": 2,
+        "src_ratio": 1,
+        "stitching": true,
+        "face_index": 0
+      }
+    },
+    {
+      "id": 119,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        3150
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 37,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Face Rig\nSet an expression by dragging handles on the face itself: brows, eyelids, gaze, mouth corners, jaw and head. It re-renders while you drag.\n\n### In the editor\n- Each side of the face moves on its own: one raised brow, a wink, half a smile. Mirror makes the edit symmetrical.\n- Head turn and gaze have their own controls in the corners.\n- `Ctrl+Z` undoes, `Shift` for fine adjustment, double-click resets a handle.\n\n### Keep Expression\nHow much of the expression the photo already has is kept. Lower it to neutralize a face that's already smiling before you pose it.\n\n### Blend Back\nBlends the face back into the original image's shoulders. Turn it off only to see the raw crop.\n\n### Crop Factor / Face\nHow much around the face goes in: more keeps more hair and shoulders, but gives the model less face to work with. `Face` picks which one if there are several.\n\n### Outputs\n`face_mask` gives you the area that was re-rendered, so a detailer works right there. `expression` saves the pose to reuse it.\n\nThe first time, it downloads its models (~600 MB).",
+        "targets": [
+          {
+            "node": "19",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 19,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Face Rig\nPon una expresión arrastrando tiradores sobre la propia cara: cejas, párpados, mirada, comisuras, mandíbula y cabeza. Se vuelve a renderizar mientras arrastras.\n\n### En el editor\n- Cada lado de la cara se mueve por separado: una ceja levantada, un guiño, media sonrisa. El espejo hace la edición simétrica.\n- Giro de cabeza y mirada tienen sus propios controles en las esquinas.\n- `Ctrl+Z` deshace, `Shift` para ajuste fino, doble clic resetea un tirador.\n\n### Keep Expression\nCuánto de la expresión que ya tiene la foto se conserva. Bájalo para neutralizar una cara que ya sonríe antes de ponerle la pose.\n\n### Blend Back\nFunde la cara con los hombros de la imagen original. Desactívalo solo para ver el recorte en bruto.\n\n### Crop Factor / Face\nCuánto alrededor de la cara entra: más deja más pelo y hombros, pero le da al modelo menos cara con la que trabajar. `Face` elige cuál si hay varias.\n\n### Salidas\n`face_mask` te da la zona que se ha re-renderizado, para que un detailer trabaje justo ahí. `expression` guarda la pose para reutilizarla.\n\nLa primera vez descarga sus modelos (~600 MB)."
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "NKDFaceCrop",
+      "pos": [
+        610,
+        3220
+      ],
+      "size": [
+        360,
+        480
+      ],
+      "flags": {},
+      "order": 38,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "Size",
+          "name": "size",
+          "type": "INT",
+          "widget": {
+            "name": "size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Padding",
+          "name": "padding",
+          "type": "FLOAT",
+          "widget": {
+            "name": "padding"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Upright",
+          "name": "upright",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "upright"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Offset",
+          "name": "offset",
+          "type": "FLOAT",
+          "widget": {
+            "name": "offset"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Face",
+          "name": "face_index",
+          "type": "INT",
+          "widget": {
+            "name": "face_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mask Region",
+          "name": "mask_region",
+          "type": "COMBO",
+          "widget": {
+            "name": "mask_region"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Forehead",
+          "name": "forehead",
+          "type": "FLOAT",
+          "widget": {
+            "name": "forehead"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Refine Edges",
+          "name": "refine_edges",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "refine_edges"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "face",
+          "name": "face",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "localized_name": "face_data",
+          "name": "face_data",
+          "type": "NKD_FACEDATA",
+          "links": null
+        },
+        {
+          "localized_name": "roll",
+          "name": "roll",
+          "type": "FLOAT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFaceCrop",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        512,
+        1.7,
+        true,
+        -0.125,
+        0,
+        "face",
+        1,
+        false
+      ],
+      "widgets_values_named": {
+        "size": 512,
+        "padding": 1.7,
+        "upright": true,
+        "offset": -0.125,
+        "face_index": 0,
+        "mask_region": "face",
+        "forehead": 1,
+        "refine_edges": false
+      }
+    },
+    {
+      "id": 120,
+      "type": "NKDHint",
+      "pos": [
+        570,
+        3150
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 39,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Face Crop\nCrops the face you select and turns it upright, so you can make precise edits without confusing the model.\n\n### Size / Padding / Offset\nThe exact square your model wants, how much around the face goes in, and whether the framing moves up or down.\n\n### Upright\nOn, it straightens the head; off, it keeps the original angle.\n\n### Mask Region / Forehead / Refine Edges\nWhat the mask covers: the whole face, without eyes or mouth, skin only or the features only. `Forehead` decides how far up it goes and `Refine Edges` fits the outline to the hair and jaw.\n\n### Face\nWhich face if there's more than one.\n\n### roll\nHow much the head was tilted.",
+        "targets": [
+          {
+            "node": "20",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 20,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Face Crop\nHace un crop de la cara que selecciones y la reorienta para dejarla en vertical, de manera que puedas hacer ediciones precisas sin marear al modelo.\n\n### Size / Padding / Offset\nEl cuadrado exacto que quiere tu modelo, cuánto alrededor de la cara entra y si el encuadre sube o baja.\n\n### Upright\nActivado endereza la cabeza; desactivado mantiene el ángulo original.\n\n### Mask Region / Forehead / Refine Edges\nQué cubre la máscara: la cara entera, sin ojos ni boca, solo piel o solo los rasgos. `Forehead` decide hasta dónde sube y `Refine Edges` ajusta el contorno al pelo y la mandíbula.\n\n### Face\nQué cara si hay más de una.\n\n### roll\nCuánto estaba inclinada la cabeza."
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "NKDFaceMask",
+      "pos": [
+        1060,
+        3220
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 40,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "Search Padding",
+          "name": "padding",
+          "type": "FLOAT",
+          "widget": {
+            "name": "padding"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Face",
+          "name": "face_index",
+          "type": "INT",
+          "widget": {
+            "name": "face_index"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Mask Region",
+          "name": "mask_region",
+          "type": "COMBO",
+          "widget": {
+            "name": "mask_region"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Forehead",
+          "name": "forehead",
+          "type": "FLOAT",
+          "widget": {
+            "name": "forehead"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Refine Edges",
+          "name": "refine_edges",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "refine_edges"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Expand",
+          "name": "expand",
+          "type": "INT",
+          "widget": {
+            "name": "expand"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFaceMask",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        1.7,
+        0,
+        "face",
+        1,
+        false,
+        0,
+        0
+      ],
+      "widgets_values_named": {
+        "padding": 1.7,
+        "face_index": 0,
+        "mask_region": "face",
+        "forehead": 1,
+        "refine_edges": false,
+        "feather": 0,
+        "expand": 0
+      }
+    },
+    {
+      "id": 121,
+      "type": "NKDHint",
+      "pos": [
+        1020,
+        3150
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 41,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Face Mask\nThe same face mask Face Crop gives, but in the original image's coordinates. For inpainting a face in place without cropping anything.\n\n### Mask Region / Forehead / Refine Edges\nWhich area it covers, how far up the forehead it goes, and whether the outline fits the hair and jaw.\n\n### Feather / Expand\nSoftens and grows the mask.\n\n### Search Padding / Face\nHow much margin it uses to look for the face, and which one to pick if there are several.",
+        "targets": [
+          {
+            "node": "21",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 21,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Face Mask\nLa misma máscara de cara que da el Face Crop, pero en las coordenadas de la imagen original. Para hacer inpaint de una cara en su sitio sin recortar nada.\n\n### Mask Region / Forehead / Refine Edges\nQué zona cubre, hasta dónde sube por la frente y si el contorno se ajusta al pelo y la mandíbula.\n\n### Feather / Expand\nSuaviza y crece la máscara.\n\n### Search Padding / Face\nCuánto margen usa para buscar la cara y cuál elegir si hay varias."
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "NKDFaceStitch",
+      "pos": [
+        1470,
+        3220
+      ],
+      "size": [
+        320,
+        200
+      ],
+      "flags": {},
+      "order": 42,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "face_data",
+          "name": "face_data",
+          "type": "NKD_FACEDATA",
+          "link": null
+        },
+        {
+          "localized_name": "Feather",
+          "name": "feather",
+          "type": "INT",
+          "widget": {
+            "name": "feather"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Edge Hardness",
+          "name": "edge_hardness",
+          "type": "FLOAT",
+          "widget": {
+            "name": "edge_hardness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Match Colors",
+          "name": "match_colors",
+          "type": "FLOAT",
+          "widget": {
+            "name": "match_colors"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Seamless Edges",
+          "name": "seamless_edges",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "seamless_edges"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFaceStitch",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        12,
+        0,
+        0,
+        false
+      ],
+      "widgets_values_named": {
+        "feather": 12,
+        "edge_hardness": 0,
+        "match_colors": 0,
+        "seamless_edges": false
+      }
+    },
+    {
+      "id": 122,
+      "type": "NKDHint",
+      "pos": [
+        1430,
+        3150
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 43,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Face Stitch\nSends the processed face back the same way it came out, so it returns to its original angle and size with the rest of the image intact.\n\nConnect Face Crop's `face_data`.\n\n### Feather / Edge Hardness / Match Colors / Seamless Edges\nThe same finishing controls as Inpaint Stitch: soft edge, no halos, colour matched to the scene and an extra pass for difficult seams.",
+        "targets": [
+          {
+            "node": "22",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 22,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Face Stitch\nDevuelve la cara procesada por el mismo camino por el que salió, así que vuelve al ángulo y tamaño originales con el resto de la imagen intacta.\n\nConecta el `face_data` del Face Crop.\n\n### Feather / Edge Hardness / Match Colors / Seamless Edges\nLos mismos controles de acabado que el Inpaint Stitch: borde suave, sin halos, color igualado con la escena y una pasada extra para costuras difíciles."
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "NKDPathBlur",
+      "pos": [
+        60,
+        4090
+      ],
+      "size": [
+        400,
+        480
+      ],
+      "flags": {},
+      "order": 44,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "paths",
+          "name": "paths",
+          "type": "STRING",
+          "widget": {
+            "name": "paths"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Strength",
+          "name": "strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Spread",
+          "name": "spread",
+          "type": "FLOAT",
+          "widget": {
+            "name": "spread"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDPathBlur",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"v\":1,\"paths\":[]}",
+        24,
+        0.15
+      ],
+      "widgets_values_named": {
+        "paths": "{\"v\":1,\"paths\":[]}",
+        "strength": 24,
+        "spread": 0.15
+      }
+    },
+    {
+      "id": 123,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        4020
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 45,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Path Blur\nMotion blur that follows curves, instead of the straight angle of a normal motion blur. Draw strokes showing where things move and the direction between them blends by itself.\n\n### In the editor\n- Each stroke has its own speed.\n- `Ctrl` + drag a point gives it its own speed, so a stroke can accelerate.\n- `Shift` + drag on empty space selects several points.\n- `V` toggles between the result and the original. The node must have run once.\n\n### Strength / Spread\n`Strength` is the overall intensity. `Spread` decides how far each stroke's influence reaches; what's far away stays sharp.\n\n### mask\nWhere it's white, the original is kept. Use it to protect what's in front, which would otherwise smear with the background.",
+        "targets": [
+          {
+            "node": "23",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 23,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Path Blur\nDesenfoque de movimiento que sigue curvas, en vez del ángulo recto de un motion blur normal. Dibuja trazos indicando hacia dónde se mueven las cosas y la dirección entre ellos se mezcla sola.\n\n### En el editor\n- Cada trazo tiene su propia velocidad.\n- `Ctrl` + arrastrar un punto le da velocidad propia, así un trazo puede acelerar.\n- `Shift` + arrastrar en vacío selecciona varios puntos.\n- `V` alterna entre el resultado y el original. El nodo tiene que haberse ejecutado una vez.\n\n### Strength / Spread\n`Strength` es la intensidad general. `Spread` decide hasta dónde llega la influencia de cada trazo; lo que queda lejos sigue nítido.\n\n### mask\nDonde es blanca se conserva el original. Úsala para proteger lo que está delante, que si no se emborrona con el fondo."
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "NKDFieldBlur",
+      "pos": [
+        550,
+        4090
+      ],
+      "size": [
+        400,
+        480
+      ],
+      "flags": {},
+      "order": 46,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "pins",
+          "name": "pins",
+          "type": "STRING",
+          "widget": {
+            "name": "pins"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Max Blur",
+          "name": "max_blur",
+          "type": "INT",
+          "widget": {
+            "name": "max_blur"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Falloff",
+          "name": "falloff",
+          "type": "FLOAT",
+          "widget": {
+            "name": "falloff"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFieldBlur",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"v\":1,\"pins\":[]}",
+        48,
+        2
+      ],
+      "widgets_values_named": {
+        "pins": "{\"v\":1,\"pins\":[]}",
+        "max_blur": 48,
+        "falloff": 2
+      }
+    },
+    {
+      "id": 124,
+      "type": "NKDHint",
+      "pos": [
+        510,
+        4020
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 47,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Field Blur\nA fake depth of field with no depth map. Place pins, drag each one's ring to say how much blur it wants, and everything in between is interpolated. One pin blurs evenly, two give you a gradient.\n\n### Max Blur\nHow many pixels a pin at maximum means.\n\n### Falloff\nHow tightly each pin holds on to its area. Raise it so a sharp pin on your subject doesn't get blurred by the ones around it.\n\n### In the editor\n`Ctrl` + drag a pin widens its reach. `V` shows the blur field in grey, which is what really shows you where the transition falls.\n\n### mask\nProtects a subject from the blur.\n\nBlur eats grain: add a Film Grain after it so it doesn't look fake.",
+        "targets": [
+          {
+            "node": "24",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 24,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Field Blur\nUna profundidad de campo falsa sin mapa de profundidad. Pon pines, arrastra el anillo de cada uno para decir cuánto desenfoque quiere, y lo de en medio se interpola. Un pin desenfoca por igual, dos te dan un degradado.\n\n### Max Blur\nCuántos píxeles significa un pin al máximo.\n\n### Falloff\nCuánto se aferra cada pin a su zona. Súbelo para que un pin nítido sobre tu sujeto no se emborrone por los de alrededor.\n\n### En el editor\n`Ctrl` + arrastrar un pin amplía su alcance. `V` muestra el campo de desenfoque en gris, que es lo que de verdad te enseña dónde cae la transición.\n\n### mask\nProtege a un sujeto del desenfoque.\n\nEl desenfoque se come el grano: pon un Film Grain después para que no se note falso."
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "NKDCurves",
+      "pos": [
+        60,
+        4820
+      ],
+      "size": [
+        400,
+        636
+      ],
+      "flags": {},
+      "order": 48,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "curves",
+          "name": "curves",
+          "type": "STRING",
+          "widget": {
+            "name": "curves"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDCurves",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"rgb\": [[0, 0], [1, 1]], \"r\": [[0, 0], [1, 1]], \"g\": [[0, 0], [1, 1]], \"b\": [[0, 0], [1, 1]]}",
+        "{\"rgb\": [[0, 0], [1, 1]], \"r\": [[0, 0], [1, 1]], \"g\": [[0, 0], [1, 1]], \"b\": [[0, 0], [1, 1]]}"
+      ],
+      "widgets_values_named": {
+        "curves": "{\"rgb\": [[0, 0], [1, 1]], \"r\": [[0, 0], [1, 1]], \"g\": [[0, 0], [1, 1]], \"b\": [[0, 0], [1, 1]]}",
+        "curves_editor": "{\"rgb\": [[0, 0], [1, 1]], \"r\": [[0, 0], [1, 1]], \"g\": [[0, 0], [1, 1]], \"b\": [[0, 0], [1, 1]]}"
+      }
+    },
+    {
+      "id": 125,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        4750
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 49,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Curves\nCurves like Photoshop's: brightness, contrast and colour balance in one editor, with the image previewed live as you drag.\n\n### Channels\n`RGB` is the master curve; `R`, `G` and `B` bend one channel each.\n\n### Points\n- Click to add, drag to move (`Shift` for fine adjustment).\n- Right-click or drag it off the graph to delete it.\n- Double-click for a hard corner.\n- The end points set the black and white points.\n- `Reset` clears the current channel and `All` every channel.\n\nThe input's histogram shows behind the curve.\n\n### mask\nOptional: limits where the correction applies.",
+        "targets": [
+          {
+            "node": "25",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 25,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Curves\nCurvas como las de Photoshop: brillo, contraste y balance de color en un editor, con la imagen previsualizada en directo mientras arrastras.\n\n### Canales\n`RGB` es la curva maestra; `R`, `G` y `B` doblan un canal cada uno.\n\n### Puntos\n- Clic para añadir, arrastrar para mover (`Shift` para ajuste fino).\n- Clic derecho o sacarlo del gráfico para borrarlo.\n- Doble clic para una esquina dura.\n- Los puntos de los extremos fijan el punto negro y el blanco.\n- `Reset` limpia el canal actual y `All` todos.\n\nEl histograma de la entrada se ve detrás de la curva.\n\n### mask\nOpcional: limita dónde se aplica la corrección."
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "NKDColorWarp",
+      "pos": [
+        550,
+        4820
+      ],
+      "size": [
+        340,
+        200
+      ],
+      "flags": {},
+      "order": 50,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mesh",
+          "name": "mesh",
+          "type": "STRING",
+          "widget": {
+            "name": "mesh"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Save LUT",
+          "name": "save_lut",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "save_lut"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "LUT Name",
+          "name": "lut_name",
+          "type": "STRING",
+          "widget": {
+            "name": "lut_name"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "IMAGE",
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDColorWarp",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"hue_segments\": 12, \"sat_rings\": 6, \"offsets\": [[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]], \"neutral\": [0.0, 0.0], \"hues\": [29.2339, 41.0048, 52.7757, 81.27244999999999, 109.7692, 126.13225, 142.4953, 203.27365, 264.052, 278.913, 293.774, 341.50395000000003]}",
+        false,
+        "nkd_color_warp"
+      ],
+      "widgets_values_named": {
+        "mesh": "{\"hue_segments\": 12, \"sat_rings\": 6, \"offsets\": [[[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]], [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]], \"neutral\": [0.0, 0.0], \"hues\": [29.2339, 41.0048, 52.7757, 81.27244999999999, 109.7692, 126.13225, 142.4953, 203.27365, 264.052, 278.913, 293.774, 341.50395000000003]}",
+        "save_lut": false,
+        "lut_name": "nkd_color_warp"
+      }
+    },
+    {
+      "id": 126,
+      "type": "NKDHint",
+      "pos": [
+        510,
+        4750
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 51,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Color Warp\nGrade by grabbing the colours themselves. Open the editor and you get a colour wheel with your pixels spread over it: drag the handle sitting on the skin tones and the skin moves; drag the blue spoke and all the blues follow. The neighbours give way smoothly.\n\n### In the editor\n- `Pin` moves one handle alone; without it, the whole spoke follows.\n- Drag the centre for a global tint.\n- Hold `Alt` and the image shows you which pixels each handle controls.\n- Three wheels (**RYB**, **RGB**, **OKLCh**): same edit, pick the one that feels natural.\n- Add spokes and rings for finer control.\n\n### Save LUT / LUT Name\nAlso saves the correction as a `.cube` in the output folder, to use in Resolve, Premiere or any other program.\n\nRun the node once to see your image on the wheel.",
+        "targets": [
+          {
+            "node": "26",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 26,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Color Warp\nGradúa agarrando los propios colores. Abre el editor y tienes una rueda de color con tus píxeles repartidos por encima: arrastra el tirador que hay sobre los tonos de piel y la piel se mueve; arrastra el radio azul y todos los azules le siguen. Los vecinos ceden con suavidad.\n\n### En el editor\n- `Pin` mueve un tirador solo; sin él le sigue todo el radio.\n- Arrastra el centro para un tinte global.\n- Mantén `Alt` y la imagen te enseña qué píxeles controla cada tirador.\n- Tres ruedas (**RYB**, **RGB**, **OKLCh**): misma edición, elige la que te resulte natural.\n- Añade radios y anillos para un control más fino.\n\n### Save LUT / LUT Name\nGuarda también la corrección como `.cube` en la carpeta de output, para usarla en Resolve, Premiere o cualquier otro programa.\n\nEjecuta el nodo una vez para ver tu imagen en la rueda."
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "NKDGradientMap",
+      "pos": [
+        980,
+        4820
+      ],
+      "size": [
+        400,
+        511
+      ],
+      "flags": {},
+      "order": 52,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "ramp",
+          "name": "ramp",
+          "type": "STRING",
+          "widget": {
+            "name": "ramp"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Invert",
+          "name": "invert",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "invert"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Strength",
+          "name": "strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDGradientMap",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}",
+        false,
+        1,
+        "",
+        "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}"
+      ],
+      "widgets_values_named": {
+        "ramp": "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}",
+        "invert": false,
+        "strength": 1,
+        "gradmap_preview": "",
+        "ramp_editor": "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}"
+      }
+    },
+    {
+      "id": 127,
+      "type": "NKDHint",
+      "pos": [
+        940,
+        4750
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 53,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Gradient Map\nRecolours a photo by brightness: the shadows land on one end of the ramp and the highlights on the other. Duotone, teal-orange or any grade.\n\n### Ramp\nClick the bar to add a colour, click a colour to change it, drag to move it and `Shift` + click to remove it. You can save your ramps as presets.\n\n### Invert / Strength\n`Invert` flips the ramp and `Strength` tones the effect down.\n\n### mask\nOptional: limits where it applies.",
+        "targets": [
+          {
+            "node": "27",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 27,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Gradient Map\nRecolorea una foto por brillo: las sombras caen en un extremo de la rampa y las luces en el otro. Duotono, teal-orange o cualquier etalonaje.\n\n### Rampa\nClic en la barra para añadir un color, clic en un color para cambiarlo, arrastra para moverlo y `Shift` + clic para quitarlo. Puedes guardar tus rampas como presets.\n\n### Invert / Strength\n`Invert` da la vuelta a la rampa y `Strength` rebaja el efecto.\n\n### mask\nOpcional: limita dónde se aplica."
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "NKDGradientGenerate",
+      "pos": [
+        1470,
+        4820
+      ],
+      "size": [
+        400,
+        601
+      ],
+      "flags": {},
+      "order": 54,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "Width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Shape",
+          "name": "shape",
+          "type": "COMBO",
+          "widget": {
+            "name": "shape"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "handles",
+          "name": "handles",
+          "type": "STRING",
+          "widget": {
+            "name": "handles"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "ramp",
+          "name": "ramp",
+          "type": "STRING",
+          "widget": {
+            "name": "ramp"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Blend Mode",
+          "name": "blend_mode",
+          "type": "COMBO",
+          "widget": {
+            "name": "blend_mode"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Opacity",
+          "name": "opacity",
+          "type": "FLOAT",
+          "widget": {
+            "name": "opacity"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDGradientGenerate",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        "Linear",
+        "{\"p0\": [0.0, 0.5], \"p1\": [1.0, 0.5], \"mid\": 0.5}",
+        "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}",
+        "none",
+        1,
+        "{\"p0\": [0.0, 0.5], \"p1\": [1.0, 0.5], \"mid\": 0.5}",
+        "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}"
+      ],
+      "widgets_values_named": {
+        "width": 1024,
+        "height": 1024,
+        "shape": "Linear",
+        "handles": "{\"p0\": [0.0, 0.5], \"p1\": [1.0, 0.5], \"mid\": 0.5}",
+        "ramp": "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}",
+        "blend_mode": "none",
+        "opacity": 1,
+        "preview_editor": "{\"p0\": [0.0, 0.5], \"p1\": [1.0, 0.5], \"mid\": 0.5}",
+        "ramp_editor": "{\"stops\": [{\"pos\": 0.0, \"color\": \"#000000\"}, {\"pos\": 1.0, \"color\": \"#ffffff\"}]}"
+      }
+    },
+    {
+      "id": 128,
+      "type": "NKDHint",
+      "pos": [
+        1430,
+        4750
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 55,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Gradient Generate\nCreates a gradient from scratch, with no input, to use as a background, a mask or a ramp source.\n\n### Shape\n**Linear**, **Radial**, **Angular** or **Diamond**. Drag the two handles on the preview for direction, centre and extent, and the diamond to move the midpoint.\n\n### Width / Height / image\nThe gradient's size. Connect an image and it takes its size.\n\n### Blend Mode / Opacity\nComposites the gradient straight over that image: light leaks, vignettes or skies without a separate blend node. With **none** it only uses the image as a size reference.\n\nThe `mask` output is always the gradient's own falloff. It shares the ramp editor with Gradient Map.",
+        "targets": [
+          {
+            "node": "28",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 28,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Gradient Generate\nCrea un degradado desde cero, sin entrada, para usarlo como fondo, máscara o fuente de rampa.\n\n### Shape\n**Linear**, **Radial**, **Angular** o **Diamond**. Arrastra los dos tiradores sobre el preview para la dirección, el centro y la extensión, y el rombo para mover el punto medio.\n\n### Width / Height / image\nEl tamaño del degradado. Si conectas una imagen, toma su tamaño.\n\n### Blend Mode / Opacity\nCompone el degradado directamente sobre esa imagen: fugas de luz, viñetas o cielos sin un nodo de fusión aparte. Con **none** solo usa la imagen como referencia de tamaño.\n\nLa salida `mask` es siempre la caída del propio degradado. Comparte el editor de rampa con el Gradient Map."
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "NKDFilmGrain",
+      "pos": [
+        60,
+        5630
+      ],
+      "size": [
+        320,
+        260
+      ],
+      "flags": {},
+      "order": 56,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Amount",
+          "name": "amount",
+          "type": "FLOAT",
+          "widget": {
+            "name": "amount"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Size",
+          "name": "size",
+          "type": "FLOAT",
+          "widget": {
+            "name": "size"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Roughness",
+          "name": "roughness",
+          "type": "FLOAT",
+          "widget": {
+            "name": "roughness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Color",
+          "name": "color",
+          "type": "FLOAT",
+          "widget": {
+            "name": "color"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Animate (video)",
+          "name": "animate",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "animate"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDFilmGrain",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        25,
+        25,
+        50,
+        0,
+        true,
+        0,
+        "randomize"
+      ],
+      "widgets_values_named": {
+        "amount": 25,
+        "size": 25,
+        "roughness": 50,
+        "color": 0,
+        "animate": true,
+        "seed": 0,
+        "control_after_generate": "randomize"
+      }
+    },
+    {
+      "id": 129,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        5560
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 57,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Film Grain\nBelievable analogue grain, closer to Lightroom or Camera Raw.\n\n### Amount / Size / Roughness\nShape the grain.\n\n### Color\nMonochrome by default; raise it for colour grain.\n\n### Animate (video)\nOn a video batch each frame gets fresh grain, so it moves like real emulsion instead of sitting frozen on top.\n\n### mask\nOptional: adds grain to one part only. Handy after a Field Blur, to put the grain back where you blurred.",
+        "targets": [
+          {
+            "node": "29",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 29,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Film Grain\nGrano analógico creíble, más cerca de Lightroom o Camera Raw.\n\n### Amount / Size / Roughness\nDan forma al grano.\n\n### Color\nEs monocromo por defecto; súbelo para grano de color.\n\n### Animate (video)\nEn un batch de vídeo cada frame tiene grano nuevo, así que vibra como emulsión real en vez de quedarse congelado encima.\n\n### mask\nOpcional: pone grano solo en una parte. Útil después de un Field Blur, para devolver el grano donde has desenfocado."
+        }
+      }
+    },
+    {
+      "id": 30,
+      "type": "NKDNoise",
+      "pos": [
+        470,
+        5630
+      ],
+      "size": [
+        320,
+        773
+      ],
+      "flags": {},
+      "order": 58,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        },
+        {
+          "localized_name": "Width",
+          "name": "width",
+          "type": "INT",
+          "widget": {
+            "name": "width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Height",
+          "name": "height",
+          "type": "INT",
+          "widget": {
+            "name": "height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Frames",
+          "name": "frames",
+          "type": "INT",
+          "widget": {
+            "name": "frames"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Scale",
+          "name": "scale",
+          "type": "FLOAT",
+          "widget": {
+            "name": "scale"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Detail",
+          "name": "detail",
+          "type": "INT",
+          "widget": {
+            "name": "detail"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Roughness",
+          "name": "roughness",
+          "type": "FLOAT",
+          "widget": {
+            "name": "roughness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Lacunarity",
+          "name": "lacunarity",
+          "type": "FLOAT",
+          "widget": {
+            "name": "lacunarity"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Distortion",
+          "name": "distortion",
+          "type": "FLOAT",
+          "widget": {
+            "name": "distortion"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Contrast",
+          "name": "contrast",
+          "type": "FLOAT",
+          "widget": {
+            "name": "contrast"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Brightness",
+          "name": "brightness",
+          "type": "FLOAT",
+          "widget": {
+            "name": "brightness"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Evolution",
+          "name": "evolution",
+          "type": "FLOAT",
+          "widget": {
+            "name": "evolution"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Loop",
+          "name": "loop",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "loop"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Offset X",
+          "name": "offset_x",
+          "type": "FLOAT",
+          "widget": {
+            "name": "offset_x"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Offset Y",
+          "name": "offset_y",
+          "type": "FLOAT",
+          "widget": {
+            "name": "offset_y"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "localized_name": "mask",
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDNoise",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        1024,
+        1024,
+        1,
+        6,
+        4,
+        0.5,
+        2,
+        0,
+        1,
+        0,
+        0,
+        false,
+        0,
+        0,
+        0,
+        "randomize",
+        ""
+      ],
+      "widgets_values_named": {
+        "width": 1024,
+        "height": 1024,
+        "frames": 1,
+        "scale": 6,
+        "detail": 4,
+        "roughness": 0.5,
+        "lacunarity": 2,
+        "distortion": 0,
+        "contrast": 1,
+        "brightness": 0,
+        "evolution": 0,
+        "loop": false,
+        "offset_x": 0,
+        "offset_y": 0,
+        "seed": 0,
+        "control_after_generate": "randomize",
+        "noise_preview": ""
+      }
+    },
+    {
+      "id": 130,
+      "type": "NKDHint",
+      "pos": [
+        430,
+        5560
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 59,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Noise\nProcedural fractal noise for clouds, fog, smoke and organic textures, as an image and as a mask.\n\n### Scale / Detail / Roughness / Lacunarity / Distortion\nShape the noise: size, how many layers of detail, how much each one weighs and how much it twists.\n\n### Contrast / Brightness / Offset X / Offset Y\nAdjust the result and shift the pattern.\n\n### Frames / Evolution / Loop\nGive you an animated sequence. With `Loop` the last frame joins the first with no jump.\n\nSend it into a Gradient Map to tint it.",
+        "targets": [
+          {
+            "node": "30",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 30,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Noise\nRuido fractal procedural para nubes, niebla, humo y texturas orgánicas, como imagen y como máscara.\n\n### Scale / Detail / Roughness / Lacunarity / Distortion\nDan forma al ruido: tamaño, cuántas capas de detalle, cuánto pesa cada una y cuánto se retuerce.\n\n### Contrast / Brightness / Offset X / Offset Y\nAjustan el resultado y desplazan el patrón.\n\n### Frames / Evolution / Loop\nTe dan una secuencia animada. Con `Loop` el último frame enlaza con el primero sin salto.\n\nPásalo a un Gradient Map para teñirlo."
+        }
+      }
+    },
+    {
+      "id": 31,
+      "type": "NKDStringSplit",
+      "pos": [
+        60,
+        6300
+      ],
+      "size": [
+        239.205078125,
+        204
+      ],
+      "flags": {},
+      "order": 60,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "Text",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Delimiter",
+          "name": "delimiter",
+          "type": "COMBO",
+          "widget": {
+            "name": "delimiter"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Custom Delimiter",
+          "name": "custom_delimiter",
+          "type": "STRING",
+          "widget": {
+            "name": "custom_delimiter"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Trim Whitespace",
+          "name": "trim_whitespace",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "trim_whitespace"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Skip Empty",
+          "name": "skip_empty",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "skip_empty"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Remove List Numbering",
+          "name": "remove_numbering",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "remove_numbering"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "strings",
+          "name": "strings",
+          "shape": 6,
+          "type": "STRING",
+          "links": null
+        },
+        {
+          "localized_name": "count",
+          "name": "count",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDStringSplit",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "",
+        "New Line",
+        "",
+        true,
+        true,
+        false
+      ],
+      "widgets_values_named": {
+        "text": "",
+        "delimiter": "New Line",
+        "custom_delimiter": "",
+        "trim_whitespace": true,
+        "skip_empty": true,
+        "remove_numbering": false
+      }
+    },
+    {
+      "id": 131,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        6230
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 61,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# String Split\nTurns a block of text into a batch. The nodes after it run once per item, so a list of prompts becomes N generations with no extra wiring.\n\n### Delimiter / Custom Delimiter\nWhere to cut: line breaks, commas, slashes… or one you type.\n\n### Trim Whitespace / Skip Empty\nRemove extra spaces and empty pieces.\n\n### Remove List Numbering\nRemoves numbering (`1.`, `2)`, `-`), for lists an LLM wrote.\n\n`count` tells you how many items came out, and the node shows the list on itself.",
+        "targets": [
+          {
+            "node": "31",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 31,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# String Split\nConvierte un bloque de texto en un batch. Los nodos de después se ejecutan una vez por elemento, así una lista de prompts se convierte en N generaciones sin cableado extra.\n\n### Delimiter / Custom Delimiter\nPor dónde cortar: saltos de línea, comas, barras… o el que tú escribas.\n\n### Trim Whitespace / Skip Empty\nQuitan espacios sobrantes y trozos vacíos.\n\n### Remove List Numbering\nQuita la numeración (`1.`, `2)`, `-`), para listas que ha escrito un LLM.\n\n`count` te dice cuántos elementos han salido, y el nodo muestra la lista sobre sí mismo."
+        }
+      }
+    },
+    {
+      "id": 32,
+      "type": "NKDPromptVariables",
+      "pos": [
+        490,
+        6300
+      ],
+      "size": [
+        400,
+        320
+      ],
+      "flags": {},
+      "order": 62,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "variable_0",
+          "name": "variables.variable_0",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        },
+        {
+          "localized_name": "text",
+          "name": "text",
+          "type": "STRING",
+          "widget": {
+            "name": "text"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Randomize All",
+          "name": "randomize_all",
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "randomize_all"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Seed",
+          "name": "seed",
+          "type": "INT",
+          "widget": {
+            "name": "seed"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "saved",
+          "name": "saved",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "saved"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "prompt",
+          "name": "prompt",
+          "shape": 6,
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDPromptVariables",
+        "nkdSchema": 1,
+        "nkd_var_labels": {}
+      },
+      "widgets_values": [
+        "",
+        false,
+        0,
+        "randomize",
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "text": "",
+        "randomize_all": false,
+        "seed": 0,
+        "control_after_generate": "randomize",
+        "saved": "",
+        "prompt_editor": ""
+      }
+    },
+    {
+      "id": 132,
+      "type": "NKDHint",
+      "pos": [
+        450,
+        6230
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 63,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Prompt Variables\nA multiprompt in two nodes. Write your prompt and drop variable chips into it; each chip is filled with the text arriving at its socket.\n\n### variables\nSockets grow as you connect them, and renaming one renames its chip. Connect a list (from a String Split, for example) and the prompt resolves once per item.\n\n### Randomize All / Seed\n`Shift` + click on a chip, or `Randomize All`, makes that variable pick a random item, with a seed so it's reproducible.\n\n### Saved\nYour own library of colours, styles or test prompts you use often, shared across workflows. Type `@` to insert them. The node keeps its own copy, so the workflow works on another machine.",
+        "targets": [
+          {
+            "node": "32",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 32,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Prompt Variables\nUn multiprompt con dos nodos. Escribe tu prompt y mete chips de variable dentro; cada chip se rellena con el texto que llegue a su socket.\n\n### variables\nLos sockets crecen a medida que conectas y si renombras uno se renombra su chip. Si le conectas una lista (de un String Split, por ejemplo) el prompt se resuelve una vez por elemento.\n\n### Randomize All / Seed\n`Shift` + clic en un chip, o `Randomize All`, hace que esa variable elija un elemento al azar, con semilla para que sea reproducible.\n\n### Saved\nUna biblioteca propia de colores, estilos o prompts de prueba que usas a menudo, compartida entre workflows. Escribe `@` para insertarlos. El nodo guarda su copia, así el workflow funciona en otra máquina."
+        }
+      }
+    },
+    {
+      "id": 33,
+      "type": "NKDResolutionSelector",
+      "pos": [
+        980,
+        6300
+      ],
+      "size": [
+        220.915625,
+        150
+      ],
+      "flags": {},
+      "order": 64,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "image",
+          "name": "image",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "localized_name": "Aspect Ratio",
+          "name": "aspect_ratio",
+          "type": "COMBO",
+          "widget": {
+            "name": "aspect_ratio"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Megapixels",
+          "name": "megapixels",
+          "type": "FLOAT",
+          "widget": {
+            "name": "megapixels"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Custom Width",
+          "name": "custom_width",
+          "type": "INT",
+          "widget": {
+            "name": "custom_width"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Custom Height",
+          "name": "custom_height",
+          "type": "INT",
+          "widget": {
+            "name": "custom_height"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Multiple",
+          "name": "multiple",
+          "type": "INT",
+          "widget": {
+            "name": "multiple"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "preview",
+          "name": "preview",
+          "shape": 7,
+          "type": "RESOLUTION_PREVIEW",
+          "widget": {
+            "name": "preview"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "width",
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "localized_name": "height",
+          "name": "height",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDResolutionSelector",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "1:1",
+        1,
+        1024,
+        1024,
+        16
+      ],
+      "widgets_values_named": {
+        "aspect_ratio": "1:1",
+        "megapixels": 1,
+        "custom_width": 1024,
+        "custom_height": 1024,
+        "multiple": 16
+      }
+    },
+    {
+      "id": 133,
+      "type": "NKDHint",
+      "pos": [
+        940,
+        6230
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 65,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Resolution Selector\nWidth and height from an aspect ratio and a megapixel budget, with Klein Presampling's list of ratios.\n\n### Aspect Ratio\n24 named ratios, portrait and landscape, with a preview of the result.\n- **As Reference**: copies the shape of the connected image and scales it to the budget.\n- **Custom**: uses your own width and height.\n\n### Megapixels\nThe pixel budget.\n\n### Multiple\nRounds the result. 16 is safe for every current model.",
+        "targets": [
+          {
+            "node": "33",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 33,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Resolution Selector\nAncho y alto a partir de una proporción y un presupuesto de megapíxeles, con la lista de proporciones del Klein Presampling.\n\n### Aspect Ratio\n24 proporciones con nombre, verticales y horizontales, con preview del resultado.\n- **As Reference**: copia la forma de la imagen conectada y la escala al presupuesto.\n- **Custom**: usa tu propio ancho y alto.\n\n### Megapixels\nEl presupuesto de píxeles.\n\n### Multiple\nRedondea el resultado. 16 es seguro para todos los modelos actuales."
+        }
+      }
+    },
+    {
+      "id": 34,
+      "type": "NKDLoader",
+      "pos": [
+        60,
+        6910
+      ],
+      "size": [
+        320,
+        58
+      ],
+      "flags": {},
+      "order": 66,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "recipe",
+          "name": "recipe",
+          "type": "STRING",
+          "widget": {
+            "name": "recipe"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDLoader",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "recipe": "",
+        "preset": ""
+      }
+    },
+    {
+      "id": 134,
+      "type": "NKDHint",
+      "pos": [
+        20,
+        6840
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 67,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Loader\nOne node that replaces a set of loaders: model, text encoders, VAE, upscaler… Save the set once and switch model family from a dropdown instead of rewiring four loaders.\n\n### Saving a preset\nSelect the loaders on the canvas, right-click and **Save as NKD Loader preset**. Any loader from any pack works.\n\n### Using it\nPick the preset and its outputs appear with type and name. When you switch presets your wires stay wherever the output keeps its type, so `MODEL`, `CLIP` and `VAE` stay connected.\n\n### Editing\nRight-click → **Unpack NKD Loader** lays the real loaders out in a group so you can change whatever you want; **Repack NKD Loader** folds it back.\n\nThe workflow carries the preset inside, so it works on a machine that doesn't have it.",
+        "targets": [
+          {
+            "node": "34",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 34,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Loader\nUn nodo que sustituye a un conjunto de loaders: modelo, text encoders, VAE, upscaler… Guarda el conjunto una vez y cambia de familia de modelos desde un desplegable en vez de recablear cuatro loaders.\n\n### Guardar un preset\nSelecciona los loaders en el lienzo, clic derecho y **Save as NKD Loader preset**. Sirve cualquier loader de cualquier pack.\n\n### Usarlo\nElige el preset y aparecen sus salidas con tipo y nombre. Al cambiar de preset tus cables se quedan donde la salida mantiene su tipo, así `MODEL`, `CLIP` y `VAE` siguen conectados.\n\n### Editar\nClic derecho → **Unpack NKD Loader** saca los loaders reales en un grupo para cambiar lo que quieras; **Repack NKD Loader** lo vuelve a plegar.\n\nEl workflow lleva el preset dentro, así que funciona en una máquina que no lo tenga."
+        }
+      }
+    },
+    {
+      "id": 35,
+      "type": "NKDLoraControl",
+      "pos": [
+        470,
+        6910
+      ],
+      "size": [
+        460,
+        932
+      ],
+      "flags": {},
+      "order": 68,
+      "mode": 0,
+      "inputs": [
+        {
+          "localized_name": "model",
+          "name": "model",
+          "type": "MODEL",
+          "link": null
+        },
+        {
+          "localized_name": "Curve",
+          "name": "curve",
+          "shape": 7,
+          "type": "FLOAT",
+          "link": null
+        },
+        {
+          "localized_name": "LoRA",
+          "name": "lora_name",
+          "type": "COMBO",
+          "widget": {
+            "name": "lora_name"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "Strength",
+          "name": "strength",
+          "type": "FLOAT",
+          "widget": {
+            "name": "strength"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "blocks",
+          "name": "blocks",
+          "type": "STRING",
+          "widget": {
+            "name": "blocks"
+          },
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "localized_name": "MODEL",
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
+        "Node name for S&R": "NKDLoraControl",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "",
+        1,
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "lora_name": "",
+        "strength": 1,
+        "blocks": "",
+        "nkd_lora_blocks": ""
+      }
+    },
+    {
+      "id": 135,
+      "type": "NKDHint",
+      "pos": [
+        430,
+        6840
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 69,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# LoRA Control\nLoads a LoRA and shows you, block by block, how much each one contributes. That way you can mute the ones that do nothing, raise the ones that do, and steer the LoRA over the course of sampling with a curve. Works with any architecture without picking a model.\n\n### Block panel\nEach block's colour and bar show its impact: cold for the ones that barely change the image, hot for the ones carrying the LoRA. Drag across the checkboxes to toggle several, select rows to move them together and double-click to go back to 1.00.\n\n### Impact filter\nMutes everything below an impact. Raise it and watch only the blocks that matter remain.\n\n### Presets\n**Only this group** comes from the blocks the file has; **Saved** are your own and work across different LoRAs.\n\n### Strength / Curve\n`Curve` takes a list of per-step values (from Sigmas Curve, for example) so the LoRA fades in or out during sampling. `Strength` multiplies the whole curve.\n\n### Save LoRA\nSaves the current setup as a normal `.safetensors` in `models/loras/NKD/`, ready for any loader at strength 1.0.",
+        "targets": [
+          {
+            "node": "35",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 35,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# LoRA Control\nCarga una LoRA y te enseña, bloque a bloque, cuánto aporta cada uno. Así puedes silenciar los que no hacen nada, subir los que sí, y controlar la LoRA a lo largo del sampleo con una curva. Funciona con cualquier arquitectura sin elegir modelo.\n\n### Panel de bloques\nEl color y la barra de cada bloque indican su impacto: frío los que apenas cambian la imagen, caliente los que llevan la LoRA. Arrastra por las casillas para activar varios, selecciona filas para moverlas a la vez y doble clic para volver a 1.00.\n\n### Filtro de impacto\nSilencia todo lo que esté por debajo de un impacto. Súbelo y mira cómo quedan solo los bloques que importan.\n\n### Presets\n**Only this group** sale de los bloques que tiene el archivo; **Saved** son los tuyos y funcionan entre LoRAs distintas.\n\n### Strength / Curve\n`Curve` acepta una lista de valores por paso (por ejemplo del Sigmas Curve) para que la LoRA entre o salga durante el sampleo. `Strength` multiplica toda la curva.\n\n### Save LoRA\nGuarda la configuración actual como un `.safetensors` normal en `models/loras/NKD/`, listo para cualquier loader a fuerza 1.0."
+        }
+      }
+    },
+    {
+      "id": 136,
+      "type": "NKDGuide",
+      "pos": [
+        60,
+        -200
+      ],
+      "size": [
+        240,
+        130
+      ],
+      "flags": {},
+      "order": 70,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "autoStart": true
+      },
+      "color": "#432",
+      "bgcolor": "#653"
+    }
+  ],
+  "links": [],
+  "groups": [
+    {
+      "id": 1,
+      "title": "Detailing & inpainting",
+      "bounding": [
+        0,
+        0,
+        2710,
+        790
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "Masking",
+      "bounding": [
+        0,
+        870,
+        2770,
+        790
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "Audio-video latents (MiniMax H3, LTXV)",
+      "bounding": [
+        0,
+        1740,
+        1670,
+        470
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "Compositing",
+      "bounding": [
+        0,
+        2290,
+        970,
+        730
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "Faces",
+      "bounding": [
+        0,
+        3100,
+        1850,
+        790
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "Blur",
+      "bounding": [
+        0,
+        3970,
+        1010,
+        650
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 7,
+      "title": "Color & gradients",
+      "bounding": [
+        0,
+        4700,
+        1930,
+        730
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 8,
+      "title": "Textures",
+      "bounding": [
+        0,
+        5510,
+        850,
+        590
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 9,
+      "title": "Prompt & text",
+      "bounding": [
+        0,
+        6180,
+        1380,
+        530
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    },
+    {
+      "id": 10,
+      "title": "Models & LoRAs",
+      "bounding": [
+        0,
+        6790,
+        990,
+        790
+      ],
+      "color": "#3f789e",
+      "flags": {}
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1.159559231762,
+      "offset": [
+        -28.289783388856563,
+        -453.0330071974011
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -12,6 +12,11 @@ those update without running the graph at all.
 
 Each node has its own page. Pick the one you need.
 
+New to the pack? `example_workflows/NKD Basic Tools - Node Explanation.json` has
+every node with a guided tour that explains what each one does, in English and
+Spanish. Needs [NKD Notes](https://github.com/Nekodificador/ComfyUI-NKD-Notes) for
+the hints. Start here.
+
 ---
 
 ## Detailing & inpainting
