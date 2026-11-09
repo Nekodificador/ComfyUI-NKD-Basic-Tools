@@ -14198,7 +14198,7 @@ class FieldPreview {
   }
 }
 const DEFAULT_INFLUENCE = 0.25;
-const C$3 = {
+const C$4 = {
   bg: "#0b0d12",
   add: "#4ab4ff",
   sub: "#ff6b6b",
@@ -15361,7 +15361,7 @@ class SplineEditor {
     const ctx = this.ctx;
     const { width, height } = this.logicalSize();
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = C$3.bg;
+    ctx.fillStyle = C$4.bg;
     ctx.fillRect(0, 0, width, height);
     ctx.imageSmoothingEnabled = this.zoom < 4;
     this.drawBackdrop();
@@ -15377,7 +15377,7 @@ class SplineEditor {
       ctx.save();
       ctx.fillStyle = "rgba(74,180,255,0.10)";
       ctx.fillRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
-      ctx.strokeStyle = C$3.marquee;
+      ctx.strokeStyle = C$4.marquee;
       ctx.lineWidth = 1;
       ctx.setLineDash([4, 3]);
       ctx.strokeRect(x, y, Math.abs(d.x1 - d.x0), Math.abs(d.y1 - d.y0));
@@ -15399,8 +15399,8 @@ class SplineEditor {
     if (poly.length < 3 || !off) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C$3.soft : C$3.softDim;
-    ctx.fillStyle = si === this.active ? C$3.soft : C$3.softDim;
+    ctx.strokeStyle = si === this.active ? C$4.soft : C$4.softDim;
+    ctx.fillStyle = si === this.active ? C$4.soft : C$4.softDim;
     ctx.lineWidth = 1.2;
     ctx.beginPath();
     const [x0, y0] = this.toScreen(poly[0][0] + off[0][0], poly[0][1] + off[0][1]);
@@ -15424,12 +15424,12 @@ class SplineEditor {
       ctx.beginPath();
       ctx.arc(gx, gy, hot ? 5.5 : 4, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = C$3.ptStroke;
+      ctx.strokeStyle = C$4.ptStroke;
       ctx.setLineDash([]);
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.setLineDash([5, 4]);
-      ctx.strokeStyle = si === this.active ? C$3.soft : C$3.softDim;
+      ctx.strokeStyle = si === this.active ? C$4.soft : C$4.softDim;
       ctx.lineWidth = 1.2;
     });
     ctx.restore();
@@ -15463,8 +15463,8 @@ class SplineEditor {
     if (poly.length < 2) return;
     ctx.save();
     ctx.setLineDash([5, 4]);
-    ctx.strokeStyle = si === this.active ? C$3.soft : C$3.softDim;
-    ctx.fillStyle = si === this.active ? C$3.soft : C$3.softDim;
+    ctx.strokeStyle = si === this.active ? C$4.soft : C$4.softDim;
+    ctx.fillStyle = si === this.active ? C$4.soft : C$4.softDim;
     ctx.lineWidth = 1.2;
     s.pts.forEach((p2) => {
       const sp = p2.sp ?? 1;
@@ -15527,14 +15527,14 @@ class SplineEditor {
   drawShape(s, si) {
     const ctx = this.ctx;
     const isActive = si === this.active;
-    const color = this.mode === "shape" ? s.op === "sub" ? C$3.sub : C$3.add : C$3.path;
+    const color = this.mode === "shape" ? s.op === "sub" ? C$4.sub : C$4.add : C$4.path;
     if (s.pts.length >= 2) {
       this.tracePath(ctx, s);
       if (s.closed && this.showFill && s.pts.length >= 3) {
         ctx.fillStyle = s.op === "sub" ? "rgba(255,107,107,0.20)" : "rgba(74,180,255,0.20)";
         ctx.fill();
       }
-      ctx.strokeStyle = isActive ? color : C$3.idle;
+      ctx.strokeStyle = isActive ? color : C$4.idle;
       ctx.lineWidth = isActive ? 2 : 1.4;
       ctx.lineJoin = "round";
       ctx.lineCap = "round";
@@ -15546,7 +15546,7 @@ class SplineEditor {
     if (s.type === "bspline" && s.pts.length >= 2) {
       ctx.save();
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = isActive ? C$3.hull : "rgba(255,255,255,0.12)";
+      ctx.strokeStyle = isActive ? C$4.hull : "rgba(255,255,255,0.12)";
       ctx.lineWidth = 1;
       ctx.beginPath();
       const [x0, y0] = this.toScreen(s.pts[0].x, s.pts[0].y);
@@ -15564,8 +15564,8 @@ class SplineEditor {
       const h = p2 ? this.handlesOf(s, this.selPt) : null;
       if (p2 && h) {
         const [cx, cy] = this.toScreen(p2.x, p2.y);
-        ctx.strokeStyle = C$3.handle;
-        ctx.fillStyle = C$3.handle;
+        ctx.strokeStyle = C$4.handle;
+        ctx.fillStyle = C$4.handle;
         ctx.lineWidth = 1;
         for (const side of [0, 2]) {
           const [hx, hy] = this.toScreen(p2.x + h[side], p2.y + h[side + 1]);
@@ -15595,15 +15595,15 @@ class SplineEditor {
       } else {
         ctx.arc(x, y, r, 0, Math.PI * 2);
       }
-      ctx.fillStyle = selected ? C$3.ptActive : hovered ? C$3.ptHover : isActive ? C$3.pt : C$3.idle;
+      ctx.fillStyle = selected ? C$4.ptActive : hovered ? C$4.ptHover : isActive ? C$4.pt : C$4.idle;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.shadowOffsetY = 0;
-      ctx.strokeStyle = C$3.ptStroke;
+      ctx.strokeStyle = C$4.ptStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
       if (this.sel.has(SplineEditor.key(si, i))) {
-        ctx.strokeStyle = C$3.marquee;
+        ctx.strokeStyle = C$4.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, r + 3, 0, Math.PI * 2);
@@ -15651,7 +15651,7 @@ class SplineEditor {
       }
       if (p2.r !== DEFAULT_INFLUENCE) {
         ctx.save();
-        ctx.strokeStyle = i === this.selPt ? C$3.soft : C$3.softDim;
+        ctx.strokeStyle = i === this.selPt ? C$4.soft : C$4.softDim;
         ctx.setLineDash([6, 5]);
         ctx.lineWidth = 1.2;
         ctx.beginPath();
@@ -15659,10 +15659,10 @@ class SplineEditor {
         ctx.stroke();
         ctx.restore();
       }
-      drawRing(ctx, x, y, p2.blur, C$3.add, i === this.selPt, `${Math.round(radius)} px`);
+      drawRing(ctx, x, y, p2.blur, C$4.add, i === this.selPt, `${Math.round(radius)} px`);
       if (this.sel.has(SplineEditor.key(0, i))) {
         ctx.save();
-        ctx.strokeStyle = C$3.marquee;
+        ctx.strokeStyle = C$4.marquee;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(x, y, 9, 0, Math.PI * 2);
@@ -17535,8 +17535,8 @@ class BrushLayer {
     this.onChange();
   }
 }
-const NODE_NAME$7 = "NKDPaint";
-const EXT_NAME$5 = "NKD.BasicTools.Paint";
+const NODE_NAME$8 = "NKDPaint";
+const EXT_NAME$6 = "NKD.BasicTools.Paint";
 console.log("[NKD Paint] rev 2");
 const CANVAS_W$2 = 240;
 const MAX_SIDE = 2048;
@@ -17576,9 +17576,9 @@ function paintSource(nodeId, canvas, fullW, fullH) {
 }
 function registerPaint() {
   app.registerExtension({
-    name: EXT_NAME$5,
+    name: EXT_NAME$6,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$7) return;
+      if (nodeData.name !== NODE_NAME$8) return;
       if (nodeType.prototype.__nkdPaintWrapped) return;
       nodeType.prototype.__nkdPaintWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -18545,8 +18545,8 @@ function setupPaintWidget(node, o) {
     redraw: scheduleDraw
   };
 }
-const NODE_NAME$6 = "NKDCrop";
-const EXT_NAME$4 = "NKD.BasicTools.Crop";
+const NODE_NAME$7 = "NKDCrop";
+const EXT_NAME$5 = "NKD.BasicTools.Crop";
 console.log("[NKD Crop] rev 1.1.0");
 const frames = /* @__PURE__ */ new Map();
 const live$1 = /* @__PURE__ */ new Map();
@@ -18577,7 +18577,7 @@ const ASPECTS = {
   "3:2": 3 / 2,
   "16:9": 16 / 9
 };
-const C$2 = {
+const C$3 = {
   bg: "#111318",
   srcBorder: "rgba(255,255,255,0.28)",
   rect: "#4ab4ff",
@@ -18716,9 +18716,9 @@ function containRotatedBox(b, deg, w, h) {
 }
 function registerCrop() {
   app.registerExtension({
-    name: EXT_NAME$4,
+    name: EXT_NAME$5,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$6) return;
+      if (nodeData.name !== NODE_NAME$7) return;
       if (nodeType.prototype.__nkdCropWrapped) return;
       nodeType.prototype.__nkdCropWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -18887,7 +18887,7 @@ function setupCropWidget(node) {
     const [cw, ch] = canvasSize();
     const ctx = syncCanvasBuffer();
     ctx.clearRect(0, 0, cw, ch);
-    ctx.fillStyle = isOutpaint() && ((_a2 = findW(node, "fill")) == null ? void 0 : _a2.value) === "transparent" ? checker(ctx) : C$2.bg;
+    ctx.fillStyle = isOutpaint() && ((_a2 = findW(node, "fill")) == null ? void 0 : _a2.value) === "transparent" ? checker(ctx) : C$3.bg;
     ctx.fillRect(0, 0, cw, ch);
     const [sx0, sy0] = toCanvas2(0, 0);
     const [sx1, sy1] = toCanvas2(srcW, srcH);
@@ -18902,7 +18902,7 @@ function setupCropWidget(node) {
       ctx.fillStyle = "#1a1c22";
       ctx.fillRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
     }
-    ctx.strokeStyle = C$2.srcBorder;
+    ctx.strokeStyle = C$3.srcBorder;
     ctx.lineWidth = 1;
     ctx.strokeRect(sx0 + 0.5, sy0 + 0.5, sx1 - sx0 - 1, sy1 - sy0 - 1);
     if (!boxActive) return;
@@ -18924,19 +18924,19 @@ function setupCropWidget(node) {
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
     addQuadSubpath();
-    ctx.fillStyle = C$2.outsideDim;
+    ctx.fillStyle = C$3.outsideDim;
     ctx.fill("evenodd");
     ctx.restore();
     ctx.save();
     strokeQuad();
     ctx.clip();
-    ctx.fillStyle = C$2.rectFill;
+    ctx.fillStyle = C$3.rectFill;
     ctx.fill();
     if (overflowFraction() > 1e-4) {
       ctx.translate(ccx, ccy);
       ctx.rotate(angle * Math.PI / 180);
       ctx.translate(-ccx, -ccy);
-      ctx.strokeStyle = C$2.outpaintHatch;
+      ctx.strokeStyle = C$3.outpaintHatch;
       ctx.lineWidth = 1;
       const step = 8;
       for (let d2 = -rh; d2 < rw; d2 += step) {
@@ -18951,7 +18951,7 @@ function setupCropWidget(node) {
     ctx.translate(ccx, ccy);
     ctx.rotate(angle * Math.PI / 180);
     ctx.translate(-ccx, -ccy);
-    ctx.strokeStyle = C$2.grid;
+    ctx.strokeStyle = C$3.grid;
     ctx.lineWidth = 1;
     for (let k = 1; k <= 2; k++) {
       const gx = rx0 + rw * k / 3;
@@ -18966,7 +18966,7 @@ function setupCropWidget(node) {
       ctx.stroke();
     }
     ctx.restore();
-    ctx.strokeStyle = C$2.rect;
+    ctx.strokeStyle = C$3.rect;
     ctx.lineWidth = 1.5;
     strokeQuad();
     ctx.stroke();
@@ -18980,7 +18980,7 @@ function setupCropWidget(node) {
       [rx0, (ry0 + ry1) / 2, "w"],
       [rx1, (ry0 + ry1) / 2, "e"]
     ];
-    ctx.fillStyle = C$2.handle;
+    ctx.fillStyle = C$3.handle;
     for (const [lx, ly] of localPts) {
       const [hx, hy] = rotatePoint(lx, ly, ccx, ccy, angle);
       ctx.beginPath();
@@ -18989,13 +18989,13 @@ function setupCropWidget(node) {
     }
     const [topX, topY] = rotatePoint((rx0 + rx1) / 2, ry0, ccx, ccy, angle);
     const [hubX, hubY] = rotatePoint((rx0 + rx1) / 2, ry0 - ROTATE_OFFSET$1, ccx, ccy, angle);
-    ctx.strokeStyle = C$2.rect;
+    ctx.strokeStyle = C$3.rect;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(topX, topY);
     ctx.lineTo(hubX, hubY);
     ctx.stroke();
-    ctx.fillStyle = C$2.handle;
+    ctx.fillStyle = C$3.handle;
     ctx.beginPath();
     ctx.arc(hubX, hubY, HANDLE_R$1, 0, Math.PI * 2);
     ctx.fill();
@@ -19479,8 +19479,8 @@ const blendFrame = (mode, bg, fg, opacity, out) => {
   }
 };
 const isBlended = (mode) => mode in CHANNEL || mode in HSL;
-const NODE_NAME$5 = "NKDMerge";
-const EXT_NAME$3 = "NKD.BasicTools.Merge";
+const NODE_NAME$6 = "NKDMerge";
+const EXT_NAME$4 = "NKD.BasicTools.Merge";
 console.log("[NKD Merge] rev 1.0.0");
 const DEFAULT = { x: 0.5, y: 0.5, scale: 1, angle: 0 };
 const sources = /* @__PURE__ */ new Map();
@@ -19515,7 +19515,7 @@ const HANDLE_R = 4;
 const HANDLE_HIT = 9;
 const ROTATE_OFFSET = 20;
 const SNAP_PX = 8;
-const C$1 = {
+const C$2 = {
   bg: "#111318",
   frame: "rgba(255,255,255,0.35)",
   dim: "rgba(0,0,0,0.55)",
@@ -19560,9 +19560,9 @@ async function fetchSource(nodeId) {
 }
 function registerMerge() {
   app.registerExtension({
-    name: EXT_NAME$3,
+    name: EXT_NAME$4,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$5) return;
+      if (nodeData.name !== NODE_NAME$6) return;
       if (nodeType.prototype.__nkdMergeWrapped) return;
       nodeType.prototype.__nkdMergeWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -19722,7 +19722,7 @@ function setupMergeWidget(node) {
     }
     const ctx = canvas.getContext("2d");
     ctx.setTransform(w / cw, 0, 0, h / ch, 0, 0);
-    ctx.fillStyle = C$1.bg;
+    ctx.fillStyle = C$2.bg;
     ctx.fillRect(0, 0, cw, ch);
     const s = src();
     if (!s) {
@@ -19774,15 +19774,15 @@ function setupMergeWidget(node) {
       ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
       ctx.drawImage(scratchBg, x0, y0, x1 - x0, y1 - y0);
     }
-    ctx.fillStyle = C$1.dim;
+    ctx.fillStyle = C$2.dim;
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
     ctx.rect(x0, y0, x1 - x0, y1 - y0);
     ctx.fill("evenodd");
-    ctx.strokeStyle = C$1.frame;
+    ctx.strokeStyle = C$2.frame;
     ctx.lineWidth = 1;
     ctx.strokeRect(x0 + 0.5, y0 + 0.5, x1 - x0 - 1, y1 - y0 - 1);
-    ctx.strokeStyle = C$1.guide;
+    ctx.strokeStyle = C$2.guide;
     ctx.setLineDash([4, 3]);
     if (guides.x !== void 0) {
       const [gx] = toCanvas2(guides.x, 0);
@@ -19800,23 +19800,23 @@ function setupMergeWidget(node) {
     }
     ctx.setLineDash([]);
     const cs = corners().map(([x, y]) => toCanvas2(x, y));
-    ctx.strokeStyle = hover === "move" ? C$1.hover : C$1.box;
+    ctx.strokeStyle = hover === "move" ? C$2.hover : C$2.box;
     ctx.beginPath();
     cs.forEach(([x, y], i) => i ? ctx.lineTo(x, y) : ctx.moveTo(x, y));
     ctx.closePath();
     ctx.stroke();
     cs.forEach(([x, y], i) => {
-      ctx.fillStyle = hover === `c${i}` ? C$1.hover : C$1.box;
+      ctx.fillStyle = hover === `c${i}` ? C$2.hover : C$2.box;
       ctx.fillRect(x - HANDLE_R, y - HANDLE_R, HANDLE_R * 2, HANDLE_R * 2);
     });
     const [rx, ry] = rotateHandle();
     const [tx, ty] = toCanvas2(...fromLocal(0, -p2.h / 2));
-    ctx.strokeStyle = C$1.box;
+    ctx.strokeStyle = C$2.box;
     ctx.beginPath();
     ctx.moveTo(tx, ty);
     ctx.lineTo(rx, ry);
     ctx.stroke();
-    ctx.fillStyle = hover === "rotate" ? C$1.hover : C$1.box;
+    ctx.fillStyle = hover === "rotate" ? C$2.hover : C$2.box;
     ctx.beginPath();
     ctx.arc(rx, ry, HANDLE_R + 1, 0, Math.PI * 2);
     ctx.fill();
@@ -20206,8 +20206,8 @@ function rowsFrom(analysis) {
 }
 const openPanels = /* @__PURE__ */ new Set();
 const refreshAllPresets = () => Promise.all([...openPanels].map((f) => f()));
-const NODE_NAME$4 = "NKDLoraControl";
-const EXT_NAME$2 = "NKD.BasicTools.LoraControl";
+const NODE_NAME$5 = "NKDLoraControl";
+const EXT_NAME$3 = "NKD.BasicTools.LoraControl";
 const ROW_H = 17;
 const PAD = 6;
 const CB = 11;
@@ -20215,7 +20215,7 @@ const LABEL_W = 116;
 const VALUE_W = 38;
 const MIN_W$1 = 340;
 const W_MIN = -1, W_MAX = 2;
-const C = {
+const C$1 = {
   bg: "#111318",
   row: "rgba(255,255,255,0.03)",
   track: "rgba(255,255,255,0.09)",
@@ -20227,7 +20227,7 @@ const C = {
   handle: "#e8edf5",
   hint: "rgba(255,255,255,0.35)"
 };
-function setup$2(node) {
+function setup$3(node) {
   const blocksW = findW(node, "blocks");
   const loraW = findW(node, "lora_name");
   const strengthW = findW(node, "strength");
@@ -20522,10 +20522,10 @@ No: only the block shape is saved, and you set the strength on the loader.`
     }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = C.bg;
+    ctx.fillStyle = C$1.bg;
     ctx.fillRect(0, 0, w, h);
     if (!rows.length) {
-      ctx.fillStyle = C.hint;
+      ctx.fillStyle = C$1.hint;
       ctx.font = "11px sans-serif";
       ctx.textBaseline = "middle";
       ctx.fillText(status, PAD, ROW_H / 2);
@@ -20540,10 +20540,10 @@ No: only the block shape is saved, and you set the strength on the loader.`
       const mid = y + ROW_H / 2;
       const picked2 = selection.has(i);
       if (picked2) {
-        ctx.fillStyle = C.sel;
+        ctx.fillStyle = C$1.sel;
         ctx.fillRect(0, y, w, ROW_H);
       } else if (i % 2) {
-        ctx.fillStyle = C.row;
+        ctx.fillStyle = C$1.row;
         ctx.fillRect(0, y, w, ROW_H);
       }
       if (hover === i) {
@@ -20561,29 +20561,29 @@ No: only the block shape is saved, and you set the strength on the loader.`
       const lx = PAD + CB + PAD;
       ctx.fillStyle = impactColor(r.score, r.on ? 0.22 : 0.08);
       ctx.fillRect(lx - 2, y + 2, (LABEL_W + 2) * (r.score / 100), ROW_H - 4);
-      ctx.fillStyle = r.on ? C.label : C.labelOff;
+      ctx.fillStyle = r.on ? C$1.label : C$1.labelOff;
       ctx.font = "10px sans-serif";
       let text = r.name;
       while (ctx.measureText(text).width > LABEL_W - 2 && text.length > 4) text = text.slice(0, -1);
       ctx.fillText(text, lx, mid);
-      ctx.fillStyle = C.track;
+      ctx.fillStyle = C$1.track;
       ctx.fillRect(sx, mid - 2, sw, 4);
-      ctx.fillStyle = C.zero;
+      ctx.fillStyle = C$1.zero;
       ctx.fillRect(zeroX - 0.5, mid - 5, 1, 10);
       const hx = sx + (Math.max(W_MIN, Math.min(W_MAX, r.weight)) - W_MIN) / (W_MAX - W_MIN) * sw;
       ctx.fillStyle = r.on ? impactColor(r.score) : "rgba(255,255,255,0.25)";
       ctx.fillRect(Math.min(zeroX, hx), mid - 2, Math.abs(hx - zeroX), 4);
       ctx.beginPath();
       ctx.arc(hx, mid, 4, 0, Math.PI * 2);
-      ctx.fillStyle = r.on ? C.handle : "rgba(255,255,255,0.3)";
+      ctx.fillStyle = r.on ? C$1.handle : "rgba(255,255,255,0.3)";
       ctx.fill();
-      ctx.fillStyle = r.on ? C.label : C.labelOff;
+      ctx.fillStyle = r.on ? C$1.label : C$1.labelOff;
       ctx.font = "10px sans-serif";
       ctx.textAlign = "right";
       ctx.fillText(r.weight.toFixed(2), w - PAD, mid);
       ctx.textAlign = "left";
       if (picked2) {
-        ctx.strokeStyle = C.selEdge;
+        ctx.strokeStyle = C$1.selEdge;
         ctx.globalAlpha = 0.5;
         ctx.strokeRect(0.5, y + 0.5, w - 1, ROW_H - 1);
         ctx.globalAlpha = 1;
@@ -20965,21 +20965,21 @@ function registerLoraControl() {
   style.textContent = CSS;
   document.head.appendChild(style);
   app.registerExtension({
-    name: EXT_NAME$2,
+    name: EXT_NAME$3,
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$4) return;
+      if (nodeData.name !== NODE_NAME$5) return;
       if (nodeType.prototype.__nkdLoraWrapped) return;
       nodeType.prototype.__nkdLoraWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function(...args) {
         const r = origCreated == null ? void 0 : origCreated.apply(this, args);
-        setup$2(this);
+        setup$3(this);
         return r;
       };
     }
   });
 }
-const NODE_NAME$3 = "NKDLoader";
+const NODE_NAME$4 = "NKDLoader";
 const SETTING = "NKD.Loader.Presets";
 const MAX_OUTPUTS = 10;
 console.log("[NKD Loader] rev 1.0.0");
@@ -21140,7 +21140,7 @@ async function repack(group) {
   const got = await capture(inside, new Set(external.map((e) => e.src)));
   if (typeof got === "string") return toast("warn", got);
   if (!await savePreset(got.recipe, group.flags[GROUP_FLAG])) return;
-  const loader = LG().createNode(NODE_NAME$3);
+  const loader = LG().createNode(NODE_NAME$4);
   graph.add(loader);
   loader.pos = [group.pos[0], group.pos[1] + group.titleHeight];
   applyRecipe(loader, got.recipe);
@@ -21199,7 +21199,7 @@ function applyToNodes(name, recipe) {
   const graphs = [app.rootGraph, ...((_b = (_a = app.rootGraph) == null ? void 0 : _a.subgraphs) == null ? void 0 : _b.values()) ?? []];
   let hit = false;
   for (const g of graphs) for (const node of (g == null ? void 0 : g.nodes) ?? []) {
-    if (node.type !== NODE_NAME$3 || ((_d = parse((_c = findW(node, "recipe")) == null ? void 0 : _c.value)) == null ? void 0 : _d.name) !== name) continue;
+    if (node.type !== NODE_NAME$4 || ((_d = parse((_c = findW(node, "recipe")) == null ? void 0 : _c.value)) == null ? void 0 : _d.name) !== name) continue;
     applyRecipe(node, recipe);
     hit = true;
   }
@@ -21424,12 +21424,12 @@ function registerLoader() {
     getNodeMenuItems(node) {
       var _a;
       const items = [];
-      if (node.type === NODE_NAME$3) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
+      if (node.type === NODE_NAME$4) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
       if ((_a = app.canvas.selected_nodes) == null ? void 0 : _a[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
       return items.length ? [null, ...items] : [];
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$3) return;
+      if (nodeData.name !== NODE_NAME$4) return;
       if (nodeType.prototype.__nkdWrapped) return;
       nodeType.prototype.__nkdWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
@@ -21459,8 +21459,8 @@ function registerLoader() {
     }
   });
 }
-const NODE_NAME$2 = "NKDMaskPicker";
-const EXT_NAME$1 = "NKD.BasicTools.MaskPicker";
+const NODE_NAME$3 = "NKDMaskPicker";
+const EXT_NAME$2 = "NKD.BasicTools.MaskPicker";
 console.log("[NKD Mask Picker] rev 2");
 const HOVER = [74, 180, 255], CUT = [70, 70, 70];
 const NEGATIVE = [255, 80, 80];
@@ -22015,7 +22015,7 @@ function makeView(state, actions, fit) {
 }
 function registerMaskPicker() {
   app.registerExtension({
-    name: EXT_NAME$1,
+    name: EXT_NAME$2,
     onNodeOutputsUpdated(outputs) {
       var _a, _b, _c, _d;
       for (const [id, out] of Object.entries(outputs)) {
@@ -22024,13 +22024,13 @@ function registerMaskPicker() {
       }
     },
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$2) return;
+      if (nodeData.name !== NODE_NAME$3) return;
       if (nodeType.prototype.__nkdMaskPickerWrapped) return;
       nodeType.prototype.__nkdMaskPickerWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function() {
         const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
-        setup$1(this);
+        setup$2(this);
         return r;
       };
       const origExecuted = nodeType.prototype.onExecuted;
@@ -22043,7 +22043,7 @@ function registerMaskPicker() {
     }
   });
 }
-function setup$1(node) {
+function setup$2(node) {
   const selW = findW(node, "selection");
   if (!selW) return;
   hideWidget(selW);
@@ -22148,13 +22148,13 @@ function setup$1(node) {
   };
   load();
 }
-const NODE_NAME$1 = "NKDMaskPainter";
+const NODE_NAME$2 = "NKDMaskPainter";
 const MASK_COLOR = "#1e3a1e", MASK_BG = "#0f1f0f";
 function runNode(node) {
   if (node.graph === app.rootGraph) app.queuePrompt(0, 1, { queueNodeIds: [String(node.id)] });
   else app.queuePrompt(0, 1);
 }
-function setup(node) {
+function setup$1(node) {
   const h = setupPaintWidget(node, {
     widget: "image",
     input: "images",
@@ -22215,16 +22215,375 @@ function registerMaskPainter() {
   app.registerExtension({
     name: "NKD.BasicTools.MaskPainter",
     async beforeRegisterNodeDef(nodeType, nodeData) {
-      if (nodeData.name !== NODE_NAME$1 || nodeType.prototype.__nkdMaskPainterWrapped) return;
+      if (nodeData.name !== NODE_NAME$2 || nodeType.prototype.__nkdMaskPainterWrapped) return;
       nodeType.prototype.__nkdMaskPainterWrapped = true;
+      const origCreated = nodeType.prototype.onNodeCreated;
+      nodeType.prototype.onNodeCreated = function() {
+        const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+        setup$1(this);
+        return r;
+      };
+    }
+  });
+}
+const NODE_NAME$1 = "NKDTemporalCrop";
+const EXT_NAME$1 = "NKD.BasicTools.TemporalCrop";
+const PREVIEW_H = 150;
+const GAP = 6;
+const STRIP_H = 56;
+const WAVE_H = 30;
+const CANVAS_H = PREVIEW_H + GAP + STRIP_H + WAVE_H;
+const EDGE_PX = 6;
+const LONG_SECONDS = 15;
+const C = {
+  bg: "#111318",
+  band: "#1a1c22",
+  wave: "rgba(200,208,224,0.55)",
+  span: "rgba(74,180,255,0.22)",
+  spanEdge: "#4ab4ff",
+  ctx: "rgba(74,180,255,0.07)",
+  hover: "#ffd166",
+  active: "#ff6b6b",
+  text: "#c8d0e0",
+  dim: "rgba(255,255,255,0.45)",
+  warn: "#ffb066"
+};
+function parseSpans(text) {
+  const out = [];
+  for (const m of (text || "").matchAll(/(\d+)\s*-\s*(\d+)/g)) {
+    const a = Number(m[1]), b = Number(m[2]);
+    out.push([Math.min(a, b), Math.max(a, b)]);
+  }
+  return normalize(out);
+}
+const formatSpans = (spans) => spans.map(([a, b]) => `${a}-${b}`).join(", ");
+function normalize(spans) {
+  const s = spans.map(([a, b]) => [Math.min(a, b), Math.max(a, b)]).sort((x, y) => x[0] - y[0]);
+  const out = [];
+  for (const sp of s) {
+    const last = out[out.length - 1];
+    if (last && sp[0] <= last[1] + 1) last[1] = Math.max(last[1], sp[1]);
+    else out.push([sp[0], sp[1]]);
+  }
+  return out;
+}
+function estimateSlowed(spans, frames2, every, context, token) {
+  const segs = normalize(spans.map(([a, b]) => [Math.max(0, a - context), Math.min(frames2 - 1, b + context)]));
+  let total = 0;
+  for (const [s0, s1] of segs) {
+    let hot = 0;
+    for (const [a, b] of spans) hot += Math.max(0, Math.min(b, s1) - Math.max(a, s0) + 1);
+    total += s1 - s0 + 1 - hot + Math.ceil(hot / every) * token;
+  }
+  return total;
+}
+class TimelineView {
+  constructor(settings, commit) {
+    __publicField(this, "root", document.createElement("div"));
+    __publicField(this, "canvas", document.createElement("canvas"));
+    __publicField(this, "info", document.createElement("div"));
+    __publicField(this, "spans", []);
+    __publicField(this, "preview", null);
+    __publicField(this, "sheet", null);
+    __publicField(this, "hover", -1);
+    __publicField(this, "drag", null);
+    __publicField(this, "ro");
+    __publicField(this, "onDown", (e) => {
+      if (!this.preview || e.button !== 0) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const { x, y } = this.local(e);
+      if (y < PREVIEW_H) return;
+      const f = this.frameAt(x);
+      const h = this.hit(x);
+      if (h) {
+        this.drag = { mode: h.part, index: h.index, anchor: f, offset: f - this.spans[h.index][0] };
+      } else {
+        this.spans.push([f, f]);
+        this.drag = { mode: "create", index: this.spans.length - 1, anchor: f, offset: 0 };
+      }
+      this.canvas.setPointerCapture(e.pointerId);
+      this.draw();
+    });
+    __publicField(this, "onMove", (e) => {
+      if (!this.preview) return;
+      e.stopPropagation();
+      const { x, y } = this.local(e);
+      const f = this.frameAt(x);
+      this.hover = f;
+      const d = this.drag;
+      if (d) {
+        const sp = this.spans[d.index];
+        const last = this.preview.frames - 1;
+        if (d.mode === "create") {
+          sp[0] = Math.min(d.anchor, f);
+          sp[1] = Math.max(d.anchor, f);
+        } else if (d.mode === "a") {
+          sp[0] = Math.min(f, sp[1]);
+        } else if (d.mode === "b") {
+          sp[1] = Math.max(f, sp[0]);
+        } else {
+          const len = sp[1] - sp[0];
+          sp[0] = Math.max(0, Math.min(last - len, f - d.offset));
+          sp[1] = sp[0] + len;
+        }
+      } else {
+        const h = y >= PREVIEW_H ? this.hit(x) : null;
+        this.canvas.style.cursor = !h ? "crosshair" : h.part === "move" ? "grab" : "ew-resize";
+      }
+      this.draw();
+    });
+    __publicField(this, "onUp", (e) => {
+      if (!this.drag) return;
+      e.stopPropagation();
+      this.drag = null;
+      this.spans = normalize(this.spans);
+      this.commit(this.spans);
+      this.draw();
+    });
+    __publicField(this, "onContext", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const { x, y } = this.local(e);
+      const h = y >= PREVIEW_H ? this.hit(x) : null;
+      if (!h) return;
+      this.spans.splice(h.index, 1);
+      this.commit(this.spans);
+      this.draw();
+    });
+    this.settings = settings;
+    this.commit = commit;
+    this.root.style.cssText = "display:flex;flex-direction:column;gap:4px;width:100%;";
+    this.canvas.style.cssText = `width:100%;height:${CANVAS_H}px;display:block;border-radius:4px;cursor:crosshair;`;
+    this.info.style.cssText = `font:11px sans-serif;color:${C.dim};padding:0 2px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;`;
+    this.root.append(this.canvas, this.info);
+    this.canvas.addEventListener("pointerdown", this.onDown);
+    this.canvas.addEventListener("pointermove", this.onMove);
+    this.canvas.addEventListener("pointerup", this.onUp);
+    this.canvas.addEventListener("pointerleave", () => {
+      if (!this.drag) {
+        this.hover = -1;
+        this.draw();
+      }
+    });
+    this.canvas.addEventListener("contextmenu", this.onContext);
+    this.ro = new ResizeObserver(() => this.draw());
+    this.ro.observe(this.canvas);
+  }
+  release() {
+    this.ro.disconnect();
+  }
+  setPreview(p2) {
+    this.preview = p2;
+    const img = new Image();
+    img.onload = () => {
+      this.sheet = img;
+      this.draw();
+    };
+    img.src = viewUrl$1(p2);
+    this.draw();
+  }
+  get width() {
+    return this.canvas.offsetWidth || 1;
+  }
+  /** Pointer -> canvas px, undoing LiteGraph's zoom (getBoundingClientRect includes it). */
+  local(e) {
+    const r = this.canvas.getBoundingClientRect();
+    const k = this.canvas.offsetWidth / (r.width || 1);
+    return { x: (e.clientX - r.left) * k, y: (e.clientY - r.top) * k };
+  }
+  frameAt(x) {
+    var _a;
+    const n = ((_a = this.preview) == null ? void 0 : _a.frames) ?? 1;
+    return Math.max(0, Math.min(n - 1, Math.floor(x / this.width * n)));
+  }
+  xOf(frame) {
+    var _a;
+    return frame / (((_a = this.preview) == null ? void 0 : _a.frames) ?? 1) * this.width;
+  }
+  hit(x) {
+    for (let i = this.spans.length - 1; i >= 0; i--) {
+      const [a, b] = this.spans[i];
+      const xa = this.xOf(a), xb = this.xOf(b + 1);
+      if (Math.abs(x - xa) <= EDGE_PX) return { index: i, part: "a" };
+      if (Math.abs(x - xb) <= EDGE_PX) return { index: i, part: "b" };
+      if (x > xa && x < xb) return { index: i, part: "move" };
+    }
+    return null;
+  }
+  /** One frame of the contact sheet into a box, cropped to keep its aspect. */
+  tile(ctx, frame, x, y, w, h) {
+    const p2 = this.preview, img = this.sheet;
+    if (!p2 || !img) return;
+    const t = Math.max(0, Math.min(p2.tiles - 1, Math.round(frame / Math.max(1, p2.frames - 1) * (p2.tiles - 1))));
+    const sx = t % p2.cols * p2.tile_w, sy = Math.floor(t / p2.cols) * p2.tile_h;
+    const want = w / h * p2.tile_h;
+    const sw = Math.min(p2.tile_w, want);
+    ctx.drawImage(img, sx + (p2.tile_w - sw) / 2, sy, sw, p2.tile_h, x, y, w, h);
+  }
+  draw() {
+    var _a;
+    const W = this.width;
+    const dpr = Math.max(window.devicePixelRatio || 1, 2);
+    if (this.canvas.width !== Math.round(W * dpr)) this.canvas.width = Math.round(W * dpr);
+    if (this.canvas.height !== Math.round(CANVAS_H * dpr)) this.canvas.height = Math.round(CANVAS_H * dpr);
+    const ctx = this.canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, W, CANVAS_H);
+    const p2 = this.preview;
+    this.updateInfo();
+    if (!p2) {
+      ctx.fillStyle = C.dim;
+      ctx.font = "12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Run once to see the clip here", W / 2, CANVAS_H / 2);
+      ctx.textAlign = "left";
+      return;
+    }
+    const y0 = PREVIEW_H + GAP, y1 = y0 + STRIP_H;
+    const shown = this.hover >= 0 ? this.hover : ((_a = this.spans[0]) == null ? void 0 : _a[0]) ?? 0;
+    const ph = PREVIEW_H, pw = Math.min(W, ph * (p2.tile_w / p2.tile_h));
+    this.tile(ctx, shown, (W - pw) / 2, 0, pw, ph);
+    ctx.fillStyle = C.text;
+    ctx.font = "11px sans-serif";
+    ctx.fillText(`frame ${shown} · ${(shown / p2.fps).toFixed(2)} s`, 6, 14);
+    ctx.fillStyle = C.band;
+    ctx.fillRect(0, y0, W, STRIP_H + WAVE_H);
+    const thumbW = STRIP_H * (p2.tile_w / p2.tile_h);
+    const count = Math.max(1, Math.floor(W / thumbW));
+    for (let k = 0; k < count; k++) {
+      const x = k * W / count, w = W / count;
+      this.tile(ctx, Math.floor((k + 0.5) / count * p2.frames), x, y0, w - 1, STRIP_H);
+    }
+    if (p2.peaks.length) {
+      ctx.fillStyle = C.wave;
+      const mid = y1 + WAVE_H / 2;
+      const bw = W / p2.peaks.length;
+      p2.peaks.forEach((v, i) => {
+        const h = Math.max(1, v * (WAVE_H - 4));
+        ctx.fillRect(i * bw, mid - h / 2, Math.max(1, bw - 0.5), h);
+      });
+    }
+    const { context } = this.settings();
+    for (const [a, b] of this.spans) {
+      const xa = this.xOf(a), xb = this.xOf(b + 1);
+      ctx.fillStyle = C.ctx;
+      ctx.fillRect(this.xOf(Math.max(0, a - context)), y0, this.xOf(Math.min(p2.frames, b + 1 + context)) - this.xOf(Math.max(0, a - context)), STRIP_H + WAVE_H);
+      ctx.fillStyle = C.span;
+      ctx.fillRect(xa, y0, xb - xa, STRIP_H + WAVE_H);
+      ctx.fillStyle = this.drag ? C.active : C.spanEdge;
+      ctx.fillRect(xa, y0, 2, STRIP_H + WAVE_H);
+      ctx.fillRect(xb - 2, y0, 2, STRIP_H + WAVE_H);
+      ctx.fillStyle = C.text;
+      ctx.fillText(`${a}–${b}`, xa + 4, y0 + 12);
+    }
+    if (this.hover >= 0) {
+      ctx.fillStyle = C.hover;
+      ctx.fillRect(this.xOf(this.hover), y0, 1, STRIP_H + WAVE_H);
+    }
+  }
+  updateInfo() {
+    const p2 = this.preview;
+    if (!p2) {
+      this.info.textContent = "Drag on the strip to mark a moment · drag its edges to adjust · right click to remove";
+      return;
+    }
+    if (!this.spans.length) {
+      this.info.style.color = C.dim;
+      this.info.textContent = `${p2.frames} frames · drag on the strip to mark the moments to redraw`;
+      return;
+    }
+    const { every, context } = this.settings();
+    const slowed = estimateSlowed(this.spans, p2.frames, every, context, p2.token);
+    const secs = slowed / p2.fps;
+    this.info.style.color = secs > LONG_SECONDS ? C.warn : C.dim;
+    this.info.textContent = `${this.spans.length} moment${this.spans.length > 1 ? "s" : ""} · slowed clip ≈ ${slowed} frames (${secs.toFixed(1)} s)` + (secs > LONG_SECONDS ? " · long: mark less, or use Drawings 2" : "") + " · right click a moment to remove it";
+  }
+}
+function registerTemporalCrop() {
+  app.registerExtension({
+    name: EXT_NAME$1,
+    onNodeOutputsUpdated(outputs) {
+      var _a, _b, _c, _d;
+      for (const [id, out] of Object.entries(outputs)) {
+        const p2 = (_a = out == null ? void 0 : out.nkd_tcrop) == null ? void 0 : _a[0];
+        if (p2 && !id.includes(":")) (_d = (_c = (_b = app.rootGraph) == null ? void 0 : _b.getNodeById(id)) == null ? void 0 : _c.__nkdTimeline) == null ? void 0 : _d.setPreview(p2);
+      }
+    },
+    async beforeRegisterNodeDef(nodeType, nodeData) {
+      if (nodeData.name !== NODE_NAME$1) return;
+      if (nodeType.prototype.__nkdTemporalWrapped) return;
+      nodeType.prototype.__nkdTemporalWrapped = true;
       const origCreated = nodeType.prototype.onNodeCreated;
       nodeType.prototype.onNodeCreated = function() {
         const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
         setup(this);
         return r;
       };
+      const origExecuted = nodeType.prototype.onExecuted;
+      nodeType.prototype.onExecuted = function(output) {
+        var _a, _b;
+        origExecuted == null ? void 0 : origExecuted.apply(this, arguments);
+        const p2 = (_a = output == null ? void 0 : output.nkd_tcrop) == null ? void 0 : _a[0];
+        if (p2) (_b = this.__nkdTimeline) == null ? void 0 : _b.setPreview(p2);
+      };
     }
   });
+}
+function setup(node) {
+  const spansW = findW(node, "spans");
+  if (!spansW) return;
+  hideWidget(spansW);
+  const num2 = (name, d) => {
+    var _a;
+    return Number(((_a = findW(node, name)) == null ? void 0 : _a.value) ?? d) || d;
+  };
+  const view = new TimelineView(
+    () => ({ every: num2("every", 1), context: num2("context", 12) }),
+    (spans) => {
+      var _a, _b, _c, _d, _e;
+      spansW.value = formatSpans(spans);
+      (_e = (_d = (_c = (_b = (_a = app.extensionManager) == null ? void 0 : _a.workflow) == null ? void 0 : _b.activeWorkflow) == null ? void 0 : _c.changeTracker) == null ? void 0 : _d.checkState) == null ? void 0 : _e.call(_d);
+    }
+  );
+  node.__nkdTimeline = view;
+  for (const name of ["every", "context"]) {
+    const w = findW(node, name);
+    if (!w) continue;
+    const cb = w.callback;
+    w.callback = function() {
+      const r = cb == null ? void 0 : cb.apply(this, arguments);
+      view.draw();
+      return r;
+    };
+  }
+  const mounted = mountDomWidget(node, {
+    name: "timeline",
+    type: "NKD_TEMPORAL_TIMELINE",
+    root: view.root,
+    minWidth: 360,
+    estimate: () => CANVAS_H + 22,
+    onResize: () => view.draw()
+  });
+  const load = () => {
+    view.spans = parseSpans(String(spansW.value ?? ""));
+    view.draw();
+  };
+  const origConfigure = node.onConfigure;
+  node.onConfigure = function() {
+    const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+    load();
+    return r;
+  };
+  const origRemoved = node.onRemoved;
+  node.onRemoved = function() {
+    view.release();
+    mounted.release();
+    return origRemoved == null ? void 0 : origRemoved.apply(this, arguments);
+  };
+  load();
+  requestAnimationFrame(() => mounted.resizeToContent());
 }
 guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDInpaintCrop: 1,
@@ -22261,7 +22620,9 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDCropStitch: 1,
   NKDLoader: 1,
   NKDMiniMaxGuides: 1,
-  NKDAVLatentExtend: 1
+  NKDAVLatentExtend: 1,
+  NKDTemporalCrop: 1,
+  NKDTemporalStitch: 1
 });
 registerCrop();
 registerMerge();
@@ -22270,6 +22631,7 @@ registerMaskPicker();
 registerMaskPainter();
 registerLoraControl();
 registerLoader();
+registerTemporalCrop();
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";
 const MIN_W = 300;

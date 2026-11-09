@@ -17,6 +17,7 @@ from .nkd_mask_ops import NKDMaskOps, NKDMaskOpsLean
 from .nkd_alpha_matte import NKDAlphaMatte
 from .nkd_merge import NKDMerge
 from .nkd_av_latent import NKDAudioMask, NKDAVLatent, NKDAVLatentExtend
+from .nkd_temporal_crop import NKDTemporalCrop, NKDTemporalStitch
 from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
@@ -77,6 +78,8 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDAudioMask,
             NKDAVLatent,
             NKDAVLatentExtend,
+            NKDTemporalCrop,
+            NKDTemporalStitch,
             NKDMaskPainter,
             NKDVectorMask,
             NKDFieldBlur,
@@ -123,6 +126,8 @@ NODE_CLASS_MAPPINGS = {
     "NKDAudioMask": NKDAudioMask,
     "NKDAVLatent": NKDAVLatent,
     "NKDAVLatentExtend": NKDAVLatentExtend,
+    "NKDTemporalCrop": NKDTemporalCrop,
+    "NKDTemporalStitch": NKDTemporalStitch,
     "NKDMaskPainter": NKDMaskPainter,
     "NKDVectorMask": NKDVectorMask,
     "NKDFieldBlur": NKDFieldBlur,
@@ -156,6 +161,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDAudioMask": "😺NKD Audio Mask",
     "NKDAVLatent": "😺NKD AV Latent",
     "NKDAVLatentExtend": "😺NKD AV Latent Extend",
+    "NKDTemporalCrop": "😺NKD Temporal Crop",
+    "NKDTemporalStitch": "😺NKD Temporal Stitch",
     "NKDMaskPainter": "😺NKD Mask Painter",
     "NKDVectorMask": "😺NKD Vector Mask",
     "NKDFieldBlur": "😺NKD Field Blur",

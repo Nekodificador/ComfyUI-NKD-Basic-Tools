@@ -23,6 +23,7 @@ import { registerLoraControl } from "./loraBlocks";
 import { registerLoader } from "./loader";
 import { registerMaskPicker } from "./maskPicker";
 import { registerMaskPainter } from "./maskPainter";
+import { registerTemporalCrop } from "./temporalCrop";
 
 // Widget-order guard for EVERY node in the pack (see schemaGuard.ts / the nkd-node
 // skill). v1 = restore-by-name only, never toasts; bump a node's version ONLY on a
@@ -37,6 +38,7 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDResolutionSelector: 1, NKDAlphaMatte: 1, NKDMerge: 1, NKDCurves: 1,
   NKDMaskPicker: 1, NKDFaceCrop: 1, NKDFaceMask: 1, NKDFaceStitch: 1,
   NKDCropStitch: 1, NKDLoader: 1, NKDMiniMaxGuides: 1, NKDAVLatentExtend: 1,
+  NKDTemporalCrop: 1, NKDTemporalStitch: 1,
 });
 
 registerCrop();
@@ -46,6 +48,7 @@ registerMaskPicker();
 registerMaskPainter();
 registerLoraControl();
 registerLoader();
+registerTemporalCrop();
 
 const NODE_NAME = "NKDPromptVariables";
 const EXT_NAME = "NKD.BasicTools.PromptVariables.Vue";

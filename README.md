@@ -35,6 +35,7 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD Mask Ops Lean](docs/mask-ops-lean.md) | The three a composite actually needs, fill holes, expand/contract and feather, at the same speed. |
 | [😺NKD AV Latent](docs/av-latent.md) | Inpaints a video that carries its own soundtrack (MiniMax H3, LTXV) without the sound being regenerated behind your back. |
 | [😺NKD AV Latent Extend](docs/av-latent-extend.md) | Continues a sampled clip into a new one, picture and sound together, so a long take can be built out of short stages. |
+| [😺NKD Temporal Crop / Stitch](docs/temporal-crop-stitch.md) | A detailer in time: mark the fast moments a video model smeared on a timeline, and only those are redrawn crisp and put back at real speed. Works with any video model. |
 | [😺NKD Audio Mask](docs/audio-mask.md) | Masks the audio branch on its own, fitted to the soundtrack's real timing. |
 | [😺NKD MiniMax Guides](docs/minimax-guides.md) | Every guide of a MiniMax H3 shot from one node, instead of a row of them each dragging the same four cables across the canvas. |
 | [😺NKD Mask Painter](docs/mask-painter.md) | Paints a mask onto an image your graph just made, and stacks masks from anywhere while the result stays paintable. |
