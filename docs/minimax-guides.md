@@ -39,6 +39,13 @@ flowchart LR
   puts its own closing keyframe, and the one place off the grid the model was
   trained on, so snapping never moves it. Drop the opening image there and the shot
   loops. Any negative counts back from the end the same way.
+- **An `until` widget per guide** sets how far into sampling it is obeyed, as a
+  fraction of the steps (1 = all the way). Feed a first render as a guide with a
+  high denoise and `until` around 0.85: the model holds that composition and
+  motion, then finishes the fine detail on its own. Each guide has its own, so a
+  layout guide can let go early while a face keyframe holds to the end. H3 runs
+  with a shift of 12, so the fraction is not the sigma: 0.5 lets go around sigma
+  0.92, 0.8 around 0.75, 0.9 around 0.57.
 - **`latent`, `video vae` and `audio vae` come straight back out**, so the
   sampler and whatever comes next hang off this node instead of reaching back
   across the graph. Both VAEs are required inputs rather than optional ones,

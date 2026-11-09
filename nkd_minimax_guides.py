@@ -116,6 +116,17 @@ class NKDMiniMaxGuides(io.ComfyNode):
                                      "positions puts this. Two slots sharing a position (a clip "
                                      "and its sound) become one guide.")
                 for i in range(1, MAX_GUIDES + 1)
+            ] + [
+                # After every position: widgets_values is positional, so appended
+                # widgets leave saved workflows reading their old values.
+                io.Float.Input(f"until_{i}", display_name=f"until {i}", default=1.0,
+                               min=0.0, max=1.0, step=0.01, optional=True, socketless=True,
+                               tooltip="How far into sampling this guide is obeyed, as a fraction "
+                                       "of the steps. 1 = the whole way. Lower it to let the model "
+                                       "follow the guide for the composition and then finish the "
+                                       "fine detail on its own. With H3's usual shift of 12, 0.5 "
+                                       "lets go around sigma 0.92 and 0.9 around 0.57.")
+                for i in range(1, MAX_GUIDES + 1)
             ],
             outputs=[
                 io.Conditioning.Output(display_name="positive"),
@@ -147,7 +158,9 @@ class NKDMiniMaxGuides(io.ComfyNode):
             frame_idx = positions.get(f"position_{_slot_index(name)}", 0)
             if frame_idx < 0:
                 frame_idx += frame_count
-            guide = merged.setdefault(frame_idx, {"image": None, "audio": None})
+            guide = merged.setdefault(frame_idx, {"image": None, "audio": None, "until": 0.0})
+            # a clip and its soundtrack are one guide: it holds while either half asks
+            guide["until"] = max(guide["until"], positions.get(f"until_{_slot_index(name)}", 1.0))
             for key, value in (("image", image), ("audio", audio)):
                 if value is None:
                     continue
@@ -170,12 +183,53 @@ class NKDMiniMaxGuides(io.ComfyNode):
                 snapped[target] = guide
             merged = snapped
 
+        # Each guide encoded once, on a blank conditioning, so it can be dealt into
+        # whichever stretches of the schedule it is obeyed in.
+        anchored = []
         for frame_idx, guide in merged.items():
-            positive = MiniMaxH3AddGuide.execute(
-                positive, latent, frame_idx, vae=vae, audio_vae=audio_vae,
+            blank = MiniMaxH3AddGuide.execute(
+                [[None, {}]], latent, frame_idx, vae=vae, audio_vae=audio_vae,
                 image=guide["image"], audio=guide["audio"])[0]
+            anchored.append((blank[0][1]["minimax_keyframes"][0], guide["until"]))
 
+        if anchored:
+            positive = _schedule(positive, anchored)
         return io.NodeOutput(positive, latent, vae, audio_vae)
+
+
+# The sampler gates entries with strict comparisons; the core's own timestep-range
+# helper leaves the same gap so only one stretch is live at a boundary.
+_EPS = 1e-5
+
+
+def _schedule(positive, anchored):
+    """One conditioning per stretch of the schedule, carrying the guides still obeyed there.
+
+    Guides only ride in the conditioning (H3 turns them into extra sequence rows each
+    step), so a guide that stops at 0.6 is simply absent from the stretch after it.
+    With every guide at 1 there is one stretch and no range keys — the old output.
+    """
+    import node_helpers
+
+    cuts = sorted({until for _, until in anchored if 0.0 < until < 1.0})
+    edges = [0.0] + cuts + [1.0]
+    out = []
+    for start, end in zip(edges, edges[1:]):
+        active = [kf for kf, until in anchored if until >= end]
+        stretch = positive
+        if active:
+            stretch = node_helpers.conditioning_set_values(
+                stretch, {"minimax_keyframes": active}, append=True)
+        if len(edges) == 2:
+            return stretch
+        for t in stretch:
+            # intersect with any range the conditioning already had upstream
+            s = max(start, t[1].get("start_percent", 0.0))
+            e = min(end - _EPS if end < 1.0 else end, t[1].get("end_percent", 1.0))
+            if s < e:
+                out.extend(node_helpers.conditioning_set_values(
+                    [t], {"start_percent": s, "end_percent": e}))
+    return out
 
 
 class NKDMiniMaxGuidesExtension(ComfyExtension):

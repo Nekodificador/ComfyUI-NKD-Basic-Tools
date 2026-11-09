@@ -113,6 +113,30 @@ def demo():
                                           guides={"guide_1": image}, position_1=0)
     assert out[1] is latent and out[2] is vae and out[3] is audio_vae
 
+    # until: a guide is dealt only into the stretches of the schedule it is obeyed in.
+    # Composition guide until 0.6, face keyframe the whole way -> two stretches.
+    cond = run([image, image], position_1=0, position_2=34, until_1=0.6)[0]
+    assert len(cond) == 2, cond
+    early, late = cond[0][1], cond[1][1]
+    assert [k["resolved_frame_index"] for k in early["minimax_keyframes"]] == [0, 34]
+    assert [k["resolved_frame_index"] for k in late["minimax_keyframes"]] == [34]
+    assert early["start_percent"] == 0.0 and late["end_percent"] == 1.0
+    assert early["end_percent"] < late["start_percent"] == 0.6
+
+    # A lone guide that lets go leaves a guide-free stretch, not an empty keyframe list.
+    cond = run([image], position_1=0, until_1=0.85)[0]
+    assert len(cond) == 2 and "minimax_keyframes" not in cond[1][1], cond
+
+    # A range set upstream is narrowed, never widened.
+    ranged = [[torch.zeros(1, 4, 16), {"start_percent": 0.0, "end_percent": 0.5}]]
+    cond = guides.NKDMiniMaxGuides.execute(ranged, latent, vae=_VideoVae(), audio_vae=_AudioVae(),
+                                           guides={"guide_1": image}, position_1=0, until_1=0.7)[0]
+    assert len(cond) == 1 and cond[0][1]["end_percent"] == 0.5, cond
+
+    # All at 1 is exactly the old output: one entry, no range keys.
+    cond = run([image], position_1=0, until_1=1.0)[0]
+    assert len(cond) == 1 and "start_percent" not in cond[0][1]
+
     print("minimax guides ok")
 
 

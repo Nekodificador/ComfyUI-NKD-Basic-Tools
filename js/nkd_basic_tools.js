@@ -143,15 +143,16 @@ const RULES = {
     watch: [],
     apply(node) {
       // Deferred: autogrow adds and removes the guide sockets from its own
-      // connection handler, and ours may run before it has done so.
+      // connection handler, and ours may run before it has done so. until_N rides the same way.
       requestAnimationFrame(() => RULES.NKDMiniMaxGuides.sync(node));
     },
     sync(node) {
       let found = false;
       for (const w of node.widgets ?? []) {
-        if (!w.name?.startsWith("position_")) continue;
+        const m = w.name?.match(/^(?:position|until)_(\d+)$/);
+        if (!m) continue;
         found = true;
-        const slot = `guide_${w.name.slice("position_".length)}`;
+        const slot = `guide_${m[1]}`;
         // endsWith, not ===: a dynamic input can arrive namespaced (guides.guide_3).
         const input = node.inputs?.find((i) => i.name === slot || i.name?.endsWith(`.${slot}`));
         if (input && input.link != null) showWidget(w);
