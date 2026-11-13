@@ -22,6 +22,7 @@ accelerator. Three ideas carry the three nodes:
 from __future__ import annotations
 
 import json
+import math
 
 import numpy as np
 import torch
@@ -275,8 +276,9 @@ def idw_field(pins: torch.Tensor, vals: torch.Tensor, height: int, width: int,
 # Blurs
 # ---------------------------------------------------------------------------
 
-def img_blur(x: torch.Tensor, radius: int) -> torch.Tensor:
-    """Three box passes per axis on a [B, C, H, W] image — `mask_core.blur`'s twin.
+def img_blur(x: torch.Tensor, radius: int, passes: int = 3) -> torch.Tensor:
+    """`passes` box passes per axis on a [B, C, H, W] image — `mask_core.blur`'s twin.
+    Three is a gaussian for the eye; one is a plain box.
 
     The difference that matters: no clamp to [0, 1]. The mask version ends on
     one, so running it over an image quietly crushes anything out of range.
@@ -291,11 +293,34 @@ def img_blur(x: torch.Tensor, radius: int) -> torch.Tensor:
 
     def run(t):
         for kern, pads in ((box, (pad, pad, 0, 0)), (box_v, (0, 0, pad, pad))):
-            for _ in range(3):
+            for _ in range(passes):
                 t = F.conv2d(F.pad(t, pads, mode="replicate"), kern, groups=c)
         return t
 
     return mask_core._map_frames(run, x)
+
+
+def basic_blur(x: torch.Tensor, radius: float, passes: int) -> torch.Tensor:
+    """Continuous-radius blur of a [B, C, H, W] image built from `passes` box passes.
+
+    Every `passes` count gets the variance of `mask_core.blur` at the same radius,
+    so a number means the same softness on an image as on a Mask Ops feather, and
+    switching Box → Gaussian changes the shape of the falloff, not its strength.
+    At three passes it *is* `mask_core.blur`, minus the clamp. The box width that
+    hits the variance is rarely odd, so the two odd widths either side are blended.
+    """
+    r = float(radius)
+    k = math.sqrt(max(0.0, 3.0 * (r * r - 1.0) / passes + 1.0))   # n·(k²−1)/12 == 3·(r²−1)/12
+    if k < 1.0 + 1e-6:
+        return x
+    lo = int(k) | 1
+    if lo > k:
+        lo -= 2
+    t = (k - lo) / 2.0
+    a = img_blur(x, lo, passes)
+    if t <= 1e-6:
+        return a
+    return torch.lerp(a, img_blur(x, lo + 2, passes), t)
 
 
 def pyramid_blur_lerp(img: torch.Tensor, radius_px: torch.Tensor,

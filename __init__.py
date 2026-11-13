@@ -22,6 +22,7 @@ from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
 from .nkd_path_blur import NKDPathBlur
+from .nkd_basic_blur import NKDBasicBlur
 from .nkd_minimax_guides import NKDMiniMaxGuides
 from .nkd_event_curve import NKDEventCurveAudio
 from .nkd_paint import NKDPaint
@@ -85,6 +86,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDVectorMask,
             NKDFieldBlur,
             NKDPathBlur,
+            NKDBasicBlur,
             NKDMiniMaxGuides,
             NKDEventCurveAudio,
             NKDPaint,
@@ -134,6 +136,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDVectorMask": NKDVectorMask,
     "NKDFieldBlur": NKDFieldBlur,
     "NKDPathBlur": NKDPathBlur,
+    "NKDBasicBlur": NKDBasicBlur,
     "NKDMiniMaxGuides": NKDMiniMaxGuides,
     "NKDEventCurveAudio": NKDEventCurveAudio,
     "NKDPaint": NKDPaint,
@@ -170,6 +173,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDVectorMask": "😺NKD Vector Mask",
     "NKDFieldBlur": "😺NKD Field Blur",
     "NKDPathBlur": "😺NKD Path Blur",
+    "NKDBasicBlur": "😺NKD Basic Blur",
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
     "NKDEventCurveAudio": "😺NKD Event Curve",
     "NKDPaint": "😺NKD Painter Node",

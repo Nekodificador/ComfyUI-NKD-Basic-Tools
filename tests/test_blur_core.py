@@ -7,10 +7,11 @@ import numpy as np
 import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from blur_core import (NEUTRAL_REACH, flow_field, idw_field, img_blur,  # noqa: E402
+from blur_core import (NEUTRAL_REACH, basic_blur, flow_field, idw_field, img_blur,  # noqa: E402
                        line_blur, parse_items, path_samples,
                        pyramid_blur_lerp, ramp_offsets, ramp_rings, rasterize,
                        splat_field)
+import mask_core  # noqa: E402
 
 LEFT_HALF = [[0.0, 0.0], [0.5, 0.0], [0.5, 1.0], [0.0, 1.0]]
 
@@ -186,6 +187,26 @@ def demo():
     blurred = img_blur(rgb, 3)
     assert float(blurred[:, 0].abs().max()) < 1e-6, float(blurred[:, 0].abs().max())
     assert abs(float(blurred[:, 1].mean()) - 1.0) < 1e-5, float(blurred[:, 1].mean())
+
+    # --- basic_blur --------------------------------------------------------
+    # Same radius, same variance as the Mask Ops feather whatever the pass
+    # count — only the shape moves. Three passes is that feather, exactly.
+    imp = torch.zeros(1, 1, 1, 201)
+    imp[..., 100] = 1.0
+    xs = torch.arange(201.0) - 100
+    def variance(row):
+        return float((row * xs * xs).sum())
+    for r in (2.0, 7.5, 20.0):
+        want = variance(mask_core.blur(imp, r)[0, 0, 0])
+        for n in (1, 2, 3):
+            row = basic_blur(imp, r, n)[0, 0, 0]
+            var = variance(row)
+            assert abs(float(row.sum()) - 1.0) < 1e-4, (r, n, float(row.sum()))
+            assert abs(var - want) < 0.05 * want + 0.2, (r, n, var)
+    assert basic_blur(imp, 0.0, 3) is imp
+    pic = torch.rand(2, 1, 40, 40)
+    for r in (3.0, 6.4, 11.0):
+        assert torch.allclose(basic_blur(pic, r, 3), mask_core.blur(pic, r), atol=1e-5), r
 
     # --- pyramid_blur_lerp ----------------------------------------------
     # Radius 0 is level 0 is the untouched image.

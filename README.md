@@ -68,13 +68,15 @@ https://github.com/user-attachments/assets/97beddd1-99ca-475d-97b8-e0d2115fef28
 
 ## Blur
 
-Blur that follows something: the shape of a movement, or the depth of a scene.
-Both are drawn on the image and previewed with the real render.
+A plain blur for anything, and two that follow something: the shape of a
+movement, or the depth of a scene. Those two are drawn on the image and previewed
+with the real render.
 
 <!-- hero video goes here -->
 
 | Node | What it does |
 |---|---|
+| [😺NKD Basic Blur](docs/basic-blur.md) | Gaussian, Tent or Box blur by a radius in pixels, on an image, a mask or a video. Fast on long clips. |
 | [😺NKD Path Blur](docs/path-blur.md) | Motion blur that curves, instead of the one straight angle a normal motion blur gives you. |
 | [😺NKD Field Blur](docs/field-blur.md) | A shallow depth of field without a depth map. Drop pins, set how much blur each wants, the rest is interpolated. |
 
