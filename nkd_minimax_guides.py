@@ -140,6 +140,7 @@ class NKDMiniMaxGuides(io.ComfyNode):
     def execute(cls, positive, latent, vae=None, audio_vae=None, snap_positions=True,
                 guides: io.Autogrow.Type = None, **positions) -> io.NodeOutput:
         from comfy.ldm.minimax.model import FRAME_PER_TOKEN
+        from comfy_extras.nodes_audio import AudioMerge
         from comfy_extras.nodes_minimax_h3 import MiniMaxH3AddGuide
 
         # Same count the core node derives, needed here to resolve negative positions
@@ -163,6 +164,11 @@ class NKDMiniMaxGuides(io.ComfyNode):
             guide["until"] = max(guide["until"], positions.get(f"until_{_slot_index(name)}", 1.0))
             for key, value in (("image", image), ("audio", audio)):
                 if value is None:
+                    continue
+                if key == "audio" and guide[key] is not None:
+                    # Two sounds on one frame are one soundtrack: mix them. The model takes a
+                    # single audio guide per position, so this is what stacking them means.
+                    guide[key] = AudioMerge.execute(guide[key], value, "add")[0]
                     continue
                 if guide[key] is not None:
                     raise ValueError(

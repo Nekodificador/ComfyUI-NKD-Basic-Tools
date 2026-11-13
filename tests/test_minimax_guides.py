@@ -83,6 +83,15 @@ def demo():
                                          guides={"guide_1": audio}, position_1=0)[0][0][1]["minimax_keyframes"]
     assert len(kf) == 1 and "audio_latent" in kf[0] and "latent" not in kf[0]
 
+    # Two sounds on the same frame are mixed into one guide; two pictures still cannot share one.
+    kf = keyframes(run([audio, audio], position_1=0, position_2=0))
+    assert len(kf) == 1 and "audio_latent" in kf[0] and "latent" not in kf[0], kf
+    try:
+        run([image, image], position_1=0, position_2=0)
+        raise AssertionError("two images on one frame should be refused")
+    except ValueError as exc:
+        assert "image" in str(exc)
+
     # Empty slots are skipped, and the conditioning comes back untouched when
     # there is nothing to anchor.
     assert "minimax_keyframes" not in run([None, None])[0][0][1]
