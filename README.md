@@ -38,6 +38,7 @@ https://github.com/user-attachments/assets/84e20b72-be4d-4dd6-84d7-69ae7f889dd7
 | [😺NKD Temporal Crop / Stitch](docs/temporal-crop-stitch.md) | A detailer in time: mark the fast moments a video model smeared on a timeline, and only those are redrawn crisp and put back at real speed. Works with any video model. |
 | [😺NKD Audio Mask](docs/audio-mask.md) | Masks the audio branch on its own, fitted to the soundtrack's real timing. |
 | [😺NKD MiniMax Guides](docs/minimax-guides.md) | Every guide of a MiniMax H3 shot from one node, instead of a row of them each dragging the same four cables across the canvas. |
+| [😺NKD Event Curve](docs/event-curve.md) | Draw when things happen in a MiniMax H3 video, or copy the timing from a song or another clip. |
 | [😺NKD Mask Painter](docs/mask-painter.md) | Paints a mask onto an image your graph just made, and stacks masks from anywhere while the result stays paintable. |
 | [😺NKD Mask Picker](docs/mask-picker.md) | Hover the image on the node to see every object you can mask, click to pick it. |
 | [😺NKD Vector Mask](docs/vector-mask.md) | Roto by hand with a pen tool. What gets saved is control points, so it's still editable next week. |

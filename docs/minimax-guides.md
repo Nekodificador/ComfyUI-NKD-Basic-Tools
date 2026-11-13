@@ -1,8 +1,7 @@
 # 😺NKD MiniMax Guides
 
-Anchors every guide of a MiniMax H3 shot from one node, instead of a row of **Add
-Guide for MiniMax H3** nodes each dragging the same four cables in from far
-upstream. Move one and the canvas turns to spaghetti.
+Every guide of a MiniMax H3 shot in one node, instead of a row of **Add Guide for
+MiniMax H3** nodes all dragging the same four cables across the canvas.
 
 ```mermaid
 flowchart LR
@@ -23,36 +22,21 @@ flowchart LR
     classDef output fill:#1f4a1f,stroke:#7fd97f,color:#fff
 ```
 
-- **The guide list grows as you fill it.** Each slot takes a still, a frame
-  sequence, a video (picture and its soundtrack) or bare audio.
-- **A `position` widget** appears next to each filled slot, for the frame it
-  lands on. Negative positions count from the end.
-- **Two slots on the same position**, a clip and its sound, become one guide.
-- **`snap positions` keeps every guide on a multiple of 17.** H3's time axis is not
-  uniform: a video token covers 1, 4, 4, 4, 4 pixel frames in turn, so token starts
-  fall on frames 17m, 17m+1, 17m+5, 17m+9, 17m+13 — while a guide's own latent is
-  always cut from the start of that cycle. The two line up only on a **multiple of
-  17** (0, 17, 34, 51, 68, 85, 102, 119…). Anywhere else the guide's rows land
-  between the video's tokens, and that frame flashes like a cut in the wrong place.
-  On by default; turn it off to place a guide by hand and own the result.
-- **`position -1` is the end anchor**, the video's very last frame — where `fl2va`
-  puts its own closing keyframe, and the one place off the grid the model was
-  trained on, so snapping never moves it. Drop the opening image there and the shot
-  loops. Any negative counts back from the end the same way.
-- **An `until` widget per guide** sets how far into sampling it is obeyed, as a
-  fraction of the steps (1 = all the way). Feed a first render as a guide with a
-  high denoise and `until` around 0.85: the model holds that composition and
-  motion, then finishes the fine detail on its own. Each guide has its own, so a
-  layout guide can let go early while a face keyframe holds to the end. H3 runs
-  with a shift of 12, so the fraction is not the sigma: 0.5 lets go around sigma
-  0.92, 0.8 around 0.75, 0.9 around 0.57.
-- **`latent`, `video vae` and `audio vae` come straight back out**, so the
-  sampler and whatever comes next hang off this node instead of reaching back
-  across the graph. Both VAEs are required inputs rather than optional ones,
-  which keeps them at the top of the node, above the guide list that grows.
-
-The anchoring itself is the core node's: same clip-length snapping, same audio
-cropping, same errors.
+- **Guides**: the list grows as you fill it. Each slot takes a still, a frame
+  sequence, a video with its sound, or just audio.
+- **`position`**: the frame each guide lands on. Negative numbers count from the
+  end, and `-1` is the last frame: put the opening image there and the shot loops.
+- **Same position**: a clip and a sound on the same frame become one guide, and two
+  sounds get mixed, so two [😺NKD Event Curve](event-curve.md) guides can share
+  frame 0.
+- **`snap positions`**: keeps every guide on a multiple of 17 (0, 17, 34, 51…),
+  the only frames where H3 takes a guide cleanly. Anywhere else that frame
+  flashes like a bad cut. On by default.
+- **`until`**: how far into sampling each guide is obeyed (1 = all the way). Feed
+  a first render as a guide with `until` around 0.85 and the model keeps its
+  layout and motion, then finishes the detail on its own.
+- **Outputs**: `latent` and both VAEs come straight back out, so the sampler
+  hangs off this node instead of reaching back across the graph.
 
 ---
 
