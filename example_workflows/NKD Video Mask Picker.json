@@ -1,0 +1,711 @@
+{
+  "id": "8074843c-6b76-41b0-af7a-29a33b0acc65",
+  "revision": 0,
+  "last_node_id": 10,
+  "last_link_id": 15,
+  "nodes": [
+    {
+      "id": 3,
+      "type": "LoadVideo",
+      "pos": [
+        788.7509892415751,
+        46.90132481009266
+      ],
+      "size": [
+        433.7078857421875,
+        469.6947448730469
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VIDEO",
+          "type": "VIDEO",
+          "links": [
+            1
+          ]
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "LoadVideo"
+      },
+      "widgets_values": [
+        "Fences_V1-0001.mov",
+        "image"
+      ],
+      "widgets_values_named": {
+        "file": "Fences_V1-0001.mov",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 4,
+      "type": "NKDMaskPicker",
+      "pos": [
+        1242.4588749837626,
+        192.90132481009266
+      ],
+      "size": [
+        420,
+        449
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 2
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 3
+        }
+      ],
+      "outputs": [
+        {
+          "name": "combined mask",
+          "type": "MASK",
+          "links": [
+            6
+          ]
+        },
+        {
+          "name": "separated masks",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "name": "bboxes",
+          "type": "BOUNDING_BOX",
+          "links": null
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "055b0784360dca77c1df049de2b9fc2115b0aeda",
+        "Node name for S&R": "NKDMaskPicker",
+        "nkdSchema": 1
+      },
+      "widgets_values": [
+        "vitmatte",
+        0.08,
+        false,
+        "normal",
+        "{\"picks\":[{\"x\":0.60938,\"y\":0.82812,\"level\":1,\"mode\":\"add\",\"group\":0}]}",
+        ""
+      ],
+      "widgets_values_named": {
+        "edges": "vitmatte",
+        "edges.edge_margin": 0.08,
+        "points_only": false,
+        "detail": "normal",
+        "selection": "{\"picks\":[{\"x\":0.60938,\"y\":0.82812,\"level\":1,\"mode\":\"add\",\"group\":0}]}",
+        "picker": ""
+      }
+    },
+    {
+      "id": 5,
+      "type": "GetVideoComponents",
+      "pos": [
+        1242.4588749837626,
+        46.90132481009266
+      ],
+      "size": [
+        193.530859375,
+        106
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "link": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "links": [
+            2,
+            4,
+            9
+          ]
+        },
+        {
+          "name": "audio",
+          "type": "AUDIO",
+          "links": [
+            13
+          ]
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "links": [
+            14,
+            15
+          ]
+        },
+        {
+          "name": "bit_depth",
+          "type": "COMBO",
+          "links": null
+        },
+        {
+          "name": "color_space",
+          "type": "COMBO",
+          "links": null
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "GetVideoComponents"
+      }
+    },
+    {
+      "id": 6,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        1242.4588749837626,
+        6.90132481009266
+      ],
+      "size": [
+        270,
+        98
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            3,
+            5
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": null
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "sam31INT8INT4Native_v10.safetensors"
+      ],
+      "widgets_values_named": {
+        "ckpt_name": "sam31INT8INT4Native_v10.safetensors"
+      }
+    },
+    {
+      "id": 7,
+      "type": "SAM3_VideoTrack",
+      "pos": [
+        1867.7004521322,
+        46.90132481009266
+      ],
+      "size": [
+        275.80859375,
+        166
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 4
+        },
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 5
+        },
+        {
+          "name": "initial_mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 6
+        },
+        {
+          "name": "conditioning",
+          "shape": 7,
+          "type": "CONDITIONING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "track_data",
+          "type": "SAM3_TRACK_DATA",
+          "links": [
+            7,
+            10
+          ]
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "SAM3_VideoTrack"
+      },
+      "widgets_values": [
+        0.5,
+        4,
+        1
+      ],
+      "widgets_values_named": {
+        "detection_threshold": 0.5,
+        "max_objects": 4,
+        "detect_interval": 1
+      }
+    },
+    {
+      "id": 8,
+      "type": "SAM3_TrackPreview",
+      "pos": [
+        1867.7004521322,
+        252.90132481009266
+      ],
+      "size": [
+        445,
+        389
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "track_data",
+          "type": "SAM3_TRACK_DATA",
+          "link": 7
+        },
+        {
+          "name": "images",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 9
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 14
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "SAM3_TrackPreview"
+      },
+      "widgets_values": [
+        0.5,
+        24
+      ],
+      "widgets_values_named": {
+        "opacity": 0.5,
+        "fps": 24
+      }
+    },
+    {
+      "id": 9,
+      "type": "SAM3_TrackToMask",
+      "pos": [
+        2203.7865117025126,
+        46.90132481009266
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "track_data",
+          "type": "SAM3_TRACK_DATA",
+          "link": 10
+        }
+      ],
+      "outputs": [
+        {
+          "name": "masks",
+          "type": "MASK",
+          "links": [
+            11
+          ]
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfy-core",
+        "ver": "0.42.0",
+        "Node name for S&R": "SAM3_TrackToMask"
+      },
+      "widgets_values": [
+        ""
+      ],
+      "widgets_values_named": {
+        "object_indices": ""
+      }
+    },
+    {
+      "id": 10,
+      "type": "NKDVideoViewer",
+      "pos": [
+        2544.4181034993876,
+        46.90132481009266
+      ],
+      "size": [
+        430,
+        722
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "shape": 7,
+          "type": "IMAGE,MASK,VIDEO",
+          "link": 11
+        },
+        {
+          "name": "audio",
+          "shape": 7,
+          "type": "AUDIO",
+          "link": 13
+        },
+        {
+          "name": "reference",
+          "shape": 7,
+          "type": "IMAGE,MASK,VIDEO",
+          "link": null
+        },
+        {
+          "name": "fps",
+          "type": "FLOAT",
+          "widget": {
+            "name": "fps"
+          },
+          "link": 15
+        }
+      ],
+      "outputs": [
+        {
+          "name": "video",
+          "type": "VIDEO",
+          "links": null
+        },
+        {
+          "name": "filepath",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {}
+        },
+        "cnr_id": "comfyui-nkd-popup-preview",
+        "ver": "2562b1a817f8565df7950fb7630204a9c443e526",
+        "Node name for S&R": "NKDVideoViewer",
+        "nkdSchema": 2,
+        "nkdVideoView": {
+          "loop": true,
+          "muted": false,
+          "compare": "off",
+          "wipe": 0.7016704513365963,
+          "labels": false
+        }
+      },
+      "widgets_values": [
+        24,
+        false,
+        "mp4 / h264",
+        19,
+        "medium",
+        "%project%/%category%/",
+        "auto (next free)",
+        1,
+        "counter",
+        "NKD",
+        "",
+        false,
+        true,
+        "",
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "fps": 24,
+        "pingpong": false,
+        "format": "mp4 / h264",
+        "format.crf": 19,
+        "format.preset": "medium",
+        "filename_prefix": "%project%/%category%/",
+        "versioning": "auto (next free)",
+        "version": 1,
+        "numbering": "counter",
+        "filename": "NKD",
+        "labels": "",
+        "save_output": false,
+        "labeled_copy": true,
+        "trim": "",
+        "product": "",
+        "nkd_video": ""
+      }
+    }
+  ],
+  "links": [
+    [
+      1,
+      3,
+      0,
+      5,
+      0,
+      "VIDEO"
+    ],
+    [
+      2,
+      5,
+      0,
+      4,
+      0,
+      "IMAGE"
+    ],
+    [
+      3,
+      6,
+      0,
+      4,
+      1,
+      "MODEL"
+    ],
+    [
+      4,
+      5,
+      0,
+      7,
+      0,
+      "IMAGE"
+    ],
+    [
+      5,
+      6,
+      0,
+      7,
+      1,
+      "MODEL"
+    ],
+    [
+      6,
+      4,
+      0,
+      7,
+      2,
+      "MASK"
+    ],
+    [
+      7,
+      7,
+      0,
+      8,
+      0,
+      "SAM3_TRACK_DATA"
+    ],
+    [
+      9,
+      5,
+      0,
+      8,
+      1,
+      "IMAGE"
+    ],
+    [
+      10,
+      7,
+      0,
+      9,
+      0,
+      "SAM3_TRACK_DATA"
+    ],
+    [
+      11,
+      9,
+      0,
+      10,
+      0,
+      "MASK"
+    ],
+    [
+      13,
+      5,
+      1,
+      10,
+      1,
+      "AUDIO"
+    ],
+    [
+      14,
+      5,
+      2,
+      8,
+      2,
+      "FLOAT"
+    ],
+    [
+      15,
+      5,
+      2,
+      10,
+      3,
+      "FLOAT"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ue_links": [],
+    "links_added_by_ue": [],
+    "ds": {
+      "scale": 0.9090909090909091,
+      "offset": [
+        -628.1138310384496,
+        334.4264711722686
+      ]
+    },
+    "linkExtensions": [
+      {
+        "id": 4,
+        "parentId": 1
+      },
+      {
+        "id": 9,
+        "parentId": 1
+      },
+      {
+        "id": 14,
+        "parentId": 2
+      },
+      {
+        "id": 15,
+        "parentId": 2
+      }
+    ],
+    "linkPresentation": {
+      "5": {
+        "hidden": true
+      },
+      "13": {
+        "hidden": true
+      },
+      "14": {
+        "hidden": true
+      },
+      "15": {
+        "hidden": true
+      }
+    },
+    "reroutes": [
+      {
+        "id": 1,
+        "pos": [
+          1825.6048710775126,
+          60.997918666904184
+        ],
+        "linkIds": [
+          4,
+          9
+        ]
+      },
+      {
+        "id": 2,
+        "parentId": 3,
+        "pos": [
+          1825.6048710775126,
+          122.90132481009266
+        ],
+        "linkIds": [
+          14,
+          15
+        ]
+      },
+      {
+        "id": 3,
+        "pos": [
+          1464.6957524251688,
+          122.90132481009266
+        ],
+        "linkIds": [
+          14,
+          15
+        ]
+      }
+    ],
+    "frontendVersion": "1.57.1",
+    "VHS_latentpreview": true,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}

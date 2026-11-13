@@ -1,0 +1,1321 @@
+{
+  "id": "caa204b9-a551-4e99-842c-c9cc684216aa",
+  "revision": 0,
+  "last_node_id": 1610,
+  "last_link_id": 23080,
+  "nodes": [
+    {
+      "id": 1542,
+      "type": "NKDPopupPreviewNode",
+      "pos": [
+        10045,
+        5415
+      ],
+      "size": [
+        420,
+        221
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23064
+        },
+        {
+          "name": "reference",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-popup-preview",
+        "ver": "f1d2140ac5b76391bbcb3ca199ef0439902ddaf5",
+        "Node name for S&R": "NKDPopupPreviewNode",
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "",
+        "NKD",
+        false,
+        "",
+        ""
+      ],
+      "widgets_values_named": {
+        "filename_prefix": "",
+        "filename": "NKD",
+        "open_on_run": false,
+        "nkd_popup": "",
+        "labels": ""
+      },
+      "color": "#4cc9f0",
+      "bgcolor": "#1a2a33"
+    },
+    {
+      "id": 1545,
+      "type": "VAEDecode",
+      "pos": [
+        9795,
+        5345
+      ],
+      "size": [
+        225,
+        50
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "samples",
+          "type": "LATENT",
+          "link": 23010
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 23077
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23041
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.19.3",
+        "Node name for S&R": "VAEDecode",
+        "enableTabs": false,
+        "tabWidth": 65,
+        "tabXOffset": 10,
+        "hasSecondTab": false,
+        "secondTabText": "Send Back",
+        "secondTabOffset": 80,
+        "secondTabWidth": 65,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      }
+    },
+    {
+      "id": 1568,
+      "type": "LoadImage",
+      "pos": [
+        8025,
+        5395
+      ],
+      "size": [
+        400,
+        330
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            23078
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": []
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.33.0",
+        "Node name for S&R": "LoadImage",
+        "#sdppp_variant": "default",
+        "#sdppp_simple_content": "canvas",
+        "#sdppp_simple_mask": "canvas",
+        "#sdppp_simple_boundary": "canvas",
+        "#sdppp_label": "",
+        "image": "clipspace-painted-masked-1787254898646.png [input]",
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "image": true,
+            "upload": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "NKD_v003.png",
+        "image"
+      ],
+      "widgets_values_named": {
+        "image": "NKD_v003.png",
+        "upload": "image"
+      }
+    },
+    {
+      "id": 1573,
+      "type": "ClownsharKSampler_Beta",
+      "pos": [
+        9516.861951467718,
+        5316
+      ],
+      "size": [
+        210,
+        642
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "shape": 7,
+          "type": "MODEL",
+          "link": 23055
+        },
+        {
+          "name": "positive",
+          "shape": 7,
+          "type": "CONDITIONING",
+          "link": 23056
+        },
+        {
+          "name": "negative",
+          "shape": 7,
+          "type": "CONDITIONING",
+          "link": 23057
+        },
+        {
+          "name": "latent_image",
+          "shape": 7,
+          "type": "LATENT",
+          "link": 23058
+        },
+        {
+          "name": "sigmas",
+          "shape": 7,
+          "type": "SIGMAS",
+          "link": null
+        },
+        {
+          "name": "guides",
+          "shape": 7,
+          "type": "GUIDES",
+          "link": null
+        },
+        {
+          "label": "options0",
+          "name": "options_group.options0",
+          "shape": 7,
+          "type": "OPTIONS",
+          "link": null
+        },
+        {
+          "label": "options1",
+          "name": "options_group.options1",
+          "shape": 7,
+          "type": "OPTIONS",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "output",
+          "type": "LATENT",
+          "links": [
+            23010
+          ]
+        },
+        {
+          "name": "denoised",
+          "type": "LATENT",
+          "links": null
+        },
+        {
+          "name": "options",
+          "type": "OPTIONS",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "RES4LYF",
+        "ver": "3802390deff0d508e56a72dd21be4be99a52ff74",
+        "Node name for S&R": "ClownsharKSampler_Beta",
+        "aux_id": "drozbay/RES4LYF",
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "eta": true,
+            "sampler_name": true,
+            "scheduler": true,
+            "steps": true,
+            "steps_to_run": true,
+            "denoise": true,
+            "cfg": true,
+            "seed": true,
+            "sampler_mode": true,
+            "bongmath": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        0.7,
+        "linear/euler",
+        "simple",
+        16,
+        -1,
+        1,
+        1,
+        2,
+        "fixed",
+        "standard",
+        true
+      ],
+      "widgets_values_named": {
+        "eta": 0.7,
+        "sampler_name": "linear/euler",
+        "scheduler": "simple",
+        "steps": 16,
+        "steps_to_run": -1,
+        "denoise": 1,
+        "cfg": 1,
+        "seed": 2,
+        "control_after_generate": "fixed",
+        "sampler_mode": "standard",
+        "bongmath": true
+      }
+    },
+    {
+      "id": 1588,
+      "type": "NKDFaceCrop",
+      "pos": [
+        8914.263754765818,
+        5395
+      ],
+      "size": [
+        210,
+        286
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23079
+        }
+      ],
+      "outputs": [
+        {
+          "name": "face",
+          "type": "IMAGE",
+          "links": [
+            23054
+          ]
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": [
+            23080
+          ]
+        },
+        {
+          "name": "face_data",
+          "type": "NKD_FACEDATA",
+          "links": [
+            23038
+          ]
+        },
+        {
+          "name": "roll",
+          "type": "FLOAT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "290b8557b26a05ef14abdb9e11f96a490777fcd7",
+        "Node name for S&R": "NKDFaceCrop",
+        "nkdSchema": 1,
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "size": true,
+            "padding": true,
+            "upright": true,
+            "offset": true,
+            "face_index": true,
+            "mask_region": true,
+            "forehead": true,
+            "refine_edges": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        1024,
+        1.7,
+        true,
+        -0.125,
+        0,
+        "face",
+        1,
+        false
+      ],
+      "widgets_values_named": {
+        "size": 1024,
+        "padding": 1.7,
+        "upright": true,
+        "offset": -0.125,
+        "face_index": 0,
+        "mask_region": "face",
+        "forehead": 1,
+        "refine_edges": false
+      }
+    },
+    {
+      "id": 1589,
+      "type": "NKDFaceStitch",
+      "pos": [
+        9790.802775704115,
+        5414.495466550632
+      ],
+      "size": [
+        210,
+        150
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23041
+        },
+        {
+          "name": "face_data",
+          "type": "NKD_FACEDATA",
+          "link": 23038
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            23064
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "290b8557b26a05ef14abdb9e11f96a490777fcd7",
+        "Node name for S&R": "NKDFaceStitch",
+        "nkdSchema": 1,
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "feather": true,
+            "edge_hardness": true,
+            "match_colors": true,
+            "seamless_edges": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        30,
+        0.2,
+        0,
+        false
+      ],
+      "widgets_values_named": {
+        "feather": 30,
+        "edge_hardness": 0.2,
+        "match_colors": 0,
+        "seamless_edges": false
+      }
+    },
+    {
+      "id": 1593,
+      "type": "NKDKleinPresampling",
+      "pos": [
+        9245,
+        5315
+      ],
+      "size": [
+        213.669921875,
+        498
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 23060
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 23061
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 23062
+        },
+        {
+          "name": "mask",
+          "shape": 7,
+          "type": "MASK",
+          "link": 23080
+        },
+        {
+          "name": "boxes",
+          "shape": 7,
+          "type": "NKD_KLEIN_BOXES",
+          "link": null
+        },
+        {
+          "name": "upsampler",
+          "shape": 7,
+          "type": "CLIP",
+          "link": null
+        },
+        {
+          "name": "ref_images.ref_0",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": 23054
+        },
+        {
+          "name": "ref_images.ref_1",
+          "shape": 7,
+          "type": "IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            23055
+          ]
+        },
+        {
+          "name": "positive",
+          "type": "CONDITIONING",
+          "links": [
+            23056
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "CONDITIONING",
+          "links": [
+            23057
+          ]
+        },
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            23058
+          ]
+        },
+        {
+          "name": "bundle",
+          "type": "NKD_KLEIN_BUNDLE",
+          "links": null
+        },
+        {
+          "name": "mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "name": "ref_0",
+          "type": "IMAGE",
+          "links": null
+        },
+        {
+          "name": "prompt",
+          "type": "STRING",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-klein-tools",
+        "ver": "c48025cf17659fd3e6514c246f8f595199de61dc",
+        "Node name for S&R": "NKDKleinPresampling",
+        "nkdSchema": 2,
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "positive": true,
+            "negative": true,
+            "pin_model": true,
+            "resize": true,
+            "aspect_ratio": true,
+            "megapixels": true,
+            "custom_width": true,
+            "custom_height": true,
+            "image_fit": true,
+            "outpaint_fill": true,
+            "slide": true,
+            "bypass_reference": true,
+            "reference_strength": true,
+            "mask_expand": true,
+            "mask_blur": true,
+            "inpaint_blend": true,
+            "use_detailing": true,
+            "detail_padding": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "Klein 2",
+        "restore this image and improve the details, sharpness and skin natural texture, remove the noise and jpeg compression artifacts",
+        "",
+        "",
+        false,
+        false,
+        "As Reference",
+        1,
+        1024,
+        1024,
+        "Native",
+        "Gray",
+        0.5,
+        false,
+        0,
+        20,
+        50,
+        1,
+        false,
+        20,
+        true,
+        "Faithful",
+        ""
+      ],
+      "widgets_values_named": {
+        "model_family": "Klein 2",
+        "positive": "restore this image and improve the details, sharpness and skin natural texture, remove the noise and jpeg compression artifacts",
+        "negative": "",
+        "boxes_json": "",
+        "pin_model": false,
+        "resize": false,
+        "aspect_ratio": "As Reference",
+        "megapixels": 1,
+        "custom_width": 1024,
+        "custom_height": 1024,
+        "image_fit": "Native",
+        "outpaint_fill": "Gray",
+        "slide": 0.5,
+        "bypass_reference": false,
+        "reference_strength": 0,
+        "mask_expand": 20,
+        "mask_blur": 50,
+        "inpaint_blend": 1,
+        "use_detailing": false,
+        "detail_padding": 20,
+        "upsample_prompt": true,
+        "upsample_style": "Faithful",
+        "nkd_resolution": ""
+      }
+    },
+    {
+      "id": 1594,
+      "type": "NKDLoader",
+      "pos": [
+        8865,
+        5191.142461047282
+      ],
+      "size": [
+        270,
+        98
+      ],
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "label": "model",
+          "name": "model",
+          "type": "MODEL",
+          "links": [
+            23060
+          ]
+        },
+        {
+          "label": "clip",
+          "name": "clip",
+          "type": "CLIP",
+          "links": [
+            23061
+          ]
+        },
+        {
+          "label": "vae",
+          "name": "vae",
+          "type": "VAE",
+          "links": [
+            23062,
+            23077
+          ]
+        }
+      ],
+      "title": "😺NKD Loader · Flux 2 Klein 9B",
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "726d727217a15a469319731d9a17a66159435557",
+        "Node name for S&R": "NKDLoader",
+        "nkdSchema": 1,
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "{\"name\":\"Flux 2 Klein 9B\",\"nodes\":[{\"class_type\":\"UNETLoader\",\"inputs\":{\"unet_name\":\"FLUX2\\\\flux-2-klein-9b-int8-ConvRot-comfyui.safetensors\",\"weight_dtype\":\"default\"}},{\"class_type\":\"CLIPLoader\",\"inputs\":{\"clip_name\":\"qwen_3_8b.safetensors\",\"type\":\"flux2\",\"device\":\"default\"}},{\"class_type\":\"VAELoader\",\"inputs\":{\"vae_name\":\"flux2-vae.safetensors\"}}],\"outputs\":[{\"node\":0,\"out\":0,\"type\":\"MODEL\",\"label\":\"model\"},{\"node\":1,\"out\":0,\"type\":\"CLIP\",\"label\":\"clip\"},{\"node\":2,\"out\":0,\"type\":\"VAE\",\"label\":\"vae\"}]}",
+        "Flux 2 Klein 9B"
+      ],
+      "widgets_values_named": {
+        "recipe": "{\"name\":\"Flux 2 Klein 9B\",\"nodes\":[{\"class_type\":\"UNETLoader\",\"inputs\":{\"unet_name\":\"FLUX2\\\\flux-2-klein-9b-int8-ConvRot-comfyui.safetensors\",\"weight_dtype\":\"default\"}},{\"class_type\":\"CLIPLoader\",\"inputs\":{\"clip_name\":\"qwen_3_8b.safetensors\",\"type\":\"flux2\",\"device\":\"default\"}},{\"class_type\":\"VAELoader\",\"inputs\":{\"vae_name\":\"flux2-vae.safetensors\"}}],\"outputs\":[{\"node\":0,\"out\":0,\"type\":\"MODEL\",\"label\":\"model\"},{\"node\":1,\"out\":0,\"type\":\"CLIP\",\"label\":\"clip\"},{\"node\":2,\"out\":0,\"type\":\"VAE\",\"label\":\"vae\"}]}",
+        "preset": "Flux 2 Klein 9B"
+      }
+    },
+    {
+      "id": 1595,
+      "type": "NKDHint",
+      "pos": [
+        8988.698683860584,
+        5005.676209550883
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "The `NKD Loader` acts as a store of presets. For example, on the left you have all the loaders you would need to work with flux klein 3. \n\nTo avoid having to load them all every time, you can select them and with the right button save them as a `NKD Loader Preset`. And you will have that configuration available from the dropdown.\n\nInternally it reads as a subgraph, with the difference that you can \"switch between different subgraphs\" from the same node quickly.",
+        "targets": [
+          {
+            "node": "1594",
+            "widget": null
+          },
+          {
+            "group": 62
+          }
+        ],
+        "style": "info",
+        "step": 0,
+        "pinned": false,
+        "width": 300,
+        "min": "",
+        "max": "",
+        "texts": {},
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 1597,
+      "type": "CLIPLoader",
+      "pos": [
+        8535.64325662466,
+        4797.201734582981
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.44.0",
+        "Node name for S&R": "CLIPLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
+        "flux3",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3.5_9b_flux3_prompt_upsampler_int8_convrot.safetensors",
+        "type": "flux3",
+        "device": "default"
+      }
+    },
+    {
+      "id": 1598,
+      "type": "UNETLoader",
+      "pos": [
+        8535.64325662466,
+        4953.201734582981
+      ],
+      "size": [
+        270,
+        82
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.44.0",
+        "Node name for S&R": "UNETLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "FLUX2\\flux3-image-klein-int8-convrot.safetensors",
+        "default"
+      ],
+      "widgets_values_named": {
+        "unet_name": "FLUX2\\flux3-image-klein-int8-convrot.safetensors",
+        "weight_dtype": "default"
+      }
+    },
+    {
+      "id": 1599,
+      "type": "CLIPLoader",
+      "pos": [
+        8535.64325662466,
+        5085.201734582981
+      ],
+      "size": [
+        270,
+        106
+      ],
+      "flags": {},
+      "order": 5,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.44.0",
+        "Node name for S&R": "CLIPLoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "qwen3vl_4b_int8_convrot.safetensors",
+        "flux3",
+        "default"
+      ],
+      "widgets_values_named": {
+        "clip_name": "qwen3vl_4b_int8_convrot.safetensors",
+        "type": "flux3",
+        "device": "default"
+      }
+    },
+    {
+      "id": 1600,
+      "type": "VAELoader",
+      "pos": [
+        8535.64325662466,
+        5241.201734582981
+      ],
+      "size": [
+        270,
+        58
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 4,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.44.0",
+        "Node name for S&R": "VAELoader",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "flux2-vae.safetensors"
+      ],
+      "widgets_values_named": {
+        "vae_name": "flux2-vae.safetensors"
+      }
+    },
+    {
+      "id": 1607,
+      "type": "NKDHint",
+      "pos": [
+        9005.382269579555,
+        5813.616215728225
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "`Face Crop` recognizes any face in the image and lets you crop it with the orientation realigned to vertical, which is the best for doing any type of retouching or editing on that face.\n\nConnected to the face stitch, any transformation is returned to the original image in the right place.",
+        "targets": [
+          {
+            "node": "1588",
+            "widget": null
+          },
+          {
+            "node": "1589",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 0,
+        "pinned": false,
+        "width": 300,
+        "min": "",
+        "max": "",
+        "texts": {},
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 1608,
+      "type": "NKDFaceRig",
+      "pos": [
+        8445,
+        5395
+      ],
+      "size": [
+        400,
+        634
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 23078
+        },
+        {
+          "name": "expression",
+          "shape": 7,
+          "type": "NKD_EXPRESSION",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            23079
+          ]
+        },
+        {
+          "name": "face_mask",
+          "type": "MASK",
+          "links": null
+        },
+        {
+          "name": "expression",
+          "type": "NKD_EXPRESSION",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "8b2968d7171bb1794dc5d345d52236eee7b6f7be",
+        "Node name for S&R": "NKDFaceRig",
+        "nkdSchema": 1,
+        "ue_properties": {
+          "widget_ue_connectable": {
+            "rig": true,
+            "crop_factor": true,
+            "src_ratio": true,
+            "stitching": true
+          },
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      },
+      "widgets_values": [
+        "{\"v\":1,\"w\":{\"au12_R\":1,\"au12_L\":1,\"au20_R\":1,\"au20_L\":1},\"rot\":[-5.00737,-5.72268,0],\"mirror\":true}",
+        1.5,
+        1,
+        true,
+        0
+      ],
+      "widgets_values_named": {
+        "rig": "{\"v\":1,\"w\":{\"au12_R\":1,\"au12_L\":1,\"au20_R\":1,\"au20_L\":1},\"rot\":[-5.00737,-5.72268,0],\"mirror\":true}",
+        "crop_factor": 1.5,
+        "src_ratio": 1,
+        "stitching": true,
+        "face_index": 0
+      }
+    },
+    {
+      "id": 1609,
+      "type": "NKDHint",
+      "pos": [
+        8630.973666434806,
+        6122.790156990842
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 8,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "Move the cursor over the image to access the different controls that will activate on the facial features. With them you can move each one individually. Open the eyes, change the gaze or head position, close the mouth, make a character smile... etc.\n\nThe technology underneath is somewhat old and generates quite a few artifacts. That is the reason why I then do a refinement pass that recovers the detail and texture.",
+        "targets": [
+          {
+            "node": "1608",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 0,
+        "pinned": false,
+        "width": 300,
+        "min": "",
+        "max": "",
+        "texts": {},
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      }
+    },
+    {
+      "id": 1610,
+      "type": "NKDHint",
+      "pos": [
+        9174.636608550078,
+        5520.961694830928
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "Sometimes it helps a lot to describe the new expression you are trying to change. For example, describe the character smiling, angry, frowning, etc.",
+        "targets": [
+          {
+            "node": "1593",
+            "widget": "positive"
+          }
+        ],
+        "style": "tip",
+        "step": 0,
+        "pinned": false,
+        "width": 300,
+        "min": "",
+        "max": "",
+        "texts": {},
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "version": "7.8",
+          "input_ue_unconnectable": {}
+        }
+      }
+    }
+  ],
+  "links": [
+    [
+      23010,
+      1573,
+      0,
+      1545,
+      0,
+      "LATENT"
+    ],
+    [
+      23038,
+      1588,
+      2,
+      1589,
+      1,
+      "NKD_FACEDATA"
+    ],
+    [
+      23041,
+      1545,
+      0,
+      1589,
+      0,
+      "IMAGE"
+    ],
+    [
+      23055,
+      1593,
+      0,
+      1573,
+      0,
+      "MODEL"
+    ],
+    [
+      23056,
+      1593,
+      1,
+      1573,
+      1,
+      "CONDITIONING"
+    ],
+    [
+      23057,
+      1593,
+      2,
+      1573,
+      2,
+      "CONDITIONING"
+    ],
+    [
+      23058,
+      1593,
+      3,
+      1573,
+      3,
+      "LATENT"
+    ],
+    [
+      23064,
+      1589,
+      0,
+      1542,
+      0,
+      "IMAGE"
+    ],
+    [
+      23077,
+      1594,
+      2,
+      1545,
+      1,
+      "VAE"
+    ],
+    [
+      23078,
+      1568,
+      0,
+      1608,
+      0,
+      "IMAGE"
+    ],
+    [
+      23079,
+      1608,
+      0,
+      1588,
+      0,
+      "IMAGE"
+    ],
+    [
+      23060,
+      1594,
+      0,
+      1593,
+      0,
+      "MODEL"
+    ],
+    [
+      23061,
+      1594,
+      1,
+      1593,
+      1,
+      "CLIP"
+    ],
+    [
+      23062,
+      1594,
+      2,
+      1593,
+      2,
+      "VAE"
+    ],
+    [
+      23080,
+      1588,
+      1,
+      1593,
+      3,
+      "MASK"
+    ],
+    [
+      23054,
+      1588,
+      0,
+      1593,
+      6,
+      "IMAGE"
+    ]
+  ],
+  "groups": [
+    {
+      "id": 62,
+      "title": "😺 Klein 3 Distilled",
+      "bounding": [
+        8515.64325662466,
+        4717.201734582981,
+        310,
+        602
+      ],
+      "color": "#3f789e",
+      "flags": {
+        "nkdLoader": "Klein 3 Distilled"
+      }
+    }
+  ],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7627768444385473,
+      "offset": [
+        -7841.392778889489,
+        -4733.4635354017755
+      ]
+    },
+    "ue_links": [],
+    "links_added_by_ue": [],
+    "reroutes": [
+      {
+        "id": 78,
+        "pos": [
+          9698.281204434215,
+          5245.142461047282
+        ],
+        "linkIds": [
+          23077
+        ]
+      }
+    ],
+    "linkExtensions": [
+      {
+        "id": 23077,
+        "parentId": 78
+      }
+    ],
+    "frontendVersion": "1.58.5",
+    "VHS_latentpreview": true,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
