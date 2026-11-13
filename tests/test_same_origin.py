@@ -1,4 +1,4 @@
-"""same_origin_only: refuses anything not marked same-origin by the browser."""
+"""same_origin_only: refuses what the browser marks cross-site, like ComfyUI does."""
 import asyncio, glob, os, re, sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 import helpers
@@ -17,9 +17,10 @@ def _call(headers):
 
 
 def test_guard():
-    assert _call({"Sec-Fetch-Site": "same-origin"}) == "ran"
-    for h in ({}, {"Sec-Fetch-Site": "cross-site"}, {"Sec-Fetch-Site": "same-site"}, {"Sec-Fetch-Site": "none"}):
-        assert _call(h).status == 403
+    for h in ({"Sec-Fetch-Site": "same-origin"}, {"Sec-Fetch-Site": "same-site"},
+              {"Sec-Fetch-Site": "none"}, {}):
+        assert _call(h) == "ran", h
+    assert _call({"Sec-Fetch-Site": "cross-site"}).status == 403
 
 
 # Routes that only read: a frame the graph already holds, the editor's own axis

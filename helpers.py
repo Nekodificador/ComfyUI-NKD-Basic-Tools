@@ -1228,16 +1228,18 @@ def _safe_annotated_path(name: str):
 
 
 def same_origin_only(handler):
-    """Route decorator for anything that writes or changes state: the browser
-    must say the request came from ComfyUI's own page (`Sec-Fetch-Site:
-    same-origin`). Other sites cannot forge that header; a request without it
-    (old browser, script) is refused too, so this fails closed."""
+    """Route decorator for anything that writes or changes state: refuse what the
+    browser marks as coming from another site (`Sec-Fetch-Site: cross-site`), which
+    other sites cannot forge. Same policy as ComfyUI's own origin check, so a
+    deployment behind a proxy or on a sibling subdomain works here as it does for
+    the rest of the API — and it still holds when `--enable-cors-header` swaps that
+    check out."""
     import functools
     from aiohttp import web
 
     @functools.wraps(handler)
     async def wrapper(request):
-        if request.headers.get("Sec-Fetch-Site", "") != "same-origin":
-            return web.json_response({"error": "same-origin requests only"}, status=403)
+        if request.headers.get("Sec-Fetch-Site", "") == "cross-site":
+            return web.json_response({"error": "cross-site requests are refused"}, status=403)
         return await handler(request)
     return wrapper
