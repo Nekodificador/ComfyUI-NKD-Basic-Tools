@@ -3,7 +3,7 @@
 // that renders {variable_N} tokens as chips, one insert button per socket.
 import { app as comfyApp } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
-import { createApp } from "vue";
+import { createApp, reactive } from "vue";
 import PromptVariablesWidget from "./PromptVariablesWidget.vue";
 import ColorRampWidget from "./ColorRampWidget.vue";
 import GradientPreviewWidget from "./GradientPreviewWidget.vue";
@@ -11,6 +11,7 @@ import GradientMapPreviewWidget from "./GradientMapPreviewWidget.vue";
 import NoisePreviewWidget from "./NoisePreviewWidget.vue";
 import FrequencyPreviewWidget from "./FrequencyPreviewWidget.vue";
 import CurvesWidget from "./CurvesWidget.vue";
+import EventCurveWidget from "./EventCurveWidget.vue";
 import { openColorWarpViewer, ColorWarpViewerHandle } from "./colorWarpViewer";
 import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import { mountFaceRig } from "./faceRig";
@@ -38,7 +39,7 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDResolutionSelector: 1, NKDAlphaMatte: 1, NKDMerge: 1, NKDCurves: 1,
   NKDMaskPicker: 1, NKDFaceCrop: 1, NKDFaceMask: 1, NKDFaceStitch: 1,
   NKDCropStitch: 1, NKDLoader: 1, NKDMiniMaxGuides: 1, NKDAVLatentExtend: 1,
-  NKDTemporalCrop: 1, NKDTemporalStitch: 1,
+  NKDTemporalCrop: 1, NKDTemporalStitch: 1, NKDEventCurveAudio: 1,
 });
 
 registerCrop();
@@ -909,6 +910,93 @@ comfyApp.registerExtension({
         origRemoved?.apply(this, arguments);
       };
 
+      return result;
+    };
+  },
+});
+
+// 😺NKD Event Curve Audio — the timing curve, previewed for the periodic shapes and
+// drawn by hand for the custom shape. Hides the raw curve string; the editor writes it back.
+const EVENT_CURVE_MIN_W = 300;
+
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.EventCurve.Vue",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (nodeData.name !== "NKDEventCurveAudio") return;
+    if (nodeType.prototype.__nkdWrapped) return;
+    nodeType.prototype.__nkdWrapped = true;
+
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function () {
+      const result = origCreated?.apply(this, arguments);
+      const node = this;
+      const w = (name: string) => node.widgets?.find((x: any) => x.name === name);
+      const curveWidget = w("curve");
+      if (!curveWidget) return result;
+      curveWidget.hidden = true;                       // not type="hidden": it must still serialise
+      if (curveWidget.options) curveWidget.options.hidden = true;
+      curveWidget.computeSize = () => [0, -4];
+
+      const read = () => ({
+        binary: ["P Guide", "B Guide"].includes(String(w("guide")?.value)),   // BINARY_GUIDES in the .py
+        shape: String(w("shape")?.value ?? "custom"),
+        cycles: Number(w("cycles")?.value ?? 2),
+        phase: Number(w("phase")?.value ?? 0),
+        seconds: Number(w("length")?.value ?? 141) / (Number(w("fps")?.value) || 24),
+        hasSource: node.inputs?.find((i: any) => i.name === "source")?.link != null,
+        // what the last run read from source; only the server can know it
+        sourceCurve: ((comfyApp as any).nodeOutputs?.[node.id]?.nkd_curve ?? null) as number[] | null,
+      });
+      const state = reactive(read());
+
+      const container = document.createElement("div");
+      const vueApp = createApp(EventCurveWidget, {
+        state,
+        onChange: (json: string) => { if (curveWidget.value !== json) curveWidget.value = json; },
+      });
+      const instance = vueApp.mount(container) as any;
+
+      const domWidget = node.addDOMWidget("curve_editor", "NKD_EVENT_CURVE_EDITOR", container, {
+        getValue: () => curveWidget.value,
+        setValue: (v: string) => { curveWidget.value = v; instance?.deserialise(v ?? ""); },
+        serialize: false,
+        hideOnZoom: false,
+      });
+      const ro = sizeDomWidgetToContent(node, domWidget, container, EVENT_CURVE_MIN_W,
+        (width) => Math.round(width * (160 / 400)) + 28);
+
+      const origResize = node.onResize;
+      node.onResize = function (size: [number, number]) {
+        origResize?.apply(this, arguments);
+        if (size[0] < EVENT_CURVE_MIN_W) size[0] = EVENT_CURVE_MIN_W;
+      };
+
+      // Widgets and the source link are plain LiteGraph state: mirror them every canvas frame.
+      const origDrawBg = node.onDrawBackground;
+      node.onDrawBackground = function () {
+        origDrawBg?.apply(this, arguments);
+        Object.assign(state, read());
+      };
+
+      const load = () => requestAnimationFrame(() => {
+        instance?.deserialise(curveWidget.value ?? "");
+        instance?.forceResize?.();
+      });
+      load();
+      const origConfigure = node.onConfigure;
+      node.onConfigure = function () {
+        const r = origConfigure?.apply(this, arguments);
+        load();
+        return r;
+      };
+
+      const origRemoved = node.onRemoved;
+      node.onRemoved = function () {
+        ro.disconnect();
+        instance?.cleanup?.();
+        vueApp.unmount();
+        origRemoved?.apply(this, arguments);
+      };
       return result;
     };
   },

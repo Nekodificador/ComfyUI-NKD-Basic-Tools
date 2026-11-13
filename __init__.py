@@ -23,6 +23,7 @@ from .nkd_vector_mask import NKDVectorMask
 from .nkd_field_blur import NKDFieldBlur
 from .nkd_path_blur import NKDPathBlur
 from .nkd_minimax_guides import NKDMiniMaxGuides
+from .nkd_event_curve import NKDEventCurveAudio
 from .nkd_paint import NKDPaint
 from .nkd_lora_control import NKDLoraControl
 from .nkd_resolution import NKDResolutionSelector
@@ -85,6 +86,7 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDFieldBlur,
             NKDPathBlur,
             NKDMiniMaxGuides,
+            NKDEventCurveAudio,
             NKDPaint,
             NKDLoraControl,
             NKDResolutionSelector,
@@ -133,6 +135,7 @@ NODE_CLASS_MAPPINGS = {
     "NKDFieldBlur": NKDFieldBlur,
     "NKDPathBlur": NKDPathBlur,
     "NKDMiniMaxGuides": NKDMiniMaxGuides,
+    "NKDEventCurveAudio": NKDEventCurveAudio,
     "NKDPaint": NKDPaint,
     "NKDLoraControl": NKDLoraControl,
     "NKDResolutionSelector": NKDResolutionSelector,
@@ -168,6 +171,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDFieldBlur": "😺NKD Field Blur",
     "NKDPathBlur": "😺NKD Path Blur",
     "NKDMiniMaxGuides": "😺NKD MiniMax Guides",
+    "NKDEventCurveAudio": "😺NKD Event Curve",
     "NKDPaint": "😺NKD Painter Node",
     "NKDLoraControl": "😺NKD LoRA Control",
     "NKDResolutionSelector": "😺NKD Resolution Selector",
