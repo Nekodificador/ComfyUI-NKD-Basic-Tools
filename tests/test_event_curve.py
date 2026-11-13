@@ -95,6 +95,17 @@ assert s[torch.fft.rfftfreq(w.numel(), 1 / SR) > 1500].sum() < 0.01 * s.sum()
 blocks = rms_blocks({"waveform": w.reshape(1, 1, -1)}, 60)          # 50 ms
 assert blocks.max() > 4 * blocks.median().clamp(min=1e-4) or (blocks < 0.2 * blocks.max()).sum() > 10, blocks
 
+
+def syllables(level):
+    b = rms_blocks({"waveform": ec.guide_audio(torch.full((100,), level), 4.0, "W Guide", 0.5)}, 400)   # 10 ms
+    on = b > 0.3 * b.max()
+    return int((on[1:] & ~on[:-1]).sum())
+
+
+# ...and the higher the curve, the faster the words come
+slow, fast = syllables(0.4), syllables(1.0)
+assert fast > 1.6 * slow, (slow, fast)
+
 # audio source: the guide is loud where the source is loud
 src = torch.zeros(1, 1, 48000 * 6)
 src[..., 48000 * 2: 48000 * 3] = torch.randn(48000)
@@ -138,4 +149,5 @@ cols = [yellow[f].any(0).nonzero().float().mean().item() for f in (0, 15, 29)]
 assert cols[0] < 20 and 140 < cols[1] < 180 and cols[2] > 300, cols
 assert not torch.equal(pv[0], pv[29])
 
-print("event curve: ok")
+if __name__ == "__main__":
+    print("event curve: ok")

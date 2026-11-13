@@ -17485,70 +17485,6 @@ function guardPackWidgetOrder(extName, versions) {
     }
   });
 }
-function viewUrl$1(ref2) {
-  const q = new URLSearchParams({
-    filename: ref2.filename,
-    type: ref2.type || "input",
-    subfolder: ref2.subfolder || ""
-  });
-  return api.apiURL(`/view?${q}`);
-}
-const FILE_WIDGETS = ["file", "video", "audio", "image", "filename", "path"];
-const looksLikeFile = (v) => typeof v === "string" && v.length > 0 && v !== "none" && /\.[a-z0-9]{2,5}$/i.test(v);
-function resolveSource(node, slotName, maxDepth = 6, depth = 0) {
-  var _a, _b, _c, _d;
-  if (depth > maxDepth) return null;
-  const slot = (_a = node == null ? void 0 : node.inputs) == null ? void 0 : _a.find((i) => {
-    var _a2;
-    return i.name === slotName || ((_a2 = i.name) == null ? void 0 : _a2.endsWith(`.${slotName}`));
-  });
-  if (!slot || slot.link == null) return null;
-  const link = (_b = node.graph) == null ? void 0 : _b.getLink(slot.link);
-  const src = link && ((_c = node.graph) == null ? void 0 : _c.getNodeById(link.origin_id));
-  if (!src) return null;
-  for (const name of FILE_WIDGETS) {
-    const w = (_d = src.widgets) == null ? void 0 : _d.find((x) => x.name === name);
-    if (w && !w.hidden && looksLikeFile(w.value)) {
-      const raw = String(w.value);
-      const m = /^(.*?)\s*\[(\w+)\]$/.exec(raw);
-      const clean = m ? m[1] : raw;
-      const cut = clean.lastIndexOf("/");
-      return {
-        filename: cut >= 0 ? clean.slice(cut + 1) : clean,
-        subfolder: cut >= 0 ? clean.slice(0, cut) : "",
-        type: m ? m[2] : "input"
-      };
-    }
-  }
-  for (const inp of src.inputs ?? []) {
-    if (inp.link == null) continue;
-    const up = resolveSource(src, inp.name, maxDepth, depth + 1);
-    if (up) return up;
-  }
-  return null;
-}
-function slotKind(node, slotName) {
-  var _a, _b, _c, _d, _e;
-  const slot = (_a = node == null ? void 0 : node.inputs) == null ? void 0 : _a.find(
-    (i) => {
-      var _a2;
-      return i.name === slotName || ((_a2 = i.name) == null ? void 0 : _a2.endsWith(`.${slotName}`));
-    }
-  );
-  if (!slot || slot.link == null) return null;
-  const link = (_b = node.graph) == null ? void 0 : _b.getLink(slot.link);
-  let type = link == null ? void 0 : link.type;
-  if (!type && link) {
-    const src = (_c = node.graph) == null ? void 0 : _c.getNodeById(link.origin_id);
-    type = (_e = (_d = src == null ? void 0 : src.outputs) == null ? void 0 : _d[link.origin_slot]) == null ? void 0 : _e.type;
-  }
-  const t = String(type ?? "").toUpperCase();
-  if (t.includes("VIDEO")) return "video";
-  if (t.includes("AUDIO")) return "audio";
-  if (t.includes("MASK")) return "mask";
-  if (t.includes("IMAGE")) return "image";
-  return null;
-}
 const ROW_SAFETY$1 = 2;
 const MAX_INSET = 48;
 const findW = (node, name) => {
@@ -17730,6 +17666,70 @@ function mountDomWidget(node, opts) {
       widthKeeper.release();
     }
   };
+}
+function viewUrl$1(ref2) {
+  const q = new URLSearchParams({
+    filename: ref2.filename,
+    type: ref2.type || "input",
+    subfolder: ref2.subfolder || ""
+  });
+  return api.apiURL(`/view?${q}`);
+}
+const FILE_WIDGETS = ["file", "video", "audio", "image", "filename", "path"];
+const looksLikeFile = (v) => typeof v === "string" && v.length > 0 && v !== "none" && /\.[a-z0-9]{2,5}$/i.test(v);
+function resolveSource(node, slotName, maxDepth = 6, depth = 0) {
+  var _a, _b, _c, _d;
+  if (depth > maxDepth) return null;
+  const slot = (_a = node == null ? void 0 : node.inputs) == null ? void 0 : _a.find((i) => {
+    var _a2;
+    return i.name === slotName || ((_a2 = i.name) == null ? void 0 : _a2.endsWith(`.${slotName}`));
+  });
+  if (!slot || slot.link == null) return null;
+  const link = (_b = node.graph) == null ? void 0 : _b.getLink(slot.link);
+  const src = link && ((_c = node.graph) == null ? void 0 : _c.getNodeById(link.origin_id));
+  if (!src) return null;
+  for (const name of FILE_WIDGETS) {
+    const w = (_d = src.widgets) == null ? void 0 : _d.find((x) => x.name === name);
+    if (w && !w.hidden && looksLikeFile(w.value)) {
+      const raw = String(w.value);
+      const m = /^(.*?)\s*\[(\w+)\]$/.exec(raw);
+      const clean = m ? m[1] : raw;
+      const cut = clean.lastIndexOf("/");
+      return {
+        filename: cut >= 0 ? clean.slice(cut + 1) : clean,
+        subfolder: cut >= 0 ? clean.slice(0, cut) : "",
+        type: m ? m[2] : "input"
+      };
+    }
+  }
+  for (const inp of src.inputs ?? []) {
+    if (inp.link == null) continue;
+    const up = resolveSource(src, inp.name, maxDepth, depth + 1);
+    if (up) return up;
+  }
+  return null;
+}
+function slotKind(node, slotName) {
+  var _a, _b, _c, _d, _e;
+  const slot = (_a = node == null ? void 0 : node.inputs) == null ? void 0 : _a.find(
+    (i) => {
+      var _a2;
+      return i.name === slotName || ((_a2 = i.name) == null ? void 0 : _a2.endsWith(`.${slotName}`));
+    }
+  );
+  if (!slot || slot.link == null) return null;
+  const link = (_b = node.graph) == null ? void 0 : _b.getLink(slot.link);
+  let type = link == null ? void 0 : link.type;
+  if (!type && link) {
+    const src = (_c = node.graph) == null ? void 0 : _c.getNodeById(link.origin_id);
+    type = (_e = (_d = src == null ? void 0 : src.outputs) == null ? void 0 : _d[link.origin_slot]) == null ? void 0 : _e.type;
+  }
+  const t = String(type ?? "").toUpperCase();
+  if (t.includes("VIDEO")) return "video";
+  if (t.includes("AUDIO")) return "audio";
+  if (t.includes("MASK")) return "mask";
+  if (t.includes("IMAGE")) return "image";
+  return null;
 }
 const FINE_GAIN = 0.1;
 if (typeof window !== "undefined") {
@@ -24011,10 +24011,25 @@ app.registerExtension({
         origResize == null ? void 0 : origResize.apply(this, arguments);
         if (size[0] < EVENT_CURVE_MIN_W) size[0] = EVENT_CURVE_MIN_W;
       };
+      let shown = "";
+      const syncVisible = () => {
+        const periodic = !state.hasSource && state.shape !== "custom";
+        const key = `${state.hasSource}|${periodic}`;
+        if (key === shown) return;
+        shown = key;
+        setWidgetVisible(node, "shape", !state.hasSource);
+        setWidgetVisible(node, "cycles", periodic);
+        setWidgetVisible(node, "phase", periodic);
+        if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];
+        node.setSize([node.size[0], node.computeSize()[1]]);
+        node.setDirtyCanvas(true, true);
+      };
+      syncVisible();
       const origDrawBg = node.onDrawBackground;
       node.onDrawBackground = function() {
         origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
         Object.assign(state, read());
+        syncVisible();
       };
       const load = () => requestAnimationFrame(() => {
         var _a;

@@ -51,6 +51,7 @@ MOTOR_HZ = 70.0              # idle pitch of the M Guide; the top of the curve i
 WARBLE_HZ = 1400.0           # centre pitch of the U Guide at the bottom of the curve; the top is an octave up
 WARBLE_RATE = 9.0            # pitch swings per second of the U Guide at the bottom; twice that at the top
 VOICE_HZ = 130.0             # speaking pitch of the W Guide
+SYLLABLES = (2.0, 8.0)       # W Guide syllables per second at the bottom and the top of the curve
 
 
 def shape_curve(shape: str, cycles: float, phase: float, n: int) -> torch.Tensor:
@@ -169,6 +170,29 @@ def _band(x: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
     return torch.fft.irfft(torch.fft.rfft(x) * ((f >= lo) & (f < hi)), x.numel())
 
 
+def _motor(env: torch.Tensor) -> torch.Tensor:
+    """An engine: a saw-like hum that climbs two octaves with the curve, each firing a little
+    louder or softer than the last, driven into saturation, popping as it lets off the gas."""
+    n = env.numel()
+    phase = torch.cumsum(2 * math.pi * MOTOR_HZ * torch.pow(2.0, 2.0 * env.double()) / SAMPLE_RATE, 0)
+    hum = sum(torch.sin(k * phase) / k for k in range(1, 9)).float()
+    cycle = (phase / (2 * math.pi)).long()
+    firing = 1 + 0.4 * (torch.rand(int(cycle[-1]) + 1, generator=torch.Generator().manual_seed(8)) * 2 - 1)[cycle]
+    rumble = _band(_noise(n), 40, 800)
+    body = torch.tanh((hum * firing + rumble / rumble.std() * 0.15) * 1.6) * 0.55
+    # pops: a few dull thuds where the curve falls, more the faster it falls - no sharp clicks
+    falling = (-torch.diff(env, prepend=env[:1]) * SAMPLE_RATE).clamp(min=0)
+    gen = torch.Generator().manual_seed(9)
+    at = (torch.rand(n, generator=gen) < falling.clamp(max=2) * 4 / SAMPLE_RATE).nonzero().flatten().tolist()
+    pops = torch.zeros(n)
+    crack = _band(_noise(int(0.06 * SAMPLE_RATE), 10), 60, 700) * torch.exp(-torch.arange(int(0.06 * SAMPLE_RATE)) / (0.015 * SAMPLE_RATE))
+    crack = crack / crack.abs().max()
+    for i in at:
+        seg = crack[: n - i]
+        pops[i:i + seg.numel()] += seg * (0.5 + 0.5 * torch.rand(1, generator=gen))
+    return env * body + pops * 0.3
+
+
 def _warble(env: torch.Tensor) -> torch.Tensor:
     """Vibrato pushed to the extreme: a high tone whose pitch swings up and down several
     times a second, faster and higher as the curve rises, over a hiss."""
@@ -184,19 +208,20 @@ def _warble(env: torch.Tensor) -> torch.Tensor:
 
 def _murmur(env: torch.Tensor) -> torch.Tensor:
     """Speech heard through a wall: a buzzing voice chopped into syllables, its vowel
-    sliding between oo and ah, with everything above ~1.2 kHz gone."""
+    sliding between oo and ah, with everything above ~1.2 kHz gone. The curve sets how
+    fast the words come; it reaches full loudness a third of the way up, so the rest of
+    its height is pace."""
     n = env.numel()
-    t = torch.arange(n) / SAMPLE_RATE
     pitch = VOICE_HZ * torch.pow(2.0, 0.25 * _wander(n, 2.0, 3).double())                # intonation
     phase = torch.cumsum(2 * math.pi * pitch / SAMPLE_RATE, 0)
     buzz = sum(torch.sin(k * phase) / k for k in range(1, 12)).float() + _noise(n, 4) * 0.1
     vowel = (_wander(n, 5.0, 5) + 1) / 2                                                   # 0 = oo, 1 = ah
     voice = _band(buzz, 200, 600) * (1 - vowel) + _band(buzz, 500, 1200) * vowel
-    # syllables: ~4.5 a second, each a soft bump, with the odd pause between phrases
-    syl = (0.5 - 0.5 * torch.cos(2 * math.pi * 4.5 * t + 3 * _wander(n, 1.5, 6))).pow(2)
-    phrase = (_wander(n, 0.8, 7) > -0.6).float()
-    voice = voice * syl * _soften(phrase)
-    return env * voice / voice.abs().max().clamp(min=1e-6) * 0.9
+    # syllables: each a soft bump, as many a second as the curve asks; pauses are wherever the curve drops to 0
+    rate = SYLLABLES[0] + (SYLLABLES[1] - SYLLABLES[0]) * env.double()
+    syl = (0.5 - 0.5 * torch.cos(torch.cumsum(2 * math.pi * rate / SAMPLE_RATE, 0) + 3 * _wander(n, 1.5, 6))).float().pow(2)
+    voice = voice * syl
+    return (env * 3).clamp(max=1) * voice / voice.abs().max().clamp(min=1e-6) * 0.9
 
 
 def guide_audio(curve: torch.Tensor, seconds: float, guide: str, strength: float) -> torch.Tensor:
@@ -213,10 +238,7 @@ def guide_audio(curve: torch.Tensor, seconds: float, guide: str, strength: float
             hit = _hit(held, tail=guide == "B Guide")[: n - start]
             wave[start:start + hit.numel()] += hit
     elif guide == "M Guide":
-        env = _soften(env)
-        phase = torch.cumsum(2 * math.pi * MOTOR_HZ * torch.pow(2.0, 2.0 * env.double()) / SAMPLE_RATE, 0)
-        hum = sum(torch.sin(k * phase) / k for k in range(1, 9)).float() * 0.35   # saw-like: rich in harmonics
-        wave = env * (hum + _noise(n) * 0.12)
+        wave = _motor(_soften(env))
     elif guide == "U Guide":
         wave = _warble(_soften(env))
     elif guide == "W Guide":
@@ -277,13 +299,16 @@ class NKDEventCurveAudio(io.ComfyNode):
             ),
             inputs=[
                 io.Combo.Input("guide", options=GUIDES, default="F Guide",
-                               tooltip="The kind of action. P (punch): sharp single events on an on/off curve - "
-                                       "bounces, steps, hits. F (flow): gradual intensity on a smooth curve - lights, "
-                                       "wind, water. M (motor): something revving, higher as the curve rises - engines, "
-                                       "acceleration. B (blast): a bang on each rise that rings while the curve stays "
-                                       "on - explosions, gunshots, thunder. U (uncanny): a warbling high tone, faster and higher as the "
-                                       "curve rises - UFOs, magic, sci-fi effects. W (words): someone talking where the "
-                                       "curve is high - give it a low until (around 0.2) so it only sets the timing."),
+                               tooltip="The kind of action.\n"
+                                       "P (punch): sharp single events on an on/off curve - bounces, steps, hits.\n"
+                                       "F (flow): gradual intensity on a smooth curve - lights, wind, water.\n"
+                                       "M (motor): something revving, higher as the curve rises - engines, acceleration.\n"
+                                       "B (blast): a bang on each rise that rings while the curve stays on - explosions, "
+                                       "gunshots, thunder.\n"
+                                       "U (uncanny): a warbling high tone, faster and higher as the curve rises - UFOs, "
+                                       "magic, sci-fi effects.\n"
+                                       "W (words): someone talking where the curve is up, the higher the faster the words "
+                                       "come - give it a low until (around 0.2) so it only sets the timing."),
                 io.Combo.Input("shape", options=SHAPES, default="custom",
                                tooltip="Custom is the curve you draw in the node. The others repeat a shape over the "
                                        "clip; P and B guides read them as on/off. Ignored when source is connected."),

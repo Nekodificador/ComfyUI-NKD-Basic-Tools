@@ -17,6 +17,7 @@ import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
+import { setWidgetVisible } from "./domHost";
 import { registerCrop, cropSource } from "./crop";
 import { registerMerge, mergeSource } from "./merge";
 import { registerPaint, paintSource } from "./paint";
@@ -971,11 +972,28 @@ comfyApp.registerExtension({
         if (size[0] < EVENT_CURVE_MIN_W) size[0] = EVENT_CURVE_MIN_W;
       };
 
+      // A source overrides the shape; cycles and phase only drive the periodic shapes.
+      let shown = "";
+      const syncVisible = () => {
+        const periodic = !state.hasSource && state.shape !== "custom";
+        const key = `${state.hasSource}|${periodic}`;
+        if (key === shown) return;
+        shown = key;
+        setWidgetVisible(node, "shape", !state.hasSource);
+        setWidgetVisible(node, "cycles", periodic);
+        setWidgetVisible(node, "phase", periodic);
+        if (Array.isArray(node.widgets)) node.widgets = [...node.widgets];   // invalidate the 2.0 snapshot
+        node.setSize([node.size[0], node.computeSize()[1]]);
+        node.setDirtyCanvas(true, true);
+      };
+      syncVisible();
+
       // Widgets and the source link are plain LiteGraph state: mirror them every canvas frame.
       const origDrawBg = node.onDrawBackground;
       node.onDrawBackground = function () {
         origDrawBg?.apply(this, arguments);
         Object.assign(state, read());
+        syncVisible();
       };
 
       const load = () => requestAnimationFrame(() => {
