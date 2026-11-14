@@ -140,7 +140,7 @@ def _register_routes() -> None:
                 body.get("node"), str(body.get("rig") or ""),
                 str(body.get("quality") or "final"),
                 frame=body.get("frame"),
-                crop_factor=body.get("crop_factor", 2.0),
+                crop_factor=body.get("crop_factor", 1.5),
                 src_ratio=body.get("src_ratio", 1.0),
                 face_index=body.get("face_index", 0),
             )

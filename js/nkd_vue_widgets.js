@@ -24799,7 +24799,7 @@ app.registerExtension({
         nodeId: () => String(node.id),
         json: (dataW == null ? void 0 : dataW.value) || "",
         faceIndex: () => Number(widgetValues(node, ["face_index"]).face_index ?? 0),
-        cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 2),
+        cropFactor: () => Number(widgetValues(node, ["crop_factor"]).crop_factor ?? 1.5),
         srcRatio: () => Number(widgetValues(node, ["src_ratio"]).src_ratio ?? 1),
         hasSource: () => {
           var _a2, _b2;
