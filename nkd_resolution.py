@@ -61,16 +61,16 @@ class NKDResolutionSelector(io.ComfyNode):
                                tooltip="The shape of the output. 'As Reference' copies "
                                        "the shape of the connected image. 'Custom' uses "
                                        "Custom Width and Custom Height."),
-                io.Float.Input("megapixels", default=1.0, min=0.1, max=16.0, step=0.1,
+                io.Float.Input("megapixels", default=1.0, min=0.1, max=1_000_000.0, step=0.1,  # no real cap: the frontend needs a number
                                display_name="Megapixels",
                                tooltip="Target size in megapixels. 1.0 MP ≈ 1024×1024 "
                                        "for a square. Ignored by 'Custom'."),
                 io.ResolutionPreview.Input("preview",
                                            tooltip="Live preview of the output resolution."),
-                io.Int.Input("custom_width", default=1024, min=64, max=8192, step=8,
+                io.Int.Input("custom_width", default=1024, min=64, max=1_000_000, step=8,
                              display_name="Custom Width",
                              tooltip="Width in pixels. Only used when Aspect Ratio is Custom."),
-                io.Int.Input("custom_height", default=1024, min=64, max=8192, step=8,
+                io.Int.Input("custom_height", default=1024, min=64, max=1_000_000, step=8,
                              display_name="Custom Height",
                              tooltip="Height in pixels. Only used when Aspect Ratio is Custom."),
                 io.Image.Input("image", optional=True,
