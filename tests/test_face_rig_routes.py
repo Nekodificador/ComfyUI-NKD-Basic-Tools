@@ -64,7 +64,7 @@ def demo():
         for quality in ("drag", "final"):
             got = routes.render("test", rig, quality)
             assert got is not None, "a prepared node must never answer 'no source'"
-            body, mime, anch, settled = got
+            body, mime, anch, settled, crop_valid = got
             assert body and len(body) > 1000, "empty preview for %r" % rig
 
             # The guarantee. Not "some anchors" — all of them, every time,
@@ -102,6 +102,19 @@ def demo():
     # A rig somebody hand-edited into nonsense still renders.
     got = routes.render("test", "{oops", "final")
     assert got is not None and got[0], "a malformed rig must not break the preview"
+
+    # A face cut by the frame edge: the crop square hangs over it, and crop_valid
+    # says which part of the crop is picture, so the editor can skip the black.
+    (fx1, _, fx2, _), _ = eng.Engine.get()._face_bbox(rgb, 0)
+    cut = np.ascontiguousarray(rgb[:, max(0, int(fx1 - (fx2 - fx1) / 4)):])   # face hard against the left edge
+    v = eng.Engine.get().prepare(cut, 1.7).crop_valid
+    assert 0 <= v[0] < v[2] <= 1 and 0 <= v[1] < v[3] <= 1, v
+    assert v[0] > 0.01, "a face at the left edge must report padding on the left: %r" % (v,)
+
+    # RGBA in, three channels to the model.
+    import torch
+    rgba = torch.rand(1, 64, 48, 4)
+    assert node.to_uint8(rgba).shape == (64, 48, 3)
 
     print("face rig routes ok")
 

@@ -84,13 +84,13 @@ def cached_source(node_id):
 
 
 def to_uint8(image: torch.Tensor) -> np.ndarray:
-    """[B,H,W,C] float 0..1 -> the first frame as uint8 RGB.
+    """[B,H,W,C] float 0..1 -> the first frame as uint8 RGB (alpha dropped, as in Face Crop).
 
     Truncation, not rounding, on purpose: the established expression pipeline
     converts with `.byte()`, and the off-by-ones it introduces feed the model.
     Byte-exact compatibility starts here.
     """
-    return (image * 255).byte().cpu().numpy()[0]
+    return (image[..., :3] * 255).byte().cpu().numpy()[0]
 
 
 def to_tensor(rgb: np.ndarray) -> torch.Tensor:

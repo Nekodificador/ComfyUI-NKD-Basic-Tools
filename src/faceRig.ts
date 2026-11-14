@@ -193,6 +193,9 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
   let anchors: Record<string, [number, number]> = {};
   let outlines: Record<string, [number, number][]> = {};
   let frameImg: HTMLImageElement | null = null;
+  // The part of the crop that is picture, x0 y0 x1 y1 in 0..1. A face near the frame
+  // edge pads the crop with black; the view fits this part instead of the square.
+  let cropValid: number[] = [0, 0, 1, 1];
 
   // ── DOM: one column — canvas, head, presets, options, status ────────────
   const root = document.createElement("div");
@@ -360,6 +363,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
         frameImg = null;
         anchors = {};
         outlines = {};
+        cropValid = [0, 0, 1, 1];
         warn.textContent = "";
         status.textContent = "";
         drawAll();
@@ -423,6 +427,7 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
           anchors = data.anchors;
           outlines = data.outlines ?? {};
         }
+        if (Array.isArray(data.crop_valid) && data.crop_valid.length === 4) cropValid = data.crop_valid.map(Number);
         await setFrame(data.image);
         askedForRun = false;                    // a picture arrived; arm it again
         const dt = performance.now() - t0;
@@ -610,7 +615,17 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
     ctx.restore();
   }
 
-  const toScreen = (p: [number, number]) => [p[0] * view.size, p[1] * view.size] as [number, number];
+  // Contain, not cover: the whole picture part stays in view, so no handle can end up off it.
+  function fitRect() {
+    const [x0, y0, x1, y1] = cropValid;
+    const k = view.size / Math.max(x1 - x0, y1 - y0);
+    return { x0, y0, w: x1 - x0, h: y1 - y0, k,
+             ox: (view.size - (x1 - x0) * k) / 2, oy: (view.size - (y1 - y0) * k) / 2 };
+  }
+  const toScreen = (p: [number, number]) => {
+    const f = fitRect();
+    return [f.ox + (p[0] - f.x0) * f.k, f.oy + (p[1] - f.y0) * f.k] as [number, number];
+  };
 
   // Where a control's handle currently sits on screen: its anchor plus its
   // value offset (the draggable box inside the wireframe).
@@ -690,7 +705,10 @@ export function mountFaceRig(host: HTMLElement, opts: FaceRigOpts): FaceRigMount
   function drawAll() {
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.clearRect(0, 0, view.size, view.size);
-    if (frameImg) ctx.drawImage(frameImg, 0, 0, view.size, view.size);
+    if (frameImg) {
+      const f = fitRect(), W = frameImg.naturalWidth, H = frameImg.naturalHeight;
+      ctx.drawImage(frameImg, f.x0 * W, f.y0 * H, f.w * W, f.h * H, f.ox, f.oy, f.w * f.k, f.h * f.k);
+    }
     else {
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.font = "12px system-ui, sans-serif";

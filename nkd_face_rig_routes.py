@@ -72,7 +72,7 @@ def _encode(rgb: np.ndarray, drag: bool) -> tuple:
 
 def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
            src_ratio=1.0, face_index=0):
-    """(bytes, mime, anchors, settled) — or None when there is no source."""
+    """(bytes, mime, anchors, settled, crop_valid) — or None when there is no source."""
     drag = quality == "drag"
 
     # When the editor sends its frame — it does on its first request of a
@@ -117,7 +117,7 @@ def render(node_id, rig: str, quality: str, frame=None, crop_factor=2.0,
     # It is another 10 ms of landmark inference, which is worth paying once per
     # gesture and not worth paying forty times a second.
     lmk = None if drag else relocate(src, out)
-    return body, mime, anchors(src, lmk), src.settled
+    return body, mime, anchors(src, lmk), src.settled, src.crop_valid
 
 
 def _register_routes() -> None:
@@ -153,7 +153,7 @@ def _register_routes() -> None:
             # queue the graph for a face they can see.
             return web.json_response({"needsFrame": True})
 
-        data, mime, anch, settled = got
+        data, mime, anch, settled, crop_valid = got
         # One JSON envelope, image included as a data URL.
         #
         # The anchors used to ride in a response header, to keep the image a
@@ -169,6 +169,7 @@ def _register_routes() -> None:
             "anchors": anch.get("_anchors", anch),
             "outlines": anch.get("_outlines", {}),
             "settled": settled,
+            "crop_valid": list(crop_valid),
         }
         if not settled:
             # The landmark model always returns 203 points, confidently, even

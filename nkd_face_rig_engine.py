@@ -91,6 +91,9 @@ class PreparedSource:
     # False when the crop never converged — no face, or one too small to find.
     # The render still works; the rig handles are the part not to trust.
     settled: bool = True
+    # The part of the crop inside the picture, x0 y0 x1 y1 in 0..1: a face near the
+    # frame edge pads the rest with black, and the editor zooms past it.
+    crop_valid: tuple = (0.0, 0.0, 1.0, 1.0)
 
 
 class Engine:
@@ -255,6 +258,10 @@ class Engine:
             rgb=rgb, crop_512=crop_512, f_s=f_s, x_s=x_s, kp_info=kp_info,
             crop_trans_m=crop_trans_m, mask_ori=mask_ori,
             lmk_crop=lmk, crop_factor=crop_factor, settled=settled,
+            crop_valid=((region[0] - square[0]) / (square[2] - square[0]),
+                        (region[1] - square[1]) / (square[3] - square[1]),
+                        (region[2] - square[0]) / (square[2] - square[0]),
+                        (region[3] - square[1]) / (square[3] - square[1])),
         )
 
     @torch.no_grad()

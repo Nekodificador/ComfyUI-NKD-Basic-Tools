@@ -16640,6 +16640,7 @@ function mountFaceRig(host, opts) {
   let anchors = {};
   let outlines = {};
   let frameImg = null;
+  let cropValid = [0, 0, 1, 1];
   const root = document.createElement("div");
   root.className = "nkd-facerig";
   root.style.cssText = "display:flex;flex-direction:column;gap:8px;width:100%;box-sizing:border-box;padding:4px 2px 12px;font:12px system-ui,sans-serif;color:#c8d0e0;";
@@ -16764,6 +16765,7 @@ function mountFaceRig(host, opts) {
         frameImg = null;
         anchors = {};
         outlines = {};
+        cropValid = [0, 0, 1, 1];
         warn.textContent = "";
         status.textContent = "";
         drawAll();
@@ -16831,6 +16833,7 @@ function mountFaceRig(host, opts) {
           anchors = data.anchors;
           outlines = data.outlines ?? {};
         }
+        if (Array.isArray(data.crop_valid) && data.crop_valid.length === 4) cropValid = data.crop_valid.map(Number);
         await setFrame(data.image);
         askedForRun = false;
         const dt = performance.now() - t0;
@@ -16987,7 +16990,23 @@ function mountFaceRig(host, opts) {
     }
     ctx.restore();
   }
-  const toScreen = (p2) => [p2[0] * view.size, p2[1] * view.size];
+  function fitRect() {
+    const [x0, y0, x1, y1] = cropValid;
+    const k = view.size / Math.max(x1 - x0, y1 - y0);
+    return {
+      x0,
+      y0,
+      w: x1 - x0,
+      h: y1 - y0,
+      k,
+      ox: (view.size - (x1 - x0) * k) / 2,
+      oy: (view.size - (y1 - y0) * k) / 2
+    };
+  }
+  const toScreen = (p2) => {
+    const f = fitRect();
+    return [f.ox + (p2[0] - f.x0) * f.k, f.oy + (p2[1] - f.y0) * f.k];
+  };
   function handleOffset(c) {
     const get = (d) => d ? (state.w[d.axis] ?? 0) / d.per : 0;
     let dx = 0, dy = 0;
@@ -17057,8 +17076,10 @@ function mountFaceRig(host, opts) {
   function drawAll() {
     ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
     ctx.clearRect(0, 0, view.size, view.size);
-    if (frameImg) ctx.drawImage(frameImg, 0, 0, view.size, view.size);
-    else {
+    if (frameImg) {
+      const f = fitRect(), W = frameImg.naturalWidth, H = frameImg.naturalHeight;
+      ctx.drawImage(frameImg, f.x0 * W, f.y0 * H, f.w * W, f.h * H, f.ox, f.oy, f.w * f.k, f.h * f.k);
+    } else {
       ctx.fillStyle = "rgba(255,255,255,0.25)";
       ctx.font = "12px system-ui, sans-serif";
       ctx.textAlign = "center";
