@@ -166,6 +166,8 @@ See which blocks of a LoRA actually do the work, then shape it block by block.
 - **Ablejones** — 😺NKD AV Latent Extend is their masked-extension workflow
   collapsed into one node, and their `MiniMaxH3_BasicMaskedExtension` is the
   fixture its tests are checked against.
+- **knoic**: splitting 😺NKD AV Latent into separately cached steps, so editing
+  a mask doesn't re-encode the video, is their idea and first version (PR #10).
 - [comfyUI-Realtime-Lora](https://github.com/ShootTheSound/comfyUI-Realtime-Lora) —
   per-block LoRA analysis and selective loading as a ComfyUI node started there,
   and the check that spots GGUF and fp8 models is ported from it (MIT).

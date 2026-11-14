@@ -16,7 +16,7 @@ from .nkd_color_warp import NKDColorWarp
 from .nkd_mask_ops import NKDMaskOps, NKDMaskOpsLean
 from .nkd_alpha_matte import NKDAlphaMatte
 from .nkd_merge import NKDMerge
-from .nkd_av_latent import NKDAudioMask, NKDAVLatent, NKDAVLatentExtend
+from .nkd_av_latent import NKDAudioMask, NKDAVLatent, NKDAVVideoEncode, NKDAVLatentMask, NKDAVLatentExtend
 from .nkd_temporal_crop import NKDTemporalCrop, NKDTemporalStitch
 from .nkd_mask_painter import NKDMaskPainter
 from .nkd_vector_mask import NKDVectorMask
@@ -79,6 +79,8 @@ class NKDBasicToolsExtension(ComfyExtension):
             NKDMerge,
             NKDAudioMask,
             NKDAVLatent,
+            NKDAVVideoEncode,
+            NKDAVLatentMask,
             NKDAVLatentExtend,
             NKDTemporalCrop,
             NKDTemporalStitch,
@@ -129,6 +131,8 @@ NODE_CLASS_MAPPINGS = {
     "NKDMerge": NKDMerge,
     "NKDAudioMask": NKDAudioMask,
     "NKDAVLatent": NKDAVLatent,
+    "NKDAVVideoEncode": NKDAVVideoEncode,
+    "NKDAVLatentMask": NKDAVLatentMask,
     "NKDAVLatentExtend": NKDAVLatentExtend,
     "NKDTemporalCrop": NKDTemporalCrop,
     "NKDTemporalStitch": NKDTemporalStitch,
@@ -166,6 +170,8 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "NKDMerge": "😺NKD Merge",
     "NKDAudioMask": "😺NKD Audio Mask",
     "NKDAVLatent": "😺NKD AV Latent",
+    "NKDAVVideoEncode": "😺NKD AV Latent (video encode)",
+    "NKDAVLatentMask": "😺NKD AV Latent (mask)",
     "NKDAVLatentExtend": "😺NKD AV Latent Extend",
     "NKDTemporalCrop": "😺NKD Temporal Crop",
     "NKDTemporalStitch": "😺NKD Temporal Stitch",

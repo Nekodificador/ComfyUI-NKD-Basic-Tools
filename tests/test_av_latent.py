@@ -37,8 +37,22 @@ def demo():
     mask = torch.zeros(124, 768, 1344)
     mask[:62, 100:200, 100:200] = 1.0      # first half of the clip, a corner of the frame
 
+    from comfy_extras.nodes_audio import VAEEncodeAudio
+    steps = {"NKDAVVideoEncode": av.NKDAVVideoEncode, "VAEEncodeAudio": VAEEncodeAudio,
+             "NKDAVLatentMask": av.NKDAVLatentMask}
+
+    def execute(images, audio, video_vae, audio_vae, **kw):
+        """Run AV Latent's expanded graph the way the executor would, in order."""
+        graph = av.NKDAVLatent.execute(images, audio, video_vae, audio_vae, **kw)
+        values = {}
+        for node_id, node in graph.expand.items():
+            inputs = {k: values[v[0]][v[1]] if isinstance(v, list) and v[0] in values else v
+                      for k, v in node["inputs"].items()}
+            values[node_id] = steps[node["class_type"]].execute(**inputs).args
+        return values[graph.args[0][0]]
+
     def run(**kw):
-        out = av.NKDAVLatent.execute(images, audio, _VideoVae(), _AudioVae(), **kw)[0]
+        out = execute(images, audio, _VideoVae(), _AudioVae(), **kw)[0]
         assert out["samples"].is_nested, "the sampler needs both streams in one latent"
         nm = out.get("noise_mask")
         return out, (None if nm is None else nm.unbind())
@@ -73,6 +87,58 @@ def demo():
     # No picture mask: the concat fills the video side, the sound still obeys.
     _, m = run(audio_mode="keep")
     assert float(m[0].min()) == 1.0 and float(m[1].max()) == 0.0
+
+    # The encodes are cached outputs shared between runs: the mask step must not write
+    # on them, or a "regenerate" run would inherit the mask a "follow mask" run left.
+    vid = {"samples": torch.zeros(1, 24, 37, 48, 84)}
+    snd = {"samples": torch.zeros(1, 32, 2, 207)}
+    step = dict(video_latent=vid, audio_latent=snd, audio_vae=_AudioVae(), images=images,
+                latent_mask=mask)
+    av.NKDAVLatentMask.execute(audio_mode="follow mask", **step)
+    assert "noise_mask" not in vid and "noise_mask" not in snd
+    m = av.NKDAVLatentMask.execute(audio_mode="regenerate", **step)[0]["noise_mask"].unbind()
+    assert float(m[1].min()) == 1.0
+
+    # Frames with alpha still encode: the video step hands the VAE three channels.
+    seen = []
+    rgba_vae = type("V", (), {"encode": lambda self, px: seen.append(px.shape[-1]) or
+                              torch.zeros(1, 24, 37, 48, 84)})()
+    av.NKDAVVideoEncode.execute(torch.zeros(2, 8, 8, 4), rgba_vae)
+    assert seen == [3], seen
+
+    # ComfyUI's own cache keys: a mask or a setting changes only the mask step's key,
+    # so both encodes are reused; new frames re-encode the video and nothing else.
+    import asyncio
+    import nodes
+    from comfy_execution.graph import DynamicPrompt
+    from comfy_execution.graph_utils import GraphBuilder
+    from comfy_execution.caching import CacheKeySetInputSignature
+    nodes.NODE_CLASS_MAPPINGS.update(steps)
+
+    class Unchanged:
+        async def get(self, node_id):
+            return False
+
+    async def keys(mode="keep", ramp=0, mask_value=0, frames_value=0):
+        GraphBuilder.set_default_prefix("av", 0, 0)
+        expanded = av.NKDAVLatent.execute(["images", 0], ["audio", 0], ["vv", 0], ["aa", 0],
+                                          latent_mask=["mask", 0], audio_mode=mode,
+                                          ramp_ticks=ramp).expand
+        prompt = {name: {"class_type": "VAEEncode", "inputs": {"value": value}}
+                  for name, value in (("images", frames_value), ("audio", 0), ("vv", 0),
+                                      ("aa", 0), ("mask", mask_value))}
+        prompt.update(expanded)
+        cache = CacheKeySetInputSignature(DynamicPrompt(prompt), prompt, Unchanged())
+        await cache.add_keys(prompt)
+        return {s: cache.get_data_key("av.0.0." + s) for s in ("video", "audio", "mask")}
+
+    base = asyncio.run(keys())
+    for changed in (dict(mode="regenerate"), dict(ramp=8), dict(mask_value=1)):
+        k = asyncio.run(keys(**changed))
+        assert k["video"] == base["video"] and k["audio"] == base["audio"], changed
+        assert k["mask"] != base["mask"], changed
+    k = asyncio.run(keys(frames_value=1))
+    assert k["video"] != base["video"] and k["audio"] == base["audio"]
 
     # The standalone node is the audio branch's Set Latent Noise Mask: the latent
     # comes back with the mask already on it.
@@ -123,8 +189,8 @@ def demo():
                               "encode": lambda self, w: torch.ones(1, 32, 2, t)})()
 
     for encoded in (207, 204, 211):                     # exact, short, long
-        out = av.NKDAVLatent.execute(images, audio, _VideoVae(), vae_returning(encoded),
-                                     audio_mode="follow mask", latent_mask=mask)[0]
+        out = execute(images, audio, _VideoVae(), vae_returning(encoded),
+                      audio_mode="follow mask", latent_mask=mask)[0]
         assert out["samples"].unbind()[1].shape[-1] == 207, encoded
         nm = out["noise_mask"].unbind()[1]
         assert nm.shape[-1] == 207, (encoded, nm.shape)     # the mask is sized to it
@@ -138,12 +204,12 @@ def demo():
     # The rate is read off the VAE, not hardcoded: halve it and the target halves.
     half = type("V", (), {"audio_sample_rate": 32000, "downscale_ratio": 1600,
                           "encode": lambda self, w: torch.zeros(1, 32, 2, 207)})()
-    out = av.NKDAVLatent.execute(images, audio, _VideoVae(), half, audio_mode="keep")[0]
+    out = execute(images, audio, _VideoVae(), half, audio_mode="keep")[0]
     assert out["samples"].unbind()[1].shape[-1] == 103, out["samples"].unbind()[1].shape
 
     # A VAE that doesn't describe itself leaves the length alone rather than guessing.
     mute = type("V", (), {"encode": lambda self, w: torch.zeros(1, 32, 2, 204)})()
-    out = av.NKDAVLatent.execute(images, audio, _VideoVae(), mute, audio_mode="keep")[0]
+    out = execute(images, audio, _VideoVae(), mute, audio_mode="keep")[0]
     assert out["samples"].unbind()[1].shape[-1] == 204
 
     # the core node on its own still does NOT fit - this is the gap being covered

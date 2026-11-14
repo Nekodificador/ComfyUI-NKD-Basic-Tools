@@ -46,6 +46,14 @@ The two optional inputs:
 Sound can be masked down to 1/40 s, so a mask edge lands within 25 ms of where
 you put it. Fine enough for a word, not for a consonant.
 
+### Editing masks doesn't re-encode
+
+Inside, the node runs as three steps, each cached on its own: the video encode,
+the audio encode, and the masking. Changing a mask, the Audio setting, a ramp or
+the FPS only redoes the masking, so you can iterate on a long clip without
+putting it through the VAE every time. New frames or a different VAE encode
+again. Idea by knoic.
+
 ---
 
 [← All 😺NKD Basic Tools nodes](../README.md)
