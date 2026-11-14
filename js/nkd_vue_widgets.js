@@ -17847,20 +17847,119 @@ function mkCanvas(w, h, doc2 = document) {
   c.height = Math.max(1, h);
   return c;
 }
+function membrane(f, inside, w, h) {
+  const n = w * h;
+  if (!inside.some((v) => v)) return;
+  if (Math.min(w, h) > 8) {
+    const cw = w + 1 >> 1, ch = h + 1 >> 1;
+    const cf = new Float32Array(cw * ch * 3), cnt = new Uint8Array(cw * ch), cin = new Uint8Array(cw * ch);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (inside[i]) continue;
+      const c = (y >> 1) * cw + (x >> 1);
+      cnt[c]++;
+      for (let k = 0; k < 3; k++) cf[c * 3 + k] += f[i * 3 + k];
+    }
+    for (let c = 0; c < cw * ch; c++) {
+      if (cnt[c]) for (let k = 0; k < 3; k++) cf[c * 3 + k] /= cnt[c];
+      else cin[c] = 1;
+    }
+    membrane(cf, cin, cw, ch);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!inside[i]) continue;
+      const c = (y >> 1) * cw + (x >> 1);
+      for (let k = 0; k < 3; k++) f[i * 3 + k] = cf[c * 3 + k];
+    }
+    sor(f, inside, w, h, 30);
+  } else {
+    const m = [0, 0, 0];
+    let known = 0;
+    for (let i = 0; i < n; i++) if (!inside[i]) {
+      known++;
+      for (let k = 0; k < 3; k++) m[k] += f[i * 3 + k];
+    }
+    for (let i = 0; i < n; i++) if (inside[i]) for (let k = 0; k < 3; k++) f[i * 3 + k] = known ? m[k] / known : 0;
+    sor(f, inside, w, h, 200);
+  }
+}
+function sor(f, inside, w, h, iters) {
+  const OMEGA = 1.8;
+  for (let it = 0; it < iters; it++) {
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!inside[i]) continue;
+      let r = 0, g = 0, b = 0, c = 0;
+      if (x > 0) {
+        const j2 = (i - 1) * 3;
+        r += f[j2];
+        g += f[j2 + 1];
+        b += f[j2 + 2];
+        c++;
+      }
+      if (x < w - 1) {
+        const j2 = (i + 1) * 3;
+        r += f[j2];
+        g += f[j2 + 1];
+        b += f[j2 + 2];
+        c++;
+      }
+      if (y > 0) {
+        const j2 = (i - w) * 3;
+        r += f[j2];
+        g += f[j2 + 1];
+        b += f[j2 + 2];
+        c++;
+      }
+      if (y < h - 1) {
+        const j2 = (i + w) * 3;
+        r += f[j2];
+        g += f[j2 + 1];
+        b += f[j2 + 2];
+        c++;
+      }
+      const j = i * 3;
+      f[j] += OMEGA * (r / c - f[j]);
+      f[j + 1] += OMEGA * (g / c - f[j + 1]);
+      f[j + 2] += OMEGA * (b / c - f[j + 2]);
+    }
+  }
+}
+function healPatch(s, d, m, w, h) {
+  const n = w * h;
+  const inside = new Uint8Array(n), f = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    inside[i] = m[i * 4 + 3] > 0 && s[i * 4 + 3] === 255 ? 1 : 0;
+    if (s[i * 4 + 3]) for (let k = 0; k < 3; k++) f[i * 3 + k] = d[i * 4 + k] - s[i * 4 + k];
+  }
+  membrane(f, inside, w, h);
+  const out = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i++) {
+    if (!inside[i]) continue;
+    for (let k = 0; k < 3; k++) out[i * 4 + k] = s[i * 4 + k] + f[i * 3 + k];
+    out[i * 4 + 3] = m[i * 4 + 3];
+  }
+  return out;
+}
 class BrushLayer {
-  // brush radius of the stroke in progress, for the blur at composite time
   /** `onChange` runs after a committed stroke, undo or redo: the owner saves and redraws. */
   constructor(w, h, params, onChange = () => {
   }, doc2 = document, undoBudget = 256 * 1024 * 1024) {
     __publicField(this, "layer");
     __publicField(this, "stroke");
     __publicField(this, "comp");
+    __publicField(this, "patch");
+    // the clone source cut to the stroke
     __publicField(this, "hasStrokes", false);
     __publicField(this, "stroking", false);
     __publicField(this, "undoStack", []);
     __publicField(this, "redoStack", []);
     __publicField(this, "last", null);
     __publicField(this, "strokeR", 0);
+    // brush radius of the stroke in progress, for the blur at composite time
+    __publicField(this, "box", [0, 0, 0, 0]);
+    // layer px the stroke in progress covers: x0, y0, x1, y1
+    __publicField(this, "healed", null);
     this.params = params;
     this.onChange = onChange;
     this.doc = doc2;
@@ -17868,6 +17967,7 @@ class BrushLayer {
     this.layer = mkCanvas(w, h, doc2);
     this.stroke = mkCanvas(w, h, doc2);
     this.comp = mkCanvas(w, h, doc2);
+    this.patch = mkCanvas(w, h, doc2);
   }
   get width() {
     return this.layer.width;
@@ -17891,6 +17991,7 @@ class BrushLayer {
     else this.hasStrokes = false;
     this.stroke = mkCanvas(w, h, this.doc);
     this.comp = mkCanvas(w, h, this.doc);
+    this.patch = mkCanvas(w, h, this.doc);
     this.undoStack.length = 0;
     this.redoStack.length = 0;
   }
@@ -17905,17 +18006,23 @@ class BrushLayer {
     this.stroking = true;
     this.last = null;
     this.strokeR = 0;
+    this.box = [Infinity, Infinity, -Infinity, -Infinity];
     this.to(x, y, r);
   }
   to(x, y, r) {
     if (!this.stroking) return;
     const p2 = this.params();
     const sctx = this.stroke.getContext("2d");
-    const [cr, cg, cb] = hexToRgb(p2.tool === "eraser" ? "#000000" : p2.color);
+    const [cr, cg, cb] = hexToRgb(p2.tool === "brush" ? p2.color : "#000000");
     sctx.strokeStyle = sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
     sctx.lineCap = sctx.lineJoin = "round";
     const rc = Math.max(0.5, coreRadius(r, p2.hardness));
     this.strokeR = Math.max(this.strokeR, r);
+    const b = this.box;
+    b[0] = Math.min(b[0], x - r);
+    b[1] = Math.min(b[1], y - r);
+    b[2] = Math.max(b[2], x + r);
+    b[3] = Math.max(b[3], y + r);
     if (!this.last) {
       sctx.beginPath();
       sctx.arc(x, y, rc, 0, Math.PI * 2);
@@ -17935,7 +18042,10 @@ class BrushLayer {
     this.stroking = false;
     this.last = null;
     this.snapshot();
+    const p2 = this.params();
+    if (p2.tool === "heal" && p2.clone) this.healed = this.heal(p2, p2.clone);
     this.composite(this.comp.getContext("2d"), true);
+    this.healed = null;
     const lctx = this.layer.getContext("2d");
     lctx.clearRect(0, 0, this.width, this.height);
     lctx.drawImage(this.comp, 0, 0);
@@ -17949,7 +18059,7 @@ class BrushLayer {
     if (pts.length < 3) return;
     const p2 = this.params();
     const sctx = this.stroke.getContext("2d");
-    const [cr, cg, cb] = hexToRgb(p2.tool === "eraser" ? "#000000" : p2.color);
+    const [cr, cg, cb] = hexToRgb(p2.tool === "brush" ? p2.color : "#000000");
     sctx.fillStyle = `rgb(${cr},${cg},${cb})`;
     sctx.beginPath();
     sctx.moveTo(pts[0][0], pts[0][1]);
@@ -17959,6 +18069,8 @@ class BrushLayer {
     this.stroking = true;
     this.last = null;
     this.strokeR = r;
+    const xs = pts.map((q) => q[0]), ys = pts.map((q) => q[1]);
+    this.box = [Math.min(...xs) - r, Math.min(...ys) - r, Math.max(...xs) + r, Math.max(...ys) + r];
     this.end();
   }
   /** Draw a picture over the layer (undoable, reported through onChange). */
@@ -17978,12 +18090,58 @@ class BrushLayer {
     const p2 = this.params();
     target.globalAlpha = p2.opacity;
     target.globalCompositeOperation = p2.tool === "eraser" ? "destination-out" : "source-over";
-    const blur = fringeBlur(this.strokeR, p2.hardness);
-    target.filter = blur >= 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
-    target.drawImage(this.stroke, 0, 0);
-    target.filter = "none";
+    if (this.healed) target.drawImage(this.healed, 0, 0);
+    else if (p2.clone && (p2.tool === "clone" || p2.tool === "heal")) target.drawImage(this.clonePatch(p2, p2.clone), 0, 0);
+    else if (p2.tool === "brush" || p2.tool === "eraser") {
+      target.filter = this.blurFilter(p2);
+      target.drawImage(this.stroke, 0, 0);
+      target.filter = "none";
+    }
     target.globalCompositeOperation = "source-over";
     target.globalAlpha = 1;
+  }
+  blurFilter(p2) {
+    const blur = fringeBlur(this.strokeR, p2.hardness);
+    return blur >= 0.5 ? `blur(${blur.toFixed(1)}px)` : "none";
+  }
+  /** The source, shifted, cut to the blurred stroke. Also the live preview of a heal. */
+  clonePatch(p2, c) {
+    const x = this.patch.getContext("2d");
+    x.globalCompositeOperation = "source-over";
+    x.clearRect(0, 0, this.width, this.height);
+    x.drawImage(c.src, -c.dx, -c.dy, this.width, this.height);
+    x.globalCompositeOperation = "destination-in";
+    x.filter = this.blurFilter(p2);
+    x.drawImage(this.stroke, 0, 0);
+    x.filter = "none";
+    x.globalCompositeOperation = "source-over";
+    return this.patch;
+  }
+  /** The finished heal, in `patch`: only the stroke's box goes through the solver. */
+  heal(p2, c) {
+    const pad = Math.ceil(fringeBlur(this.strokeR, p2.hardness) * 3) + 2;
+    const x0 = Math.max(0, Math.floor(this.box[0]) - pad), y0 = Math.max(0, Math.floor(this.box[1]) - pad);
+    const x1 = Math.min(this.width, Math.ceil(this.box[2]) + pad), y1 = Math.min(this.height, Math.ceil(this.box[3]) + pad);
+    const w = x1 - x0, h = y1 - y0;
+    if (w < 1 || h < 1) return this.clonePatch(p2, c);
+    const x = this.patch.getContext("2d");
+    const grab = (draw) => {
+      x.clearRect(0, 0, this.width, this.height);
+      draw();
+      return x.getImageData(x0, y0, w, h).data;
+    };
+    const m = grab(() => {
+      x.filter = this.blurFilter(p2);
+      x.drawImage(this.stroke, 0, 0);
+      x.filter = "none";
+    });
+    const s = grab(() => x.drawImage(c.src, -c.dx, -c.dy, this.width, this.height));
+    const d = grab(() => x.drawImage(c.src, 0, 0, this.width, this.height));
+    const out = x.createImageData(w, h);
+    out.data.set(healPatch(s, d, m, w, h));
+    x.clearRect(0, 0, this.width, this.height);
+    x.putImageData(out, x0, y0);
+    return this.patch;
   }
   /** What to draw on screen right now: the live composite mid-stroke, else the layer. */
   current() {
@@ -18140,12 +18298,18 @@ function setupPaintWidget(node, o) {
   const controlnet = () => !!(cnW == null ? void 0 : cnW.value);
   const brushColor = () => o.mask || controlnet() ? "#ffffff" : String(P.nkdPaintColor);
   let eraseNow = false;
+  const cloning = () => !o.mask && !controlnet() && (tool() === "clone" || tool() === "heal");
+  let cloneSrc = null;
+  let cloneOff = null;
+  let cloneNow = null;
+  const snap = mkCanvas(1, 1);
   const L = new BrushLayer(1024, 1024, () => ({
     size: P.nkdPaintSize,
     opacity: P.nkdPaintOpacity,
     hardness: P.nkdPaintHardness,
     tool: eraseNow ? "eraser" : tool(),
-    color: brushColor()
+    color: brushColor(),
+    clone: cloneNow
   }), () => {
     scheduleSave();
     syncToolbar();
@@ -18199,6 +18363,8 @@ function setupPaintWidget(node, o) {
     o.mask ? "Lasso fill (L): drag to draw a shape, or click corners and close on the first point, double-click or Enter. Alt, the right button or the eraser takes it away." : "Lasso fill (L): drag to draw a shape, or click corners and close on the first point, double-click or Enter. With the eraser or the right button it erases.",
     "Lasso"
   );
+  const cloneBtn = btn("pi-clone", "Clone (S): Alt+click sets the source, then paint. The offset holds across strokes until the next Alt+click", "Clone");
+  const healBtn = btn("", "Heal (J): Clone that blends in. On release the patch keeps the source's texture and takes the light and colour around it", "Heal");
   const colorIn = document.createElement("input");
   colorIn.type = "color";
   colorIn.value = P.nkdPaintColor;
@@ -18222,7 +18388,7 @@ function setupPaintWidget(node, o) {
   clearBtn.style.marginLeft = "auto";
   const expandBtn = btn("pi-window-maximize", "Full-screen view");
   row1.append(brushBtn, eraserBtn, lassoBtn);
-  if (!o.mask) row1.append(colorIn, whiteSw, blackSw);
+  if (!o.mask) row1.append(cloneBtn, healBtn, colorIn, whiteSw, blackSw);
   row1.append(undoBtn, redoBtn, clearBtn, expandBtn);
   const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => {
     P.nkdPaintSize = v;
@@ -18259,11 +18425,14 @@ function setupPaintWidget(node, o) {
     colorIn.value = hex;
   }
   function syncToolbar() {
+    if (controlnet() && (tool() === "clone" || tool() === "heal")) P.nkdPaintTool = "brush";
+    cloneBtn.style.cssText = BTN_CSS + (tool() === "clone" ? ON_CSS : "");
+    healBtn.style.cssText = BTN_CSS + (tool() === "heal" ? ON_CSS : "");
     brushBtn.style.cssText = BTN_CSS + (tool() === "brush" ? ON_CSS : "");
     eraserBtn.style.cssText = BTN_CSS + (tool() === "eraser" ? ON_CSS : "");
     lassoBtn.style.cssText = BTN_CSS + (P.nkdPaintLasso ? ON_CSS : "");
     const cn = controlnet();
-    for (const el of [colorIn, whiteSw, blackSw]) {
+    for (const el of [colorIn, whiteSw, blackSw, cloneBtn, healBtn]) {
       el.style.opacity = cn ? "0.3" : "1";
       el.style.pointerEvents = cn ? "none" : "auto";
     }
@@ -18276,7 +18445,7 @@ function setupPaintWidget(node, o) {
       viewBtn.lastElementChild.textContent = maskHidden ? "Hidden" : VIEW_LABEL[P.nkdMaskView];
       viewBtn.style.cssText = BTN_CSS + (maskHidden ? "border-color:#e0a040;color:#e0a040;" : "");
     }
-    cv.style.cursor = altHeld && !o.mask ? PIPETTE : P.nkdPaintLasso ? "crosshair" : "none";
+    cv.style.cursor = altHeld && !o.mask ? cloning() ? "crosshair" : PIPETTE : P.nkdPaintLasso ? "crosshair" : "none";
   }
   function cycleView(shift) {
     if (shift || maskHidden) {
@@ -18292,6 +18461,14 @@ function setupPaintWidget(node, o) {
   });
   eraserBtn.addEventListener("click", () => {
     P.nkdPaintTool = "eraser";
+    syncToolbar();
+  });
+  cloneBtn.addEventListener("click", () => {
+    P.nkdPaintTool = "clone";
+    syncToolbar();
+  });
+  healBtn.addEventListener("click", () => {
+    P.nkdPaintTool = "heal";
     syncToolbar();
   });
   lassoBtn.addEventListener("click", () => {
@@ -18324,7 +18501,7 @@ function setupPaintWidget(node, o) {
     holder.style.cssText = "display:flex;flex-direction:column;flex:1;width:100%;height:100%;min-width:0;min-height:0;";
     const m = openNkdModal({
       title: o.title,
-      hint: "wheel: zoom · Space or middle drag: pan · 0: fit · [ ]: size · Alt+right drag: size and hardness" + (o.mask ? " · Alt: erase · V: view" : ""),
+      hint: "wheel: zoom · Space or middle drag: pan · 0: fit · [ ]: size · Alt+right drag: size and hardness" + (o.mask ? " · Alt: erase · V: view" : " · S / J: clone / heal, Alt+click sets the source"),
       onClose: () => {
         root.append(bar, cv);
         cv.style.flex = "";
@@ -18490,6 +18667,7 @@ function setupPaintWidget(node, o) {
     ctx.strokeStyle = "rgba(255,255,255,0.25)";
     ctx.lineWidth = 1;
     ctx.strokeRect(ox + 0.5, oy + 0.5, lw - 1, lh - 1);
+    if (cloning() && hover && !panning) drawCloneSource(s, ox, oy);
     if (lasso) drawLasso(s, ox, oy);
     else if (hover && !panning && !P.nkdPaintLasso && (o.mask || !altHeld || sizeDrag)) {
       const r = Math.max(1.5, (sizePreview ?? P.nkdPaintSize) * s / 2);
@@ -18511,6 +18689,54 @@ function setupPaintWidget(node, o) {
         ctx.setLineDash([]);
       }
     }
+  }
+  function drawCloneSource(s, ox, oy) {
+    let p2 = null;
+    if (cloneOff && hover) p2 = [hover[0] + cloneOff[0] * s, hover[1] + cloneOff[1] * s];
+    else if (cloneSrc) p2 = [cloneSrc[0] * s + ox, cloneSrc[1] * s + oy];
+    if (!p2) return;
+    const r = Math.max(4, P.nkdPaintSize * s / 2);
+    ctx.beginPath();
+    ctx.arc(p2[0], p2[1], r, 0, Math.PI * 2);
+    ctx.moveTo(p2[0] - 5, p2[1]);
+    ctx.lineTo(p2[0] + 5, p2[1]);
+    ctx.moveTo(p2[0], p2[1] - 5);
+    ctx.lineTo(p2[0], p2[1] + 5);
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = "rgba(0,0,0,0.7)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  function startClone(pt) {
+    var _a, _b, _c;
+    if (!cloneSrc) {
+      (_c = (_b = (_a = app.extensionManager) == null ? void 0 : _a.toast) == null ? void 0 : _b.add) == null ? void 0 : _c.call(_b, {
+        severity: "info",
+        summary: "NKD Painter Node",
+        detail: "Alt+click where to copy from first.",
+        life: 3e3
+      });
+      return false;
+    }
+    if (!cloneOff) cloneOff = [cloneSrc[0] - pt[0], cloneSrc[1] - pt[1]];
+    if (snap.width !== L.width || snap.height !== L.height) {
+      snap.width = L.width;
+      snap.height = L.height;
+    }
+    const x = snap.getContext("2d");
+    x.clearRect(0, 0, L.width, L.height);
+    if (base) x.drawImage(base.el, 0, 0, L.width, L.height);
+    else if (bgW == null ? void 0 : bgW.value) {
+      x.fillStyle = String(bgW.value);
+      x.fillRect(0, 0, L.width, L.height);
+    }
+    x.drawImage(L.layer, 0, 0);
+    cloneNow = { src: snap, dx: cloneOff[0], dy: cloneOff[1] };
+    return true;
   }
   let lasso = null;
   let lassoDrag = null;
@@ -18545,9 +18771,10 @@ function setupPaintWidget(node, o) {
     lasso = null;
     lassoDrag = null;
     eraseNow = lassoErase || o.mask && alt;
-    L.fill(pts, P.nkdPaintSize / 2);
+    if (eraseNow || !cloning() || startClone(pts[0])) L.fill(pts, P.nkdPaintSize / 2);
     eraseNow = false;
     lassoErase = false;
+    cloneNow = null;
     scheduleDraw();
   }
   function nearFirst(px, py) {
@@ -18604,6 +18831,12 @@ function setupPaintWidget(node, o) {
       return;
     }
     if (!o.mask && e.altKey && e.button === 0) {
+      if (cloning()) {
+        cloneSrc = dispToLayer(px, py);
+        cloneOff = null;
+        scheduleDraw();
+        return;
+      }
       picking = true;
       pick(px, py);
       return;
@@ -18625,6 +18858,7 @@ function setupPaintWidget(node, o) {
       scheduleDraw();
       return;
     }
+    if (!erase && cloning() && !startClone(pt)) return;
     eraseNow = erase;
     L.begin(pt[0], pt[1], radiusFor(P.nkdPaintSize, e));
     scheduleDraw();
@@ -18663,6 +18897,7 @@ function setupPaintWidget(node, o) {
     e.stopPropagation();
     L.end();
     eraseNow = false;
+    cloneNow = null;
     if (lasso && lassoDrag) {
       const freehand = lassoDrag.startedHere && lassoDrag.moved;
       lassoDrag = null;
@@ -18758,6 +18993,16 @@ function setupPaintWidget(node, o) {
       case "e":
       case "E":
         P.nkdPaintTool = "eraser";
+        break;
+      case "s":
+      case "S":
+        if (!o.mask && !controlnet()) P.nkdPaintTool = "clone";
+        else handled = false;
+        break;
+      case "j":
+      case "J":
+        if (!o.mask && !controlnet()) P.nkdPaintTool = "heal";
+        else handled = false;
         break;
       case "l":
       case "L":

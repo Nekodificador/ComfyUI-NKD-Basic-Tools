@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 from PIL import Image
 from typing_extensions import override
 from comfy_api.latest import ComfyExtension, io
@@ -81,7 +82,13 @@ class NKDPaint(io.ComfyNode):
             h, w = height, width
             base = _solid(h, w, bg)
 
-        push_source(node_id(cls, unique_id), base, event="nkd-paint-source")
+        # Clone copies these pixels, so they come at the layer's own size (≤2048), area-resampled:
+        # push_source's stride would send a 2100 px base at 1050.
+        frame = base
+        if max(h, w) > 2048:
+            k = 2048 / max(h, w)
+            frame = F.interpolate(base.movedim(-1, 1), size=(round(h * k), round(w * k)), mode="area").movedim(1, -1)
+        push_source(node_id(cls, unique_id), frame, event="nkd-paint-source", max_side=2048)
 
         stroke_bg = _solid(h, w, (0.0, 0.0, 0.0) if controlnet else bg)
 

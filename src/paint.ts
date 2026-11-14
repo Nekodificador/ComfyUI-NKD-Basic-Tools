@@ -26,7 +26,7 @@ import { resolveSource, viewUrl, type MediaRef } from "./mediaProbe";
 import { findW, hideWidget, mountDomWidget, setWidgetVisible } from "./domHost";
 import { attachFineRange } from "./fine_drag";
 import { openNkdModal } from "./nkd_modal";
-import { BrushLayer, adjustBrush, mkCanvas, radiusFor, stepSize, SIZE_MAX } from "./brush";
+import { BrushLayer, adjustBrush, mkCanvas, radiusFor, stepSize, SIZE_MAX, type CloneSource } from "./brush";
 
 const NODE_NAME = "NKDPaint";
 const EXT_NAME = "NKD.BasicTools.Paint";
@@ -38,7 +38,7 @@ const MAX_SIDE = 2048;     // layer resolution cap; Python resizes to the base
 const ZOOM_MIN = 0.25, ZOOM_MAX = 16;
 const LASSO_SNAP = 8;      // display px: a click this close to the first point closes the lasso
 
-type Tool = "brush" | "eraser";
+type Tool = "brush" | "eraser" | "clone" | "heal";
 type Base = { el: CanvasImageSource; w: number; h: number; fullW: number; fullH: number };
 type MaskView = "overlay" | "dim" | "mask";
 const MASK_VIEWS: MaskView[] = ["overlay", "dim", "mask"];
@@ -188,10 +188,17 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   const brushColor = () => (o.mask || controlnet() ? "#ffffff" : String(P.nkdPaintColor));
   // Mask Painter: Alt erases for the stroke or lasso it was held for.
   let eraseNow = false;
+  // Clone / Heal (Paint only, not Scribble: that mode whitens every stroke). Alt+click sets the
+  // source; the first stroke after it fixes the offset, which then holds (Photoshop's Aligned).
+  const cloning = () => !o.mask && !controlnet() && (tool() === "clone" || tool() === "heal");
+  let cloneSrc: [number, number] | null = null;   // layer px
+  let cloneOff: [number, number] | null = null;   // source - destination
+  let cloneNow: CloneSource | null = null;        // for the stroke in progress
+  const snap = mkCanvas(1, 1);
 
   const L = new BrushLayer(1024, 1024, () => ({
     size: P.nkdPaintSize, opacity: P.nkdPaintOpacity, hardness: P.nkdPaintHardness,
-    tool: eraseNow ? "eraser" : tool(), color: brushColor(),
+    tool: eraseNow ? "eraser" : tool(), color: brushColor(), clone: cloneNow,
   }), () => { scheduleSave(); syncToolbar(); scheduleDraw(); });
   let base: Base | null = null;
   let lastRef: MediaRef | null = null;
@@ -240,6 +247,8 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     ? "Lasso fill (L): drag to draw a shape, or click corners and close on the first point, double-click or Enter. Alt, the right button or the eraser takes it away."
     : "Lasso fill (L): drag to draw a shape, or click corners and close on the first point, double-click or Enter. With the eraser or the right button it erases.",
     "Lasso");
+  const cloneBtn = btn("pi-clone", "Clone (S): Alt+click sets the source, then paint. The offset holds across strokes until the next Alt+click", "Clone");
+  const healBtn = btn("", "Heal (J): Clone that blends in. On release the patch keeps the source's texture and takes the light and colour around it", "Heal");
   const colorIn = document.createElement("input");
   colorIn.type = "color"; colorIn.value = P.nkdPaintColor; colorIn.title = "Brush colour (Alt+click picks from the canvas, X swaps black/white)";
   colorIn.style.cssText = "width:22px;height:22px;padding:0;border:1px solid #3a3d46;border-radius:4px;background:none;cursor:pointer;flex:0 0 auto;";
@@ -258,7 +267,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   clearBtn.style.marginLeft = "auto";
   const expandBtn = btn("pi-window-maximize", "Full-screen view");
   row1.append(brushBtn, eraserBtn, lassoBtn);
-  if (!o.mask) row1.append(colorIn, whiteSw, blackSw);
+  if (!o.mask) row1.append(cloneBtn, healBtn, colorIn, whiteSw, blackSw);
   row1.append(undoBtn, redoBtn, clearBtn, expandBtn);
 
   const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => { P.nkdPaintSize = v; });
@@ -291,11 +300,14 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     P.nkdPaintColor = hex; colorIn.value = hex;
   }
   function syncToolbar() {
+    if (controlnet() && (tool() === "clone" || tool() === "heal")) P.nkdPaintTool = "brush";
+    cloneBtn.style.cssText = BTN_CSS + (tool() === "clone" ? ON_CSS : "");
+    healBtn.style.cssText = BTN_CSS + (tool() === "heal" ? ON_CSS : "");
     brushBtn.style.cssText = BTN_CSS + (tool() === "brush" ? ON_CSS : "");
     eraserBtn.style.cssText = BTN_CSS + (tool() === "eraser" ? ON_CSS : "");
     lassoBtn.style.cssText = BTN_CSS + (P.nkdPaintLasso ? ON_CSS : "");
     const cn = controlnet();
-    for (const el of [colorIn, whiteSw, blackSw]) {
+    for (const el of [colorIn, whiteSw, blackSw, cloneBtn, healBtn]) {
       el.style.opacity = cn ? "0.3" : "1"; el.style.pointerEvents = cn ? "none" : "auto";
     }
     if (cn) colorIn.value = "#ffffff"; else colorIn.value = P.nkdPaintColor;
@@ -306,7 +318,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
       viewBtn.lastElementChild!.textContent = maskHidden ? "Hidden" : VIEW_LABEL[P.nkdMaskView as MaskView];
       viewBtn.style.cssText = BTN_CSS + (maskHidden ? "border-color:#e0a040;color:#e0a040;" : "");
     }
-    cv.style.cursor = altHeld && !o.mask ? PIPETTE : P.nkdPaintLasso ? "crosshair" : "none";
+    cv.style.cursor = altHeld && !o.mask ? (cloning() ? "crosshair" : PIPETTE) : P.nkdPaintLasso ? "crosshair" : "none";
   }
   function cycleView(shift: boolean) {
     if (shift || maskHidden) { maskHidden = shift && !maskHidden; return; }
@@ -315,6 +327,8 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   }
   brushBtn.addEventListener("click", () => { P.nkdPaintTool = "brush"; syncToolbar(); });
   eraserBtn.addEventListener("click", () => { P.nkdPaintTool = "eraser"; syncToolbar(); });
+  cloneBtn.addEventListener("click", () => { P.nkdPaintTool = "clone"; syncToolbar(); });
+  healBtn.addEventListener("click", () => { P.nkdPaintTool = "heal"; syncToolbar(); });
   lassoBtn.addEventListener("click", () => { P.nkdPaintLasso = !P.nkdPaintLasso; lasso = null; syncToolbar(); scheduleDraw(); });
   viewBtn.addEventListener("click", (e) => { cycleView(e.shiftKey); syncToolbar(); scheduleDraw(); });
   undoBtn.addEventListener("click", () => L.undo());
@@ -337,7 +351,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     const m = openNkdModal({
       title: o.title,
       hint: "wheel: zoom · Space or middle drag: pan · 0: fit · [ ]: size · Alt+right drag: size and hardness" +
-            (o.mask ? " · Alt: erase · V: view" : ""),
+            (o.mask ? " · Alt: erase · V: view" : " · S / J: clone / heal, Alt+click sets the source"),
       onClose: () => {
         root.append(bar, cv);
         cv.style.flex = ""; cv.style.minHeight = ""; cv.style.aspectRatio = `${L.width}/${L.height}`;
@@ -485,6 +499,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     ctx.restore();
     ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1;
     ctx.strokeRect(ox + 0.5, oy + 0.5, lw - 1, lh - 1);
+    if (cloning() && hover && !panning) drawCloneSource(s, ox, oy);
     if (lasso) drawLasso(s, ox, oy);
     else if (hover && !panning && !P.nkdPaintLasso && (o.mask || !altHeld || sizeDrag)) {
       const r = Math.max(1.5, ((sizePreview ?? P.nkdPaintSize) * s) / 2);
@@ -497,6 +512,39 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
         ctx.setLineDash([3, 3]); ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.stroke(); ctx.setLineDash([]);
       }
     }
+  }
+
+  // Where the brush is copying from: follows the pointer once the offset is set.
+  function drawCloneSource(s: number, ox: number, oy: number) {
+    let p: [number, number] | null = null;
+    if (cloneOff && hover) p = [hover[0] + cloneOff[0] * s, hover[1] + cloneOff[1] * s];
+    else if (cloneSrc) p = [cloneSrc[0] * s + ox, cloneSrc[1] * s + oy];
+    if (!p) return;
+    const r = Math.max(4, (P.nkdPaintSize * s) / 2);
+    ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, Math.PI * 2);
+    ctx.moveTo(p[0] - 5, p[1]); ctx.lineTo(p[0] + 5, p[1]); ctx.moveTo(p[0], p[1] - 5); ctx.lineTo(p[0], p[1] + 5);
+    ctx.setLineDash([2, 3]);
+    ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  /** Snapshot what the canvas shows (base at full strength, then the layer) as the source of
+   *  the stroke starting at `pt`. False, with a hint, when there is no source yet. */
+  function startClone(pt: [number, number]): boolean {
+    if (!cloneSrc) {
+      comfyApp.extensionManager?.toast?.add?.({ severity: "info", summary: "NKD Painter Node",
+        detail: "Alt+click where to copy from first.", life: 3000 });
+      return false;
+    }
+    if (!cloneOff) cloneOff = [cloneSrc[0] - pt[0], cloneSrc[1] - pt[1]];
+    if (snap.width !== L.width || snap.height !== L.height) { snap.width = L.width; snap.height = L.height; }
+    const x = snap.getContext("2d")!;
+    x.clearRect(0, 0, L.width, L.height);
+    if (base) x.drawImage(base.el, 0, 0, L.width, L.height);
+    else if (bgW?.value) { x.fillStyle = String(bgW.value); x.fillRect(0, 0, L.width, L.height); }
+    x.drawImage(L.layer, 0, 0);
+    cloneNow = { src: snap, dx: cloneOff[0], dy: cloneOff[1] };
+    return true;
   }
 
   // ── lasso ──
@@ -529,8 +577,8 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     if (!lasso) return;
     const pts = lasso; lasso = null; lassoDrag = null;
     eraseNow = lassoErase || (o.mask && alt);
-    L.fill(pts, P.nkdPaintSize / 2);
-    eraseNow = false; lassoErase = false;
+    if (eraseNow || !cloning() || startClone(pts[0])) L.fill(pts, P.nkdPaintSize / 2);
+    eraseNow = false; lassoErase = false; cloneNow = null;
     scheduleDraw();
   }
   function nearFirst(px: number, py: number): boolean {
@@ -573,7 +621,10 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
       sizeDrag = { x0: px, y0: py, size0: P.nkdPaintSize, hard0: P.nkdPaintHardness };
       sizePreview = P.nkdPaintSize; hardPreview = P.nkdPaintHardness; return;
     }
-    if (!o.mask && e.altKey && e.button === 0) { picking = true; pick(px, py); return; }
+    if (!o.mask && e.altKey && e.button === 0) {
+      if (cloning()) { cloneSrc = dispToLayer(px, py); cloneOff = null; scheduleDraw(); return; }
+      picking = true; pick(px, py); return;
+    }
     if (e.button !== 0 && e.button !== 2) return;
     // Right button erases, like the native mask editor; in Mask Painter Alt does too.
     const erase = e.button === 2 || (o.mask && e.altKey);
@@ -586,6 +637,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
       lassoDrag = { startedHere, moved: false, last: [px, py] };
       scheduleDraw(); return;
     }
+    if (!erase && cloning() && !startClone(pt)) return;
     eraseNow = erase;
     L.begin(pt[0], pt[1], radiusFor(P.nkdPaintSize, e));
     scheduleDraw();
@@ -619,7 +671,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   const endPointer = (e: PointerEvent) => {
     e.stopPropagation();
     L.end();
-    eraseNow = false;
+    eraseNow = false; cloneNow = null;
     if (lasso && lassoDrag) {
       const freehand = lassoDrag.startedHere && lassoDrag.moved;
       lassoDrag = null;
@@ -678,6 +730,8 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     switch (k) {
       case "b": case "B": P.nkdPaintTool = "brush"; break;
       case "e": case "E": P.nkdPaintTool = "eraser"; break;
+      case "s": case "S": if (!o.mask && !controlnet()) P.nkdPaintTool = "clone"; else handled = false; break;
+      case "j": case "J": if (!o.mask && !controlnet()) P.nkdPaintTool = "heal"; else handled = false; break;
       case "l": case "L": P.nkdPaintLasso = !P.nkdPaintLasso; lasso = null; break;
       case "v": case "V": if (o.mask) cycleView(e.shiftKey); else handled = false; break;
       case "x": case "X": if (!o.mask) setColor(P.nkdPaintColor.toLowerCase() === "#ffffff" ? "#000000" : "#ffffff"); else handled = false; break;
