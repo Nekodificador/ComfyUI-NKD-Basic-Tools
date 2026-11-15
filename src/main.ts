@@ -989,12 +989,21 @@ comfyApp.registerExtension({
       syncVisible();
 
       // Widgets and the source link are plain LiteGraph state: mirror them every canvas frame.
+      const mirror = () => { Object.assign(state, read()); syncVisible(); };
       const origDrawBg = node.onDrawBackground;
       node.onDrawBackground = function () {
         origDrawBg?.apply(this, arguments);
-        Object.assign(state, read());
-        syncVisible();
+        mirror();
       };
+      // Vue Nodes (2.0) never calls onDrawBackground — follow the change events instead.
+      for (const hook of ["onWidgetChanged", "onConnectionsChange", "onExecuted"]) {
+        const orig = node[hook];
+        node[hook] = function () {
+          const r = orig?.apply(this, arguments);
+          queueMicrotask(mirror);   // after the caller finishes, so app.nodeOutputs is current
+          return r;
+        };
+      }
 
       const load = () => requestAnimationFrame(() => {
         instance?.deserialise(curveWidget.value ?? "");

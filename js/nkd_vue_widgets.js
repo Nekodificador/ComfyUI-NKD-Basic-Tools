@@ -24310,12 +24310,23 @@ app.registerExtension({
         node.setDirtyCanvas(true, true);
       };
       syncVisible();
-      const origDrawBg = node.onDrawBackground;
-      node.onDrawBackground = function() {
-        origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
+      const mirror = () => {
         Object.assign(state, read());
         syncVisible();
       };
+      const origDrawBg = node.onDrawBackground;
+      node.onDrawBackground = function() {
+        origDrawBg == null ? void 0 : origDrawBg.apply(this, arguments);
+        mirror();
+      };
+      for (const hook of ["onWidgetChanged", "onConnectionsChange", "onExecuted"]) {
+        const orig = node[hook];
+        node[hook] = function() {
+          const r = orig == null ? void 0 : orig.apply(this, arguments);
+          queueMicrotask(mirror);
+          return r;
+        };
+      }
       const load = () => requestAnimationFrame(() => {
         var _a;
         instance == null ? void 0 : instance.deserialise(curveWidget.value ?? "");
