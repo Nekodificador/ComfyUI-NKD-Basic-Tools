@@ -39,6 +39,10 @@ Guide for MiniMax H3) and match `length` and `fps` to your video.
 - **`strength`**: lower it if the result feels forced.
 - **`preview`**: the curve with a moving playhead, to stack under your clip.
 
+Example: `example_workflows/NKD H3 Event Control.json` drives MiniMax H3 sound
+events with this node and MiniMax Guides, with hints in English and Spanish. The
+note at its top lists the other packs it needs.
+
 ---
 
 [← All 😺NKD Basic Tools nodes](../README.md)
