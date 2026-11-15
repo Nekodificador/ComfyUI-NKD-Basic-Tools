@@ -1538,7 +1538,14 @@
           "widget_ue_connectable": {},
           "input_ue_unconnectable": {},
           "version": "7.8"
-        }
+        },
+        "models": [
+          {
+            "name": "taeh3.safetensors",
+            "url": "https://huggingface.co/Kijai/MiniMax-H3-TAE/resolve/main/vae_approx/taeh3.safetensors",
+            "directory": "vae_approx"
+          }
+        ]
       },
       "widgets_values": [
         "main",
