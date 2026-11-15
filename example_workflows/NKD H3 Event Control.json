@@ -3068,11 +3068,11 @@
       "type": "MarkdownNote",
       "pos": [
         -3015,
-        5600
+        5380
       ],
       "size": [
         1050,
-        250
+        470
       ],
       "flags": {},
       "order": 53,
@@ -3082,7 +3082,7 @@
       "title": "Required nodes",
       "properties": {},
       "widgets_values": [
-        "## Required nodes\n\n- [NKD Basic Tools](https://github.com/Nekodificador/ComfyUI-NKD-Basic-Tools) - Here are the Event Curve node and Minimax Guides node.\n- [NKD Sigmas Curve](https://github.com/Nekodificador/ComfyUI-NKD-Sigmas-Curve)\n- [NKD Preview Tools](https://github.com/Nekodificador/ComfyUI-NKD-Preview-Tools)\n- [NKD Notes](https://github.com/Nekodificador/ComfyUI-NKD-Notes)\n- [Preview Relay](https://github.com/drozbay/ComfyUI-PreviewRelay)\n- [KJNodes](https://github.com/kijai/ComfyUI-KJNodes)\n- [Video Helper Suite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)\n"
+        "## Required nodes\n\n- [NKD Basic Tools](https://github.com/Nekodificador/ComfyUI-NKD-Basic-Tools) - Here are the Event Curve node and Minimax Guides node.\n- [NKD Sigmas Curve](https://github.com/Nekodificador/ComfyUI-NKD-Sigmas-Curve)\n- [NKD Preview Tools](https://github.com/Nekodificador/ComfyUI-NKD-Preview-Tools)\n- [NKD Notes](https://github.com/Nekodificador/ComfyUI-NKD-Notes)\n- [Preview Relay](https://github.com/drozbay/ComfyUI-PreviewRelay)\n- [KJNodes](https://github.com/kijai/ComfyUI-KJNodes)\n- [Video Helper Suite](https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite)\n\n## Models\n- [taeh3.safetensors](https://huggingface.co/Kijai/MiniMax-H3-TAE/resolve/main/vae_approx/taeh3.safetensors) → `models/vae_approx`\n- [minimax_h3_fl2va_pruned_int8_convrot.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors) → `models/diffusion_models`\n- [pika_h3_flex_fl2va_v1_avg_rank_56_bf16.safetensors](https://huggingface.co/Kijai/MiniMax-H3_comfy/resolve/main/loras/Pika/pika_h3_flex_fl2va_v1_avg_rank_56_bf16.safetensors) → `models/loras`\n- [pika_h3_flex_ref2va_v1_avg_rank_55_bf16.safetensors](https://huggingface.co/Kijai/MiniMax-H3_comfy/resolve/main/loras/Pika/pika_h3_flex_ref2va_v1_avg_rank_55_bf16.safetensors) → `models/loras`\n- [minimax_h3_ref2va_pruned_int8_convrot.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors) → `models/diffusion_models`\n- [minimax_h3_video_vae_int8_convrot.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_video_vae_int8_convrot.safetensors) → `models/vae`\n- [minimax_h3_audio_vae_fp32.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/vae/minimax_h3_audio_vae_fp32.safetensors) → `models/vae`\n- [qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors](https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors) → `models/text_encoders`\n"
       ],
       "color": "#432",
       "bgcolor": "#653"
