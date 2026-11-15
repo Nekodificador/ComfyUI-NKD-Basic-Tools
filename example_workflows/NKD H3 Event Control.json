@@ -3837,18 +3837,18 @@
               },
               "models": [
                 {
-                  "name": "pika_h3_flex_fl2va_v1_bf16.safetensors",
-                  "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/loras/pika_h3_flex_fl2va_v1_bf16.safetensors",
+                  "name": "pika_h3_flex_fl2va_v1_avg_rank_56_bf16.safetensors",
+                  "url": "https://huggingface.co/Kijai/MiniMax-H3_comfy/resolve/main/loras/Pika/pika_h3_flex_fl2va_v1_avg_rank_56_bf16.safetensors",
                   "directory": "loras"
                 }
               ]
             },
             "widgets_values": [
-              "pika_h3_flex_fl2va_v1_bf16.safetensors",
+              "pika_h3_flex_fl2va_v1_avg_rank_56_bf16.safetensors",
               1
             ],
             "widgets_values_named": {
-              "lora_name": "pika_h3_flex_fl2va_v1_bf16.safetensors",
+              "lora_name": "pika_h3_flex_fl2va_v1_avg_rank_56_bf16.safetensors",
               "strength_model": 1
             }
           },
@@ -3978,18 +3978,18 @@
               },
               "models": [
                 {
-                  "name": "pika_h3_flex_ref2va_v1_bf16.safetensors",
-                  "url": "https://huggingface.co/Comfy-Org/MiniMax-H3/resolve/main/loras/pika_h3_flex_ref2va_v1_bf16.safetensors",
+                  "name": "pika_h3_flex_ref2va_v1_avg_rank_55_bf16.safetensors",
+                  "url": "https://huggingface.co/Kijai/MiniMax-H3_comfy/resolve/main/loras/Pika/pika_h3_flex_ref2va_v1_avg_rank_55_bf16.safetensors",
                   "directory": "loras"
                 }
               ]
             },
             "widgets_values": [
-              "pika_h3_flex_ref2va_v1_bf16.safetensors",
+              "pika_h3_flex_ref2va_v1_avg_rank_55_bf16.safetensors",
               1
             ],
             "widgets_values_named": {
-              "lora_name": "pika_h3_flex_ref2va_v1_bf16.safetensors",
+              "lora_name": "pika_h3_flex_ref2va_v1_avg_rank_55_bf16.safetensors",
               "strength_model": 1
             }
           },
