@@ -503,6 +503,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     if (lasso) drawLasso(s, ox, oy);
     else if (hover && !panning && !P.nkdPaintLasso && (o.mask || !altHeld || sizeDrag)) {
       const r = Math.max(1.5, ((sizePreview ?? P.nkdPaintSize) * s) / 2);
+      if (cloning() && cloneSrc && !L.stroking) peekClone(r, s, ox, oy, lw, lh);
       ctx.beginPath(); ctx.arc(hover[0], hover[1], r, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.lineWidth = 2; ctx.stroke();
       ctx.strokeStyle = "rgba(255,255,255,0.9)"; ctx.lineWidth = 1; ctx.stroke();
@@ -514,6 +515,19 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     }
   }
 
+  /** What the brush will copy, inside the ring, before the click (Affinity's preview). */
+  function peekClone(r: number, s: number, ox: number, oy: number, lw: number, lh: number) {
+    const [hx, hy] = dispToLayer(hover![0], hover![1]);
+    const dx = cloneOff ? Math.round(cloneOff[0]) : cloneSrc![0] - hx, dy = cloneOff ? Math.round(cloneOff[1]) : cloneSrc![1] - hy;
+    const x = ox - dx * s, y = oy - dy * s;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(hover![0], hover![1], r, 0, Math.PI * 2); ctx.clip();
+    ctx.imageSmoothingEnabled = s < 3;   // as the picture around it
+    if (base) ctx.drawImage(base.el, x, y, lw, lh);
+    else if (bgW?.value) { ctx.fillStyle = String(bgW.value); ctx.fillRect(x, y, lw, lh); }
+    ctx.drawImage(L.layer, x, y, lw, lh);
+    ctx.restore();
+  }
   // Where the brush is copying from: follows the pointer once the offset is set.
   function drawCloneSource(s: number, ox: number, oy: number) {
     let p: [number, number] | null = null;

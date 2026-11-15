@@ -36,6 +36,8 @@
 export type BrushTool = "brush" | "eraser" | "clone" | "heal";
 /** Layer px. The stroke at (x, y) copies `src` at (x + dx, y + dy); `src` spans the layer. */
 export interface CloneSource { src: CanvasImageSource; dx: number; dy: number }
+// Whole pixels: a fractional offset resamples every copied pixel and the clone comes out soft.
+const shift = (c: CloneSource): [number, number] => [-Math.round(c.dx), -Math.round(c.dy)];
 export interface BrushParams {
   size: number;       // diameter, layer px
   opacity: number;    // 0..1, applied to the whole stroke on release
@@ -322,7 +324,7 @@ export class BrushLayer {
     const x = this.patch.getContext("2d")!;
     x.globalCompositeOperation = "source-over";
     x.clearRect(0, 0, this.width, this.height);
-    x.drawImage(c.src, -c.dx, -c.dy, this.width, this.height);
+    x.drawImage(c.src, ...shift(c), this.width, this.height);
     x.globalCompositeOperation = "destination-in";
     x.filter = this.blurFilter(p);
     x.drawImage(this.stroke, 0, 0);
@@ -344,7 +346,7 @@ export class BrushLayer {
       return x.getImageData(x0, y0, w, h).data;
     };
     const m = grab(() => { x.filter = this.blurFilter(p); x.drawImage(this.stroke, 0, 0); x.filter = "none"; });
-    const s = grab(() => x.drawImage(c.src, -c.dx, -c.dy, this.width, this.height));
+    const s = grab(() => x.drawImage(c.src, ...shift(c), this.width, this.height));
     const d = grab(() => x.drawImage(c.src, 0, 0, this.width, this.height));
     const out = x.createImageData(w, h);
     out.data.set(healPatch(s, d, m, w, h));

@@ -11790,9 +11790,9 @@ class ColorWarpGrid {
     }
     return [ri, best];
   }
-  beginRemoteDrag(ri, sj, shift) {
+  beginRemoteDrag(ri, sj, shift2) {
     const [px, py] = this.nodePt(ri, sj);
-    const kind = shift ? "shift" : this.selected.has(this.key(ri, sj)) ? "group" : "node";
+    const kind = shift2 ? "shift" : this.selected.has(this.key(ri, sj)) ? "group" : "node";
     this.drag = {
       kind,
       ri,
@@ -17841,6 +17841,7 @@ function attachFineRange(root) {
     root.removeEventListener("dblclick", onDblClick, true);
   };
 }
+const shift = (c) => [-Math.round(c.dx), -Math.round(c.dy)];
 const SIZE_MAX = 400;
 const coreRadius = (r, hardness) => r * (0.5 + 0.5 * hardness);
 const fringeBlur = (r, hardness) => r * (1 - hardness) * 0.3;
@@ -18130,7 +18131,7 @@ class BrushLayer {
     const x = this.patch.getContext("2d");
     x.globalCompositeOperation = "source-over";
     x.clearRect(0, 0, this.width, this.height);
-    x.drawImage(c.src, -c.dx, -c.dy, this.width, this.height);
+    x.drawImage(c.src, ...shift(c), this.width, this.height);
     x.globalCompositeOperation = "destination-in";
     x.filter = this.blurFilter(p2);
     x.drawImage(this.stroke, 0, 0);
@@ -18156,7 +18157,7 @@ class BrushLayer {
       x.drawImage(this.stroke, 0, 0);
       x.filter = "none";
     });
-    const s = grab(() => x.drawImage(c.src, -c.dx, -c.dy, this.width, this.height));
+    const s = grab(() => x.drawImage(c.src, ...shift(c), this.width, this.height));
     const d = grab(() => x.drawImage(c.src, 0, 0, this.width, this.height));
     const out = x.createImageData(w, h);
     out.data.set(healPatch(s, d, m, w, h));
@@ -18468,9 +18469,9 @@ function setupPaintWidget(node, o) {
     }
     cv.style.cursor = altHeld && !o.mask ? cloning() ? "crosshair" : PIPETTE : P.nkdPaintLasso ? "crosshair" : "none";
   }
-  function cycleView(shift) {
-    if (shift || maskHidden) {
-      maskHidden = shift && !maskHidden;
+  function cycleView(shift2) {
+    if (shift2 || maskHidden) {
+      maskHidden = shift2 && !maskHidden;
       return;
     }
     const i = MASK_VIEWS.indexOf(P.nkdMaskView);
@@ -18692,6 +18693,7 @@ function setupPaintWidget(node, o) {
     if (lasso) drawLasso(s, ox, oy);
     else if (hover && !panning && !P.nkdPaintLasso && (o.mask || !altHeld || sizeDrag)) {
       const r = Math.max(1.5, (sizePreview ?? P.nkdPaintSize) * s / 2);
+      if (cloning() && cloneSrc && !L.stroking) peekClone(r, s, ox, oy, lw, lh);
       ctx.beginPath();
       ctx.arc(hover[0], hover[1], r, 0, Math.PI * 2);
       ctx.strokeStyle = "rgba(0,0,0,0.7)";
@@ -18710,6 +18712,23 @@ function setupPaintWidget(node, o) {
         ctx.setLineDash([]);
       }
     }
+  }
+  function peekClone(r, s, ox, oy, lw, lh) {
+    const [hx, hy] = dispToLayer(hover[0], hover[1]);
+    const dx = cloneOff ? Math.round(cloneOff[0]) : cloneSrc[0] - hx, dy = cloneOff ? Math.round(cloneOff[1]) : cloneSrc[1] - hy;
+    const x = ox - dx * s, y = oy - dy * s;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(hover[0], hover[1], r, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.imageSmoothingEnabled = s < 3;
+    if (base) ctx.drawImage(base.el, x, y, lw, lh);
+    else if (bgW == null ? void 0 : bgW.value) {
+      ctx.fillStyle = String(bgW.value);
+      ctx.fillRect(x, y, lw, lh);
+    }
+    ctx.drawImage(L.layer, x, y, lw, lh);
+    ctx.restore();
   }
   function drawCloneSource(s, ox, oy) {
     let p2 = null;
