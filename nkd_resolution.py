@@ -73,12 +73,12 @@ class NKDResolutionSelector(io.ComfyNode):
                 io.Int.Input("custom_height", default=1024, min=64, max=1_000_000, step=8,
                              display_name="Custom Height",
                              tooltip="Height in pixels. Only used when Aspect Ratio is Custom."),
-                io.Image.Input("image", optional=True,
-                               tooltip="Shape source for 'As Reference'."),
                 io.Int.Input("multiple", default=16, min=8, max=128, step=4, advanced=True,
                              display_name="Multiple",
                              tooltip="Round the result to a multiple of this. 16 is safe "
                                      "for every current model, 8 for SD-era ones."),
+                io.Image.Input("image", optional=True,
+                               tooltip="Shape source for 'As Reference'."),
             ],
             outputs=[
                 io.Int.Output(display_name="width"),

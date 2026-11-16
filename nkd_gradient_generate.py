@@ -58,11 +58,6 @@ class NKDGradientGenerate(io.ComfyNode):
                 io.String.Input("ramp", multiline=False, default=_DEFAULT_RAMP,
                                 socketless=True,
                                 tooltip="The color ramp, edited above."),
-                io.Image.Input("image", optional=True,
-                               tooltip="Optional — the gradient takes this image's "
-                                       "size (width/height are ignored). Composite "
-                                       "over it with blend_mode, or leave blend_mode "
-                                       "on 'none' to use it as a size reference only."),
                 io.Combo.Input("blend_mode",
                                options=["none"] + list(_BLEND_MODES),
                                default="none",
@@ -74,6 +69,11 @@ class NKDGradientGenerate(io.ComfyNode):
                                display_name="Opacity",
                                tooltip="How much of the composited gradient shows "
                                        "through. Ignored when blend_mode is 'none'."),
+                io.Image.Input("image", optional=True,
+                               tooltip="Optional — the gradient takes this image's "
+                                       "size (width/height are ignored). Composite "
+                                       "over it with blend_mode, or leave blend_mode "
+                                       "on 'none' to use it as a size reference only."),
             ],
             hidden=[io.Hidden.unique_id],  # to tell the preview the resolved size
             outputs=[

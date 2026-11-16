@@ -45,8 +45,6 @@ class NKDPaint(io.ComfyNode):
             description="Paint or scribble straight on the node, over an image or a blank canvas. "
                         "Outputs the untouched image, the painted one, the strokes alone, their exact mask and its inverse.",
             inputs=[
-                io.Image.Input("image", optional=True,
-                               tooltip="Optional base image. Sets the canvas size and shows behind the strokes."),
                 io.String.Input("layer", default="", socketless=True),
                 io.Int.Input("width", default=1024, min=64, max=4096, step=8,
                              display_name="Width",
@@ -60,6 +58,8 @@ class NKDPaint(io.ComfyNode):
                 io.Boolean.Input("controlnet", default=False,
                                  display_name="Scribble Mode",
                                  tooltip="Scribble mode: the brush is always white and strokes is white on black."),
+                io.Image.Input("image", optional=True,
+                               tooltip="Optional base image. Sets the canvas size and shows behind the strokes."),
             ],
             outputs=[
                 io.Image.Output("image", display_name="image", tooltip="The base image untouched, so the graph can continue from it."),

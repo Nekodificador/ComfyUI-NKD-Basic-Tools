@@ -50,20 +50,6 @@ class NKDMaskOps(io.ComfyNode):
             is_output_node=True,
             inputs=[
                 io.Mask.Input("mask", tooltip="Mask or mask batch (one per video frame)."),
-                io.Vae.Input("vae", optional=True,
-                             tooltip="Optional. Connect the VAE you are sampling with and "
-                                     "Blockify turns on with that VAE's own grid — including, on "
-                                     "a video VAE, the frames it collapses into a single latent. "
-                                     "The mask then lands on latent boundaries exactly, with "
-                                     "nothing bleeding into the neighbouring blocks."),
-                io.Model.Input("model", optional=True,
-                               tooltip="Optional, alongside the VAE. A few models (MiniMax H3) "
-                                       "read the mask themselves and regenerate a whole token "
-                                       "the moment any part of it is covered, so the block that "
-                                       "has to stay clean is bigger than one latent. Connect the "
-                                       "model and Blockify uses whichever of the two applies — "
-                                       "it asks the model rather than assuming, and changes "
-                                       "nothing for the models where the latent is the unit."),
                 io.Boolean.Input("invert", default=False,
                                  display_name="Invert",
                                  tooltip="Swap masked and unmasked before anything else runs."),
@@ -133,6 +119,20 @@ class NKDMaskOps(io.ComfyNode):
                 io.Float.Input("edge_high", default=1.0, min=0.0, max=1.0, step=0.01,
                                display_name="Edge High",
                                tooltip="The other end of that band."),
+                io.Vae.Input("vae", optional=True,
+                             tooltip="Optional. Connect the VAE you are sampling with and "
+                                     "Blockify turns on with that VAE's own grid — including, on "
+                                     "a video VAE, the frames it collapses into a single latent. "
+                                     "The mask then lands on latent boundaries exactly, with "
+                                     "nothing bleeding into the neighbouring blocks."),
+                io.Model.Input("model", optional=True,
+                               tooltip="Optional, alongside the VAE. A few models (MiniMax H3) "
+                                       "read the mask themselves and regenerate a whole token "
+                                       "the moment any part of it is covered, so the block that "
+                                       "has to stay clean is bigger than one latent. Connect the "
+                                       "model and Blockify uses whichever of the two applies — "
+                                       "it asks the model rather than assuming, and changes "
+                                       "nothing for the models where the latent is the unit."),
             ],
             outputs=[
                 io.Mask.Output(display_name="mask"),

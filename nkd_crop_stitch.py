@@ -85,13 +85,6 @@ class NKDInpaintCrop(io.ComfyNode):
             ),
             is_output_node=True,
             inputs=[
-                io.Model.Input("model", optional=True,
-                               tooltip="Optional. Connect your model and use the model output: "
-                                       "the regenerated area will follow the mask softness for "
-                                       "a cleaner inpaint, with no extra nodes."),
-                io.Vae.Input("vae", optional=True,
-                             tooltip="Optional. Connect your VAE and the latent output comes "
-                                     "out ready to plug straight into the sampler."),
                 io.Image.Input("image"),
                 io.Mask.Input("mask"),
                 io.Boolean.Input("invert_mask", default=False,
@@ -162,6 +155,13 @@ class NKDInpaintCrop(io.ComfyNode):
                                default="Largest First",
                                display_name="Region Order",
                                tooltip="Order in which the areas are processed."),
+                io.Model.Input("model", optional=True,
+                               tooltip="Optional. Connect your model and use the model output: "
+                                       "the regenerated area will follow the mask softness for "
+                                       "a cleaner inpaint, with no extra nodes."),
+                io.Vae.Input("vae", optional=True,
+                             tooltip="Optional. Connect your VAE and the latent output comes "
+                                     "out ready to plug straight into the sampler."),
             ],
             outputs=[
                 io.Model.Output(display_name="model",

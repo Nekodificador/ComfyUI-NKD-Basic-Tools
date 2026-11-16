@@ -208,18 +208,6 @@ class NKDAVLatent(io.ComfyNode):
                 io.Vae.Input("audio_vae", raw_link=True, display_name="audio vae",
                              tooltip="Resampled to this VAE's own rate first, so the audio "
                                      "doesn't have to arrive at it."),
-                io.Mask.Input("latent_mask", raw_link=True, display_name="latent mask", optional=True,
-                              tooltip="What to repaint in the picture. Leave it unconnected and "
-                                      "the whole video is generated. Feed the latent_mask output "
-                                      "of 😺NKD Mask Ops (with its VAE and model connected) and "
-                                      "it lands on the model's own grid instead of being "
-                                      "stretched onto it here."),
-                io.Mask.Input("audio_mask", raw_link=True, display_name="audio mask", optional=True,
-                              tooltip="Which moments Follow mask follows, instead of the picture "
-                                      "mask above: white regenerates the sound of that moment, "
-                                      "black keeps it. Only its timing is read, so feed one at "
-                                      "frame rate — the picture mask is already coarser than a "
-                                      "frame. Does nothing on the other two settings."),
                 io.Combo.Input("audio_mode", options=AUDIO_MODES,
                                default="keep", display_name="Audio",
                                tooltip="This is what decides, always. Keep: the original "
@@ -262,6 +250,18 @@ class NKDAVLatent(io.ComfyNode):
                                        "control; high band spends the whole ramp between 0.85 "
                                        "and 0.995, the narrow range of mask values the model "
                                        "actually distinguishes."),
+                io.Mask.Input("latent_mask", raw_link=True, display_name="latent mask", optional=True,
+                              tooltip="What to repaint in the picture. Leave it unconnected and "
+                                      "the whole video is generated. Feed the latent_mask output "
+                                      "of 😺NKD Mask Ops (with its VAE and model connected) and "
+                                      "it lands on the model's own grid instead of being "
+                                      "stretched onto it here."),
+                io.Mask.Input("audio_mask", raw_link=True, display_name="audio mask", optional=True,
+                              tooltip="Which moments Follow mask follows, instead of the picture "
+                                      "mask above: white regenerates the sound of that moment, "
+                                      "black keeps it. Only its timing is read, so feed one at "
+                                      "frame rate — the picture mask is already coarser than a "
+                                      "frame. Does nothing on the other two settings."),
             ],
             outputs=[io.Latent.Output(display_name="latent")],
         )
@@ -316,13 +316,13 @@ class NKDAVLatentMask(io.ComfyNode):
                 io.Latent.Input("audio_latent"),
                 io.Vae.Input("audio_vae"),
                 io.Image.Input("images"),
-                io.Mask.Input("latent_mask", optional=True),
-                io.Mask.Input("audio_mask", optional=True),
                 io.Combo.Input("audio_mode", options=AUDIO_MODES),
                 io.Float.Input("fps"),
                 io.Int.Input("ramp_ticks"),
                 io.Int.Input("ramp_out_ticks"),
                 io.Combo.Input("ramp_shape", options=mask_core.RAMP_SHAPES),
+                io.Mask.Input("latent_mask", optional=True),
+                io.Mask.Input("audio_mask", optional=True),
             ],
             outputs=[io.Latent.Output()],
         )

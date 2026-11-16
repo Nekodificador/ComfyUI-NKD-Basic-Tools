@@ -230,9 +230,6 @@ class NKDMerge(io.ComfyNode):
                 io.Image.Input("foreground",
                                tooltip="RGBA cut-out, as Alpha Matte makes. An RGB image "
                                        "is treated as fully opaque."),
-                io.Mask.Input("alpha", optional=True,
-                              tooltip="Optional matte for the foreground, 1 = opaque. "
-                                      "Replaces the foreground's own alpha."),
                 io.Combo.Input("fit", options=list(FITS), default="fit",
                                display_name="Fit",
                                tooltip="What scale 1 means. fit: the whole foreground fits "
@@ -253,6 +250,9 @@ class NKDMerge(io.ComfyNode):
                                          "the alpha input or the foreground itself: what "
                                          "was see-through becomes solid and the other way "
                                          "round."),
+                io.Mask.Input("alpha", optional=True,
+                              tooltip="Optional matte for the foreground, 1 = opaque. "
+                                      "Replaces the foreground's own alpha."),
             ],
             outputs=[
                 io.Image.Output(display_name="image",

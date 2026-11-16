@@ -320,12 +320,12 @@ class NKDFrequencyCombine(io.ComfyNode):
                                display_name="Detail Strength",
                                tooltip="Attenuate (<1) or boost (>1) the transferred "
                                        "detail. 1.0 restores it faithfully."),
-                io.Mask.Input("mask", optional=True,
-                              tooltip="Optional — apply the detail only inside the mask "
-                                      "(feathered by its values)."),
                 io.Float.Input("mask_feather", default=0.0, min=0.0, max=64.0, step=1.0,
                                display_name="Mask Feather",
                                tooltip="Soften the mask edge before applying."),
+                io.Mask.Input("mask", optional=True,
+                              tooltip="Optional — apply the detail only inside the mask "
+                                      "(feathered by its values)."),
             ],
             outputs=[
                 io.Image.Output(display_name="image",
