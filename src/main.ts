@@ -17,7 +17,7 @@ import { openSplineOverlay, type SplineOverlayHandle } from "./splineOverlay";
 import { mountFaceRig } from "./faceRig";
 import type { EditorMode } from "./splineEditor";
 import { guardPackWidgetOrder } from "./schemaGuard";
-import { setWidgetVisible } from "./domHost";
+import { findW, setWidgetVisible } from "./domHost";
 import { registerCrop, cropSource } from "./crop";
 import { registerMerge, mergeSource } from "./merge";
 import { registerPaint, paintSource } from "./paint";
@@ -41,6 +41,39 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDMaskPicker: 1, NKDFaceCrop: 1, NKDFaceMask: 1, NKDFaceStitch: 1,
   NKDCropStitch: 1, NKDLoader: 1, NKDMiniMaxGuides: 1, NKDAVLatentExtend: 1,
   NKDTemporalCrop: 1, NKDTemporalStitch: 1, NKDEventCurveAudio: 1,
+});
+
+// A hidden `socketless` widget still gets an input slot: the frontend reads `socketless`
+// off the widget's options, which never carry it, and saved workflows bring the slot
+// back on load. Nodes 2.0 has no row to put it in, so its dot lands on top of the first
+// input. Drop the slot, but only while nothing is plugged into it.
+comfyApp.registerExtension({
+  name: "NKD.BasicTools.HiddenSlots",
+  async beforeRegisterNodeDef(nodeType: any, nodeData: any) {
+    if (!nodeData?.name?.startsWith("NKD")) return;
+    const specs = { ...nodeData.input?.required, ...nodeData.input?.optional };
+    const names = Object.keys(specs).filter((k) => specs[k]?.[1]?.socketless);
+    if (!names.length) return;
+    const drop = (node: any) => {
+      for (let i = (node.inputs?.length ?? 0) - 1; i >= 0; i--) {
+        const inp = node.inputs[i];
+        if (!names.includes(inp.name) || inp.link != null) continue;
+        if (findW(node, inp.name)?.hidden) node.removeInput(i);
+      }
+    };
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function (this: any) {
+      const r = origCreated?.apply(this, arguments as any);
+      queueMicrotask(() => drop(this));   // the per-node setup hides its widgets after this wrapper
+      return r;
+    };
+    const origConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function (this: any) {
+      const r = origConfigure?.apply(this, arguments as any);
+      drop(this);
+      return r;
+    };
+  },
 });
 
 registerCrop();

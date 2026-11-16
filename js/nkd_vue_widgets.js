@@ -23398,6 +23398,39 @@ guardPackWidgetOrder("NKD.BasicTools.SchemaGuard", {
   NKDTemporalStitch: 1,
   NKDEventCurveAudio: 1
 });
+app.registerExtension({
+  name: "NKD.BasicTools.HiddenSlots",
+  async beforeRegisterNodeDef(nodeType, nodeData) {
+    var _a, _b, _c;
+    if (!((_a = nodeData == null ? void 0 : nodeData.name) == null ? void 0 : _a.startsWith("NKD"))) return;
+    const specs = { ...(_b = nodeData.input) == null ? void 0 : _b.required, ...(_c = nodeData.input) == null ? void 0 : _c.optional };
+    const names = Object.keys(specs).filter((k) => {
+      var _a2, _b2;
+      return (_b2 = (_a2 = specs[k]) == null ? void 0 : _a2[1]) == null ? void 0 : _b2.socketless;
+    });
+    if (!names.length) return;
+    const drop = (node) => {
+      var _a2, _b2;
+      for (let i = (((_a2 = node.inputs) == null ? void 0 : _a2.length) ?? 0) - 1; i >= 0; i--) {
+        const inp = node.inputs[i];
+        if (!names.includes(inp.name) || inp.link != null) continue;
+        if ((_b2 = findW(node, inp.name)) == null ? void 0 : _b2.hidden) node.removeInput(i);
+      }
+    };
+    const origCreated = nodeType.prototype.onNodeCreated;
+    nodeType.prototype.onNodeCreated = function() {
+      const r = origCreated == null ? void 0 : origCreated.apply(this, arguments);
+      queueMicrotask(() => drop(this));
+      return r;
+    };
+    const origConfigure = nodeType.prototype.onConfigure;
+    nodeType.prototype.onConfigure = function() {
+      const r = origConfigure == null ? void 0 : origConfigure.apply(this, arguments);
+      drop(this);
+      return r;
+    };
+  }
+});
 registerCrop();
 registerMerge();
 registerPaint();
