@@ -1,6 +1,8 @@
 # 😺NKD Vector Mask
 
-<img width="1853" height="1199" alt="image" src="https://github.com/user-attachments/assets/aea95716-85a8-4402-abf8-e10e78cedfb6" />
+<img src="img/NKDVectorMask.png" alt="😺NKD Vector Mask" align="left" width="30%">
+
+<img alt="image" src="https://github.com/user-attachments/assets/aea95716-85a8-4402-abf8-e10e78cedfb6" />
 
 Draws a mask by hand with a pen tool, the way you'd roto a shape in Nuke, and
 keeps it editable forever, because what gets saved is the control points rather
@@ -77,6 +79,8 @@ want to keep editing. Send it a vector mask, a segmenter's output, 😺NKD Mask
 Ops, and its `mask_input_mode` composites them with `Add`, `Subtract` or
 `Intersect` while you carry on painting on the result by hand. Chain several and
 each stage stays editable.
+
+<br clear="left">
 
 ---
 

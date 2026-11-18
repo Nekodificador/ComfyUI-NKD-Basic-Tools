@@ -1,5 +1,7 @@
 # 😺NKD Noise
 
+<img src="img/NKDNoise.png" alt="😺NKD Noise" align="left" width="30%">
+
 Procedural fractal noise (fBm) for clouds, fog, smoke and organic textures, as an
 image and as a mask.
 
@@ -9,7 +11,8 @@ image and as a mask.
 
 Feed the output straight into [Gradient Map](gradient-map-generate.md) to tint it.
 
-<img width="413" height="1053" alt="image" src="https://github.com/user-attachments/assets/33bac00e-28bd-42b0-a453-c2c2bf878024" />
+
+<br clear="left">
 
 ---
 

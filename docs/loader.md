@@ -1,5 +1,7 @@
 # 😺NKD Loader
 
+<img src="img/NKDLoader.png" alt="😺NKD Loader" align="left" width="30%">
+
 One node that stands in for a set of loader nodes: a diffusion model, its text
 encoders, the VAE, an upscaler, adapters. Save the set once, then switch model
 families from a single dropdown instead of rewiring four loaders.
@@ -37,6 +39,8 @@ Deleting a preset doesn't break the workflows that use it.
 ## Outputs
 
 Up to 10 outputs, whatever the preset's loaders produce.
+
+<br clear="left">
 
 ---
 

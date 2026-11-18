@@ -57,6 +57,8 @@ to stay inside the source rather than pulling black in with it.
 
 ## Crop / Outpaint
 
+<img src="img/NKDCrop-example.png" alt="😺NKD Crop / Outpaint" align="left" width="30%">
+
 - `mode` picks between the two. Crop keeps the rectangle inside the source.
   Outpaint lets it extend past the edge and grow the canvas.
 - `fill` decides what goes under the outpainted area: `edge` replicates the border
@@ -83,7 +85,11 @@ video in, the mask is white over the outpainted area, which is the polarity
 `VAEEncodeForInpaint` and the rest of the core expect: white means generate here.
 Feed the node a mask instead and it crops the mask itself.
 
+<br clear="left">
+
 ## Stitch
+
+<img src="img/NKDCropStitch.png" alt="😺NKD Crop / Outpaint Stitch" align="left" width="30%">
 
 - `feather` softens the edge of the pasted patch, in pixels. It only ever grows
   inward. Blurring outward would smear the patch over pixels that were never part
@@ -93,6 +99,8 @@ Feed the node a mask instead and it crops the mask itself.
 
 Rotation is handled here too, so a crop taken at an angle goes back at the same
 angle without you squaring anything up by hand.
+
+<br clear="left">
 
 ---
 

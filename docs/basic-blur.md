@@ -1,5 +1,7 @@
 # 😺NKD Basic Blur
 
+<img src="img/NKDBasicBlur.png" alt="😺NKD Basic Blur" align="left" width="30%">
+
 The plain blur ComfyUI doesn't ship: pick a type, set a radius in pixels.
 
 - **Image, mask or video** on the same input, and the output is the same type. A
@@ -11,6 +13,8 @@ The plain blur ComfyUI doesn't ship: pick a type, set a radius in pixels.
   changes the result. It's the same scale as the feather in
   [😺NKD Mask Ops](mask-ops.md): the same number softens an image and its mask
   alike.
+
+<br clear="left">
 
 ---
 

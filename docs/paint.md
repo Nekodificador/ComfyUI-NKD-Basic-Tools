@@ -1,5 +1,7 @@
 # 😺NKD Painter Node
 
+<img src="img/NKDPaint-example.png" alt="😺NKD Painter Node" align="left" width="30%">
+
 A brush on the node itself. Connect an image and it shows up behind the canvas at
 its own resolution; connect nothing and you get a blank canvas of the size you set.
 Paint, scribble, block in a contrast, erase, and the result comes out five ways at
@@ -84,6 +86,8 @@ name is a hash of the picture, so an unchanged layer is a cache hit and the grap
 doesn't re-run the node. It also means the drawing travels with the ComfyUI
 install, like a Load Image file, not inside the workflow JSON. Old layers you no
 longer reference stay in that folder until you delete them.
+
+<br clear="left">
 
 ---
 

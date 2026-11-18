@@ -1,5 +1,7 @@
 # 😺NKD Audio Mask
 
+<img src="img/NKDAudioMask.png" alt="😺NKD Audio Mask" align="left" width="30%">
+
 The audio half of [😺NKD AV Latent](av-latent.md) on its own, for when you'd
 rather keep the chain out in the open. It *is* the audio branch's Set Latent
 Noise Mask, latent in and the same latent out with the mask already on it, so it
@@ -28,6 +30,8 @@ It isn't a shortcut for the stock node. Hand a video mask to Set Latent Noise
 Mask and the soundtrack comes back regenerated from end to end no matter what the
 mask said, with no error to tell you. It reads a mask as a picture, and a
 soundtrack has no picture in it.
+
+<br clear="left">
 
 ---
 

@@ -24,6 +24,8 @@ flowchart LR
 
 ## Crop
 
+<img src="img/NKDInpaintCrop.png" alt="😺NKD Inpaint Crop" align="left" width="30%">
+
 - Mask cleanup is built in, so invert, fill holes, expand and soften all happen
   here rather than in four nodes before it.
 - `Resize Mode` decides the crop size. `Automatic` keeps the native resolution
@@ -50,7 +52,11 @@ filter by minimum area, cap the count and choose the order.
 they come, with or without `Separate Regions`: nothing is filtered or capped.
 A batch of images (a video) still gets one crop over all its frames.
 
+<br clear="left">
+
 ## Stitch
+
+<img src="img/NKDInpaintStitch.png" alt="😺NKD Inpaint Stitch" align="left" width="30%">
 
 - `Feather` and `Edge Hardness` control how softly the patch blends and how well
   the original background is kept from ghosting at the edges.
@@ -58,11 +64,15 @@ A batch of images (a video) still gets one crop over all its frames.
   so the patch belongs to the same scene.
 - `Seamless Edges` is an extra pass for stubborn seams. It needs OpenCV.
 
+<br clear="left">
+
 ---
+
+<br clear="left">
 
 ## Tips and tricks
 
-<img width="2461" height="1058" alt="image" src="https://github.com/user-attachments/assets/fd650b56-bdbe-403c-bc38-c41a0a00b0de" />
+<img alt="image" src="https://github.com/user-attachments/assets/fd650b56-bdbe-403c-bc38-c41a0a00b0de" />
 
 
 [← All 😺NKD Basic Tools nodes](../README.md)

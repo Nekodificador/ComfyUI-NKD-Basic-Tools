@@ -1,5 +1,7 @@
 # 😺NKD Path Blur
 
+<img src="img/NKDPathBlur.png" alt="😺NKD Path Blur" align="left" width="30%">
+
 Directional motion blur that *curves*, instead of the single straight angle a
 normal motion blur gives you. Draw strokes showing which way things move; the
 direction between them is blended into a smooth field, and each stroke carries
@@ -26,6 +28,8 @@ its own speed.
 
 Very high **Strength** ghosts rather than blurs. The sampling is capped, and past
 that point you see discrete steps instead of a smear.
+
+<br clear="left">
 
 ---
 

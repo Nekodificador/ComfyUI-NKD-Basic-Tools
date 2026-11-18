@@ -1,5 +1,7 @@
 # 😺NKD AV Latent
 
+<img src="img/NKDAVLatent.png" alt="😺NKD AV Latent" align="left" width="30%">
+
 For inpainting a video that carries its own soundtrack (MiniMax H3, LTXV) without
 wiring the same six nodes every time, and without the sound being regenerated
 behind your back.
@@ -53,6 +55,8 @@ the audio encode, and the masking. Changing a mask, the Audio setting, a ramp or
 the FPS only redoes the masking, so you can iterate on a long clip without
 putting it through the VAE every time. New frames or a different VAE encode
 again. Idea by knoic.
+
+<br clear="left">
 
 ---
 

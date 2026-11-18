@@ -1,5 +1,7 @@
 # 😺NKD Mask Ops Lean
 
+<img src="img/NKDMaskOpsLean.png" alt="😺NKD Mask Ops Lean" align="left" width="30%">
+
 The three mask tweaks a composite actually needs, Fill Holes, Expand / Contract
 and Feather, without the rest of the panel on screen. Same engine as Mask Ops,
 same speed, three widgets.
@@ -37,6 +39,8 @@ Single image or 81 frames, same node.
 
 Reach for the full [😺NKD Mask Ops](mask-ops.md) when you need levels, speck
 removal, gap closing, blockify or the temporal steps.
+
+<br clear="left">
 
 ---
 

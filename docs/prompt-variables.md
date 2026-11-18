@@ -1,5 +1,7 @@
 # 😺NKD Prompt Variables
 
+<img src="img/NKDPromptVariables.png" alt="😺NKD Prompt Variables" align="left" width="30%">
+
 Builds a multiprompt with two nodes. Write your prompt and drop variable chips
 into it; each chip is filled by whatever text arrives on its input socket.
 
@@ -32,6 +34,8 @@ library of your own instead of a socket. The library is shared by every workflow
   workflow still runs for someone who doesn't have your library. Editing an entry
   from this node's panel updates this node. Other nodes keep their copy until you
   insert the variable again.
+
+<br clear="left">
 
 ---
 

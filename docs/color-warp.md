@@ -1,5 +1,7 @@
 # 😺NKD Color Warp
 
+<img src="img/NKDColorWarp.png" alt="😺NKD Color Warp" align="left" width="30%">
+
 Grading by grabbing the colors themselves. Open the editor from the node and you
 get a color wheel with a web of handles over it: drag the one sitting on your
 skin tones and the skin moves, drag the rim of the blue spoke and every blue in
@@ -10,6 +12,10 @@ Your image is on the wheel. Run the node once and the editor scatters the frame'
 own pixels across it, so you can see where your image actually lives before
 touching anything. The preview updates live as you drag, full frame, not a
 thumbnail.
+
+<br clear="left">
+
+![The Color Warp editor: the wheel with its handles on the left, the live preview on the right](img/NKDColorWarp-editor.png)
 
 - **Drag a handle** to move the colors around it. `Pin` moves a single handle on
   its own; without it the whole spoke follows. Double-click resets a handle and
@@ -33,6 +39,8 @@ Hue shifts don't drag brightness along with them, and colors pushed past what th
 screen can show are brought back in gracefully instead of clipping to a flat
 patch. The whole grade is a single lookup, so a 200-frame batch is graded
 identically frame to frame.
+
+<br clear="left">
 
 ---
 

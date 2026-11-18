@@ -1,5 +1,7 @@
 # 😺NKD Mask Picker
 
+<img src="img/NKDMaskPicker.png" alt="😺NKD Mask Picker" align="left" width="30%">
+
 Pick objects for a mask by pointing at them. Press **Analyze** and the node finds
 every object it can in the image. Then hover the preview on the node to see what's
 under the cursor, and click to pick it. No prompt to write, no ids to read off a
@@ -159,6 +161,8 @@ with a text prompt.
 SAM 3 is by Meta. The node uses ComfyUI's native implementation of it.
 [ViTMatte](https://github.com/hustvl/ViTMatte) is by hustvl (Apache-2.0); the node
 runs `hustvl/vitmatte-small-composition-1k` through Hugging Face Transformers.
+
+<br clear="left">
 
 ---
 

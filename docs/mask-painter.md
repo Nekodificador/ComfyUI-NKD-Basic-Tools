@@ -1,5 +1,7 @@
 # 😺NKD Mask Painter
 
+<img src="img/NKDMaskPainter-example.png" alt="😺NKD Mask Painter" align="left" width="30%">
+
 Paints a mask onto an image that doesn't exist as a file yet, anything your graph
 just generated, without saving it out and loading it back in. The canvas is on the
 node itself: run the graph once and the image appears behind it. Out come the
@@ -56,6 +58,8 @@ This is the node for stacking masks. Anything with a `MASK` output feeds it,
 [😺NKD Vector Mask](vector-mask.md) included, and the set operations composite
 them while the result stays paintable. See
 [Vector Mask or Mask Painter?](vector-mask.md#vector-mask-or-mask-painter)
+
+<br clear="left">
 
 ---
 

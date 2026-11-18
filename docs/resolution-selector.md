@@ -1,5 +1,7 @@
 # 😺NKD Resolution Selector
 
+<img src="img/NKDResolutionSelector.png" alt="😺NKD Resolution Selector" align="left" width="30%">
+
 Width and height from an aspect ratio and a megapixel budget, like the native
 Resolution Selector but with the ratio list of 😺NKD Klein Presampling.
 
@@ -7,6 +9,8 @@ Resolution Selector but with the ratio list of 😺NKD Klein Presampling.
 - **As Reference** copies the shape of a connected image and scales it to the budget.
 - **Custom** takes your own width and height, rounded to the multiple.
 - **Multiple** (advanced) rounds the result. 16 is safe for every current model.
+
+<br clear="left">
 
 ---
 

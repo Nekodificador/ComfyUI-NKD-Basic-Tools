@@ -1,5 +1,7 @@
 # 😺NKD Alpha Matte
 
+<img src="img/NKDAlphaMatte.png" alt="😺NKD Alpha Matte" align="left" width="30%">
+
 Turns an image and a roto mask into a transparent cut-out. One frame or a whole
 video, in one node.
 
@@ -40,6 +42,8 @@ for video, save with 😺NKD Video Viewer from [NKD Preview Tools](https://githu
 the matte that was applied, 1 = opaque.
 
 81 frames at 1080p take about 5 s on an RTX 5090 with everything on.
+
+<br clear="left">
 
 ---
 

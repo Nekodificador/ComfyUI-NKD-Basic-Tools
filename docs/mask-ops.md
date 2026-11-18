@@ -1,5 +1,7 @@
 # 😺NKD Mask Ops
 
+<img src="img/NKDMaskOps.png" alt="😺NKD Mask Ops" align="left" width="30%">
+
 Gets a mask ready to use in one node instead of six, and stops mask cleanup from
 being the slow part of a video workflow. The whole batch goes to the GPU once and
 comes back processed: a full pipeline on 81 frames of 1080p takes about a third
@@ -58,6 +60,8 @@ the latent is the unit. A few (MiniMax H3) take it into their own forward and
 regenerate a whole token the moment any part of it is covered, and there the
 block has to be a token wide. The node asks the model instead of assuming, so it
 changes nothing for the models where it shouldn't.
+
+<br clear="left">
 
 ---
 

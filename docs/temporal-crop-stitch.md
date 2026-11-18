@@ -30,6 +30,8 @@ LoRAs and schedule.
 
 ## Temporal Crop
 
+<img src="img/NKDTemporalCrop.png" alt="😺NKD Temporal Crop" align="left" width="30%">
+
 - **The timeline.** Run the node once and it shows your clip as a strip of
   thumbnails, with the soundtrack under it. Drag on the strip to mark a moment, drag
   its edges to adjust it, right click it to remove it. Hovering shows that frame large,
@@ -55,12 +57,18 @@ Stitch needs.
 It reads the model's frame layout from the VAE you connect, so it works with any video
 model: MiniMax H3, Wan, Hunyuan, LTX.
 
+<br clear="left">
+
 ## Temporal Stitch
+
+<img src="img/NKDTemporalStitch.png" alt="😺NKD Temporal Stitch" align="left" width="30%">
 
 Takes the original frames, the `temporal_map` and the decoded result of the sampler.
 Each redrawn moment comes back at real speed, with the sharpest frame of every drawing,
 and is blended into the original across the context frames. Everything outside the
 marked moments is the original video, untouched. Keep using your original soundtrack.
+
+<br clear="left">
 
 ---
 

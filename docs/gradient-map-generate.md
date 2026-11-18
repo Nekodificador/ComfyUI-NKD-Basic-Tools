@@ -6,6 +6,8 @@ load your own ramps as presets.
 
 ## Gradient Map
 
+<img src="img/NKDGradientMap-example.png" alt="😺NKD Gradient Map" align="left" width="30%">
+
 Recolors a photo by brightness, so darks land on one end of the ramp and lights
 on the other. Duotone, teal-orange, any color grade.
 
@@ -18,7 +20,11 @@ on the other. Duotone, teal-orange, any color grade.
 
 https://github.com/user-attachments/assets/909d881d-3b09-41d2-88ba-aff797db9898
 
+<br clear="left">
+
 ## Gradient Generate
+
+<img src="img/NKDGradientGenerate.png" alt="😺NKD Gradient Generate" align="left" width="30%">
 
 Makes a gradient image from scratch, no input needed, as a background, a mask or
 a ramp source.
@@ -40,6 +46,8 @@ a ramp source.
 The preview shows the composite live.
 
 https://github.com/user-attachments/assets/1826bb38-fe14-46a2-9d62-92cee798560e
+
+<br clear="left">
 
 ---
 

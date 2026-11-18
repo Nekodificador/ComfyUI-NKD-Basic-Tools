@@ -1,5 +1,7 @@
 # 😺NKD Face Rig
 
+<img src="img/NKDFaceRig.png" alt="😺NKD Face Rig" align="left" width="30%">
+
 https://github.com/user-attachments/assets/97beddd1-99ca-475d-97b8-e0d2115fef28
 
 Poses a portrait's expression by dragging handles that sit on the face itself:
@@ -30,6 +32,8 @@ It runs standalone, no other custom nodes needed. Weights (~600 MB) download
 automatically from Hugging Face into `models/liveportrait` on first use. If
 `ultralytics` is installed the crop uses the standard YOLOv8 face detector,
 otherwise OpenCV's own detector stands in.
+
+<br clear="left">
 
 ---
 

@@ -1,5 +1,7 @@
 # 😺NKD AV Latent Extend
 
+<img src="img/NKDAVLatentExtend.png" alt="😺NKD AV Latent Extend" align="left" width="30%">
+
 Continues a MiniMax H3 clip into a new one, sound included. The tail of the
 segment you already sampled is planted at the head of a fresh empty latent and
 masked as "keep", so the sampler doesn't start a new shot: it carries on the
@@ -48,6 +50,8 @@ pixel space afterwards, and only what comes after it survives.
 It refuses rather than guesses: a `previous` and a `new` latent of different
 sizes, a previous clip shorter than the overlap you asked for, or a new latent no
 longer than the overlap all stop with a message saying which.
+
+<br clear="left">
 
 ---
 

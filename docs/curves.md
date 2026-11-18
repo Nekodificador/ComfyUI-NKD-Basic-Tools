@@ -1,5 +1,7 @@
 # 😺NKD Curves
 
+<img src="img/NKDCurves-example.png" alt="😺NKD Curves" align="left" width="30%">
+
 Tone curves like Photoshop's: brightness, contrast and color balance in one
 editor, with the graded image previewed live above it as you drag.
 
@@ -20,3 +22,9 @@ editor, with the graded image previewed live above it as you drag.
   you run the node once (the editor says so until then).
 - The play button loads the preview even when the image comes through a resize
   or a subgraph.
+
+<br clear="left">
+
+---
+
+[← All 😺NKD Basic Tools nodes](../README.md)

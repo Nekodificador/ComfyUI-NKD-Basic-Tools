@@ -1,5 +1,7 @@
 # 😺NKD Field Blur
 
+<img src="img/NKDFieldBlur.png" alt="😺NKD Field Blur" align="left" width="30%">
+
 Fakes a shallow depth of field without a depth map. Drop pins, drag the ring
 around each one to set how much blur it wants, and everything in between is
 interpolated. One pin blurs evenly, two give you a gradient.
@@ -33,6 +35,8 @@ Blur destroys grain, and a plastic-smooth area butted against a grainy sharp one
 is what makes a fake depth of field read as fake. Put it back with
 [😺NKD Film Grain](film-grain.md) after this node, masked so it only lands where
 you blurred.
+
+<br clear="left">
 
 ---
 

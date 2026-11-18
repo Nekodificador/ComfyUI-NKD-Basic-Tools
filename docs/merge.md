@@ -1,5 +1,7 @@
 # 😺NKD Merge
 
+<img src="img/NKDMerge-example.png" alt="😺NKD Merge" align="left" width="30%">
+
 Puts a transparent cut-out over a background, frame by frame, and lets you place
 it by dragging it around in the node. A still background under a video cut-out
 works, and so does the other way round.
@@ -67,6 +69,8 @@ mode looks the same in both. Colours are mixed in linear light, which is why a
 50% black over white comes out lighter than a 0.5 grey would suggest. Normal runs
 on the GPU; the other modes go through the core's CPU code and take roughly a
 second per 1080p frame.
+
+<br clear="left">
 
 ---
 

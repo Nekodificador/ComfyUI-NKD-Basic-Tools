@@ -1,5 +1,7 @@
 # 😺NKD MiniMax Guides
 
+<img src="img/NKDMiniMaxGuides.png" alt="😺NKD MiniMax Guides" align="left" width="30%">
+
 Every guide of a MiniMax H3 shot in one node, instead of a row of **Add Guide for
 MiniMax H3** nodes all dragging the same four cables across the canvas.
 
@@ -37,6 +39,8 @@ flowchart LR
   layout and motion, then finishes the detail on its own.
 - **Outputs**: `latent` and both VAEs come straight back out, so the sampler
   hangs off this node instead of reaching back across the graph.
+
+<br clear="left">
 
 ---
 

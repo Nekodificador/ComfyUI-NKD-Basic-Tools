@@ -1,5 +1,7 @@
 # 😺NKD Event Curve
 
+<img src="img/NKDEventCurveAudio.png" alt="😺NKD Event Curve" align="left" width="30%">
+
 Draw when things happen in a MiniMax H3 video. Ask for a dog jumping, draw three
 peaks, get three jumps.
 
@@ -42,6 +44,8 @@ Guide for MiniMax H3) and match `length` and `fps` to your video.
 Example: `example_workflows/NKD H3 Event Control.json` drives MiniMax H3 sound
 events with this node and MiniMax Guides, with hints in English and Spanish. The
 note at its top lists the other packs it needs.
+
+<br clear="left">
 
 ---
 

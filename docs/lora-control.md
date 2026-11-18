@@ -1,5 +1,7 @@
 # 😺NKD LoRA Control
 
+<img src="img/NKDLoraControl.png" alt="😺NKD LoRA Control" align="left" width="30%">
+
 Loads a LoRA and shows you, block by block, how much of it each block actually
 carries. From there you can mute the blocks that aren't pulling their weight,
 push up the ones that are, and drive the whole thing over sampling time with a
@@ -121,6 +123,8 @@ file has nowhere to put that, so a saved file carries the block shape only.
 ## Outputs
 
 - `model`
+
+<br clear="left">
 
 ---
 

@@ -1,12 +1,15 @@
 # 😺NKD Frequency Separate / 😺NKD Frequency Combine
 
+<img src="img/NKDFrequencySeparate-example.png" alt="😺NKD Frequency Separate" align="left" width="30%">
+<img src="img/NKDFrequencyCombine-example.png" alt="😺NKD Frequency Combine" align="right" width="30%">
+
 Splits an image into a soft base (low frequency) and a detail layer (high
 frequency), then puts them back together. The classic job is restoring texture
 after a relight: you take the pores and the fabric from the original, the
 lighting from the relit version, and get the relit image back with its
 micro-detail intact.
 
-<img width="1604" height="1106" alt="image" src="https://github.com/user-attachments/assets/2545613e-cb73-4b32-aac3-2ddc8fd9588b" />
+<img alt="image" src="https://github.com/user-attachments/assets/2545613e-cb73-4b32-aac3-2ddc8fd9588b" />
 
 ```mermaid
 flowchart LR
@@ -47,6 +50,8 @@ destroys the very high frequency you're trying to look at. When the view is
 fitted, `radius` is scaled to that downscale and the hint shows you the effective
 value (`r8 → r2 @ 31%`), so the number in front of you matches the frequency
 you're getting.
+
+<br clear="left">
 
 ---
 
