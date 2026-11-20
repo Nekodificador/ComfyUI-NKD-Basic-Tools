@@ -33,7 +33,10 @@ back in a group, still wired, so you can change a file or a setting. Right-click
 the group and choose **Repack NKD Loader** to save it and fold it back into one
 node. The output order and names stay as they were.
 
-Rename, reorder or delete presets under **Settings → NKD Basic Tools → Loader**.
+**Convert NKD Loader to subgraph** unpacks into a subgraph instead, with every
+loader setting exposed as a widget on the subgraph node.
+
+Rename, reorder or delete presets under **Settings → NKD → Loader**.
 Deleting a preset doesn't break the workflows that use it.
 
 ## Outputs

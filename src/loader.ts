@@ -137,12 +137,12 @@ async function saveSelection(): Promise<void> {
 const LG = () => (window as any).LiteGraph;
 const GROUP_FLAG = "nkdLoader";   // on the group's flags: the preset it was unpacked from
 
-/** Replace the loader node by its real loaders, inside a group, keeping every outgoing link. */
-function unpack(node: any): void {
+/** Replace the loader node by its real loaders, keeping every outgoing link. Returns them, or null. */
+function expand(node: any): { recipe: Recipe; made: any[] } | null {
   const recipe = parse(findW(node, "recipe")?.value);
-  if (!recipe) return toast("warn", "Choose a preset first.");
+  if (!recipe) { toast("warn", "Choose a preset first."); return null; }
   const missing = recipe.nodes.find((n) => !LG().registered_node_types[n.class_type]);
-  if (missing) return toast("warn", `${missing.class_type} is not installed.`);
+  if (missing) { toast("warn", `${missing.class_type} is not installed.`); return null; }
   const graph = node.graph;
   let y = node.pos[1];
   const made = recipe.nodes.map((n) => {
@@ -168,6 +168,15 @@ function unpack(node: any): void {
     }
   });
   graph.remove(node);
+  return { recipe, made };
+}
+
+/** Unpack inside a group, which Repack turns back into the loader node. */
+function unpack(node: any): void {
+  const got = expand(node);
+  if (!got) return;
+  const { recipe, made } = got;
+  const graph = made[0].graph;
   const group = new (LG().LGraphGroup)(`😺 ${recipe.name}`);
   group.flags[GROUP_FLAG] = recipe.name;
   graph.add(group);
@@ -179,6 +188,31 @@ function unpack(node: any): void {
   group.size = [Math.max(...made.map((m) => m.pos[0] + m.size[0])) + pad - x0,
                 Math.max(...made.map((m) => m.pos[1] + m.size[1])) + pad - y0];
   comfyApp.canvas.setDirty(true, true);
+}
+
+/** Unpack straight into a subgraph, every loader widget wired to a subgraph input. */
+function toSubgraph(node: any): void {
+  const pos = [...node.pos];
+  const got = expand(node);
+  if (!got) return;
+  // The subgraph's input/output nodes are laid out from the bounding rects, only measured on draw.
+  for (const m of got.made) m.updateArea();
+  const { subgraph, node: sg } = got.made[0].graph.convertToSubgraph(new Set(got.made));
+  sg.pos = pos;
+  // Same as dropping a link on the input node's empty slot: a new subgraph input per widget.
+  for (const m of subgraph.nodes) for (const inp of m.inputs ?? [])
+    if (inp.widget && inp.link == null) subgraph.inputNode.emptySlot.connect(inp, m);
+  // Every preset output, like the loader node had; the ones already wired out are there.
+  for (const ref of got.recipe.outputs) {
+    const m = subgraph.getNodeById(got.made[ref.node].id);
+    const out = m.outputs[ref.out];
+    if (!(out.links ?? []).some((id: number) => subgraph.getLink(id)?.target_id === subgraph.outputNode.id))
+      subgraph.outputNode.emptySlot.connect(out, m);
+  }
+  subgraph.name = sg.title = `😺 ${got.recipe.name}`;
+  comfyApp.canvas.select(sg);
+  comfyApp.canvas.setDirty(true, true);
+  comfyApp.extensionManager.workflow?.activeWorkflow?.changeTracker?.checkState();
 }
 
 /** The inverse: capture the group, save it as a preset and put one loader node back. */
@@ -254,7 +288,14 @@ function applyToNodes(name: string, recipe: Recipe): void {
   if (hit) comfyApp.extensionManager.workflow?.activeWorkflow?.changeTracker?.checkState();
 }
 
-const FIELD = "background:#252830;border:1px solid #3a3d46;border-radius:4px;color:#c8d0e0;padding:3px 8px;font-size:12px;min-width:0;width:100%;box-sizing:border-box";
+// Same look as ComfyUI's own setting rows and inputs (Settings > Timeline Shortcuts is the reference).
+const FIELD = "background:var(--secondary);border:none;border-radius:var(--radius-lg);color:var(--foreground);padding:6px 12px;font-size:var(--text-sm);min-width:0;width:100%;box-sizing:border-box";
+// The settings row puts a custom control in a narrow right column; this drops the list onto its own full-width line.
+const PRESETS_CSS = `
+div:has(> div > div > .nkd-loader-presets){flex-wrap:wrap}
+div:has(> div > .nkd-loader-presets){display:block;flex-basis:100%}
+.nkd-loader-presets button{background:none;border:none;color:var(--muted-foreground);padding:6px;border-radius:var(--radius-lg);cursor:pointer;display:flex}
+.nkd-loader-presets button:hover{color:var(--foreground);background:var(--secondary)}`;
 
 /** One control per input of a recipe node, built from the loader's own node definition. */
 function inputControl(spec: any, value: unknown, onChange: (v: unknown) => void): HTMLElement {
@@ -299,9 +340,9 @@ function reorderable(row: HTMLElement, handle: HTMLElement, kind: string, i: num
 
 const grip = () => {
   const g = document.createElement("i");
-  g.className = "pi pi-bars";
+  g.className = "icon-[lucide--grip-vertical]";
   g.title = "Drag to reorder";
-  g.style.cssText = "opacity:.45;padding:4px";
+  g.style.cssText = "color:var(--muted-foreground);flex:none";
   return g;
 };
 
@@ -314,9 +355,9 @@ const moved = <T>(list: T[], from: number, to: number): T[] => {
 /** `onChange(true)` asks for a redraw; without it focus stays in the field being edited. */
 function recipeEditor(recipe: Recipe, onChange: (redraw?: boolean) => void): HTMLElement {
   const box = document.createElement("div");
-  box.style.cssText = "display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;align-items:center;padding:6px 0 10px 12px;border-left:2px solid #3a3d46;margin-left:4px";
+  box.style.cssText = "display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;align-items:center;padding:4px 0 12px 24px";
   const outHead = document.createElement("div");
-  outHead.style.cssText = "grid-column:1/-1;font-weight:600";
+  outHead.style.cssText = "grid-column:1/-1;font-size:var(--text-sm)";
   outHead.textContent = "Outputs";
   outHead.title = "Order and names of the node's outputs. Reordering outputs of different types drops their links in the open workflow.";
   box.append(outHead);
@@ -324,26 +365,33 @@ function recipeEditor(recipe: Recipe, onChange: (redraw?: boolean) => void): HTM
     const row = document.createElement("div");
     row.style.cssText = "grid-column:1/-1;display:grid;grid-template-columns:subgrid;align-items:center";
     const type = document.createElement("div");
-    type.style.cssText = "display:flex;align-items:center;gap:2px;opacity:.6";
+    type.style.cssText = "display:flex;align-items:center;gap:4px;font-size:var(--text-sm);color:var(--muted-foreground)";
     const g = grip();
     type.append(g, o.type);
     const name = document.createElement("input");
     name.style.cssText = FIELD;
     name.value = o.label;
-    name.onchange = () => { o.label = name.value.trim() || o.type.toLowerCase(); name.value = o.label; onChange(); };
+    name.onchange = () => { o.label = name.value.trim() || o.type.toLowerCase(); name.value = o.label; onChange(true); };
     row.append(type, name);
     reorderable(row, g, "nkd-loader-output", i, (from, to) => { recipe.outputs = moved(recipe.outputs, from, to); onChange(true); });
     box.append(row);
   });
-  recipe.nodes.forEach((n) => {
+  // Models follow the output order and are titled by the outputs they feed, so two loaders of
+  // the same type (two CLIPs) can't be told apart only by their node name.
+  const first = (i: number) => { const k = recipe.outputs.findIndex((o) => o.node === i); return k < 0 ? Infinity : k; };
+  [...recipe.nodes.keys()].sort((a, b) => first(a) - first(b)).forEach((ni) => {
+    const n = recipe.nodes[ni];
     const def = (window as any).LiteGraph?.registered_node_types?.[n.class_type]?.nodeData;
     const head = document.createElement("div");
-    head.style.cssText = "grid-column:1/-1;font-weight:600;margin-top:4px";
-    head.textContent = def?.display_name ?? n.class_type;
+    head.style.cssText = "grid-column:1/-1;font-size:var(--text-sm);margin-top:8px";
+    const feeds = recipe.outputs.filter((o) => o.node === ni).map((o) => o.label).join(" · ");
+    head.innerHTML = `<span></span><span style="color:var(--muted-foreground);margin-left:8px"></span>`;
+    (head.children[0] as HTMLElement).textContent = feeds || (def?.display_name ?? n.class_type);
+    (head.children[1] as HTMLElement).textContent = feeds ? (def?.display_name ?? n.class_type) : "";
     box.append(head);
     if (!def) {
       const warn = document.createElement("div");
-      warn.style.cssText = "grid-column:1/-1;color:#ff6b6b";
+      warn.style.cssText = "grid-column:1/-1;color:var(--error-text)";
       warn.textContent = "Node not installed.";
       box.append(warn);
       return;
@@ -351,13 +399,13 @@ function recipeEditor(recipe: Recipe, onChange: (redraw?: boolean) => void): HTM
     const specs = { ...def.input?.required, ...def.input?.optional };
     for (const [k, v] of Object.entries(n.inputs)) {
       const lbl = document.createElement("div");
-      lbl.style.cssText = "opacity:.6";
+      lbl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground)";
       lbl.textContent = k;
       let ctl: HTMLElement;
       if (v && typeof v === "object") {
         const src = v as Link;
         ctl = document.createElement("div");
-        ctl.style.cssText = "opacity:.45";
+        ctl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground)";
         ctl.textContent = `← ${recipe.nodes[src.from].class_type} · output ${src.out}`;
       } else {
         ctl = inputControl(specs[k], v, (nv) => { n.inputs[k] = nv; onChange(); });
@@ -373,8 +421,15 @@ const open = new Set<string>();
 
 function renderManager(_name: string, setter: (v: unknown) => void, value: Record<string, Recipe>): HTMLElement {
   const root = document.createElement("div");
-  root.style.cssText = "display:flex;flex-direction:column;gap:6px;min-width:320px";
+  root.className = "nkd-loader-presets";
+  root.style.cssText = "display:flex;flex-direction:column;padding-top:4px";
   ensureNkdModalStyles();
+  if (!document.getElementById("nkd-loader-presets-css")) {
+    const st = document.createElement("style");
+    st.id = "nkd-loader-presets-css";
+    st.textContent = PRESETS_CSS;
+    document.head.append(st);
+  }
   let presets: Record<string, Recipe> = structuredClone(value ?? {});
   const commit = () => { setter(structuredClone(presets)); draw(); };
   const draw = () => {
@@ -382,13 +437,14 @@ function renderManager(_name: string, setter: (v: unknown) => void, value: Recor
     const names = Object.keys(presets);
     if (!names.length) {
       root.textContent = "No presets yet. Select loader nodes, right-click and choose \"Save as NKD Loader preset\".";
-      root.style.opacity = "0.6";
+      root.style.color = "var(--muted-foreground)";
+      root.style.fontSize = "var(--text-sm)";
       return;
     }
-    root.style.opacity = "";
+    root.style.color = root.style.fontSize = "";
     for (const name of names) {
       const row = document.createElement("div");
-      row.style.cssText = "display:flex;align-items:center;gap:8px";
+      row.style.cssText = "display:flex;align-items:center;gap:8px;min-height:2rem";
       const g = grip();
       row.append(g);
       reorderable(row, g, "nkd-loader-preset", names.indexOf(name), (from, to) => {
@@ -396,25 +452,24 @@ function renderManager(_name: string, setter: (v: unknown) => void, value: Recor
         commit();
       });
       const label = document.createElement("div");
-      label.style.cssText = "flex:1;min-width:0";
-      label.innerHTML = `<div style="font-weight:600"></div><div style="opacity:.55;font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>`;
+      label.style.cssText = "flex:1;min-width:0;font-size:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+      label.innerHTML = `<span style="color:var(--muted-foreground)"></span><span style="color:var(--muted-foreground);opacity:.6;margin-left:8px"></span>`;
       (label.children[0] as HTMLElement).textContent = name;
       (label.children[1] as HTMLElement).textContent = presets[name].outputs.map((o) => o.label).join(" · ");
       label.title = presets[name].nodes.map((n) => n.class_type).join(", ");
       const btn = (icon: string, title: string, fn: () => void) => {
         const b = document.createElement("button");
-        b.className = "p-button p-button-text p-button-sm";
         b.title = title;
-        b.innerHTML = `<i class="pi ${icon}"></i>`;
+        b.innerHTML = `<i class="${icon}"></i>`;
         b.onclick = fn;
         return b;
       };
       row.append(label,
-        btn(open.has(name) ? "pi-chevron-up" : "pi-sliders-h", "Edit models", () => {
+        btn(open.has(name) ? "icon-[lucide--chevron-up]" : "icon-[lucide--sliders-horizontal]", "Edit models", () => {
           open.has(name) ? open.delete(name) : open.add(name);
           draw();
         }),
-        btn("pi-pencil", "Rename", async () => {
+        btn("icon-[lucide--pencil]", "Rename", async () => {
           const to = (await comfyApp.extensionManager.dialog.prompt({ title: "Rename preset", message: "New name", defaultValue: name }))?.trim();
           if (!to || to === name) return;
           presets = Object.fromEntries(Object.entries(presets).map(([k, r]) => k === name ? [to, { ...r, name: to }] : [k, r]));
@@ -422,7 +477,7 @@ function renderManager(_name: string, setter: (v: unknown) => void, value: Recor
           commit();
           applyToNodes(name, presets[to]);
         }),
-        btn("pi-trash", "Delete", async () => {
+        btn("icon-[lucide--trash-2]", "Delete", async () => {
           if (!(await comfyApp.extensionManager.dialog.confirm({ title: "Delete preset", message: `Delete "${name}"? Workflows that use it keep working.` }))) return;
           delete presets[name];
           commit();
@@ -443,8 +498,8 @@ export function registerLoader(): void {
     name: "NKD.BasicTools.Loader",
     settings: [{
       id: SETTING,
-      category: ["NKD Basic Tools", "Loader", "Presets"],
-      name: "NKD Loader presets",
+      category: ["NKD", "Loader", "Presets"],
+      name: "Presets",
       tooltip: "Select loader nodes, right-click and choose \"Save as NKD Loader preset\".",
       type: renderManager,
       defaultValue: {},
@@ -459,7 +514,9 @@ export function registerLoader(): void {
     },
     getNodeMenuItems(node: any) {
       const items: any[] = [];
-      if (node.type === NODE_NAME) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
+      if (node.type === NODE_NAME) items.push(
+        { content: "Unpack NKD Loader", callback: () => unpack(node) },
+        { content: "Convert NKD Loader to subgraph", callback: () => toSubgraph(node) });
       if (comfyApp.canvas.selected_nodes?.[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
       return items.length ? [null, ...items] : [];
     },

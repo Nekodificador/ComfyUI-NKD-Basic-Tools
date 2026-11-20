@@ -18514,9 +18514,9 @@ function setupPaintWidget(node, o) {
     scheduleDraw();
     (_a = o.onClear) == null ? void 0 : _a.call(o);
   });
-  expandBtn.addEventListener("click", () => expand());
+  expandBtn.addEventListener("click", () => expand2());
   const detachFine = attachFineRange(bar);
-  function expand() {
+  function expand2() {
     const keepH = root.offsetHeight;
     root.style.height = `${keepH}px`;
     const holder = document.createElement("div");
@@ -21854,12 +21854,18 @@ async function saveSelection() {
 }
 const LG = () => window.LiteGraph;
 const GROUP_FLAG = "nkdLoader";
-function unpack(node) {
+function expand(node) {
   var _a, _b;
   const recipe = parse((_a = findW(node, "recipe")) == null ? void 0 : _a.value);
-  if (!recipe) return toast("warn", "Choose a preset first.");
+  if (!recipe) {
+    toast("warn", "Choose a preset first.");
+    return null;
+  }
   const missing = recipe.nodes.find((n) => !LG().registered_node_types[n.class_type]);
-  if (missing) return toast("warn", `${missing.class_type} is not installed.`);
+  if (missing) {
+    toast("warn", `${missing.class_type} is not installed.`);
+    return null;
+  }
   const graph = node.graph;
   let y = node.pos[1];
   const made = recipe.nodes.map((n) => {
@@ -21885,6 +21891,13 @@ function unpack(node) {
     }
   });
   graph.remove(node);
+  return { recipe, made };
+}
+function unpack(node) {
+  const got = expand(node);
+  if (!got) return;
+  const { recipe, made } = got;
+  const graph = made[0].graph;
   const group = new (LG()).LGraphGroup(`😺 ${recipe.name}`);
   group.flags[GROUP_FLAG] = recipe.name;
   graph.add(group);
@@ -21897,6 +21910,30 @@ function unpack(node) {
     Math.max(...made.map((m) => m.pos[1] + m.size[1])) + pad - y0
   ];
   app.canvas.setDirty(true, true);
+}
+function toSubgraph(node) {
+  var _a, _b, _c;
+  const pos = [...node.pos];
+  const got = expand(node);
+  if (!got) return;
+  for (const m of got.made) m.updateArea();
+  const { subgraph, node: sg } = got.made[0].graph.convertToSubgraph(new Set(got.made));
+  sg.pos = pos;
+  for (const m of subgraph.nodes) for (const inp of m.inputs ?? [])
+    if (inp.widget && inp.link == null) subgraph.inputNode.emptySlot.connect(inp, m);
+  for (const ref2 of got.recipe.outputs) {
+    const m = subgraph.getNodeById(got.made[ref2.node].id);
+    const out = m.outputs[ref2.out];
+    if (!(out.links ?? []).some((id) => {
+      var _a2;
+      return ((_a2 = subgraph.getLink(id)) == null ? void 0 : _a2.target_id) === subgraph.outputNode.id;
+    }))
+      subgraph.outputNode.emptySlot.connect(out, m);
+  }
+  subgraph.name = sg.title = `😺 ${got.recipe.name}`;
+  app.canvas.select(sg);
+  app.canvas.setDirty(true, true);
+  (_c = (_b = (_a = app.extensionManager.workflow) == null ? void 0 : _a.activeWorkflow) == null ? void 0 : _b.changeTracker) == null ? void 0 : _c.checkState();
 }
 async function repack(group) {
   var _a;
@@ -21978,7 +22015,12 @@ function applyToNodes(name, recipe) {
   }
   if (hit) (_g = (_f = (_e = app.extensionManager.workflow) == null ? void 0 : _e.activeWorkflow) == null ? void 0 : _f.changeTracker) == null ? void 0 : _g.checkState();
 }
-const FIELD = "background:#252830;border:1px solid #3a3d46;border-radius:4px;color:#c8d0e0;padding:3px 8px;font-size:12px;min-width:0;width:100%;box-sizing:border-box";
+const FIELD = "background:var(--secondary);border:none;border-radius:var(--radius-lg);color:var(--foreground);padding:6px 12px;font-size:var(--text-sm);min-width:0;width:100%;box-sizing:border-box";
+const PRESETS_CSS = `
+div:has(> div > div > .nkd-loader-presets){flex-wrap:wrap}
+div:has(> div > .nkd-loader-presets){display:block;flex-basis:100%}
+.nkd-loader-presets button{background:none;border:none;color:var(--muted-foreground);padding:6px;border-radius:var(--radius-lg);cursor:pointer;display:flex}
+.nkd-loader-presets button:hover{color:var(--foreground);background:var(--secondary)}`;
 function inputControl(spec, value, onChange) {
   var _a, _b;
   const options = Array.isArray(spec == null ? void 0 : spec[0]) ? spec[0] : (_a = spec == null ? void 0 : spec[1]) == null ? void 0 : _a.options;
@@ -22024,9 +22066,9 @@ function reorderable(row, handle, kind, i, move) {
 }
 const grip = () => {
   const g = document.createElement("i");
-  g.className = "pi pi-bars";
+  g.className = "icon-[lucide--grip-vertical]";
   g.title = "Drag to reorder";
-  g.style.cssText = "opacity:.45;padding:4px";
+  g.style.cssText = "color:var(--muted-foreground);flex:none";
   return g;
 };
 const moved = (list, from, to) => {
@@ -22036,9 +22078,9 @@ const moved = (list, from, to) => {
 };
 function recipeEditor(recipe, onChange) {
   const box = document.createElement("div");
-  box.style.cssText = "display:grid;grid-template-columns:max-content minmax(0,1fr);gap:4px 10px;align-items:center;padding:6px 0 10px 12px;border-left:2px solid #3a3d46;margin-left:4px";
+  box.style.cssText = "display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;align-items:center;padding:4px 0 12px 24px";
   const outHead = document.createElement("div");
-  outHead.style.cssText = "grid-column:1/-1;font-weight:600";
+  outHead.style.cssText = "grid-column:1/-1;font-size:var(--text-sm)";
   outHead.textContent = "Outputs";
   outHead.title = "Order and names of the node's outputs. Reordering outputs of different types drops their links in the open workflow.";
   box.append(outHead);
@@ -22046,7 +22088,7 @@ function recipeEditor(recipe, onChange) {
     const row = document.createElement("div");
     row.style.cssText = "grid-column:1/-1;display:grid;grid-template-columns:subgrid;align-items:center";
     const type = document.createElement("div");
-    type.style.cssText = "display:flex;align-items:center;gap:2px;opacity:.6";
+    type.style.cssText = "display:flex;align-items:center;gap:4px;font-size:var(--text-sm);color:var(--muted-foreground)";
     const g = grip();
     type.append(g, o.type);
     const name = document.createElement("input");
@@ -22055,7 +22097,7 @@ function recipeEditor(recipe, onChange) {
     name.onchange = () => {
       o.label = name.value.trim() || o.type.toLowerCase();
       name.value = o.label;
-      onChange();
+      onChange(true);
     };
     row.append(type, name);
     reorderable(row, g, "nkd-loader-output", i, (from, to) => {
@@ -22064,16 +22106,24 @@ function recipeEditor(recipe, onChange) {
     });
     box.append(row);
   });
-  recipe.nodes.forEach((n) => {
+  const first = (i) => {
+    const k = recipe.outputs.findIndex((o) => o.node === i);
+    return k < 0 ? Infinity : k;
+  };
+  [...recipe.nodes.keys()].sort((a, b) => first(a) - first(b)).forEach((ni) => {
     var _a, _b, _c, _d, _e;
+    const n = recipe.nodes[ni];
     const def2 = (_c = (_b = (_a = window.LiteGraph) == null ? void 0 : _a.registered_node_types) == null ? void 0 : _b[n.class_type]) == null ? void 0 : _c.nodeData;
     const head = document.createElement("div");
-    head.style.cssText = "grid-column:1/-1;font-weight:600;margin-top:4px";
-    head.textContent = (def2 == null ? void 0 : def2.display_name) ?? n.class_type;
+    head.style.cssText = "grid-column:1/-1;font-size:var(--text-sm);margin-top:8px";
+    const feeds = recipe.outputs.filter((o) => o.node === ni).map((o) => o.label).join(" · ");
+    head.innerHTML = `<span></span><span style="color:var(--muted-foreground);margin-left:8px"></span>`;
+    head.children[0].textContent = feeds || ((def2 == null ? void 0 : def2.display_name) ?? n.class_type);
+    head.children[1].textContent = feeds ? (def2 == null ? void 0 : def2.display_name) ?? n.class_type : "";
     box.append(head);
     if (!def2) {
       const warn = document.createElement("div");
-      warn.style.cssText = "grid-column:1/-1;color:#ff6b6b";
+      warn.style.cssText = "grid-column:1/-1;color:var(--error-text)";
       warn.textContent = "Node not installed.";
       box.append(warn);
       return;
@@ -22081,13 +22131,13 @@ function recipeEditor(recipe, onChange) {
     const specs = { ...(_d = def2.input) == null ? void 0 : _d.required, ...(_e = def2.input) == null ? void 0 : _e.optional };
     for (const [k, v] of Object.entries(n.inputs)) {
       const lbl = document.createElement("div");
-      lbl.style.cssText = "opacity:.6";
+      lbl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground)";
       lbl.textContent = k;
       let ctl;
       if (v && typeof v === "object") {
         const src = v;
         ctl = document.createElement("div");
-        ctl.style.cssText = "opacity:.45";
+        ctl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground)";
         ctl.textContent = `← ${recipe.nodes[src.from].class_type} · output ${src.out}`;
       } else {
         ctl = inputControl(specs[k], v, (nv) => {
@@ -22103,8 +22153,15 @@ function recipeEditor(recipe, onChange) {
 const open = /* @__PURE__ */ new Set();
 function renderManager(_name, setter, value) {
   const root = document.createElement("div");
-  root.style.cssText = "display:flex;flex-direction:column;gap:6px;min-width:320px";
+  root.className = "nkd-loader-presets";
+  root.style.cssText = "display:flex;flex-direction:column;padding-top:4px";
   ensureNkdModalStyles();
+  if (!document.getElementById("nkd-loader-presets-css")) {
+    const st = document.createElement("style");
+    st.id = "nkd-loader-presets-css";
+    st.textContent = PRESETS_CSS;
+    document.head.append(st);
+  }
   let presets = structuredClone(value ?? {});
   const commit = () => {
     setter(structuredClone(presets));
@@ -22115,13 +22172,14 @@ function renderManager(_name, setter, value) {
     const names = Object.keys(presets);
     if (!names.length) {
       root.textContent = 'No presets yet. Select loader nodes, right-click and choose "Save as NKD Loader preset".';
-      root.style.opacity = "0.6";
+      root.style.color = "var(--muted-foreground)";
+      root.style.fontSize = "var(--text-sm)";
       return;
     }
-    root.style.opacity = "";
+    root.style.color = root.style.fontSize = "";
     for (const name of names) {
       const row = document.createElement("div");
-      row.style.cssText = "display:flex;align-items:center;gap:8px";
+      row.style.cssText = "display:flex;align-items:center;gap:8px;min-height:2rem";
       const g = grip();
       row.append(g);
       reorderable(row, g, "nkd-loader-preset", names.indexOf(name), (from, to) => {
@@ -22129,26 +22187,25 @@ function renderManager(_name, setter, value) {
         commit();
       });
       const label = document.createElement("div");
-      label.style.cssText = "flex:1;min-width:0";
-      label.innerHTML = `<div style="font-weight:600"></div><div style="opacity:.55;font-size:.85em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>`;
+      label.style.cssText = "flex:1;min-width:0;font-size:var(--text-sm);white-space:nowrap;overflow:hidden;text-overflow:ellipsis";
+      label.innerHTML = `<span style="color:var(--muted-foreground)"></span><span style="color:var(--muted-foreground);opacity:.6;margin-left:8px"></span>`;
       label.children[0].textContent = name;
       label.children[1].textContent = presets[name].outputs.map((o) => o.label).join(" · ");
       label.title = presets[name].nodes.map((n) => n.class_type).join(", ");
       const btn = (icon, title, fn) => {
         const b = document.createElement("button");
-        b.className = "p-button p-button-text p-button-sm";
         b.title = title;
-        b.innerHTML = `<i class="pi ${icon}"></i>`;
+        b.innerHTML = `<i class="${icon}"></i>`;
         b.onclick = fn;
         return b;
       };
       row.append(
         label,
-        btn(open.has(name) ? "pi-chevron-up" : "pi-sliders-h", "Edit models", () => {
+        btn(open.has(name) ? "icon-[lucide--chevron-up]" : "icon-[lucide--sliders-horizontal]", "Edit models", () => {
           open.has(name) ? open.delete(name) : open.add(name);
           draw();
         }),
-        btn("pi-pencil", "Rename", async () => {
+        btn("icon-[lucide--pencil]", "Rename", async () => {
           var _a;
           const to = (_a = await app.extensionManager.dialog.prompt({ title: "Rename preset", message: "New name", defaultValue: name })) == null ? void 0 : _a.trim();
           if (!to || to === name) return;
@@ -22157,7 +22214,7 @@ function renderManager(_name, setter, value) {
           commit();
           applyToNodes(name, presets[to]);
         }),
-        btn("pi-trash", "Delete", async () => {
+        btn("icon-[lucide--trash-2]", "Delete", async () => {
           if (!await app.extensionManager.dialog.confirm({ title: "Delete preset", message: `Delete "${name}"? Workflows that use it keep working.` })) return;
           delete presets[name];
           commit();
@@ -22178,8 +22235,8 @@ function registerLoader() {
     name: "NKD.BasicTools.Loader",
     settings: [{
       id: SETTING,
-      category: ["NKD Basic Tools", "Loader", "Presets"],
-      name: "NKD Loader presets",
+      category: ["NKD", "Loader", "Presets"],
+      name: "Presets",
       tooltip: 'Select loader nodes, right-click and choose "Save as NKD Loader preset".',
       type: renderManager,
       defaultValue: {},
@@ -22197,7 +22254,10 @@ function registerLoader() {
     getNodeMenuItems(node) {
       var _a;
       const items = [];
-      if (node.type === NODE_NAME$4) items.push({ content: "Unpack NKD Loader", callback: () => unpack(node) });
+      if (node.type === NODE_NAME$4) items.push(
+        { content: "Unpack NKD Loader", callback: () => unpack(node) },
+        { content: "Convert NKD Loader to subgraph", callback: () => toSubgraph(node) }
+      );
       if ((_a = app.canvas.selected_nodes) == null ? void 0 : _a[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
       return items.length ? [null, ...items] : [];
     },
@@ -22872,7 +22932,7 @@ function setup$2(node) {
   api.addEventListener("execution_error", stopAnalyzing);
   api.addEventListener("execution_interrupted", stopAnalyzing);
   let modal = null;
-  const expand = () => {
+  const expand2 = () => {
     let big;
     modal = openNkdModal({
       title: "😺 Mask Picker",
@@ -22887,7 +22947,7 @@ function setup$2(node) {
     modal.body.appendChild(big.root);
     modal.addPrimary("Done");
   };
-  const view = makeView(state, { analyze, expand });
+  const view = makeView(state, { analyze, expand: expand2 });
   const mounted = mountDomWidget(node, {
     name: "picker",
     type: "NKD_MASK_PICKER",
