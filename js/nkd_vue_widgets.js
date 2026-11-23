@@ -21752,6 +21752,26 @@ function registerLoraControl() {
     }
   });
 }
+const MODEL_EXT = /\.(safetensors|gguf|ckpt|pt|pth|bin|sft|onnx)$/i;
+const isModelFile = (v) => typeof v === "string" && MODEL_EXT.test(v);
+function modelRefs(values, known = [], dirs = {}) {
+  const prev = /* @__PURE__ */ new Map();
+  for (const m of known) {
+    if (!m || typeof m.name !== "string") continue;
+    const at2 = prev.get(m.name) ?? { name: m.name };
+    if (m.url) at2.url = m.url;
+    if (m.directory) at2.directory = m.directory;
+    prev.set(m.name, at2);
+  }
+  const refs = [];
+  for (const v of values) {
+    if (!isModelFile(v) || refs.some((r) => r.name === v)) continue;
+    const was = prev.get(v);
+    const directory = (was == null ? void 0 : was.directory) || dirs[v];
+    refs.push({ name: v, ...(was == null ? void 0 : was.url) ? { url: was.url } : {}, ...directory ? { directory } : {} });
+  }
+  return refs;
+}
 const NODE_NAME$4 = "NKDLoader";
 const SETTING = "NKD.Loader.Presets";
 const MAX_OUTPUTS = 10;
@@ -21769,6 +21789,16 @@ function refreshNames() {
   presetNames.splice(0, presetNames.length, ...Object.keys(getPresets()));
 }
 const isLink = (v) => Array.isArray(v) && v.length === 2 && typeof v[0] === "string" && typeof v[1] === "number";
+async function modelDirs(names) {
+  const q = [...new Set(names)].map((n) => `name=${encodeURIComponent(n)}`).join("&");
+  if (!q) return {};
+  try {
+    const res = await api.fetchApi(`/nkd_loader/model_dirs?${q}`);
+    return res.ok ? await res.json() : {};
+  } catch {
+    return {};
+  }
+}
 async function capture(selected, keep = /* @__PURE__ */ new Set()) {
   const { output } = await app.graphToPrompt();
   const ids = new Set(selected.map((n) => String(n.id)));
@@ -21799,6 +21829,13 @@ async function capture(selected, keep = /* @__PURE__ */ new Set()) {
     }
     nodes.push({ class_type: output[id].class_type, inputs });
   }
+  const dirs = await modelDirs(nodes.flatMap((n) => Object.values(n.inputs).filter(isModelFile)));
+  order.forEach((id, i) => {
+    var _a, _b;
+    const known = (_b = (_a = app.graph.getNodeById(id)) == null ? void 0 : _a.properties) == null ? void 0 : _b.models;
+    const refs = modelRefs(Object.values(nodes[i].inputs), Array.isArray(known) ? known : [], dirs);
+    if (refs.length) nodes[i].models = refs;
+  });
   const outputs = [];
   order.forEach((id, i) => {
     var _a;
@@ -21855,7 +21892,7 @@ async function saveSelection() {
 const LG = () => window.LiteGraph;
 const GROUP_FLAG = "nkdLoader";
 function expand(node) {
-  var _a, _b;
+  var _a, _b, _c;
   const recipe = parse((_a = findW(node, "recipe")) == null ? void 0 : _a.value);
   if (!recipe) {
     toast("warn", "Choose a preset first.");
@@ -21866,6 +21903,7 @@ function expand(node) {
     toast("warn", `${missing.class_type} is not installed.`);
     return null;
   }
+  const stored = (((_b = getPresets()[recipe.name]) == null ? void 0 : _b.nodes) ?? []).flatMap((n) => n.models ?? []);
   const graph = node.graph;
   let y = node.pos[1];
   const made = recipe.nodes.map((n) => {
@@ -21877,13 +21915,15 @@ function expand(node) {
       const w = findW(m, k);
       if (w && !(v && typeof v === "object")) w.value = v;
     }
+    const refs = modelRefs(Object.values(n.inputs), [...stored, ...n.models ?? []]);
+    if (refs.length) m.properties.models = refs;
     return m;
   });
   recipe.nodes.forEach((n, i) => {
     for (const [k, v] of Object.entries(n.inputs))
       if (v && typeof v === "object") made[v.from].connect(v.out, made[i], k);
   });
-  (_b = node.outputs) == null ? void 0 : _b.forEach((o, i) => {
+  (_c = node.outputs) == null ? void 0 : _c.forEach((o, i) => {
     const ref2 = recipe.outputs[i];
     for (const id of [...o.links ?? []]) {
       const l = graph.getLink(id);
@@ -21911,7 +21951,7 @@ function unpack(node) {
   ];
   app.canvas.setDirty(true, true);
 }
-function toSubgraph(node) {
+function toSubgraph(node, promoteWidgets) {
   var _a, _b, _c;
   const pos = [...node.pos];
   const got = expand(node);
@@ -21919,8 +21959,10 @@ function toSubgraph(node) {
   for (const m of got.made) m.updateArea();
   const { subgraph, node: sg } = got.made[0].graph.convertToSubgraph(new Set(got.made));
   sg.pos = pos;
-  for (const m of subgraph.nodes) for (const inp of m.inputs ?? [])
-    if (inp.widget && inp.link == null) subgraph.inputNode.emptySlot.connect(inp, m);
+  if (promoteWidgets) {
+    for (const m of subgraph.nodes) for (const inp of m.inputs ?? [])
+      if (inp.widget && inp.link == null) subgraph.inputNode.emptySlot.connect(inp, m);
+  }
   for (const ref2 of got.recipe.outputs) {
     const m = subgraph.getNodeById(got.made[ref2.node].id);
     const out = m.outputs[ref2.out];
@@ -22076,6 +22118,24 @@ const moved = (list, from, to) => {
   out.splice(to, 0, ...out.splice(from, 1));
   return out;
 };
+function linkRow(n, file, onChange) {
+  const lbl = document.createElement("div");
+  lbl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground);padding-left:12px";
+  lbl.textContent = "download link";
+  lbl.title = "Where this file can be downloaded. Hugging Face (…/resolve/main/…) or Civitai.";
+  const models = n.models ?? (n.models = []);
+  let ref2 = models.find((m) => m.name === file);
+  if (!ref2) models.push(ref2 = { name: file });
+  const el = document.createElement("input");
+  el.style.cssText = FIELD;
+  el.placeholder = "https://huggingface.co/…/resolve/main/…";
+  el.value = ref2.url ?? "";
+  el.onchange = () => {
+    ref2.url = el.value.trim() || void 0;
+    onChange();
+  };
+  return [lbl, el];
+}
 function recipeEditor(recipe, onChange) {
   const box = document.createElement("div");
   box.style.cssText = "display:grid;grid-template-columns:max-content minmax(0,1fr);gap:6px 12px;align-items:center;padding:4px 0 12px 24px";
@@ -22142,10 +22202,11 @@ function recipeEditor(recipe, onChange) {
       } else {
         ctl = inputControl(specs[k], v, (nv) => {
           n.inputs[k] = nv;
-          onChange();
+          onChange(isModelFile(nv) || isModelFile(v));
         });
       }
       box.append(lbl, ctl);
+      if (isModelFile(v)) box.append(...linkRow(n, v, onChange));
     }
   });
   return box;
@@ -22256,7 +22317,8 @@ function registerLoader() {
       const items = [];
       if (node.type === NODE_NAME$4) items.push(
         { content: "Unpack NKD Loader", callback: () => unpack(node) },
-        { content: "Convert NKD Loader to subgraph", callback: () => toSubgraph(node) }
+        { content: "Convert NKD Loader to subgraph", callback: () => toSubgraph(node, true) },
+        { content: "Convert NKD Loader to subgraph for sharing", callback: () => toSubgraph(node, false) }
       );
       if ((_a = app.canvas.selected_nodes) == null ? void 0 : _a[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
       return items.length ? [null, ...items] : [];

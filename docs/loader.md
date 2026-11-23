@@ -34,10 +34,26 @@ the group and choose **Repack NKD Loader** to save it and fold it back into one
 node. The output order and names stay as they were.
 
 **Convert NKD Loader to subgraph** unpacks into a subgraph instead, with every
-loader setting exposed as a widget on the subgraph node.
+loader setting exposed as a widget on the subgraph node (**… for sharing** leaves
+the settings inside, so the node shows only its outputs).
 
 Rename, reorder or delete presets under **Settings → NKD → Loader**.
 Deleting a preset doesn't break the workflows that use it.
+
+## Sharing a workflow that uses a preset
+
+Under **Settings → NKD → Loader**, open a preset with the sliders button: every
+model file has a **download link** field. Paste the file's direct download
+address — `https://huggingface.co/<repo>/resolve/main/<path>` or the Civitai
+`api/download` link, not the page it sits on — and the preset remembers it. A
+link already declared on the loader node you captured is picked up on its own.
+
+Before you share the workflow, right-click the node and choose **Convert NKD
+Loader to subgraph for sharing**. The real loaders go inside a subgraph that
+exposes the same outputs, so no cable moves, and each loader carries its download
+links: whoever opens the workflow is offered the models it needs with a download
+button, which a single opaque node can't do. The subgraph holds only the loaders
+themselves, so the workflow opens and runs without NKD Basic Tools installed.
 
 ## Outputs
 

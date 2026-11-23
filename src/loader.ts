@@ -7,11 +7,17 @@
  * recipe into its hidden `recipe` widget — the workflow carries the recipe, not the name, so
  * it runs on machines that don't have the preset. nkd_loader.py expands it into the loaders.
  *
+ * Each recipe node also carries the download metadata of its model files, so the loaders it
+ * unpacks into declare them like any shared workflow does and ComfyUI can offer the download.
+ * Links are typed in Settings > NKD > Loader > Presets.
+ *
  * The backend declares MAX_OUTPUTS `*` outputs; the node keeps only the recipe's, typed and
  * labelled. Outputs are positional, so a link survives a preset switch when its slot keeps
  * the same type (Flux 2 → Flux 3: MODEL / CLIP / VAE stay wired).
  */
 import { app as comfyApp } from "../../scripts/app.js";
+import { api } from "../../scripts/api.js";
+import { isModelFile, modelRefs, type ModelRef } from "./loaderModels";
 import { findW, hideWidget } from "./domHost";
 import { ensureNkdModalStyles, nkdSelect } from "./nkd_modal";
 
@@ -24,7 +30,7 @@ console.log("[NKD Loader] rev 1.0.0");
 type Link = { from: number; out: number };
 type Recipe = {
   name: string;
-  nodes: { class_type: string; inputs: Record<string, unknown> }[];
+  nodes: { class_type: string; inputs: Record<string, unknown>; models?: ModelRef[] }[];
   outputs: { node: number; out: number; type: string; label: string }[];
 };
 
@@ -48,6 +54,18 @@ const isLink = (v: unknown): v is [string, number] =>
   Array.isArray(v) && v.length === 2 && typeof v[0] === "string" && typeof v[1] === "number";
 
 type Captured = { recipe: Recipe; sources: string[] };   // sources[i] = "nodeId:slot" behind output i
+
+/** The models/ folder of each file, from the server's own file lists (nkd_loader.py). */
+async function modelDirs(names: string[]): Promise<Record<string, string>> {
+  const q = [...new Set(names)].map((n) => `name=${encodeURIComponent(n)}`).join("&");
+  if (!q) return {};
+  try {
+    const res = await api.fetchApi(`/nkd_loader/model_dirs?${q}`);
+    return res.ok ? await res.json() : {};
+  } catch {
+    return {};   // a preset without folders still saves; the links are what matters
+  }
+}
 
 /** `keep`: "nodeId:slot" outputs to expose even when the selection consumes them itself. */
 async function capture(selected: any[], keep = new Set<string>()): Promise<Captured | string> {
@@ -76,6 +94,13 @@ async function capture(selected: any[], keep = new Set<string>()): Promise<Captu
     }
     nodes.push({ class_type: output[id].class_type, inputs });
   }
+  // Download metadata the selected loaders already declare, plus the folder of every model file.
+  const dirs = await modelDirs(nodes.flatMap((n) => Object.values(n.inputs).filter(isModelFile)));
+  order.forEach((id, i) => {
+    const known = comfyApp.graph.getNodeById(id)?.properties?.models;
+    const refs = modelRefs(Object.values(nodes[i].inputs), Array.isArray(known) ? known : [], dirs);
+    if (refs.length) nodes[i].models = refs;
+  });
   const outputs: (Recipe["outputs"][number] & { pos: number[]; src: string })[] = [];
   order.forEach((id, i) => {
     const node = comfyApp.graph.getNodeById(id);
@@ -143,6 +168,9 @@ function expand(node: any): { recipe: Recipe; made: any[] } | null {
   if (!recipe) { toast("warn", "Choose a preset first."); return null; }
   const missing = recipe.nodes.find((n) => !LG().registered_node_types[n.class_type]);
   if (missing) { toast("warn", `${missing.class_type} is not installed.`); return null; }
+  // A workflow saved before its preset had download links carries that older recipe, so the
+  // links also come from the preset as it stands now; they are matched by file name.
+  const stored = (getPresets()[recipe.name]?.nodes ?? []).flatMap((n) => n.models ?? []);
   const graph = node.graph;
   let y = node.pos[1];
   const made = recipe.nodes.map((n) => {
@@ -154,6 +182,8 @@ function expand(node: any): { recipe: Recipe; made: any[] } | null {
       const w = findW(m, k);
       if (w && !(v && typeof v === "object")) w.value = v;
     }
+    const refs = modelRefs(Object.values(n.inputs), [...stored, ...(n.models ?? [])]);
+    if (refs.length) m.properties.models = refs;
     return m;
   });
   recipe.nodes.forEach((n, i) => {
@@ -190,8 +220,9 @@ function unpack(node: any): void {
   comfyApp.canvas.setDirty(true, true);
 }
 
-/** Unpack straight into a subgraph, every loader widget wired to a subgraph input. */
-function toSubgraph(node: any): void {
+/** Unpack straight into a subgraph. `promoteWidgets` wires every loader widget to a subgraph
+ *  input; without it the subgraph node shows only the loader's outputs, as it did before. */
+function toSubgraph(node: any, promoteWidgets: boolean): void {
   const pos = [...node.pos];
   const got = expand(node);
   if (!got) return;
@@ -200,7 +231,7 @@ function toSubgraph(node: any): void {
   const { subgraph, node: sg } = got.made[0].graph.convertToSubgraph(new Set(got.made));
   sg.pos = pos;
   // Same as dropping a link on the input node's empty slot: a new subgraph input per widget.
-  for (const m of subgraph.nodes) for (const inp of m.inputs ?? [])
+  if (promoteWidgets) for (const m of subgraph.nodes) for (const inp of m.inputs ?? [])
     if (inp.widget && inp.link == null) subgraph.inputNode.emptySlot.connect(inp, m);
   // Every preset output, like the loader node had; the ones already wired out are there.
   for (const ref of got.recipe.outputs) {
@@ -352,6 +383,24 @@ const moved = <T>(list: T[], from: number, to: number): T[] => {
   return out;
 };
 
+/** Download link of one model file, kept in the recipe node's `models`: that is what the
+ *  unpacked loaders declare, and what puts a download button on the model. */
+function linkRow(n: Recipe["nodes"][number], file: string, onChange: () => void): HTMLElement[] {
+  const lbl = document.createElement("div");
+  lbl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground);padding-left:12px";
+  lbl.textContent = "download link";
+  lbl.title = "Where this file can be downloaded. Hugging Face (…/resolve/main/…) or Civitai.";
+  const models = (n.models ??= []);
+  let ref = models.find((m) => m.name === file);
+  if (!ref) models.push(ref = { name: file });
+  const el = document.createElement("input");
+  el.style.cssText = FIELD;
+  el.placeholder = "https://huggingface.co/…/resolve/main/…";
+  el.value = ref.url ?? "";
+  el.onchange = () => { ref.url = el.value.trim() || undefined; onChange(); };
+  return [lbl, el];
+}
+
 /** `onChange(true)` asks for a redraw; without it focus stays in the field being edited. */
 function recipeEditor(recipe: Recipe, onChange: (redraw?: boolean) => void): HTMLElement {
   const box = document.createElement("div");
@@ -408,9 +457,10 @@ function recipeEditor(recipe: Recipe, onChange: (redraw?: boolean) => void): HTM
         ctl.style.cssText = "font-size:var(--text-sm);color:var(--muted-foreground)";
         ctl.textContent = `← ${recipe.nodes[src.from].class_type} · output ${src.out}`;
       } else {
-        ctl = inputControl(specs[k], v, (nv) => { n.inputs[k] = nv; onChange(); });
+        ctl = inputControl(specs[k], v, (nv) => { n.inputs[k] = nv; onChange(isModelFile(nv) || isModelFile(v)); });
       }
       box.append(lbl, ctl);
+      if (isModelFile(v)) box.append(...linkRow(n, v, onChange));
     }
   });
   return box;
@@ -516,7 +566,8 @@ export function registerLoader(): void {
       const items: any[] = [];
       if (node.type === NODE_NAME) items.push(
         { content: "Unpack NKD Loader", callback: () => unpack(node) },
-        { content: "Convert NKD Loader to subgraph", callback: () => toSubgraph(node) });
+        { content: "Convert NKD Loader to subgraph", callback: () => toSubgraph(node, true) },
+        { content: "Convert NKD Loader to subgraph for sharing", callback: () => toSubgraph(node, false) });
       if (comfyApp.canvas.selected_nodes?.[node.id]) items.push({ content: "Save as NKD Loader preset", callback: saveSelection });
       return items.length ? [null, ...items] : [];
     },
