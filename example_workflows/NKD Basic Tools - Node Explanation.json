@@ -1,7 +1,7 @@
 {
   "id": "bc520b6c-ca48-41f0-8fd1-2940d50d1d44",
   "revision": 0,
-  "last_node_id": 136,
+  "last_node_id": 140,
   "last_link_id": 0,
   "nodes": [
     {
@@ -1269,7 +1269,7 @@
           }
         ],
         "style": "info",
-        "step": 7,
+        "step": 9,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -1384,7 +1384,7 @@
           }
         ],
         "style": "info",
-        "step": 8,
+        "step": 10,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -1524,7 +1524,7 @@
           }
         ],
         "style": "info",
-        "step": 9,
+        "step": 11,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -1675,7 +1675,7 @@
           }
         ],
         "style": "info",
-        "step": 10,
+        "step": 12,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -1801,7 +1801,7 @@
           }
         ],
         "style": "info",
-        "step": 11,
+        "step": 13,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -1958,7 +1958,7 @@
       "inputs": [],
       "outputs": [],
       "properties": {
-        "text": "# Painter Node\nA brush on the node itself, over the image or over a blank canvas. Made for a quick scribble for ControlNet without leaving for an external editor.\n\n### image / Width / Height / Background\nConnect an image and the canvas takes its size and shows it behind. With no image, it uses `Width` and `Height` with the `Background` colour.\n\n### Scribble Mode\nThe brush is always white and `strokes` comes out white on black, ready for a Scribble ControlNet.\n\n### Painting\n`B` brush, `E` eraser, `X` swaps between white and black, `Alt` + click picks a colour. `Alt` + right drag changes size and hardness, like in Photoshop. `Ctrl+Z` undoes.\n\n### Outputs\n- `image`: the image just as it came in.\n- `painted`: the strokes over the image.\n- `strokes`: the strokes alone.\n- `mask` / `inverted mask`: the exact mask of what you painted. With `strokes` and `inverted mask` in Join Image with Alpha you get a transparent PNG of the strokes.",
+        "text": "# Painter Node\nA brush on the node itself, over the image or over a blank canvas. Made for a quick scribble for ControlNet without leaving for an external editor.\n\n### image / Width / Height / Background\nConnect an image and the canvas takes its size and shows it behind. With no image, it uses `Width` and `Height` with the `Background` colour.\n\n### Scribble Mode\nThe brush is always white and `strokes` comes out white on black, ready for a Scribble ControlNet.\n\n### Painting\n`B` brush, `E` eraser, `X` swaps between white and black, `Alt` + click picks a colour. `Alt` + right drag changes size and hardness, like in Photoshop. `L` lasso fills a shape. `Ctrl+Z` undoes.\n\n### Clone and Heal\n`S` clones, `J` heals: `Alt` + click where to copy from, then paint. The offset holds across strokes until the next `Alt` + click. Heal blends the patch into the light and colour around it.\n\n### Outputs\n- `image`: the image just as it came in.\n- `painted`: the strokes over the image.\n- `strokes`: the strokes alone.\n- `mask` / `inverted mask`: the exact mask of what you painted. With `strokes` and `inverted mask` in Join Image with Alpha you get a transparent PNG of the strokes.",
         "targets": [
           {
             "node": "12",
@@ -1966,13 +1966,13 @@
           }
         ],
         "style": "info",
-        "step": 12,
+        "step": 14,
         "pinned": false,
         "width": 500,
         "min": "",
         "max": "",
         "texts": {
-          "es": "# Painter Node\nUn pincel en el propio nodo, sobre la imagen o sobre un lienzo vacío. Pensado para hacer un garabato rápido para ControlNet sin salir a un editor externo.\n\n### image / Width / Height / Background\nSi conectas una imagen, el lienzo toma su tamaño y la muestra detrás. Sin imagen, usa `Width` y `Height` con el color de `Background`.\n\n### Scribble Mode\nEl pincel siempre es blanco y `strokes` sale blanco sobre negro, listo para un ControlNet Scribble.\n\n### Pintar\n`B` pincel, `E` goma, `X` cambia entre blanco y negro, `Alt` + clic coge un color. `Alt` + arrastrar con el botón derecho cambia tamaño y dureza, como en Photoshop. `Ctrl+Z` deshace.\n\n### Salidas\n- `image`: la imagen tal cual entró.\n- `painted`: los trazos sobre la imagen.\n- `strokes`: solo los trazos.\n- `mask` / `inverted mask`: la máscara exacta de lo que has pintado. Con `strokes` e `inverted mask` en Join Image with Alpha sacas un PNG transparente de los trazos."
+          "es": "# Painter Node\nUn pincel en el propio nodo, sobre la imagen o sobre un lienzo vacío. Pensado para hacer un garabato rápido para ControlNet sin salir a un editor externo.\n\n### image / Width / Height / Background\nSi conectas una imagen, el lienzo toma su tamaño y la muestra detrás. Sin imagen, usa `Width` y `Height` con el color de `Background`.\n\n### Scribble Mode\nEl pincel siempre es blanco y `strokes` sale blanco sobre negro, listo para un ControlNet Scribble.\n\n### Pintar\n`B` pincel, `E` goma, `X` cambia entre blanco y negro, `Alt` + clic coge un color. `Alt` + arrastrar con el botón derecho cambia tamaño y dureza, como en Photoshop. `L` lazo rellena una forma. `Ctrl+Z` deshace.\n\n### Clonar y Corrector\n`S` clona, `J` corrige: `Alt` + clic donde copiar, luego pinta. El desplazamiento se mantiene entre trazos hasta el siguiente `Alt` + clic. El corrector funde el parche con la luz y el color de alrededor.\n\n### Salidas\n- `image`: la imagen tal cual entró.\n- `painted`: los trazos sobre la imagen.\n- `strokes`: solo los trazos.\n- `mask` / `inverted mask`: la máscara exacta de lo que has pintado. Con `strokes` e `inverted mask` en Join Image with Alpha sacas un PNG transparente de los trazos."
         }
       }
     },
@@ -1981,7 +1981,7 @@
       "type": "NKDAVLatent",
       "pos": [
         60,
-        1860
+        1861
       ],
       "size": [
         320,
@@ -2109,7 +2109,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        1790
+        1791
       ],
       "size": [
         28,
@@ -2129,7 +2129,7 @@
           }
         ],
         "style": "info",
-        "step": 13,
+        "step": 15,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -2144,7 +2144,7 @@
       "type": "NKDAVLatentExtend",
       "pos": [
         470,
-        1860
+        1861
       ],
       "size": [
         320,
@@ -2214,7 +2214,7 @@
       "type": "NKDHint",
       "pos": [
         430,
-        1790
+        1791
       ],
       "size": [
         28,
@@ -2234,7 +2234,7 @@
           }
         ],
         "style": "info",
-        "step": 14,
+        "step": 16,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -2249,7 +2249,7 @@
       "type": "NKDAudioMask",
       "pos": [
         880,
-        1860
+        1861
       ],
       "size": [
         320,
@@ -2329,7 +2329,7 @@
       "type": "NKDHint",
       "pos": [
         840,
-        1790
+        1791
       ],
       "size": [
         28,
@@ -2349,7 +2349,7 @@
           }
         ],
         "style": "info",
-        "step": 15,
+        "step": 17,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -2364,245 +2364,20 @@
       "type": "NKDMiniMaxGuides",
       "pos": [
         1290,
-        1860
+        1861
       ],
       "size": [
         210,
-        158
+        206
       ],
       "flags": {},
       "order": 30,
       "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "positive",
-          "name": "positive",
-          "type": "CONDITIONING",
-          "link": null
-        },
-        {
-          "localized_name": "video vae",
-          "name": "vae",
-          "type": "VAE",
-          "link": null
-        },
-        {
-          "localized_name": "audio vae",
-          "name": "audio_vae",
-          "type": "VAE",
-          "link": null
-        },
-        {
-          "localized_name": "latent",
-          "name": "latent",
-          "type": "LATENT",
-          "link": null
-        },
-        {
-          "localized_name": "guide_1",
-          "name": "guides.guide_1",
-          "shape": 7,
-          "type": "IMAGE,AUDIO,VIDEO",
-          "link": null
-        },
-        {
-          "localized_name": "guide_2",
-          "name": "guides.guide_2",
-          "shape": 7,
-          "type": "IMAGE,AUDIO,VIDEO",
-          "link": null
-        },
-        {
-          "localized_name": "Snap Positions",
-          "name": "snap_positions",
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "snap_positions"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 1",
-          "name": "position_1",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_1"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 2",
-          "name": "position_2",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_2"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 3",
-          "name": "position_3",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_3"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 4",
-          "name": "position_4",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_4"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 5",
-          "name": "position_5",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_5"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 6",
-          "name": "position_6",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_6"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 7",
-          "name": "position_7",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_7"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 8",
-          "name": "position_8",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_8"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 9",
-          "name": "position_9",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_9"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 10",
-          "name": "position_10",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_10"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 11",
-          "name": "position_11",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_11"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "position 12",
-          "name": "position_12",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "position_12"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "positive",
-          "name": "positive",
-          "type": "CONDITIONING",
-          "links": null
-        },
-        {
-          "localized_name": "latent",
-          "name": "latent",
-          "type": "LATENT",
-          "links": null
-        },
-        {
-          "localized_name": "video vae",
-          "name": "video vae",
-          "type": "VAE",
-          "links": null
-        },
-        {
-          "localized_name": "audio vae",
-          "name": "audio vae",
-          "type": "VAE",
-          "links": null
-        }
-      ],
       "properties": {
         "cnr_id": "comfyui-nkd-basic-tools",
         "ver": "87a3ee05fdbca14839f19e728bf67ec26314a8d8",
         "Node name for S&R": "NKDMiniMaxGuides",
         "nkdSchema": 1
-      },
-      "widgets_values": [
-        true,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0,
-        0
-      ],
-      "widgets_values_named": {
-        "snap_positions": true,
-        "position_1": 0,
-        "position_2": 0,
-        "position_3": 0,
-        "position_4": 0,
-        "position_5": 0,
-        "position_6": 0,
-        "position_7": 0,
-        "position_8": 0,
-        "position_9": 0,
-        "position_10": 0,
-        "position_11": 0,
-        "position_12": 0
       }
     },
     {
@@ -2610,7 +2385,7 @@
       "type": "NKDHint",
       "pos": [
         1250,
-        1790
+        1791
       ],
       "size": [
         28,
@@ -2622,7 +2397,7 @@
       "inputs": [],
       "outputs": [],
       "properties": {
-        "text": "# MiniMax Guides\nAll the guides of a MiniMax H3 shot from a single node, instead of a row of Add Guide nodes dragging the same four wires.\n\n### guides\nThe list grows as you fill it. Each slot takes an image, a sequence, a video with its sound, or audio alone. Next to it a `position` appears with the frame where it lands. Negatives count from the end: **-1** is the last frame; put the starting image there and the shot loops.\n\n### Snap Positions\nKeeps each guide on a multiple of 17, the only place where it fits H3's time grid. Anywhere else that frame flickers like a cut. Turn it off if you want to place it by hand.\n\n### Outputs\n`latent`, `video vae` and `audio vae` come out as they are so the sampler hangs off this node and you don't have to cross the workflow again.",
+        "text": "# MiniMax Guides\nAll the guides of a MiniMax H3 shot from a single node, instead of a row of Add Guide nodes dragging the same four wires.\n\n### guides\nThe list grows as you fill it. Each slot takes an image, a sequence, a video with its sound, or audio alone. Next to it a `position` appears with the frame where it lands. Negatives count from the end: **-1** is the last frame; put the starting image there and the shot loops.\n\nA clip and a sound on the same frame become one guide, and two sounds get mixed, so two Event Curve guides can share frame 0.\n\n### until\nHow far into sampling each guide is obeyed (1 = all the way). Feed a first render as a guide with `until` around 0.85 and the model keeps its layout and motion, then finishes the detail on its own.\n\n### Snap Positions\nKeeps each guide on a multiple of 17, the only place where it fits H3's time grid. Anywhere else that frame flickers like a cut. Turn it off if you want to place it by hand.\n\n### Outputs\n`latent`, `video vae` and `audio vae` come out as they are so the sampler hangs off this node and you don't have to cross the workflow again.",
         "targets": [
           {
             "node": "16",
@@ -2630,13 +2405,13 @@
           }
         ],
         "style": "info",
-        "step": 16,
+        "step": 18,
         "pinned": false,
         "width": 500,
         "min": "",
         "max": "",
         "texts": {
-          "es": "# MiniMax Guides\nTodas las guías de un plano de MiniMax H3 desde un solo nodo, en vez de una fila de Add Guide arrastrando los mismos cuatro cables.\n\n### guides\nLa lista crece a medida que la llenas. Cada hueco acepta una imagen, una secuencia, un vídeo con su sonido o solo audio. Al lado aparece un `position` con el frame donde cae. Los negativos cuentan desde el final: **-1** es el último frame; pon ahí la imagen inicial y el plano hace loop.\n\n### Snap Positions\nMantiene cada guía en un múltiplo de 17, el único sitio donde encaja con la rejilla temporal de H3. Fuera de ahí ese frame parpadea como un corte. Desactívalo si quieres colocarla a mano.\n\n### Salidas\n`latent`, `video vae` y `audio vae` salen tal cual para que el sampler cuelgue de este nodo y no tengas que volver a cruzar el workflow."
+          "es": "# MiniMax Guides\nTodas las guías de un plano de MiniMax H3 desde un solo nodo, en vez de una fila de Add Guide arrastrando los mismos cuatro cables.\n\n### guides\nLa lista crece a medida que la llenas. Cada hueco acepta una imagen, una secuencia, un vídeo con su sonido o solo audio. Al lado aparece un `position` con el frame donde cae. Los negativos cuentan desde el final: **-1** es el último frame; pon ahí la imagen inicial y el plano hace loop.\n\nUn clip y un sonido en el mismo frame forman una sola guía, y dos sonidos se mezclan, así que dos guías de Event Curve pueden compartir el frame 0.\n\n### until\nHasta qué punto del sampling se obedece cada guía (1 = hasta el final). Mete un primer render como guía con `until` sobre 0.85 y el modelo mantiene la composición y el movimiento, y luego termina el detalle por su cuenta.\n\n### Snap Positions\nMantiene cada guía en un múltiplo de 17, el único sitio donde encaja con la rejilla temporal de H3. Fuera de ahí ese frame parpadea como un corte. Desactívalo si quieres colocarla a mano.\n\n### Salidas\n`latent`, `video vae` y `audio vae` salen tal cual para que el sampler cuelgue de este nodo y no tengas que volver a cruzar el workflow."
         }
       }
     },
@@ -2645,7 +2420,7 @@
       "type": "NKDAlphaMatte",
       "pos": [
         60,
-        2410
+        2514
       ],
       "size": [
         320,
@@ -2775,7 +2550,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        2340
+        2444
       ],
       "size": [
         28,
@@ -2795,7 +2570,7 @@
           }
         ],
         "style": "info",
-        "step": 17,
+        "step": 20,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -2810,7 +2585,7 @@
       "type": "NKDMerge",
       "pos": [
         470,
-        2410
+        2514
       ],
       "size": [
         440,
@@ -2928,7 +2703,7 @@
       "type": "NKDHint",
       "pos": [
         430,
-        2340
+        2444
       ],
       "size": [
         28,
@@ -2948,7 +2723,7 @@
           }
         ],
         "style": "info",
-        "step": 18,
+        "step": 21,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -2963,7 +2738,7 @@
       "type": "NKDFaceRig",
       "pos": [
         60,
-        3220
+        3324
       ],
       "size": [
         460,
@@ -3078,7 +2853,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        3150
+        3254
       ],
       "size": [
         28,
@@ -3090,7 +2865,7 @@
       "inputs": [],
       "outputs": [],
       "properties": {
-        "text": "# Face Rig\nSet an expression by dragging handles on the face itself: brows, eyelids, gaze, mouth corners, jaw and head. It re-renders while you drag.\n\n### In the editor\n- Each side of the face moves on its own: one raised brow, a wink, half a smile. Mirror makes the edit symmetrical.\n- Head turn and gaze have their own controls in the corners.\n- `Ctrl+Z` undoes, `Shift` for fine adjustment, double-click resets a handle.\n\n### Keep Expression\nHow much of the expression the photo already has is kept. Lower it to neutralize a face that's already smiling before you pose it.\n\n### Blend Back\nBlends the face back into the original image's shoulders. Turn it off only to see the raw crop.\n\n### Crop Factor / Face\nHow much around the face goes in: more keeps more hair and shoulders, but gives the model less face to work with. `Face` picks which one if there are several.\n\n### Outputs\n`face_mask` gives you the area that was re-rendered, so a detailer works right there. `expression` saves the pose to reuse it.\n\nThe first time, it downloads its models (~600 MB).",
+        "text": "# Face Rig\nSet an expression by dragging handles on the face itself: brows, eyelids, gaze, mouth corners, jaw and head. It re-renders while you drag.\n\n### In the editor\n- Each side of the face moves on its own: one raised brow, a wink, half a smile. Mirror makes the edit symmetrical.\n- Head turn and gaze have their own controls in the corners.\n- `Ctrl+Z` undoes, `Shift` for fine adjustment, double-click resets a handle.\n\n### Keep Expression\nHow much of the expression the photo already has is kept. Lower it to neutralize a face that's already smiling before you pose it.\n\n### Blend Back\nBlends the face back into the original image's shoulders. Turn it off only to see the raw crop.\n\n### Crop Factor / Face\nHow much around the face goes in: more keeps more hair and shoulders, but gives the model less face to work with. It starts at 1.5, so the face fills more of the crop and the controls respond better. `Face` picks which one if there are several.\n\n### Outputs\n`face_mask` gives you the area that was re-rendered, so a detailer works right there. `expression` saves the pose to reuse it.\n\nThe first time, it downloads its models (~600 MB).",
         "targets": [
           {
             "node": "19",
@@ -3098,13 +2873,13 @@
           }
         ],
         "style": "info",
-        "step": 19,
+        "step": 22,
         "pinned": false,
         "width": 500,
         "min": "",
         "max": "",
         "texts": {
-          "es": "# Face Rig\nPon una expresión arrastrando tiradores sobre la propia cara: cejas, párpados, mirada, comisuras, mandíbula y cabeza. Se vuelve a renderizar mientras arrastras.\n\n### En el editor\n- Cada lado de la cara se mueve por separado: una ceja levantada, un guiño, media sonrisa. El espejo hace la edición simétrica.\n- Giro de cabeza y mirada tienen sus propios controles en las esquinas.\n- `Ctrl+Z` deshace, `Shift` para ajuste fino, doble clic resetea un tirador.\n\n### Keep Expression\nCuánto de la expresión que ya tiene la foto se conserva. Bájalo para neutralizar una cara que ya sonríe antes de ponerle la pose.\n\n### Blend Back\nFunde la cara con los hombros de la imagen original. Desactívalo solo para ver el recorte en bruto.\n\n### Crop Factor / Face\nCuánto alrededor de la cara entra: más deja más pelo y hombros, pero le da al modelo menos cara con la que trabajar. `Face` elige cuál si hay varias.\n\n### Salidas\n`face_mask` te da la zona que se ha re-renderizado, para que un detailer trabaje justo ahí. `expression` guarda la pose para reutilizarla.\n\nLa primera vez descarga sus modelos (~600 MB)."
+          "es": "# Face Rig\nPon una expresión arrastrando tiradores sobre la propia cara: cejas, párpados, mirada, comisuras, mandíbula y cabeza. Se vuelve a renderizar mientras arrastras.\n\n### En el editor\n- Cada lado de la cara se mueve por separado: una ceja levantada, un guiño, media sonrisa. El espejo hace la edición simétrica.\n- Giro de cabeza y mirada tienen sus propios controles en las esquinas.\n- `Ctrl+Z` deshace, `Shift` para ajuste fino, doble clic resetea un tirador.\n\n### Keep Expression\nCuánto de la expresión que ya tiene la foto se conserva. Bájalo para neutralizar una cara que ya sonríe antes de ponerle la pose.\n\n### Blend Back\nFunde la cara con los hombros de la imagen original. Desactívalo solo para ver el recorte en bruto.\n\n### Crop Factor / Face\nCuánto alrededor de la cara entra: más deja más pelo y hombros, pero le da al modelo menos cara con la que trabajar. Empieza en 1.5, así la cara ocupa más del recorte y los controles responden mejor. `Face` elige cuál si hay varias.\n\n### Salidas\n`face_mask` te da la zona que se ha re-renderizado, para que un detailer trabaje justo ahí. `expression` guarda la pose para reutilizarla.\n\nLa primera vez descarga sus modelos (~600 MB)."
         }
       }
     },
@@ -3113,7 +2888,7 @@
       "type": "NKDFaceCrop",
       "pos": [
         610,
-        3220
+        3324
       ],
       "size": [
         360,
@@ -3260,7 +3035,7 @@
       "type": "NKDHint",
       "pos": [
         570,
-        3150
+        3254
       ],
       "size": [
         28,
@@ -3280,7 +3055,7 @@
           }
         ],
         "style": "info",
-        "step": 20,
+        "step": 23,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -3295,7 +3070,7 @@
       "type": "NKDFaceMask",
       "pos": [
         1060,
-        3220
+        3324
       ],
       "size": [
         320,
@@ -3413,7 +3188,7 @@
       "type": "NKDHint",
       "pos": [
         1020,
-        3150
+        3254
       ],
       "size": [
         28,
@@ -3433,7 +3208,7 @@
           }
         ],
         "style": "info",
-        "step": 21,
+        "step": 24,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -3448,7 +3223,7 @@
       "type": "NKDFaceStitch",
       "pos": [
         1470,
-        3220
+        3324
       ],
       "size": [
         320,
@@ -3539,7 +3314,7 @@
       "type": "NKDHint",
       "pos": [
         1430,
-        3150
+        3254
       ],
       "size": [
         28,
@@ -3559,7 +3334,7 @@
           }
         ],
         "style": "info",
-        "step": 22,
+        "step": 25,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -3574,7 +3349,7 @@
       "type": "NKDPathBlur",
       "pos": [
         60,
-        4090
+        4246
       ],
       "size": [
         400,
@@ -3655,7 +3430,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        4020
+        4176
       ],
       "size": [
         28,
@@ -3675,7 +3450,7 @@
           }
         ],
         "style": "info",
-        "step": 23,
+        "step": 26,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -3690,7 +3465,7 @@
       "type": "NKDFieldBlur",
       "pos": [
         550,
-        4090
+        4246
       ],
       "size": [
         400,
@@ -3771,7 +3546,7 @@
       "type": "NKDHint",
       "pos": [
         510,
-        4020
+        4176
       ],
       "size": [
         28,
@@ -3791,7 +3566,7 @@
           }
         ],
         "style": "info",
-        "step": 24,
+        "step": 27,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -3806,7 +3581,7 @@
       "type": "NKDCurves",
       "pos": [
         60,
-        4820
+        4976
       ],
       "size": [
         400,
@@ -3867,7 +3642,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        4750
+        4906
       ],
       "size": [
         28,
@@ -3887,7 +3662,7 @@
           }
         ],
         "style": "info",
-        "step": 25,
+        "step": 29,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -3902,7 +3677,7 @@
       "type": "NKDColorWarp",
       "pos": [
         550,
-        4820
+        4976
       ],
       "size": [
         340,
@@ -3976,7 +3751,7 @@
       "type": "NKDHint",
       "pos": [
         510,
-        4750
+        4906
       ],
       "size": [
         28,
@@ -3996,7 +3771,7 @@
           }
         ],
         "style": "info",
-        "step": 26,
+        "step": 30,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4011,7 +3786,7 @@
       "type": "NKDGradientMap",
       "pos": [
         980,
-        4820
+        4976
       ],
       "size": [
         400,
@@ -4102,7 +3877,7 @@
       "type": "NKDHint",
       "pos": [
         940,
-        4750
+        4906
       ],
       "size": [
         28,
@@ -4122,7 +3897,7 @@
           }
         ],
         "style": "info",
-        "step": 27,
+        "step": 31,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4137,7 +3912,7 @@
       "type": "NKDGradientGenerate",
       "pos": [
         1470,
-        4820
+        4976
       ],
       "size": [
         400,
@@ -4266,7 +4041,7 @@
       "type": "NKDHint",
       "pos": [
         1430,
-        4750
+        4906
       ],
       "size": [
         28,
@@ -4286,7 +4061,7 @@
           }
         ],
         "style": "info",
-        "step": 28,
+        "step": 32,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4301,7 +4076,7 @@
       "type": "NKDFilmGrain",
       "pos": [
         60,
-        5630
+        5842
       ],
       "size": [
         320,
@@ -4417,7 +4192,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        5560
+        5772
       ],
       "size": [
         28,
@@ -4437,7 +4212,7 @@
           }
         ],
         "style": "info",
-        "step": 29,
+        "step": 33,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4452,7 +4227,7 @@
       "type": "NKDNoise",
       "pos": [
         470,
-        5630
+        5842
       ],
       "size": [
         320,
@@ -4669,7 +4444,7 @@
       "type": "NKDHint",
       "pos": [
         430,
-        5560
+        5772
       ],
       "size": [
         28,
@@ -4689,7 +4464,7 @@
           }
         ],
         "style": "info",
-        "step": 30,
+        "step": 34,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4704,7 +4479,7 @@
       "type": "NKDStringSplit",
       "pos": [
         60,
-        6300
+        6845
       ],
       "size": [
         239.205078125,
@@ -4812,7 +4587,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        6230
+        6775
       ],
       "size": [
         28,
@@ -4832,7 +4607,7 @@
           }
         ],
         "style": "info",
-        "step": 31,
+        "step": 35,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4847,7 +4622,7 @@
       "type": "NKDPromptVariables",
       "pos": [
         490,
-        6300
+        6845
       ],
       "size": [
         400,
@@ -4940,7 +4715,7 @@
       "type": "NKDHint",
       "pos": [
         450,
-        6230
+        6775
       ],
       "size": [
         28,
@@ -4960,7 +4735,7 @@
           }
         ],
         "style": "info",
-        "step": 32,
+        "step": 36,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -4975,7 +4750,7 @@
       "type": "NKDResolutionSelector",
       "pos": [
         980,
-        6300
+        6845
       ],
       "size": [
         220.915625,
@@ -5088,7 +4863,7 @@
       "type": "NKDHint",
       "pos": [
         940,
-        6230
+        6775
       ],
       "size": [
         28,
@@ -5100,7 +4875,7 @@
       "inputs": [],
       "outputs": [],
       "properties": {
-        "text": "# Resolution Selector\nWidth and height from an aspect ratio and a megapixel budget, with Klein Presampling's list of ratios.\n\n### Aspect Ratio\n24 named ratios, portrait and landscape, with a preview of the result.\n- **As Reference**: copies the shape of the connected image and scales it to the budget.\n- **Custom**: uses your own width and height.\n\n### Megapixels\nThe pixel budget.\n\n### Multiple\nRounds the result. 16 is safe for every current model.",
+        "text": "# Resolution Selector\nWidth and height from an aspect ratio and a megapixel budget, with Klein Presampling's list of ratios.\n\n### Aspect Ratio\n24 named ratios, portrait and landscape, with a preview of the result.\n- **As Reference**: copies the shape of the connected image and scales it to the budget.\n- **Custom**: uses your own width and height.\n\n### Megapixels\nThe pixel budget, with no upper limit.\n\n### Multiple\nRounds the result. 16 is safe for every current model.",
         "targets": [
           {
             "node": "33",
@@ -5108,13 +4883,13 @@
           }
         ],
         "style": "info",
-        "step": 33,
+        "step": 37,
         "pinned": false,
         "width": 500,
         "min": "",
         "max": "",
         "texts": {
-          "es": "# Resolution Selector\nAncho y alto a partir de una proporción y un presupuesto de megapíxeles, con la lista de proporciones del Klein Presampling.\n\n### Aspect Ratio\n24 proporciones con nombre, verticales y horizontales, con preview del resultado.\n- **As Reference**: copia la forma de la imagen conectada y la escala al presupuesto.\n- **Custom**: usa tu propio ancho y alto.\n\n### Megapixels\nEl presupuesto de píxeles.\n\n### Multiple\nRedondea el resultado. 16 es seguro para todos los modelos actuales."
+          "es": "# Resolution Selector\nAncho y alto a partir de una proporción y un presupuesto de megapíxeles, con la lista de proporciones del Klein Presampling.\n\n### Aspect Ratio\n24 proporciones con nombre, verticales y horizontales, con preview del resultado.\n- **As Reference**: copia la forma de la imagen conectada y la escala al presupuesto.\n- **Custom**: usa tu propio ancho y alto.\n\n### Megapixels\nEl presupuesto de píxeles, sin límite superior.\n\n### Multiple\nRedondea el resultado. 16 es seguro para todos los modelos actuales."
         }
       }
     },
@@ -5123,7 +4898,7 @@
       "type": "NKDLoader",
       "pos": [
         60,
-        6910
+        7455
       ],
       "size": [
         320,
@@ -5164,7 +4939,7 @@
       "type": "NKDHint",
       "pos": [
         20,
-        6840
+        7385
       ],
       "size": [
         28,
@@ -5176,7 +4951,7 @@
       "inputs": [],
       "outputs": [],
       "properties": {
-        "text": "# Loader\nOne node that replaces a set of loaders: model, text encoders, VAE, upscaler… Save the set once and switch model family from a dropdown instead of rewiring four loaders.\n\n### Saving a preset\nSelect the loaders on the canvas, right-click and **Save as NKD Loader preset**. Any loader from any pack works.\n\n### Using it\nPick the preset and its outputs appear with type and name. When you switch presets your wires stay wherever the output keeps its type, so `MODEL`, `CLIP` and `VAE` stay connected.\n\n### Editing\nRight-click → **Unpack NKD Loader** lays the real loaders out in a group so you can change whatever you want; **Repack NKD Loader** folds it back.\n\nThe workflow carries the preset inside, so it works on a machine that doesn't have it.",
+        "text": "# Loader\nOne node that replaces a set of loaders: model, text encoders, VAE, upscaler… Save the set once and switch model family from a dropdown instead of rewiring four loaders.\n\n### Saving a preset\nSelect the loaders on the canvas, right-click and **Save as NKD Loader preset**. Any loader from any pack works.\n\n### Using it\nPick the preset and its outputs appear with type and name. When you switch presets your wires stay wherever the output keeps its type, so `MODEL`, `CLIP` and `VAE` stay connected.\n\n### Editing\nRight-click → **Unpack NKD Loader** lays the real loaders out in a group so you can change whatever you want; **Repack NKD Loader** folds it back.\n\n### Sharing\nEach model file in a preset can keep a **download link** (Settings → NKD → Loader, sliders button). Before sharing, right-click → **Convert NKD Loader to subgraph for sharing**: the real loaders go into a subgraph with the same outputs, so whoever opens it is offered the models with a download button, even without NKD Basic Tools installed.\n\nThe workflow carries the preset inside, so it works on a machine that doesn't have it.",
         "targets": [
           {
             "node": "34",
@@ -5184,13 +4959,13 @@
           }
         ],
         "style": "info",
-        "step": 34,
+        "step": 38,
         "pinned": false,
         "width": 500,
         "min": "",
         "max": "",
         "texts": {
-          "es": "# Loader\nUn nodo que sustituye a un conjunto de loaders: modelo, text encoders, VAE, upscaler… Guarda el conjunto una vez y cambia de familia de modelos desde un desplegable en vez de recablear cuatro loaders.\n\n### Guardar un preset\nSelecciona los loaders en el lienzo, clic derecho y **Save as NKD Loader preset**. Sirve cualquier loader de cualquier pack.\n\n### Usarlo\nElige el preset y aparecen sus salidas con tipo y nombre. Al cambiar de preset tus cables se quedan donde la salida mantiene su tipo, así `MODEL`, `CLIP` y `VAE` siguen conectados.\n\n### Editar\nClic derecho → **Unpack NKD Loader** saca los loaders reales en un grupo para cambiar lo que quieras; **Repack NKD Loader** lo vuelve a plegar.\n\nEl workflow lleva el preset dentro, así que funciona en una máquina que no lo tenga."
+          "es": "# Loader\nUn nodo que sustituye a un conjunto de loaders: modelo, text encoders, VAE, upscaler… Guarda el conjunto una vez y cambia de familia de modelos desde un desplegable en vez de recablear cuatro loaders.\n\n### Guardar un preset\nSelecciona los loaders en el lienzo, clic derecho y **Save as NKD Loader preset**. Sirve cualquier loader de cualquier pack.\n\n### Usarlo\nElige el preset y aparecen sus salidas con tipo y nombre. Al cambiar de preset tus cables se quedan donde la salida mantiene su tipo, así `MODEL`, `CLIP` y `VAE` siguen conectados.\n\n### Editar\nClic derecho → **Unpack NKD Loader** saca los loaders reales en un grupo para cambiar lo que quieras; **Repack NKD Loader** lo vuelve a plegar.\n\n### Compartir\nCada fichero de modelo de un preset puede guardar un **enlace de descarga** (Settings → NKD → Loader, botón de sliders). Antes de compartir, clic derecho → **Convert NKD Loader to subgraph for sharing**: los loaders reales van a un subgraph con las mismas salidas, así quien lo abra ve los modelos con botón de descarga, aunque no tenga NKD Basic Tools instalado.\n\nEl workflow lleva el preset dentro, así que funciona en una máquina que no lo tenga."
         }
       }
     },
@@ -5199,7 +4974,7 @@
       "type": "NKDLoraControl",
       "pos": [
         470,
-        6910
+        7455
       ],
       "size": [
         460,
@@ -5282,7 +5057,7 @@
       "type": "NKDHint",
       "pos": [
         430,
-        6840
+        7385
       ],
       "size": [
         28,
@@ -5302,7 +5077,7 @@
           }
         ],
         "style": "info",
-        "step": 35,
+        "step": 39,
         "pinned": false,
         "width": 500,
         "min": "",
@@ -5333,6 +5108,283 @@
       },
       "color": "#432",
       "bgcolor": "#653"
+    },
+    {
+      "id": 36,
+      "type": "NKDTemporalCrop",
+      "pos": [
+        2740,
+        120
+      ],
+      "size": [
+        480,
+        400
+      ],
+      "flags": {},
+      "order": 71,
+      "mode": 0,
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "Node name for S&R": "NKDTemporalCrop"
+      }
+    },
+    {
+      "id": 37,
+      "type": "NKDTemporalStitch",
+      "pos": [
+        3310,
+        120
+      ],
+      "size": [
+        320,
+        150
+      ],
+      "flags": {},
+      "order": 72,
+      "mode": 0,
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "Node name for S&R": "NKDTemporalStitch"
+      }
+    },
+    {
+      "id": 38,
+      "type": "NKDEventCurveAudio",
+      "pos": [
+        1590,
+        1861
+      ],
+      "size": [
+        305,
+        423
+      ],
+      "flags": {},
+      "order": 73,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "length",
+          "type": "INT",
+          "widget": {
+            "name": "length"
+          },
+          "link": null
+        },
+        {
+          "name": "source",
+          "shape": 7,
+          "type": "AUDIO,IMAGE",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "guide",
+          "type": "AUDIO",
+          "links": null
+        },
+        {
+          "name": "preview",
+          "type": "IMAGE",
+          "links": null
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "NKDEventCurveAudio",
+        "nkdSchema": 1,
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "ver": "e43ea2fffb12f3b99526aabf04de1def263b6424",
+        "ue_properties": {
+          "widget_ue_connectable": {},
+          "input_ue_unconnectable": {},
+          "version": "7.8"
+        }
+      },
+      "widgets_values": [
+        "P Guide",
+        "sine",
+        10,
+        0,
+        141,
+        24,
+        1,
+        "{\"points\":[[0,0],[0.0862,0],[0.0962,0.5472],[0.25,1],[0.5,0],[0.75,1],[1,0]]}",
+        1280,
+        208,
+        "{\"points\":[[0,0],[0.0862,0],[0.0962,0.5472],[0.25,1],[0.5,0],[0.75,1],[1,0]]}"
+      ],
+      "widgets_values_named": {
+        "guide": "P Guide",
+        "shape": "sine",
+        "cycles": 10,
+        "phase": 0,
+        "length": 141,
+        "fps": 24,
+        "strength": 1,
+        "curve": "{\"points\":[[0,0],[0.0862,0],[0.0962,0.5472],[0.25,1],[0.5,0],[0.75,1],[1,0]]}",
+        "preview_width": 1280,
+        "preview_height": 208,
+        "curve_editor": "{\"points\":[[0,0],[0.0862,0],[0.0962,0.5472],[0.25,1],[0.5,0],[0.75,1],[1,0]]}"
+      }
+    },
+    {
+      "id": 39,
+      "type": "NKDBasicBlur",
+      "pos": [
+        1040,
+        4246
+      ],
+      "size": [
+        320,
+        130
+      ],
+      "flags": {},
+      "order": 74,
+      "mode": 0,
+      "properties": {
+        "cnr_id": "comfyui-nkd-basic-tools",
+        "Node name for S&R": "NKDBasicBlur"
+      }
+    },
+    {
+      "id": 137,
+      "type": "NKDHint",
+      "pos": [
+        2700,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 75,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Temporal Crop\nA detailer in time. Video models smear fast motion: a punch, a sword swing, a quick turn. Mark those moments and only they are redrawn, slowed down so the model draws every pose crisp, then put back at real speed.\n\n### The timeline\nRun the node once and it shows the clip as thumbnails with the soundtrack under it. Drag to mark a moment, drag its edges to adjust it, right-click to remove it. With nothing marked the video goes straight through.\n\n### Drawings\nA new drawing every 1, 2 or 3 frames. **2** is animation on twos and costs about half.\n\n### Context\nUntouched frames around each moment, so the model sees the motion come in and go out and the paste has room to blend.\n\n### audio / audio vae / prompt\nFor models that make sound with the picture (MiniMax H3, LTX 2), the soundtrack is slowed with the picture and kept. Shot times written as `At 00:01.200` in the prompt are moved to match.\n\nThe line under the timeline turns orange past 15 seconds of slowed clip: mark less, or use Drawings 2.",
+        "targets": [
+          {
+            "node": "36",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 7,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Temporal Crop\nUn detailer en el tiempo. Los modelos de vídeo emborronan el movimiento rápido: un puñetazo, un espadazo, un giro brusco. Marca esos momentos y solo esos se redibujan, a cámara lenta para que el modelo dibuje cada pose nítida, y luego vuelven a velocidad real.\n\n### La línea de tiempo\nEjecuta el nodo una vez y muestra el clip en miniaturas con el audio debajo. Arrastra para marcar un momento, arrastra sus bordes para ajustarlo, clic derecho para quitarlo. Sin nada marcado el vídeo pasa tal cual.\n\n### Drawings\nUn dibujo nuevo cada 1, 2 o 3 frames. **2** es animación a doses y cuesta más o menos la mitad.\n\n### Context\nFrames intactos alrededor de cada momento, para que el modelo vea cómo entra y sale el movimiento y el pegado tenga margen para fundirse.\n\n### audio / audio vae / prompt\nPara modelos que generan sonido con la imagen (MiniMax H3, LTX 2), el audio se ralentiza con la imagen y se conserva. Los tiempos de plano escritos como `At 00:01.200` en el prompt se mueven para que cuadren.\n\nLa línea bajo la línea de tiempo se pone naranja pasados 15 segundos de clip ralentizado: marca menos o usa Drawings 2."
+        }
+      }
+    },
+    {
+      "id": 138,
+      "type": "NKDHint",
+      "pos": [
+        3270,
+        50
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 76,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Temporal Stitch\nTakes the original frames, the `temporal_map` and the decoded result of your sampler. Each redrawn moment comes back at real speed, using the sharpest frame of every drawing, and blends into the original across the context frames.\n\nEverything outside the marked moments is the original video, untouched. Keep using your original soundtrack.",
+        "targets": [
+          {
+            "node": "37",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 8,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Temporal Stitch\nRecibe los frames originales, el `temporal_map` y el resultado decodificado de tu sampler. Cada momento redibujado vuelve a velocidad real, con el frame más nítido de cada dibujo, y se funde con el original a lo largo de los frames de contexto.\n\nTodo lo que queda fuera de los momentos marcados es el vídeo original, intacto. Sigue usando tu audio original."
+        }
+      }
+    },
+    {
+      "id": 139,
+      "type": "NKDHint",
+      "pos": [
+        1550,
+        1791
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 77,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Event Curve\nDraw when things happen in a MiniMax H3 video. Ask for a dog jumping, draw three peaks, get three jumps.\n\nPlug `guide` into frame 0 of MiniMax Guides and match `length` and `fps` to your video.\n\n### guide\nThe kind of action:\n- **P (punch)**: sharp single events: bounces, steps, hits.\n- **F (flow)**: gradual intensity: lights, wind, water.\n- **M (motor)**: something revving: engines, acceleration.\n- **B (blast)**: a bang on each rise: explosions, gunshots, thunder.\n- **U (uncanny)**: a pulse that speeds up as the curve rises: UFOs, magic.\n- **W (words)**: someone talking where the curve is up. Give it a low `until` in MiniMax Guides (around 0.2).\n\n### shape\nDraw your own with `custom` (click to add a point, right-click to delete, double-click for a sharp corner, **Draw** to paint it freehand), or repeat a sine, square, triangle, sawtooth or pulses.\n\n### source\nCopy the timing from a song, a sound or another clip instead.\n\n`strength`: lower it if the result feels forced.",
+        "targets": [
+          {
+            "node": "38",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 19,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Event Curve\nDibuja cuándo pasan las cosas en un vídeo de MiniMax H3. Pide un perro saltando, dibuja tres picos y salen tres saltos.\n\nConecta `guide` al frame 0 de MiniMax Guides y ajusta `length` y `fps` a tu vídeo.\n\n### guide\nEl tipo de acción:\n- **P (punch)**: golpes secos: rebotes, pasos, impactos.\n- **F (flow)**: intensidad gradual: luces, viento, agua.\n- **M (motor)**: algo que se revoluciona: motores, aceleración.\n- **B (blast)**: un estallido en cada subida: explosiones, disparos, truenos.\n- **U (uncanny)**: un pulso que se acelera al subir la curva: ovnis, magia.\n- **W (words)**: alguien hablando donde la curva está arriba. Dale un `until` bajo en MiniMax Guides (sobre 0.2).\n\n### shape\nDibuja la tuya con `custom` (clic para añadir un punto, clic derecho para borrarlo, doble clic para una esquina, **Draw** para pintarla a mano alzada), o repite un seno, cuadrada, triangular, diente de sierra o pulsos.\n\n### source\nCopia el ritmo de una canción, un sonido u otro clip.\n\n`strength`: bájalo si el resultado queda forzado."
+        }
+      }
+    },
+    {
+      "id": 140,
+      "type": "NKDHint",
+      "pos": [
+        1000,
+        4176
+      ],
+      "size": [
+        28,
+        28
+      ],
+      "flags": {},
+      "order": 78,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [],
+      "properties": {
+        "text": "# Basic Blur\nThe plain blur ComfyUI doesn't ship: pick a type, set a radius in pixels.\n\n### Image, mask or video\nSame input for all three, and the output is the same type. A video keeps its audio and frame rate.\n\n### Type\nGaussian for a smooth falloff, Box for a flat average with harder edges, Tent in between. All three blur by the same amount at the same radius, so switching type changes the look of the edge, not its strength.\n\n### Radius\nIn pixels, with fractions. Same scale as the feather in Mask Ops, so the same number softens an image and its mask alike.",
+        "targets": [
+          {
+            "node": "39",
+            "widget": null
+          }
+        ],
+        "style": "info",
+        "step": 28,
+        "pinned": false,
+        "width": 500,
+        "min": "",
+        "max": "",
+        "texts": {
+          "es": "# Basic Blur\nEl desenfoque sencillo que ComfyUI no trae: eliges un tipo y un radio en píxeles.\n\n### Imagen, máscara o vídeo\nLa misma entrada para los tres, y la salida es del mismo tipo. Un vídeo conserva su audio y sus fps.\n\n### Type\nGaussian para una caída suave, Box para un promedio plano con bordes más duros, Tent a medio camino. Los tres desenfocan lo mismo con el mismo radio, así que cambiar de tipo cambia el aspecto del borde, no su fuerza.\n\n### Radius\nEn píxeles, con decimales. Misma escala que el feather de Mask Ops, así que el mismo número suaviza igual una imagen y su máscara."
+        }
+      }
     }
   ],
   "links": [],
@@ -5343,7 +5395,7 @@
       "bounding": [
         0,
         0,
-        2710,
+        3700,
         790
       ],
       "color": "#3f789e",
@@ -5356,7 +5408,7 @@
         0,
         870,
         2770,
-        790
+        791
       ],
       "color": "#3f789e",
       "flags": {}
@@ -5366,9 +5418,9 @@
       "title": "Audio-video latents (MiniMax H3, LTXV)",
       "bounding": [
         0,
-        1740,
-        1670,
-        470
+        1741,
+        1930,
+        573
       ],
       "color": "#3f789e",
       "flags": {}
@@ -5378,7 +5430,7 @@
       "title": "Compositing",
       "bounding": [
         0,
-        2290,
+        2394,
         970,
         730
       ],
@@ -5390,9 +5442,9 @@
       "title": "Faces",
       "bounding": [
         0,
-        3100,
+        3204,
         1850,
-        790
+        842
       ],
       "color": "#3f789e",
       "flags": {}
@@ -5402,8 +5454,8 @@
       "title": "Blur",
       "bounding": [
         0,
-        3970,
-        1010,
+        4126,
+        1400,
         650
       ],
       "color": "#3f789e",
@@ -5414,9 +5466,9 @@
       "title": "Color & gradients",
       "bounding": [
         0,
-        4700,
+        4856,
         1930,
-        730
+        786
       ],
       "color": "#3f789e",
       "flags": {}
@@ -5426,9 +5478,9 @@
       "title": "Textures",
       "bounding": [
         0,
-        5510,
+        5722,
         850,
-        590
+        923
       ],
       "color": "#3f789e",
       "flags": {}
@@ -5438,7 +5490,7 @@
       "title": "Prompt & text",
       "bounding": [
         0,
-        6180,
+        6725,
         1380,
         530
       ],
@@ -5450,9 +5502,9 @@
       "title": "Models & LoRAs",
       "bounding": [
         0,
-        6790,
+        7335,
         990,
-        790
+        1082
       ],
       "color": "#3f789e",
       "flags": {}
