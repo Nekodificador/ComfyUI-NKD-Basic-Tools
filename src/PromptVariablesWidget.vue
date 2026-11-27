@@ -679,6 +679,14 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   word-break: break-word;
   outline: none;
 }
+.nkd-pvar.fill {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.nkd-pvar.fill .nkd-pvar-editor {
+  flex: 1 1 0;
+  height: auto;
+}
 .nkd-pvar-editor:focus {
   border-color: #4ab4ff;
 }

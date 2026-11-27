@@ -160,6 +160,9 @@ function sizeDomWidgetToContent(
     raf = 0;
     if (!node.size) return;
     clampWidth();  // node may have been resized wider — track it
+    // Nodes 2.0 keeps the node at least as tall as its content on its own; a
+    // LiteGraph-estimated grow here would snap a user's shrink back.
+    if (opts?.growOnly && vueMode()) return;
     const needed = node.computeSize();
     const diff = needed[1] - node.size[1];
     // growOnly: only auto-resize when content outgrows the node (user controls shrinking)
@@ -328,23 +331,42 @@ comfyApp.registerExtension({
       // editor height keeps onResize's overhead exact at any size — otherwise a
       // short editor is counted as overhead and the button bar overflows the node.
       // growOnly in apply() prevents auto-shrinking; this lets the user drag smaller.
+      // When the DOM can't be measured, fall back to the last known overhead, never to
+      // the measured widget height: the editor fills the node, so that height would
+      // become the minimum and the node could grow but never shrink back.
       const EDITOR_MIN_H = 90;
+      let overheadH = MIN_EDITOR_H - EDITOR_MIN_H;
       const innerComputeSize = domWidget.computeSize;
       domWidget.computeSize = (width: number) => {
         const result = innerComputeSize(width);
         const root = container.firstElementChild as HTMLElement | null;
-        if (root && root.offsetHeight > 0) result[1] = root.offsetHeight + ROW_SAFETY;
         const editorEl = container.querySelector<HTMLElement>(".nkd-pvar-editor");
-        if (editorEl && editorEl.offsetHeight > 0) {
-          result[1] = result[1] - editorEl.offsetHeight + EDITOR_MIN_H;
+        if (root && editorEl && root.offsetHeight > 0 && editorEl.offsetHeight > 0) {
+          overheadH = root.offsetHeight - editorEl.offsetHeight;
         }
+        result[1] = overheadH + EDITOR_MIN_H + ROW_SAFETY;
         return result;
       };
+
+      // Nodes 2.0 stretches the widget host to the node's height (growable row):
+      // let the editor flex-fill it there. Classic keeps the onResize sizing below —
+      // filling the host there would feed back into the content-measuring resize.
+      const syncFill = () => {
+        const on = !!(window as any).LiteGraph?.vueNodesMode;
+        const root = container.firstElementChild as HTMLElement | null;
+        if (!root || root.classList.contains("fill") === on) return;
+        root.classList.toggle("fill", on);
+        container.style.display = on ? "flex" : "";
+        container.style.flexDirection = on ? "column" : "";
+        if (on) container.querySelector<HTMLElement>(".nkd-pvar-editor")?.style.removeProperty("height");
+      };
+      syncFill();
 
       const origResize = this.onResize;
       this.onResize = function (size: [number, number]) {
         origResize?.apply(this, arguments);
         if (size[0] < MIN_W) size[0] = MIN_W;
+        if ((window as any).LiteGraph?.vueNodesMode) return;
         // Grow/shrink the editor to fill the node when user drags a corner.
         const editorEl = container.querySelector<HTMLElement>(".nkd-pvar-editor");
         if (!editorEl) return;
@@ -372,6 +394,7 @@ comfyApp.registerExtension({
       };
       // Vue Nodes (2.0) never calls onDrawBackground — poll instead.
       const varsTimer = window.setInterval(() => {
+        syncFill(); // also catches a runtime switch between classic and Nodes 2.0
         syncLabels(this);
         instance?.setVariables(readVariables(this));
       }, 800);
