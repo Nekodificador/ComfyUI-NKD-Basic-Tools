@@ -53,7 +53,7 @@
       >Saved</button>
     </div>
     <Teleport v-if="modal" :to="modal.body">
-    <div class="nkd-pvar-lib" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
+    <div class="nkd-pvar-lib nkd-ui" @keydown="onPanelKeydown" @paste.stop @copy.stop @cut.stop>
       <div v-for="item in library.items" :key="item.name" class="nkd-pvar-lib-row">
         <div class="nkd-pvar-lib-head">
           <span class="nkd-pvar-lib-at">@</span>
@@ -65,8 +65,8 @@
             @change="renameSaved(item, $event)"
             @keydown.enter="blurTarget"
           />
-          <button class="nkd-modal-btn" title="Insert into the prompt" @click.stop.prevent="insertSaved(item)">Insert</button>
-          <button class="nkd-modal-btn" title="Delete from your library" @click.stop.prevent="deleteSaved(item)">×</button>
+          <button class="nkd-ui-btn round" title="Insert into the prompt" @click.stop.prevent="insertSaved(item)">Insert</button>
+          <button class="nkd-ui-btn icon" title="Delete from your library" @click.stop.prevent="deleteSaved(item)"><i class="pi pi-times" /></button>
         </div>
         <textarea
           class="nkd-pvar-lib-value"
@@ -725,20 +725,27 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
   border-color: #b48cff;
   color: #d6c2ff;
 }
+/* The library is a list of cards from the shared editor kit (.nkd-ui-*, nkd_modal.ts): one
+   per saved variable, its name and actions in the head, its value underneath. */
 .nkd-pvar-lib {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   flex: 1 1 auto;
   min-width: 0;
   overflow-y: auto;
-  padding: 14px;
+  padding: 8px;
   box-sizing: border-box;
+  background: #1a1c22;
 }
 .nkd-pvar-lib-row {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 10px 12px 12px;
+  background: #202229;
+  border-radius: 12px;
 }
 .nkd-pvar-lib-head {
   display: flex;
@@ -747,39 +754,47 @@ defineExpose({ serialise, deserialise, setVariables, setSaved, cleanup });
 }
 .nkd-pvar-lib-at {
   color: #b48cff;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
 }
 .nkd-pvar-lib-name,
 .nkd-pvar-lib-value {
-  background: #252830;
-  border: 1px solid #3a3d46;
-  border-radius: 4px;
-  color: #c8d0e0;
-  font-size: 12px;
+  background: #17181d;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #dcdce0;
   font-family: inherit;
-  padding: 4px 8px;
   outline: none;
 }
 .nkd-pvar-lib-name {
   flex: 1 1 auto;
   min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: transparent;
 }
+.nkd-pvar-lib-name:hover { background: #17181d; }
 .nkd-pvar-lib-value {
   resize: vertical;
-  min-height: 34px;
+  min-height: 40px;
+  padding: 6px 8px;
+  font-size: 12px;
   line-height: 1.45;
 }
 .nkd-pvar-lib-name:focus,
 .nkd-pvar-lib-value:focus {
   border-color: #4ab4ff;
+  background: #17181d;
 }
 .nkd-pvar-lib-name.nkd-pvar-lib-bad {
   border-color: #ff5c5c;
 }
 .nkd-pvar-lib-empty {
-  color: rgba(255, 255, 255, 0.4);
+  color: #6f7686;
   font-size: 12px;
+  padding: 8px 4px;
 }
 .nkd-pvar-ac {
   position: absolute;

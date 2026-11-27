@@ -6977,6 +6977,10 @@ const CSS$1 = `
 .nkd-ui-float button .pi { font-size: 13px; line-height: 1; color: inherit; }
 .nkd-ui-float button:hover { background: rgba(255,255,255,0.1); color: #fff; }
 .nkd-ui-float button.on { background: #4ab4ff; color: #0c0d10; }
+/* The one that queues work on the server: ComfyUI's own Run colour, read from the frontend's
+   variable so it follows the theme. Reserve it for that — one per editor at most. */
+.nkd-ui-float button.run { background: var(--color-brand-yellow, #f0ff41); color: #0c0d10; }
+.nkd-ui-float button.run:hover { background: color-mix(in srgb, var(--color-brand-yellow, #f0ff41) 82%, #fff); color: #0c0d10; }
 .nkd-ui-float button:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; color: #c8d0e0; }
 .nkd-ui-sep { width: 1px; height: 16px; margin: 0 3px; background: rgba(255,255,255,0.14); flex: 0 0 auto; }
 .nkd-ui-float.col .nkd-ui-sep { width: 16px; height: 1px; margin: 3px 0; }
@@ -7937,7 +7941,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
           to: modal.value.body
         }, [
           createBaseVNode("div", {
-            class: "nkd-pvar-lib",
+            class: "nkd-pvar-lib nkd-ui",
             onKeydown: onPanelKeydown,
             onPaste: _cache[4] || (_cache[4] = withModifiers(() => {
             }, ["stop"])),
@@ -7952,7 +7956,7 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
                 class: "nkd-pvar-lib-row"
               }, [
                 createBaseVNode("div", _hoisted_4$5, [
-                  _cache[10] || (_cache[10] = createBaseVNode("span", { class: "nkd-pvar-lib-at" }, "@", -1)),
+                  _cache[11] || (_cache[11] = createBaseVNode("span", { class: "nkd-pvar-lib-at" }, "@", -1)),
                   createBaseVNode("input", {
                     class: "nkd-pvar-lib-name",
                     value: item.name,
@@ -7962,15 +7966,17 @@ Shift+click: normal → random 🎲 → cycle 🔁 · drag to move`;
                     onKeydown: withKeys(blurTarget, ["enter"])
                   }, null, 40, _hoisted_5$2),
                   createBaseVNode("button", {
-                    class: "nkd-modal-btn",
+                    class: "nkd-ui-btn round",
                     title: "Insert into the prompt",
                     onClick: withModifiers(($event) => insertSaved(item), ["stop", "prevent"])
                   }, "Insert", 8, _hoisted_6$2),
                   createBaseVNode("button", {
-                    class: "nkd-modal-btn",
+                    class: "nkd-ui-btn icon",
                     title: "Delete from your library",
                     onClick: withModifiers(($event) => deleteSaved(item), ["stop", "prevent"])
-                  }, "×", 8, _hoisted_7$2)
+                  }, [..._cache[10] || (_cache[10] = [
+                    createBaseVNode("i", { class: "pi pi-times" }, null, -1)
+                  ])], 8, _hoisted_7$2)
                 ]),
                 createBaseVNode("textarea", {
                   class: "nkd-pvar-lib-value",
@@ -8006,7 +8012,7 @@ const _export_sfc = (sfc, props) => {
   }
   return target;
 };
-const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$7, [["__scopeId", "data-v-d30d281a"]]);
+const PromptVariablesWidget = /* @__PURE__ */ _export_sfc(_sfc_main$7, [["__scopeId", "data-v-bfbfbb6e"]]);
 const MODES = ["smooth", "bezier", "steps"];
 function midWarp(f, mid) {
   const m = Math.min(0.95, Math.max(0.05, mid ?? 0.5));
@@ -18655,6 +18661,11 @@ async function sha1Name(blob, prefix) {
 }
 const BTN_CSS = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;border-radius:4px;font:11px sans-serif;padding:2px 7px;cursor:pointer;flex:0 0 auto;height:22px;display:inline-flex;align-items:center;gap:4px;";
 const ON_CSS = "border-color:#4ab4ff;color:#4ab4ff;";
+const BTN_FLOAT = "background:transparent;color:#c8d0e0;border:0;border-radius:999px;font:11px sans-serif;padding:0 9px;cursor:pointer;flex:0 0 auto;height:30px;min-width:30px;display:inline-flex;align-items:center;justify-content:center;gap:5px;";
+const ON_FLOAT = "background:#4ab4ff;color:#0c0d10;";
+const BAR_CSS = "display:flex;flex-direction:column;gap:4px;padding:4px 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;";
+const BAR_SEAT$1 = 64;
+const BAR_FLOAT = "position:absolute;left:20px;right:20px;bottom:" + (BAR_SEAT$1 - 42) / 2 + "px;margin:0 auto;width:fit-content;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;gap:2px 12px;padding:6px 10px;background:rgba(26,28,34,0.86);border-radius:20px;font:11px sans-serif;color:#c8d0e0;z-index:3;";
 function setupPaintWidget(node, o) {
   const layerW = findW(node, o.widget);
   if (!layerW) return;
@@ -18701,18 +18712,23 @@ function setupPaintWidget(node, o) {
   root.className = "nkd-paint-wrap";
   root.style.cssText = "display:flex;flex-direction:column;background:#111318;border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
   const bar = document.createElement("div");
-  bar.style.cssText = "display:flex;flex-direction:column;gap:4px;padding:4px 8px;background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;";
+  bar.style.cssText = BAR_CSS;
+  let BTN2 = BTN_CSS, ON2 = ON_CSS;
+  let popped = false;
+  const allBtns = [], allRanges = [];
   const row1 = document.createElement("div"), row2 = document.createElement("div");
   for (const r of [row1, row2]) r.style.cssText = "display:flex;align-items:center;gap:6px;";
   bar.append(row1, row2);
   function btn(icon, title, label) {
     const b = document.createElement("button");
-    b.style.cssText = BTN_CSS;
+    b.style.cssText = BTN2;
     b.title = title;
+    allBtns.push(b);
     b.innerHTML = `${icon ? `<i class="pi ${icon}" style="font-size:11px;color:inherit"></i>` : ""}${label ? `<span>${label}</span>` : ""}`;
     return b;
   }
-  function range(label, min, max, step, get, set, width = 54) {
+  const readouts = [];
+  function range(label, min, max, step, get, set, fmt = (v) => v.toFixed(2), width = 54) {
     const wrap = document.createElement("label");
     wrap.style.cssText = "display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;opacity:0.85;";
     const span = document.createElement("span");
@@ -18730,8 +18746,12 @@ function setupPaintWidget(node, o) {
       scheduleDraw();
     });
     inp.addEventListener("pointerdown", (e) => e.stopPropagation());
-    wrap.append(span, inp);
+    const out = document.createElement("span");
+    out.style.cssText = "display:none;min-width:38px;text-align:right;color:#dcdce0;font-variant-numeric:tabular-nums;";
+    wrap.append(span, inp, out);
     wrap._inp = inp;
+    allRanges.push(inp);
+    readouts.push({ inp, out, fmt });
     return wrap;
   }
   const brushBtn = btn("pi-pencil", "Brush (B)");
@@ -18768,9 +18788,17 @@ function setupPaintWidget(node, o) {
   row1.append(brushBtn, eraserBtn, lassoBtn);
   if (!o.mask) row1.append(cloneBtn, healBtn, colorIn, whiteSw, blackSw);
   row1.append(undoBtn, redoBtn, clearBtn, expandBtn);
-  const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => {
-    P.nkdPaintSize = v;
-  });
+  const sizeR = range(
+    "Size",
+    1,
+    SIZE_MAX,
+    1,
+    () => P.nkdPaintSize,
+    (v) => {
+      P.nkdPaintSize = v;
+    },
+    (v) => `${Math.round(v)} px`
+  );
   const opR = range("Opacity", 0.05, 1, 0.01, () => P.nkdPaintOpacity, (v) => {
     P.nkdPaintOpacity = v;
   });
@@ -18804,11 +18832,11 @@ function setupPaintWidget(node, o) {
   }
   function syncToolbar() {
     if (controlnet() && (tool() === "clone" || tool() === "heal")) P.nkdPaintTool = "brush";
-    cloneBtn.style.cssText = BTN_CSS + (tool() === "clone" ? ON_CSS : "");
-    healBtn.style.cssText = BTN_CSS + (tool() === "heal" ? ON_CSS : "");
-    brushBtn.style.cssText = BTN_CSS + (tool() === "brush" ? ON_CSS : "");
-    eraserBtn.style.cssText = BTN_CSS + (tool() === "eraser" ? ON_CSS : "");
-    lassoBtn.style.cssText = BTN_CSS + (P.nkdPaintLasso ? ON_CSS : "");
+    cloneBtn.style.cssText = BTN2 + (tool() === "clone" ? ON2 : "");
+    healBtn.style.cssText = BTN2 + (tool() === "heal" ? ON2 : "");
+    brushBtn.style.cssText = BTN2 + (tool() === "brush" ? ON2 : "");
+    eraserBtn.style.cssText = BTN2 + (tool() === "eraser" ? ON2 : "");
+    lassoBtn.style.cssText = BTN2 + (P.nkdPaintLasso ? ON2 : "");
     const cn = controlnet();
     for (const el of [colorIn, whiteSw, blackSw, cloneBtn, healBtn]) {
       el.style.opacity = cn ? "0.3" : "1";
@@ -18821,7 +18849,7 @@ function setupPaintWidget(node, o) {
     baseR.style.display = base ? "" : "none";
     if (o.mask) {
       viewBtn.lastElementChild.textContent = maskHidden ? "Hidden" : VIEW_LABEL[P.nkdMaskView];
-      viewBtn.style.cssText = BTN_CSS + (maskHidden ? "border-color:#e0a040;color:#e0a040;" : "");
+      viewBtn.style.cssText = BTN2 + (maskHidden ? popped ? "background:#e0a040;color:#0c0d10;" : "border-color:#e0a040;color:#e0a040;" : "");
     }
     cv.style.cursor = altHeld && !o.mask ? cloning() ? "crosshair" : PIPETTE : P.nkdPaintLasso ? "crosshair" : "none";
   }
@@ -18872,15 +18900,31 @@ function setupPaintWidget(node, o) {
   });
   expandBtn.addEventListener("click", () => expand2());
   const detachFine = attachFineRange(bar);
+  function dressBar(float) {
+    popped = float;
+    BTN2 = float ? BTN_FLOAT : BTN_CSS;
+    ON2 = float ? ON_FLOAT : ON_CSS;
+    bar.style.cssText = float ? BAR_FLOAT : BAR_CSS;
+    for (const b of allBtns) b.style.cssText = BTN2;
+    clearBtn.style.marginLeft = float ? "" : "auto";
+    expandBtn.style.display = float ? "none" : "";
+    for (const r of allRanges) {
+      r.classList.toggle("nkd-ui-range", float);
+      r.style.cssText = float ? "width:96px;" : `width:54px;height:12px;margin:0;accent-color:#4ab4ff;`;
+    }
+    for (const r of readouts) r.out.style.display = float ? "inline-block" : "none";
+    syncToolbar();
+  }
   function expand2() {
     const keepH = root.offsetHeight;
     root.style.height = `${keepH}px`;
     const holder = document.createElement("div");
-    holder.style.cssText = "display:flex;flex-direction:column;flex:1;width:100%;height:100%;min-width:0;min-height:0;";
+    holder.style.cssText = `position:relative;display:flex;flex-direction:column;flex:1;width:100%;height:100%;min-width:0;min-height:0;box-sizing:border-box;padding-bottom:${BAR_SEAT$1}px;`;
     const m = openNkdModal({
       title: o.title,
-      hint: "wheel: zoom · Space or middle drag: pan · 0: fit · [ ]: size · Alt+right drag: size and hardness" + (o.mask ? " · Alt: erase · V: view" : " · S / J: clone / heal, Alt+click sets the source"),
+      hint: "wheel: zoom · Space or middle drag: pan · [ ]: size · ? for the shortcuts",
       onClose: () => {
+        dressBar(false);
         root.append(bar, cv);
         cv.style.flex = "";
         cv.style.minHeight = "";
@@ -18895,8 +18939,43 @@ function setupPaintWidget(node, o) {
     cv.style.aspectRatio = "auto";
     cv.style.flex = "1";
     cv.style.minHeight = "0";
-    holder.append(bar, cv);
+    holder.append(cv, bar);
     m.body.appendChild(holder);
+    dressBar(true);
+    const keys = [
+      ["Tools", o.mask ? [
+        ["Brush", ["B"]],
+        ["Eraser", ["E"]],
+        ["Lasso fill", ["L"]],
+        ["Erase with any tool", ["Alt"], "or the right button"],
+        ["Cycle the mask view", ["V"]],
+        ["Hide the mask", ["Shift", "V"]]
+      ] : [
+        ["Brush", ["B"]],
+        ["Eraser", ["E"]],
+        ["Lasso fill", ["L"]],
+        ["Clone", ["S"]],
+        ["Heal", ["J"]],
+        ["Set the clone source", ["Alt"], "click"],
+        ["Pick a colour", ["Alt"], "click"],
+        ["Swap black / white", ["X"]]
+      ]],
+      ["Brush", [
+        ["Smaller / bigger", ["[", "]"]],
+        ["Size and hardness", ["Alt"], "right-drag"],
+        ["Fine slider steps", ["Shift"], "drag"]
+      ]],
+      ["View", [
+        ["Zoom", [], "wheel"],
+        ["Pan", ["Space"], "drag, or middle-drag"],
+        ["Fit", ["0"]]
+      ]],
+      ["Edit", [
+        ["Undo", ["Ctrl", "Z"]],
+        ["Redo", ["Ctrl", "Shift", "Z"]]
+      ]]
+    ];
+    nkdFloat(holder, "right:14px;top:14px", true, nkdHelp(m, holder, keys));
     m.addPrimary("Done");
     zoom = 1;
     panX = panY = 0;
@@ -19009,6 +19088,7 @@ function setupPaintWidget(node, o) {
   let sizePreview = null;
   let hardPreview = null;
   function draw() {
+    if (popped) for (const r of readouts) r.out.textContent = r.fmt(Number(r.inp.value));
     const { W, H, s, ox, oy } = view();
     if (W < 1 || H < 1) return;
     const dpr = window.devicePixelRatio || 1;
@@ -23051,22 +23131,52 @@ function button(icon, label, onClick, title = "") {
   };
   return b;
 }
-function makeView(state, actions, fit) {
+const BAR_SEAT = 64;
+const KEYS_OBJECTS = [
+  ["Picking", [
+    ["See the objects", [], "hover"],
+    ["Pick one", [], "click"],
+    ["Pick several as one", [], "drag across them"],
+    ["Add only", ["Shift"], "click"],
+    ["Cut a hole", ["Alt"], "click or drag"],
+    ["Bigger / smaller object", [], "wheel"],
+    ["Make SAM look somewhere", [], "click or drag on nothing"]
+  ]]
+];
+const KEYS_POINTS = [
+  ["Points", [
+    ["Positive point", [], "click"],
+    ["Negative point", ["Alt"], "click, or right click"],
+    ["Move a point", [], "drag it"],
+    ["Delete a point", [], "right click it"]
+  ]]
+];
+function makeView(state, actions, modal) {
+  const fit = modal == null ? void 0 : modal.body;
+  const big = !!modal;
   const root = document.createElement("div");
-  root.style.cssText = "display:flex;flex-direction:column;gap:6px;width:100%;" + (fit ? "align-items:center;" : "");
+  root.style.cssText = big ? `position:relative;display:flex;flex-direction:column;align-items:center;width:100%;box-sizing:border-box;padding-bottom:${BAR_SEAT}px;` : "display:flex;flex-direction:column;gap:6px;width:100%;";
   const bar = document.createElement("div");
   bar.style.cssText = "display:flex;gap:4px;align-items:center;flex-wrap:nowrap;";
-  const imgBtn = button("pi-image", "Image", () => {
+  const mk = (icon, label, onClick, title = "") => big ? nkdIcon(icon.replace(/^pi-/, ""), title || label, onClick) : button(icon, label, onClick, title);
+  const paint = (b, on, shown = true) => {
+    if (big) {
+      b.classList.toggle("on", on);
+      b.style.display = shown ? "" : "none";
+    } else b.style.cssText = BTN + (shown ? "" : "display:none;") + (on ? ON : "");
+  };
+  const imgBtn = mk("pi-image", "Image", () => {
     state.showMask = false;
     state.redraw();
-  });
-  const maskBtn = button("pi-circle-fill", "Mask", () => {
+  }, big ? "Show the image" : "");
+  const maskBtn = mk("pi-circle-fill", "Mask", () => {
     state.showMask = true;
     state.redraw();
-  });
+  }, big ? "Show the mask" : "");
   const status = document.createElement("span");
-  status.style.cssText = "flex:1;font:11px sans-serif;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
-  const objBtn = button(
+  if (big) status.className = "nkd-modal-status";
+  else status.style.cssText = "flex:1;font:11px sans-serif;color:rgba(255,255,255,0.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+  const objBtn = mk(
     "pi-plus",
     "Object",
     () => {
@@ -23075,25 +23185,75 @@ function makeView(state, actions, fit) {
     },
     "Start another object: the next points make their own mask"
   );
-  const liveBtn = button("pi-bolt", "Live", () => {
+  const liveBtn = mk("pi-bolt", "Live", () => {
     state.live = !state.live;
     state.saveLive();
     if (state.live && state.objects().length) state.changed();
     else state.redraw();
   }, "Show the mask after every point. Off: only when the workflow runs");
-  bar.append(
-    imgBtn,
-    maskBtn,
-    status,
-    objBtn,
-    liveBtn,
-    button("pi-refresh", "Analyze", actions.analyze, "Find every object in the image"),
-    button("pi-times", "", () => state.clear(), "Clear the selection")
-  );
-  if (actions.expand) bar.append(button("pi-expand", "", actions.expand, "Open full screen"));
+  const analyzeBtn = big ? nkdIcon("Analyze", "Find every object in the image", actions.analyze, true) : button("pi-refresh", "Analyze", actions.analyze, "Find every object in the image");
+  if (big) analyzeBtn.classList.add("run");
+  const det = big ? actions.detail : void 0;
+  const detailSep = nkdSep();
+  const detailBtns = ((det == null ? void 0 : det.options) ?? []).map((name) => nkdIcon(
+    name,
+    `Detail level ${name}: how many objects Analyze lists. Higher finds smaller parts and gives the wheel more sizes to step through; max takes about a second.`,
+    () => {
+      if (det.get() === name) return;
+      det.set(name);
+      state.redraw();
+      if (state.canAutoAnalyze()) actions.analyze();
+    },
+    true
+  ));
+  const detailBox = document.createElement("span");
+  detailBox.style.cssText = "display:inline-flex;align-items:center;gap:2px";
+  detailBox.append(...detailBtns);
+  detailBox.addEventListener("wheel", (e) => {
+    if (!det) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const i = det.options.indexOf(det.get()) + (e.deltaY < 0 ? 1 : -1);
+    if (i >= 0 && i < det.options.length) detailBtns[i].click();
+  }, { passive: false });
+  if (modal) {
+    modal.footerLeft.appendChild(status);
+    nkdFloat(
+      root,
+      `left:20px;right:20px;bottom:${(BAR_SEAT - 40) / 2}px;margin:0 auto;width:fit-content;flex-wrap:wrap;justify-content:center;border-radius:20px`,
+      false,
+      imgBtn,
+      maskBtn,
+      nkdSep(),
+      objBtn,
+      liveBtn,
+      detailBox,
+      analyzeBtn,
+      detailSep,
+      nkdIcon("trash", "Clear the selection", () => state.clear())
+    );
+    nkdFloat(
+      root,
+      "right:14px;top:14px",
+      true,
+      nkdHelp(modal, root, state.pointsOnly() ? KEYS_POINTS : KEYS_OBJECTS)
+    );
+  } else {
+    bar.append(
+      imgBtn,
+      maskBtn,
+      status,
+      objBtn,
+      liveBtn,
+      analyzeBtn,
+      button("pi-times", "", () => state.clear(), "Clear the selection")
+    );
+    if (actions.expand) bar.append(button("pi-expand", "", actions.expand, "Open full screen"));
+  }
   const canvas = document.createElement("canvas");
   canvas.style.cssText = "width:100%;display:block;border-radius:6px;background:#111318;cursor:crosshair;outline:none;";
-  root.append(bar, canvas);
+  if (big) root.append(canvas);
+  else root.append(bar, canvas);
   canvas.dataset.captureWheel = "true";
   canvas.tabIndex = -1;
   canvas.addEventListener("pointerenter", () => {
@@ -23181,17 +23341,22 @@ function makeView(state, actions, fit) {
   const layer = document.createElement("canvas");
   const draw = () => {
     status.textContent = status.title = state.status();
-    imgBtn.style.cssText = BTN + (state.showMask ? "" : ON);
-    maskBtn.style.cssText = BTN + (state.showMask ? ON : "");
+    paint(imgBtn, !state.showMask);
+    paint(maskBtn, state.showMask);
     const po = state.pointsOnly();
-    objBtn.style.cssText = BTN + (po ? "" : "display:none;");
-    liveBtn.style.cssText = BTN + (po ? "" : "display:none;") + (state.live ? ON : "");
+    paint(objBtn, false, po);
+    paint(liveBtn, state.live, po);
+    if (det) {
+      detailBox.style.display = po ? "none" : "inline-flex";
+      const cur = det.get();
+      detailBtns.forEach((b2, i) => b2.classList.toggle("on", det.options[i] === cur));
+    }
     const p2 = state.payload;
     const b = state.backdrop, k = b ? Math.min(1, 512 / Math.max(b.naturalWidth, b.naturalHeight)) : 1;
     const w = (p2 == null ? void 0 : p2.w) ?? Math.round(((b == null ? void 0 : b.naturalWidth) ?? 512) * k), h = (p2 == null ? void 0 : p2.h) ?? Math.round(((b == null ? void 0 : b.naturalHeight) ?? 288) * k);
     let z = 1, dot = 3.5;
     if (fit) {
-      const s = Math.min(fit.clientWidth / w, (fit.clientHeight - bar.offsetHeight - 6) / h);
+      const s = Math.min((fit.clientWidth - 48) / w, (fit.clientHeight - BAR_SEAT - 24) / h);
       dot = 7 / s;
       canvas.style.width = Math.floor(w * s) + "px";
       z = Math.max(1, Math.min(s * devicePixelRatio, ((b == null ? void 0 : b.naturalWidth) ?? w) / w));
@@ -23351,16 +23516,28 @@ function setup$2(node) {
   api.addEventListener("execution_interrupted", stopAnalyzing);
   let modal = null;
   const expand2 = () => {
+    var _a;
     let big;
     modal = openNkdModal({
       title: "😺 Mask Picker",
-      hint: state.pointsOnly() ? "click: positive point · right click or Alt+click: negative point · drag a point to move it · right click a point to delete it · + Object starts another object · Live shows the mask after every point" : "hover to see objects · click to pick · drag to pick several as one · Shift+click adds only · Alt cuts holes · click or drag on nothing to make SAM look there · wheel: bigger / smaller",
+      hint: (state.pointsOnly() ? "click to place points" : "hover to see objects · click to pick") + " · ? for the shortcuts",
       onClose: () => {
         big.release();
         modal = null;
       }
     });
-    big = makeView(state, { analyze }, modal.body);
+    const detW = findW(node, "detail");
+    const detail = detW ? {
+      options: ((_a = detW.options) == null ? void 0 : _a.values) ?? ["low", "normal", "high", "max"],
+      get: () => String(detW.value),
+      set: (v) => {
+        var _a2;
+        detW.value = v;
+        (_a2 = detW.callback) == null ? void 0 : _a2.call(detW, v);
+        node.setDirtyCanvas(true, true);
+      }
+    } : void 0;
+    big = makeView(state, { analyze, detail }, modal);
     big.root.style.cssText += "height:100%;justify-content:center;";
     modal.body.appendChild(big.root);
     modal.addPrimary("Done");
@@ -25466,7 +25643,7 @@ console.log("[NKD Basic Tools] spline editors + color warp loaded (window.NKD_DE
   try {
     if (typeof document != "undefined") {
       var elementStyle = document.createElement("style");
-      elementStyle.appendChild(document.createTextNode('.nkd-pvar[data-v-d30d281a] {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pvar-editor[data-v-d30d281a] {\n  height: 150px;\n  min-height: 90px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 6px 8px;\n  color: #c8d0e0;\n  font-size: 11.5px;\n  line-height: 1.55;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pvar.fill[data-v-d30d281a] {\n  flex: 1 1 auto;\n  min-height: 0;\n}\n.nkd-pvar.fill .nkd-pvar-editor[data-v-d30d281a] {\n  flex: 1 1 0;\n  height: auto;\n}\n.nkd-pvar-editor[data-v-d30d281a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-editor[data-v-d30d281a]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pvar-bar[data-v-d30d281a] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pvar-add[data-v-d30d281a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pvar-add[data-v-d30d281a]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pvar-add.connected[data-v-d30d281a] {\n  color: #4ab4ff;\n}\n.nkd-pvar-lib-toggle[data-v-d30d281a] {\n  margin-left: auto;\n}\n.nkd-pvar-lib-toggle.active[data-v-d30d281a],\n.nkd-pvar-lib-toggle[data-v-d30d281a]:hover {\n  border-color: #b48cff;\n  color: #d6c2ff;\n}\n.nkd-pvar-lib[data-v-d30d281a] {\n  display: flex;\n  flex-direction: column;\n  gap: 10px;\n  flex: 1 1 auto;\n  min-width: 0;\n  overflow-y: auto;\n  padding: 14px;\n  box-sizing: border-box;\n}\n.nkd-pvar-lib-row[data-v-d30d281a] {\n  display: flex;\n  flex-direction: column;\n  gap: 3px;\n}\n.nkd-pvar-lib-head[data-v-d30d281a] {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n.nkd-pvar-lib-at[data-v-d30d281a] {\n  color: #b48cff;\n  font-size: 11px;\n  font-weight: 600;\n}\n.nkd-pvar-lib-name[data-v-d30d281a],\n.nkd-pvar-lib-value[data-v-d30d281a] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 12px;\n  font-family: inherit;\n  padding: 4px 8px;\n  outline: none;\n}\n.nkd-pvar-lib-name[data-v-d30d281a] {\n  flex: 1 1 auto;\n  min-width: 0;\n}\n.nkd-pvar-lib-value[data-v-d30d281a] {\n  resize: vertical;\n  min-height: 34px;\n  line-height: 1.45;\n}\n.nkd-pvar-lib-name[data-v-d30d281a]:focus,\n.nkd-pvar-lib-value[data-v-d30d281a]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-lib-name.nkd-pvar-lib-bad[data-v-d30d281a] {\n  border-color: #ff5c5c;\n}\n.nkd-pvar-lib-empty[data-v-d30d281a] {\n  color: rgba(255, 255, 255, 0.4);\n  font-size: 12px;\n}\n.nkd-pvar-ac[data-v-d30d281a] {\n  position: absolute;\n  z-index: 100;\n  background: #1e2028;\n  border: 1px solid #3a3d46;\n  border-radius: 5px;\n  padding: 3px;\n  min-width: 120px;\n  max-height: 160px;\n  overflow-y: auto;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pvar-ac-item[data-v-d30d281a] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  color: #c8d0e0;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.nkd-pvar-ac-item[data-v-d30d281a]:hover,\n.nkd-pvar-ac-item.active[data-v-d30d281a] {\n  background: rgba(74, 180, 255, 0.18);\n  color: #fff;\n}\n.nkd-pvar-dot-off[data-v-d30d281a] {\n  background: transparent !important;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n\n.nkd-pvar-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 15px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pvar-chip:active {\n  cursor: grabbing;\n}\n.nkd-pvar-chip::selection,\n.nkd-pvar-chip *::selection {\n  background: transparent;\n}\n.nkd-pvar-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pvar-chip-saved {\n  border-color: rgba(180, 140, 255, 0.8);\n  color: #e0d2ff;\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pvar-chip-saved .nkd-pvar-dot {\n  background: #b48cff;\n}\n.nkd-pvar-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pvar-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pvar-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-rand .nkd-pvar-dot {\n  background: #ffd166;\n}\n.nkd-pvar-chip-rand.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pvar-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pvar-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-cycle .nkd-pvar-dot {\n  background: #66e0aa;\n}\n.nkd-pvar-chip-cycle.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-516464c4] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-516464c4], .nkd-root[data-v-516464c4] *, .nkd-root[data-v-516464c4] *::before, .nkd-root[data-v-516464c4] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-516464c4] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-516464c4] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-516464c4] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-516464c4] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-516464c4] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-516464c4] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-516464c4] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-516464c4] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-516464c4] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-516464c4] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-516464c4] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-516464c4]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-516464c4] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}\r\n\n.nkd-root[data-v-753186ea] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-753186ea], .nkd-root[data-v-753186ea] *, .nkd-root[data-v-753186ea] *::before, .nkd-root[data-v-753186ea] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-753186ea] {\n  width: 100%;\n  aspect-ratio: 400 / 160;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n  touch-action: none;\n}\n.nkd-bar[data-v-753186ea] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-753186ea] { display: flex; align-items: center; gap: 6px; padding: 4px 8px; min-height: 26px;\n}\n.nkd-spacer[data-v-753186ea] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-753186ea] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-info[data-v-753186ea] {\n  font: 10px monospace;\n  font-variant-numeric: tabular-nums;\n  color: rgba(180,210,255,0.65);\n  white-space: nowrap;\n}\n.nkd-btn[data-v-753186ea] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-753186ea]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-btn.on[data-v-753186ea] { border-color: #4ab4ff; color: #4ab4ff;\n}'));
+      elementStyle.appendChild(document.createTextNode('.nkd-pvar[data-v-bfbfbb6e] {\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  gap: 6px;\n  box-sizing: border-box;\n  padding: 2px;\n}\n.nkd-pvar-editor[data-v-bfbfbb6e] {\n  height: 150px;\n  min-height: 90px;\n  overflow-y: auto;\n  background: #111318;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  padding: 6px 8px;\n  color: #c8d0e0;\n  font-size: 11.5px;\n  line-height: 1.55;\n  white-space: pre-wrap;\n  word-break: break-word;\n  outline: none;\n}\n.nkd-pvar.fill[data-v-bfbfbb6e] {\n  flex: 1 1 auto;\n  min-height: 0;\n}\n.nkd-pvar.fill .nkd-pvar-editor[data-v-bfbfbb6e] {\n  flex: 1 1 0;\n  height: auto;\n}\n.nkd-pvar-editor[data-v-bfbfbb6e]:focus {\n  border-color: #4ab4ff;\n}\n.nkd-pvar-editor[data-v-bfbfbb6e]:empty::before {\n  content: attr(data-placeholder);\n  color: rgba(255, 255, 255, 0.22);\n  pointer-events: none;\n}\n.nkd-pvar-bar[data-v-bfbfbb6e] {\n  display: flex;\n  flex-wrap: wrap;\n  gap: 4px;\n  flex: 0 0 auto;\n}\n.nkd-pvar-add[data-v-bfbfbb6e] {\n  background: #252830;\n  border: 1px solid #3a3d46;\n  border-radius: 4px;\n  color: #c8d0e0;\n  font-size: 11px;\n  padding: 2px 8px;\n  cursor: pointer;\n}\n.nkd-pvar-add[data-v-bfbfbb6e]:hover {\n  border-color: #4ab4ff;\n  color: #4ab4ff;\n}\n.nkd-pvar-add.connected[data-v-bfbfbb6e] {\n  color: #4ab4ff;\n}\n.nkd-pvar-lib-toggle[data-v-bfbfbb6e] {\n  margin-left: auto;\n}\n.nkd-pvar-lib-toggle.active[data-v-bfbfbb6e],\n.nkd-pvar-lib-toggle[data-v-bfbfbb6e]:hover {\n  border-color: #b48cff;\n  color: #d6c2ff;\n}\n/* The library is a list of cards from the shared editor kit (.nkd-ui-*, nkd_modal.ts): one\n   per saved variable, its name and actions in the head, its value underneath. */\n.nkd-pvar-lib[data-v-bfbfbb6e] {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  flex: 1 1 auto;\n  min-width: 0;\n  overflow-y: auto;\n  padding: 8px;\n  box-sizing: border-box;\n  background: #1a1c22;\n}\n.nkd-pvar-lib-row[data-v-bfbfbb6e] {\n  display: flex;\n  flex-direction: column;\n  gap: 8px;\n  flex: 0 0 auto;\n  padding: 10px 12px 12px;\n  background: #202229;\n  border-radius: 12px;\n}\n.nkd-pvar-lib-head[data-v-bfbfbb6e] {\n  display: flex;\n  align-items: center;\n  gap: 4px;\n}\n.nkd-pvar-lib-at[data-v-bfbfbb6e] {\n  color: #b48cff;\n  font-size: 13px;\n  font-weight: 600;\n}\n.nkd-pvar-lib-name[data-v-bfbfbb6e],\n.nkd-pvar-lib-value[data-v-bfbfbb6e] {\n  background: #17181d;\n  border: 1px solid transparent;\n  border-radius: 6px;\n  color: #dcdce0;\n  font-family: inherit;\n  outline: none;\n}\n.nkd-pvar-lib-name[data-v-bfbfbb6e] {\n  flex: 1 1 auto;\n  min-width: 0;\n  height: 24px;\n  padding: 0 8px;\n  font-size: 13px;\n  font-weight: 600;\n  background: transparent;\n}\n.nkd-pvar-lib-name[data-v-bfbfbb6e]:hover { background: #17181d;\n}\n.nkd-pvar-lib-value[data-v-bfbfbb6e] {\n  resize: vertical;\n  min-height: 40px;\n  padding: 6px 8px;\n  font-size: 12px;\n  line-height: 1.45;\n}\n.nkd-pvar-lib-name[data-v-bfbfbb6e]:focus,\n.nkd-pvar-lib-value[data-v-bfbfbb6e]:focus {\n  border-color: #4ab4ff;\n  background: #17181d;\n}\n.nkd-pvar-lib-name.nkd-pvar-lib-bad[data-v-bfbfbb6e] {\n  border-color: #ff5c5c;\n}\n.nkd-pvar-lib-empty[data-v-bfbfbb6e] {\n  color: #6f7686;\n  font-size: 12px;\n  padding: 8px 4px;\n}\n.nkd-pvar-ac[data-v-bfbfbb6e] {\n  position: absolute;\n  z-index: 100;\n  background: #1e2028;\n  border: 1px solid #3a3d46;\n  border-radius: 5px;\n  padding: 3px;\n  min-width: 120px;\n  max-height: 160px;\n  overflow-y: auto;\n  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);\n}\n.nkd-pvar-ac-item[data-v-bfbfbb6e] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n  padding: 4px 8px;\n  border-radius: 3px;\n  font-size: 11px;\n  color: #c8d0e0;\n  cursor: pointer;\n  white-space: nowrap;\n}\n.nkd-pvar-ac-item[data-v-bfbfbb6e]:hover,\n.nkd-pvar-ac-item.active[data-v-bfbfbb6e] {\n  background: rgba(74, 180, 255, 0.18);\n  color: #fff;\n}\n.nkd-pvar-dot-off[data-v-bfbfbb6e] {\n  background: transparent !important;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n\n.nkd-pvar-chip {\n  display: inline-flex;\n  align-items: center;\n  gap: 5px;\n  background: rgba(74, 180, 255, 0.14);\n  border: 1px solid rgba(74, 180, 255, 0.75);\n  color: #bfe3ff;\n  border-radius: 999px;\n  padding: 0 9px 0 7px;\n  margin: 0 2px;\n  font-size: 10px;\n  font-weight: 600;\n  letter-spacing: 0.2px;\n  line-height: 15px;\n  vertical-align: text-bottom;\n  user-select: none;\n  cursor: grab;\n  white-space: nowrap;\n  transform: translateY(-1px);\n}\n.nkd-pvar-chip:active {\n  cursor: grabbing;\n}\n.nkd-pvar-chip::selection,\n.nkd-pvar-chip *::selection {\n  background: transparent;\n}\n.nkd-pvar-dot {\n  width: 6px;\n  height: 6px;\n  border-radius: 50%;\n  background: #4ab4ff;\n  flex: 0 0 auto;\n}\n.nkd-pvar-chip-saved {\n  border-color: rgba(180, 140, 255, 0.8);\n  color: #e0d2ff;\n  background: rgba(180, 140, 255, 0.14);\n}\n.nkd-pvar-chip-saved .nkd-pvar-dot {\n  background: #b48cff;\n}\n.nkd-pvar-chip-off {\n  border-style: dashed;\n  border-color: rgba(255, 255, 255, 0.32);\n  color: rgba(255, 255, 255, 0.5);\n  background: rgba(255, 255, 255, 0.05);\n}\n.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.35);\n}\n.nkd-pvar-chip-rand {\n  border-color: rgba(255, 209, 102, 0.85);\n  color: #ffe3a8;\n  background: rgba(255, 209, 102, 0.12);\n}\n.nkd-pvar-chip-rand::after {\n  content: "🎲";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-rand .nkd-pvar-dot {\n  background: #ffd166;\n}\n.nkd-pvar-chip-rand.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(255, 209, 102, 0.5);\n}\n.nkd-pvar-chip-cycle {\n  border-color: rgba(102, 224, 170, 0.85);\n  color: #b6f2d8;\n  background: rgba(102, 224, 170, 0.12);\n}\n.nkd-pvar-chip-cycle::after {\n  content: "🔁";\n  font-size: 10px;\n  line-height: 1;\n}\n.nkd-pvar-chip-cycle .nkd-pvar-dot {\n  background: #66e0aa;\n}\n.nkd-pvar-chip-cycle.nkd-pvar-chip-off .nkd-pvar-dot {\n  background: transparent;\n  box-shadow: inset 0 0 0 1.5px rgba(102, 224, 170, 0.5);\n}\n\n.nkd-root[data-v-3d741d05] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-3d741d05], .nkd-root[data-v-3d741d05] *, .nkd-root[data-v-3d741d05] *::before, .nkd-root[data-v-3d741d05] *::after {\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-3d741d05] {\n  width: 100%;\n  aspect-ratio: 380 / 64;\n  height: auto;\n  display: block;\n  cursor: crosshair;\n  flex: 0 0 auto;\n}\n.nkd-color-input[data-v-3d741d05] {\n  position: absolute;\n  width: 1px;\n  height: 1px;\n  opacity: 0;\n  pointer-events: none;\n}\n.nkd-bar[data-v-3d741d05] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-3d741d05] {\n  display: flex;\n  align-items: center;\n  gap: 6px;\n}\n.nkd-row--controls[data-v-3d741d05] { padding: 5px 8px 3px;\n}\n.nkd-row--presets[data-v-3d741d05]  { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-3d741d05] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-3d741d05] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-label[data-v-3d741d05] {\n  font-size: 10px;\n  color: var(--descrip-text, rgba(255,255,255,0.45));\n  white-space: nowrap;\n}\n.nkd-select--preset[data-v-3d741d05] { flex: 1 1 auto; min-width: 0; max-width: 240px;\n}\n.nkd-select--interp[data-v-3d741d05] { flex: 0 0 auto; padding: 2px 4px; font-size: 10px;\n}\n.nkd-btn[data-v-3d741d05], .nkd-select[data-v-3d741d05] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:hover, .nkd-select[data-v-3d741d05]:focus {\n  border-color: #4ab4ff;\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn[data-v-3d741d05]:disabled {\n  opacity: 0.35;\n  cursor: not-allowed;\n}\n\n.nkd-root[data-v-f11c2d3f] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-f11c2d3f], .nkd-root[data-v-f11c2d3f] *, .nkd-root[data-v-f11c2d3f] *::before, .nkd-root[data-v-f11c2d3f] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-f11c2d3f] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 210;\r\n  height: auto;\r\n  display: block;\r\n  cursor: default;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-f11c2d3f] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-f11c2d3f] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-f11c2d3f] { padding: 5px 8px;\n}\n.nkd-spacer[data-v-f11c2d3f] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-f11c2d3f] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-f11c2d3f] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n}\n.nkd-btn[data-v-f11c2d3f]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\r\n\n.nkd-root[data-v-be72e354] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-be72e354], .nkd-root[data-v-be72e354] *, .nkd-root[data-v-be72e354] *::before, .nkd-root[data-v-be72e354] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-canvas[data-v-be72e354] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\n}\n.nkd-bar[data-v-be72e354] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-be72e354] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-be72e354] { padding: 5px 8px;\n}\n.nkd-hint[data-v-be72e354] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\n}\n.nkd-hint--warn[data-v-be72e354] { color: #ffb43c; opacity: 1;\n}\r\n\n.nkd-root[data-v-773b27a5] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-773b27a5], .nkd-root[data-v-773b27a5] *, .nkd-root[data-v-773b27a5] *::before, .nkd-root[data-v-773b27a5] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-773b27a5] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-bar[data-v-773b27a5] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-773b27a5] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-773b27a5] { padding: 5px 8px;\n}\n.nkd-hint[data-v-773b27a5] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n\n.nkd-root[data-v-cf839f24] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-cf839f24], .nkd-root[data-v-cf839f24] *, .nkd-root[data-v-cf839f24] *::before, .nkd-root[data-v-cf839f24] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-cf839f24] { width: 100%; height: auto; display: block; flex: 0 0 auto;\n}\n.nkd-canvas--pan[data-v-cf839f24] { cursor: grab;\n}\n.nkd-canvas--pan[data-v-cf839f24]:active { cursor: grabbing;\n}\n.nkd-spacer[data-v-cf839f24] { flex: 1 1 auto;\n}\n.nkd-btn[data-v-cf839f24] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 1px 7px;\r\n  font-size: 10px;\r\n  cursor: pointer;\r\n  transition: border-color 0.12s, color 0.12s;\n}\n.nkd-btn[data-v-cf839f24]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-bar[data-v-cf839f24] { flex: 0 0 auto; background: var(--comfy-menu-bg, #1a1c22); border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-cf839f24] { display: flex; align-items: center; gap: 6px;\n}\n.nkd-row--controls[data-v-cf839f24] { padding: 5px 8px;\n}\n.nkd-hint[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.32); opacity: 0.7; white-space: nowrap;\n}\n.nkd-label[data-v-cf839f24] { font-size: 9.5px; color: rgba(255,255,255,0.45); white-space: nowrap;\n}\n.nkd-slider[data-v-cf839f24] {\r\n  flex: 1 1 auto;\r\n  min-width: 40px;\r\n  height: 3px;\r\n  accent-color: #4ab4ff;\r\n  cursor: ew-resize;\n}\r\n\n.nkd-root[data-v-516464c4] {\r\n  display: flex;\r\n  flex-direction: column;\r\n  width: 100%;\r\n  box-sizing: border-box;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border: 1px solid var(--border-color, #2a2d36);\r\n  border-radius: 6px;\r\n  overflow: hidden;\r\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-516464c4], .nkd-root[data-v-516464c4] *, .nkd-root[data-v-516464c4] *::before, .nkd-root[data-v-516464c4] *::after {\r\n  box-sizing: border-box;\n}\n.nkd-preview[data-v-516464c4] {\r\n  width: 100%;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  border-bottom: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-canvas[data-v-516464c4] {\r\n  width: 100%;\r\n  aspect-ratio: 320 / 240;\r\n  height: auto;\r\n  display: block;\r\n  flex: 0 0 auto;\r\n  touch-action: none;\n}\n.nkd-bar[data-v-516464c4] {\r\n  flex: 0 0 auto;\r\n  background: var(--comfy-menu-bg, #1a1c22);\r\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-516464c4] {\r\n  display: flex;\r\n  align-items: center;\r\n  gap: 6px;\n}\n.nkd-row--controls[data-v-516464c4] { padding: 5px 8px 3px;\n}\n.nkd-row--hint[data-v-516464c4] { padding: 3px 8px 5px; border-top: 1px solid var(--border-color, rgba(255,255,255,0.06));\n}\n.nkd-spacer[data-v-516464c4] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-516464c4] {\r\n  font-size: 9.5px;\r\n  color: rgba(255,255,255,0.32);\r\n  opacity: 0.7;\r\n  white-space: nowrap;\r\n  overflow: hidden;\r\n  text-overflow: ellipsis;\n}\n.nkd-hint--warn[data-v-516464c4] { color: #ffb43c; opacity: 1;\n}\n.nkd-info[data-v-516464c4] {\r\n  font: 10px monospace;\r\n  font-variant-numeric: tabular-nums;\r\n  color: rgba(180,210,255,0.65);\r\n  white-space: nowrap;\n}\n.nkd-btn[data-v-516464c4] {\r\n  background: var(--comfy-input-bg, #252830);\r\n  border: 1px solid var(--border-color, #3a3d46);\r\n  color: var(--input-text, rgba(255,255,255,0.65));\r\n  border-radius: 5px;\r\n  padding: 2px 8px;\r\n  font-size: 11px;\r\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\r\n  cursor: pointer;\n}\n.nkd-btn[data-v-516464c4]:hover {\r\n  border-color: #4ab4ff;\r\n  color: rgba(255,255,255,0.95);\n}\n.nkd-btn--ch[data-v-516464c4] { padding: 2px 6px; font-size: 10px; min-width: 30px;\n}\r\n\n.nkd-root[data-v-753186ea] {\n  display: flex;\n  flex-direction: column;\n  width: 100%;\n  box-sizing: border-box;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border: 1px solid var(--border-color, #2a2d36);\n  border-radius: 6px;\n  overflow: hidden;\n  font: 11px Inter, sans-serif;\n}\n.nkd-root[data-v-753186ea], .nkd-root[data-v-753186ea] *, .nkd-root[data-v-753186ea] *::before, .nkd-root[data-v-753186ea] *::after { box-sizing: border-box;\n}\n.nkd-canvas[data-v-753186ea] {\n  width: 100%;\n  aspect-ratio: 400 / 160;\n  height: auto;\n  display: block;\n  flex: 0 0 auto;\n  touch-action: none;\n}\n.nkd-bar[data-v-753186ea] {\n  flex: 0 0 auto;\n  background: var(--comfy-menu-bg, #1a1c22);\n  border-top: 1px solid var(--border-color, #2a2d36);\n}\n.nkd-row[data-v-753186ea] { display: flex; align-items: center; gap: 6px; padding: 4px 8px; min-height: 26px;\n}\n.nkd-spacer[data-v-753186ea] { flex: 1 1 auto;\n}\n.nkd-hint[data-v-753186ea] {\n  font-size: 9.5px;\n  color: rgba(255,255,255,0.32);\n  opacity: 0.7;\n  white-space: nowrap;\n  overflow: hidden;\n  text-overflow: ellipsis;\n}\n.nkd-info[data-v-753186ea] {\n  font: 10px monospace;\n  font-variant-numeric: tabular-nums;\n  color: rgba(180,210,255,0.65);\n  white-space: nowrap;\n}\n.nkd-btn[data-v-753186ea] {\n  background: var(--comfy-input-bg, #252830);\n  border: 1px solid var(--border-color, #3a3d46);\n  color: var(--input-text, rgba(255,255,255,0.65));\n  border-radius: 5px;\n  padding: 2px 8px;\n  font-size: 11px;\n  transition: border-color 0.12s, color 0.12s, background 0.12s;\n  cursor: pointer;\n}\n.nkd-btn[data-v-753186ea]:hover { border-color: #4ab4ff; color: rgba(255,255,255,0.95);\n}\n.nkd-btn.on[data-v-753186ea] { border-color: #4ab4ff; color: #4ab4ff;\n}'));
       document.head.appendChild(elementStyle);
     }
   } catch (e) {

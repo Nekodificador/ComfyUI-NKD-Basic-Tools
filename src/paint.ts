@@ -25,7 +25,7 @@ import { api } from "../../scripts/api.js";
 import { resolveSource, viewUrl, type MediaRef } from "./mediaProbe";
 import { findW, hideWidget, mountDomWidget, setWidgetVisible } from "./domHost";
 import { attachFineRange } from "./fine_drag";
-import { openNkdModal } from "./nkd_modal";
+import { openNkdModal, nkdFloat, nkdHelp, type NkdShortcuts } from "./nkd_modal";
 import { BrushLayer, adjustBrush, mkCanvas, radiusFor, stepSize, SIZE_MAX, type CloneSource } from "./brush";
 
 const NODE_NAME = "NKDPaint";
@@ -159,6 +159,20 @@ const BTN_CSS = "background:#252830;color:#c8d0e0;border:1px solid #3a3d46;borde
   "font:11px sans-serif;padding:2px 7px;cursor:pointer;flex:0 0 auto;height:22px;" +
   "display:inline-flex;align-items:center;gap:4px;";
 const ON_CSS = "border-color:#4ab4ff;color:#4ab4ff;";
+// The same buttons, full screen: round and borderless in a floating bar, like the other NKD
+// editors. The toolbar is ONE set of elements that moves between the node and the modal, so
+// the look is two style strings rather than two toolbars.
+const BTN_FLOAT = "background:transparent;color:#c8d0e0;border:0;border-radius:999px;" +
+  "font:11px sans-serif;padding:0 9px;cursor:pointer;flex:0 0 auto;height:30px;min-width:30px;" +
+  "display:inline-flex;align-items:center;justify-content:center;gap:5px;";
+const ON_FLOAT = "background:#4ab4ff;color:#0c0d10;";
+const BAR_CSS = "display:flex;flex-direction:column;gap:4px;padding:4px 8px;" +
+  "background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;";
+const BAR_SEAT = 64;   // px kept free under the full-screen canvas for the floating bar
+const BAR_FLOAT = "position:absolute;left:20px;right:20px;bottom:" + (BAR_SEAT - 42) / 2 + "px;margin:0 auto;" +
+  "width:fit-content;display:flex;flex-direction:row;flex-wrap:wrap;justify-content:center;align-items:center;" +
+  "gap:2px 12px;padding:6px 10px;background:rgba(26,28,34,0.86);border-radius:20px;" +
+  "font:11px sans-serif;color:#c8d0e0;z-index:3;";
 
 // ── widget ────────────────────────────────────────────────────────────────────
 
@@ -213,20 +227,28 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   root.style.cssText = "display:flex;flex-direction:column;background:#111318;" +
     "border:1px solid #2a2d36;border-radius:6px;overflow:hidden;width:100%;";
   const bar = document.createElement("div");
-  bar.style.cssText = "display:flex;flex-direction:column;gap:4px;padding:4px 8px;" +
-    "background:#1a1c22;border-bottom:1px solid #2a2d36;font:11px sans-serif;color:#c8d0e0;";
+  bar.style.cssText = BAR_CSS;
+  // Which look the toolbar wears: the node's, or the full-screen float's (see expand()).
+  let BTN = BTN_CSS, ON = ON_CSS;
+  let popped = false;   // the toolbar is in the full-screen view
+  const allBtns: HTMLButtonElement[] = [], allRanges: HTMLInputElement[] = [];
   const row1 = document.createElement("div"), row2 = document.createElement("div");
   for (const r of [row1, row2]) r.style.cssText = "display:flex;align-items:center;gap:6px;";
   bar.append(row1, row2);
 
   function btn(icon: string, title: string, label?: string): HTMLButtonElement {
     const b = document.createElement("button");
-    b.style.cssText = BTN_CSS; b.title = title;
+    b.style.cssText = BTN; b.title = title;
+    allBtns.push(b);
     b.innerHTML = `${icon ? `<i class="pi ${icon}" style="font-size:11px;color:inherit"></i>` : ""}${label ? `<span>${label}</span>` : ""}`;
     return b;
   }
+  // A slider's number, shown full screen (the node's bar has no room for four more columns).
+  // Refreshed from draw(), because the value also moves from the keyboard and from Alt+drag.
+  const readouts: { inp: HTMLInputElement; out: HTMLSpanElement; fmt: (v: number) => string }[] = [];
   function range(label: string, min: number, max: number, step: number, get: () => number,
-                 set: (v: number) => void, width = 54): HTMLElement {
+                 set: (v: number) => void, fmt: (v: number) => string = (v) => v.toFixed(2),
+                 width = 54): HTMLElement {
     const wrap = document.createElement("label");
     wrap.style.cssText = "display:inline-flex;align-items:center;gap:3px;flex:0 0 auto;opacity:0.85;";
     const span = document.createElement("span"); span.textContent = label;
@@ -236,8 +258,12 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     inp.style.cssText = `width:${width}px;height:12px;margin:0;accent-color:#4ab4ff;`;
     inp.addEventListener("input", () => { set(Number(inp.value)); scheduleDraw(); });
     inp.addEventListener("pointerdown", (e) => e.stopPropagation());
-    wrap.append(span, inp);
+    const out = document.createElement("span");
+    out.style.cssText = "display:none;min-width:38px;text-align:right;color:#dcdce0;font-variant-numeric:tabular-nums;";
+    wrap.append(span, inp, out);
     (wrap as any)._inp = inp;
+    allRanges.push(inp);
+    readouts.push({ inp, out, fmt });
     return wrap;
   }
 
@@ -270,7 +296,8 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   if (!o.mask) row1.append(cloneBtn, healBtn, colorIn, whiteSw, blackSw);
   row1.append(undoBtn, redoBtn, clearBtn, expandBtn);
 
-  const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => { P.nkdPaintSize = v; });
+  const sizeR = range("Size", 1, SIZE_MAX, 1, () => P.nkdPaintSize, (v) => { P.nkdPaintSize = v; },
+    (v) => `${Math.round(v)} px`);
   const opR = range("Opacity", 0.05, 1, 0.01, () => P.nkdPaintOpacity, (v) => { P.nkdPaintOpacity = v; });
   const hardR = range("Hard", 0, 1, 0.01, () => P.nkdPaintHardness, (v) => { P.nkdPaintHardness = v; });
   const baseR = range("Base", 0, 1, 0.01, () => P.nkdPaintBase, (v) => { P.nkdPaintBase = v; });
@@ -301,11 +328,11 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   }
   function syncToolbar() {
     if (controlnet() && (tool() === "clone" || tool() === "heal")) P.nkdPaintTool = "brush";
-    cloneBtn.style.cssText = BTN_CSS + (tool() === "clone" ? ON_CSS : "");
-    healBtn.style.cssText = BTN_CSS + (tool() === "heal" ? ON_CSS : "");
-    brushBtn.style.cssText = BTN_CSS + (tool() === "brush" ? ON_CSS : "");
-    eraserBtn.style.cssText = BTN_CSS + (tool() === "eraser" ? ON_CSS : "");
-    lassoBtn.style.cssText = BTN_CSS + (P.nkdPaintLasso ? ON_CSS : "");
+    cloneBtn.style.cssText = BTN + (tool() === "clone" ? ON : "");
+    healBtn.style.cssText = BTN + (tool() === "heal" ? ON : "");
+    brushBtn.style.cssText = BTN + (tool() === "brush" ? ON : "");
+    eraserBtn.style.cssText = BTN + (tool() === "eraser" ? ON : "");
+    lassoBtn.style.cssText = BTN + (P.nkdPaintLasso ? ON : "");
     const cn = controlnet();
     for (const el of [colorIn, whiteSw, blackSw, cloneBtn, healBtn]) {
       el.style.opacity = cn ? "0.3" : "1"; el.style.pointerEvents = cn ? "none" : "auto";
@@ -316,7 +343,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
     baseR.style.display = base ? "" : "none";
     if (o.mask) {
       viewBtn.lastElementChild!.textContent = maskHidden ? "Hidden" : VIEW_LABEL[P.nkdMaskView as MaskView];
-      viewBtn.style.cssText = BTN_CSS + (maskHidden ? "border-color:#e0a040;color:#e0a040;" : "");
+      viewBtn.style.cssText = BTN + (maskHidden ? (popped ? "background:#e0a040;color:#0c0d10;" : "border-color:#e0a040;color:#e0a040;") : "");
     }
     cv.style.cursor = altHeld && !o.mask ? (cloning() ? "crosshair" : PIPETTE) : P.nkdPaintLasso ? "crosshair" : "none";
   }
@@ -343,16 +370,36 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   const detachFine = attachFineRange(bar);
 
   // ── full-screen: the same bar and canvas, moved into the modal and back ──
+  /** Dress the toolbar for where it is. Every button is restyled from scratch and then
+   *  syncToolbar() puts the on-states and the dimming back, so nothing is left half-way. */
+  function dressBar(float: boolean) {
+    popped = float;
+    BTN = float ? BTN_FLOAT : BTN_CSS;
+    ON = float ? ON_FLOAT : ON_CSS;
+    bar.style.cssText = float ? BAR_FLOAT : BAR_CSS;
+    for (const b of allBtns) b.style.cssText = BTN;
+    clearBtn.style.marginLeft = float ? "" : "auto";
+    expandBtn.style.display = float ? "none" : "";   // already full screen
+    for (const r of allRanges) {
+      r.classList.toggle("nkd-ui-range", float);
+      r.style.cssText = float ? "width:96px;" : `width:54px;height:12px;margin:0;accent-color:#4ab4ff;`;
+    }
+    for (const r of readouts) r.out.style.display = float ? "inline-block" : "none";
+    syncToolbar();
+  }
   function expand() {
     const keepH = root.offsetHeight;
     root.style.height = `${keepH}px`;   // the node keeps its size while the content is away
     const holder = document.createElement("div");
-    holder.style.cssText = "display:flex;flex-direction:column;flex:1;width:100%;height:100%;min-width:0;min-height:0;";
+    // The canvas takes the body less the bar's seat, so the floating bar sits UNDER the
+    // picture: what you reach for while painting is next to the work and never on it.
+    holder.style.cssText = "position:relative;display:flex;flex-direction:column;flex:1;width:100%;height:100%;" +
+      `min-width:0;min-height:0;box-sizing:border-box;padding-bottom:${BAR_SEAT}px;`;
     const m = openNkdModal({
       title: o.title,
-      hint: "wheel: zoom · Space or middle drag: pan · 0: fit · [ ]: size · Alt+right drag: size and hardness" +
-            (o.mask ? " · Alt: erase · V: view" : " · S / J: clone / heal, Alt+click sets the source"),
+      hint: "wheel: zoom · Space or middle drag: pan · [ ]: size · ? for the shortcuts",
       onClose: () => {
+        dressBar(false);
         root.append(bar, cv);
         cv.style.flex = ""; cv.style.minHeight = ""; cv.style.aspectRatio = `${L.width}/${L.height}`;
         root.style.height = "";
@@ -361,8 +408,31 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
       },
     });
     cv.style.aspectRatio = "auto"; cv.style.flex = "1"; cv.style.minHeight = "0";
-    holder.append(bar, cv);
+    holder.append(cv, bar);
     m.body.appendChild(holder);
+    dressBar(true);
+    const keys: NkdShortcuts = [
+      ["Tools", o.mask
+        ? [["Brush", ["B"]], ["Eraser", ["E"]], ["Lasso fill", ["L"]], ["Erase with any tool", ["Alt"], "or the right button"],
+           ["Cycle the mask view", ["V"]], ["Hide the mask", ["Shift", "V"]]]
+        : [["Brush", ["B"]], ["Eraser", ["E"]], ["Lasso fill", ["L"]], ["Clone", ["S"]], ["Heal", ["J"]],
+           ["Set the clone source", ["Alt"], "click"], ["Pick a colour", ["Alt"], "click"], ["Swap black / white", ["X"]]]],
+      ["Brush", [
+        ["Smaller / bigger", ["[", "]"]],
+        ["Size and hardness", ["Alt"], "right-drag"],
+        ["Fine slider steps", ["Shift"], "drag"],
+      ]],
+      ["View", [
+        ["Zoom", [], "wheel"],
+        ["Pan", ["Space"], "drag, or middle-drag"],
+        ["Fit", ["0"]],
+      ]],
+      ["Edit", [
+        ["Undo", ["Ctrl", "Z"]],
+        ["Redo", ["Ctrl", "Shift", "Z"]],
+      ]],
+    ];
+    nkdFloat(holder, "right:14px;top:14px", true, nkdHelp(m, holder, keys));
     m.addPrimary("Done");
     zoom = 1; panX = panY = 0;
     requestAnimationFrame(draw);
@@ -472,6 +542,7 @@ export function setupPaintWidget(node: any, o: PaintOpts): PaintHandle | undefin
   let hardPreview: number | null = null;       // hardness while Alt+right-dragging
 
   function draw() {
+    if (popped) for (const r of readouts) r.out.textContent = r.fmt(Number(r.inp.value));
     const { W, H, s, ox, oy } = view();
     if (W < 1 || H < 1) return;
     const dpr = window.devicePixelRatio || 1;

@@ -181,6 +181,10 @@ const CSS = `
 .nkd-ui-float button .pi { font-size: 13px; line-height: 1; color: inherit; }
 .nkd-ui-float button:hover { background: rgba(255,255,255,0.1); color: #fff; }
 .nkd-ui-float button.on { background: #4ab4ff; color: #0c0d10; }
+/* The one that queues work on the server: ComfyUI's own Run colour, read from the frontend's
+   variable so it follows the theme. Reserve it for that — one per editor at most. */
+.nkd-ui-float button.run { background: var(--color-brand-yellow, #f0ff41); color: #0c0d10; }
+.nkd-ui-float button.run:hover { background: color-mix(in srgb, var(--color-brand-yellow, #f0ff41) 82%, #fff); color: #0c0d10; }
 .nkd-ui-float button:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; color: #c8d0e0; }
 .nkd-ui-sep { width: 1px; height: 16px; margin: 0 3px; background: rgba(255,255,255,0.14); flex: 0 0 auto; }
 .nkd-ui-float.col .nkd-ui-sep { width: 16px; height: 1px; margin: 3px 0; }

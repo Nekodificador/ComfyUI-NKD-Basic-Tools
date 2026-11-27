@@ -13,7 +13,7 @@
 import { app as comfyApp } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { findW, hideWidget, mountDomWidget } from "./domHost";
-import { openNkdModal } from "./nkd_modal";
+import { openNkdModal, nkdFloat, nkdIcon, nkdSep, nkdHelp, type NkdModal, type NkdShortcuts } from "./nkd_modal";
 import { resolveSource, viewUrl } from "./mediaProbe";
 
 const NODE_NAME = "NKDMaskPicker";
@@ -339,31 +339,108 @@ function button(icon: string, label: string, onClick: () => void, title = ""): H
   return b;
 }
 
-/** A preview + toolbar on `state`. Returns its root and an unsubscribe. */
-function makeView(state: PickerState, actions: { analyze: () => void; expand?: () => void }, fit?: HTMLElement) {
+// What the full-screen view's title bar has no room to say, for its shortcuts sheet (?).
+const BAR_SEAT = 64;   // px kept free under the full-screen picture for the floating bar
+const KEYS_OBJECTS: NkdShortcuts = [
+  ["Picking", [
+    ["See the objects", [], "hover"],
+    ["Pick one", [], "click"],
+    ["Pick several as one", [], "drag across them"],
+    ["Add only", ["Shift"], "click"],
+    ["Cut a hole", ["Alt"], "click or drag"],
+    ["Bigger / smaller object", [], "wheel"],
+    ["Make SAM look somewhere", [], "click or drag on nothing"],
+  ]],
+];
+const KEYS_POINTS: NkdShortcuts = [
+  ["Points", [
+    ["Positive point", [], "click"],
+    ["Negative point", ["Alt"], "click, or right click"],
+    ["Move a point", [], "drag it"],
+    ["Delete a point", [], "right click it"],
+  ]],
+];
+
+/** The node's Detail Level widget, as the full-screen view reads and writes it. */
+type DetailAccess = { options: string[]; get: () => string; set: (v: string) => void };
+
+/** A preview + toolbar on `state`. Returns its root and an unsubscribe. On the node the tools are
+ *  a bar over the preview; full screen (`modal`) they are ONE floating bar under the picture —
+ *  everything here is reached for while picking, so it sits next to the work — the status goes
+ *  to the footer and the canvas gets the whole body. Same buttons, same state. */
+function makeView(state: PickerState,
+                  actions: { analyze: () => void; expand?: () => void; detail?: DetailAccess },
+                  modal?: NkdModal) {
+  const fit = modal?.body;
+  const big = !!modal;
   const root = document.createElement("div");
-  root.style.cssText = "display:flex;flex-direction:column;gap:6px;width:100%;" + (fit ? "align-items:center;" : "");
+  root.style.cssText = big
+    // The bottom padding is the bar's seat: the picture is centred in what is left above it.
+    ? `position:relative;display:flex;flex-direction:column;align-items:center;width:100%;box-sizing:border-box;padding-bottom:${BAR_SEAT}px;`
+    : "display:flex;flex-direction:column;gap:6px;width:100%;";
   const bar = document.createElement("div");
   bar.style.cssText = "display:flex;gap:4px;align-items:center;flex-wrap:nowrap;";
-  const imgBtn = button("pi-image", "Image", () => { state.showMask = false; state.redraw(); });
-  const maskBtn = button("pi-circle-fill", "Mask", () => { state.showMask = true; state.redraw(); });
+  // One call site for both looks: a labelled bar button on the node, a round icon in a float.
+  const mk = (icon: string, label: string, onClick: () => void, title = ""): HTMLButtonElement =>
+    big ? nkdIcon(icon.replace(/^pi-/, ""), title || label, onClick) : button(icon, label, onClick, title);
+  const paint = (b: HTMLElement, on: boolean, shown = true) => {
+    if (big) { b.classList.toggle("on", on); b.style.display = shown ? "" : "none"; }
+    else b.style.cssText = BTN + (shown ? "" : "display:none;") + (on ? ON : "");
+  };
+  const imgBtn = mk("pi-image", "Image", () => { state.showMask = false; state.redraw(); }, big ? "Show the image" : "");
+  const maskBtn = mk("pi-circle-fill", "Mask", () => { state.showMask = true; state.redraw(); }, big ? "Show the mask" : "");
   const status = document.createElement("span");
-  status.style.cssText = "flex:1;font:11px sans-serif;color:rgba(255,255,255,0.45);white-space:nowrap;" +
+  if (big) status.className = "nkd-modal-status";
+  else status.style.cssText = "flex:1;font:11px sans-serif;color:rgba(255,255,255,0.45);white-space:nowrap;" +
     "overflow:hidden;text-overflow:ellipsis;";
-  const objBtn = button("pi-plus", "Object", () => { state.current = state.nextGroup(); state.redraw(); },
+  const objBtn = mk("pi-plus", "Object", () => { state.current = state.nextGroup(); state.redraw(); },
     "Start another object: the next points make their own mask");
-  const liveBtn = button("pi-bolt", "Live", () => {
+  const liveBtn = mk("pi-bolt", "Live", () => {
     state.live = !state.live; state.saveLive();
     if (state.live && state.objects().length) state.changed(); else state.redraw();
   }, "Show the mask after every point. Off: only when the workflow runs");
-  bar.append(imgBtn, maskBtn, status, objBtn, liveBtn,
-    button("pi-refresh", "Analyze", actions.analyze, "Find every object in the image"),
-    button("pi-times", "", () => state.clear(), "Clear the selection"));
-  if (actions.expand) bar.append(button("pi-expand", "", actions.expand, "Open full screen"));
+  // Full screen Analyze is spelled out: it is the one button that starts work on the server.
+  const analyzeBtn = big
+    ? nkdIcon("Analyze", "Find every object in the image", actions.analyze, true)
+    : button("pi-refresh", "Analyze", actions.analyze, "Find every object in the image");
+  if (big) analyzeBtn.classList.add("run");   // it queues the node: ComfyUI's Run yellow
+  // Detail Level, full screen only: four steps, so four buttons rather than a slider. It lives
+  // on the node as a widget; changing it here writes that widget and analyzes again, because a
+  // new level means nothing until the objects are found afresh. Not inside a subgraph, where
+  // Analyze runs the whole workflow: there the level is set and Analyze is left to the user.
+  const det = big ? actions.detail : undefined;
+  const detailSep = nkdSep();
+  const detailBtns = (det?.options ?? []).map((name) =>
+    nkdIcon(name, `Detail level ${name}: how many objects Analyze lists. Higher finds smaller parts ` +
+      "and gives the wheel more sizes to step through; max takes about a second.",
+      () => { if (det!.get() === name) return; det!.set(name); state.redraw(); if (state.canAutoAnalyze()) actions.analyze(); }, true));
+  const detailBox = document.createElement("span");
+  detailBox.style.cssText = "display:inline-flex;align-items:center;gap:2px";
+  detailBox.append(...detailBtns);
+  // The wheel steps through the levels, as it does over the pack's dropdowns.
+  detailBox.addEventListener("wheel", (e) => {
+    if (!det) return;
+    e.preventDefault(); e.stopPropagation();
+    const i = det.options.indexOf(det.get()) + (e.deltaY < 0 ? 1 : -1);
+    if (i >= 0 && i < det.options.length) detailBtns[i].click();
+  }, { passive: false });
+  if (modal) {
+    modal.footerLeft.appendChild(status);
+    nkdFloat(root, `left:20px;right:20px;bottom:${(BAR_SEAT - 40) / 2}px;margin:0 auto;width:fit-content;` +
+      "flex-wrap:wrap;justify-content:center;border-radius:20px", false,
+      imgBtn, maskBtn, nkdSep(), objBtn, liveBtn, detailBox, analyzeBtn, detailSep,
+      nkdIcon("trash", "Clear the selection", () => state.clear()));
+    nkdFloat(root, "right:14px;top:14px", true,
+      nkdHelp(modal, root, state.pointsOnly() ? KEYS_POINTS : KEYS_OBJECTS));
+  } else {
+    bar.append(imgBtn, maskBtn, status, objBtn, liveBtn, analyzeBtn,
+      button("pi-times", "", () => state.clear(), "Clear the selection"));
+    if (actions.expand) bar.append(button("pi-expand", "", actions.expand, "Open full screen"));
+  }
 
   const canvas = document.createElement("canvas");
   canvas.style.cssText = "width:100%;display:block;border-radius:6px;background:#111318;cursor:crosshair;outline:none;";
-  root.append(bar, canvas);
+  if (big) root.append(canvas); else root.append(bar, canvas);
   // Vue nodes forward wheel to the graph unless the target sits in data-capture-wheel AND holds focus
   canvas.dataset.captureWheel = "true";
   canvas.tabIndex = -1;
@@ -439,18 +516,25 @@ function makeView(state: PickerState, actions: { analyze: () => void; expand?: (
   const layer = document.createElement("canvas");
   const draw = () => {
     status.textContent = status.title = state.status();
-    imgBtn.style.cssText = BTN + (state.showMask ? "" : ON);
-    maskBtn.style.cssText = BTN + (state.showMask ? ON : "");
+    paint(imgBtn, !state.showMask);
+    paint(maskBtn, state.showMask);
     const po = state.pointsOnly();
-    objBtn.style.cssText = BTN + (po ? "" : "display:none;");
-    liveBtn.style.cssText = BTN + (po ? "" : "display:none;") + (state.live ? ON : "");
+    paint(objBtn, false, po);
+    paint(liveBtn, state.live, po);
+    if (det) {
+      // Detail belongs to Analyze, which points mode does not use.
+      detailBox.style.display = po ? "none" : "inline-flex";
+      const cur = det.get();
+      detailBtns.forEach((b, i) => b.classList.toggle("on", det.options[i] === cur));
+    }
     const p = state.payload;
     const b = state.backdrop, k = b ? Math.min(1, 512 / Math.max(b.naturalWidth, b.naturalHeight)) : 1;
     const w = p?.w ?? Math.round((b?.naturalWidth ?? 512) * k), h = p?.h ?? Math.round((b?.naturalHeight ?? 288) * k);
     // the node draws at preview size; full screen draws at screen size, up to the photo's own (2048 px at most)
     let z = 1, dot = 3.5;
     if (fit) {
-      const s = Math.min(fit.clientWidth / w, (fit.clientHeight - bar.offsetHeight - 6) / h);
+      // The bar sits under the picture, never on it.
+      const s = Math.min((fit.clientWidth - 48) / w, (fit.clientHeight - BAR_SEAT - 24) / h);
       dot = 7 / s;   // 7 screen px
       canvas.style.width = Math.floor(w * s) + "px";
       z = Math.max(1, Math.min(s * devicePixelRatio, (b?.naturalWidth ?? w) / w));
@@ -583,14 +667,17 @@ function setup(node: any): void {
     let big: ReturnType<typeof makeView>;
     modal = openNkdModal({
       title: "😺 Mask Picker",
-      hint: state.pointsOnly()
-        ? "click: positive point · right click or Alt+click: negative point · drag a point to move it · " +
-          "right click a point to delete it · + Object starts another object · Live shows the mask after every point"
-        : "hover to see objects · click to pick · drag to pick several as one · Shift+click adds only · " +
-          "Alt cuts holes · click or drag on nothing to make SAM look there · wheel: bigger / smaller",
+      hint: (state.pointsOnly() ? "click to place points" : "hover to see objects · click to pick") +
+            " · ? for the shortcuts",
       onClose: () => { big.release(); modal = null; },
     });
-    big = makeView(state, { analyze }, modal.body);
+    const detW = findW(node, "detail");
+    const detail: DetailAccess | undefined = detW ? {
+      options: (detW.options?.values as string[] | undefined) ?? ["low", "normal", "high", "max"],
+      get: () => String(detW.value),
+      set: (v) => { detW.value = v; detW.callback?.(v); node.setDirtyCanvas(true, true); },
+    } : undefined;
+    big = makeView(state, { analyze, detail }, modal);
     big.root.style.cssText += "height:100%;justify-content:center;";
     modal.body.appendChild(big.root);
     modal.addPrimary("Done");
