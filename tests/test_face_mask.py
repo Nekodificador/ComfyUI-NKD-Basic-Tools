@@ -118,6 +118,18 @@ def test_crop_is_square_and_the_size_asked_for():
     assert a["crop"].shape[:2] == (384, 384), a["crop"].shape
 
 
+def test_region_is_the_face_mask_on_the_picture():
+    # Face Crop's `region` output: the crop's mask warped back onto the picture
+    # has to land where the same mask drawn on the picture itself does.
+    lmk = rotate(synthetic_face(), 23.0)
+    a = fc.align(picture(), lmk, size=256, padding=1.7)
+    crop_mask = fc.region_mask(a["lmk_crop"], 256, 256, "face", 0.0).numpy().astype(np.float32)
+    region = fc.warp_back(crop_mask, a["M_c2o"], 512, 512)
+    direct = fc.region_mask(lmk, 512, 512, "face", 0.0).numpy()
+    overlap = np.minimum(region, direct).sum() / np.maximum(region, direct).sum()
+    assert overlap > 0.95, overlap
+
+
 # --- masks ------------------------------------------------------------------
 
 def at(mask, lmk, idx, inset=0.0):

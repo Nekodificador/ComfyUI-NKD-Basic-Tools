@@ -159,6 +159,9 @@ class NKDFaceCrop(io.ComfyNode):
                 io.Float.Output(display_name="roll",
                                 tooltip="Degrees of tilt taken out of the first "
                                         "frame, positive clockwise."),
+                io.Mask.Output(display_name="region",
+                               tooltip="The same face mask, put back on the "
+                                       "full image at its original angle."),
             ],
         )
 
@@ -187,8 +190,11 @@ class NKDFaceCrop(io.ComfyNode):
         paste = mask if mask_region != "none" else torch.ones_like(mask)
         data = NKDFaceData(background=image.cpu(), transforms=transforms,
                            size=int(size), masks=paste)
+        h, w = image.shape[1], image.shape[2]
+        region = torch.stack([torch.from_numpy(fc.warp_back(m.cpu().numpy().astype(np.float32), t, w, h))
+                              for m, t in zip(mask, transforms)]).to(image.device)
         preview = _quad_preview(image, mask[0], transforms[0], int(size))
-        return io.NodeOutput(out, mask, data, rolls[0] if rolls else 0.0,
+        return io.NodeOutput(out, mask, data, rolls[0] if rolls else 0.0, region,
                              ui=ui.PreviewImage(preview, cls=cls))
 
 
