@@ -1,7 +1,7 @@
-// 😺NKD Color Warp — fullscreen viewer overlay (vanilla TS, no Vue).
-// Copies the VFX Tools overlay lifecycle (fixed fullscreen div on document.body,
-// z-index 100000, Esc / backdrop / Close → serialize + teardown, single-instance
-// guard). Left pane = RYB polar net, right pane = image / live LUT preview.
+// 😺NKD Color Warp — the editor, in the shared NKD modal chrome (vanilla TS, no Vue).
+// The frame, title bar, Esc / backdrop / ✕ and the footer come from nkd_modal; every exit
+// path serialises and tears down. Left pane = RYB polar net, right pane = image / live LUT
+// preview. Each control floats over the pane it acts on (shared UI kit, .nkd-ui-*).
 // The node's `mesh` string widget is the single source of truth — parsed on
 // open, written back on change/close.
 import {
@@ -11,6 +11,7 @@ import {
 import { ColorWarpGrid, ColorWarpLumaStrip } from "./colorWarpGrid";
 import { ColorWarpPreview } from "./colorWarpPreview";
 import { ColorWarpScope3D } from "./colorWarpScope3D";
+import { openNkdModal, nkdFloat, nkdIcon, nkdSep, nkdHelp, type NkdShortcuts } from "./nkd_modal";
 
 export interface ColorWarpViewerOpts {
   image: HTMLImageElement | HTMLCanvasElement | null;
@@ -30,7 +31,7 @@ export interface ColorWarpViewerHandle {
 // Single-instance guard: only one overlay at a time.
 let active: { destroy: () => void } | null = null;
 
-const PANEL = "#111318";
+const PANEL = "#0d0f13";
 const BAR_BG = "#1a1c22";
 const ACCENT = "#4ab4ff";
 const BORDER = "#3a3d46";
@@ -39,6 +40,27 @@ const TEXT = "#c8d0e0";
 // TEMP debug (2026-07-23, off 2026-07-24): forced a 6×4 grid for node-naming
 // over text. Superseded by the Spokes/Rings density selects. Labels stay.
 const DEBUG_GRID = false;
+
+const SHORTCUTS: NkdShortcuts = [
+  ["Wheel", [
+    ["Move a node", [], "drag it"],
+    ["Move one node only", [], "turn Pin on"],
+    ["Lock to hue or saturation", ["Shift"], "drag"],
+    ["Reset a node", [], "double-click it"],
+    ["Change its luma", ["Alt"], "wheel"],
+    ["See the region a cell affects", ["Alt"], "hover the wheel"],
+    ["Reset everything", ["R"]],
+  ]],
+  ["Image", [
+    ["Move the node behind a colour", [], "drag on the image"],
+    ["Change that colour's luma", ["Alt"], "wheel"],
+    ["See the original", ["\\"], "hold, or hold Before"],
+  ]],
+  ["Editor", [
+    ["Clear the selection, then close", ["Esc"]],
+    ["Shortcuts", ["?"]],
+  ]],
+];
 
 function meshJson(m: Mesh): string {
   return JSON.stringify(meshToDict(m));
@@ -69,57 +91,33 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
 
   let sourceCanvas = toCanvas(opts.image);
 
-  // --- DOM shell -----------------------------------------------------------
-  const host = document.createElement("div");
-  host.style.cssText =
-    `position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;` +
-    `background:${PANEL};color:${TEXT};font:11px Inter,system-ui,sans-serif;`;
+  // --- Shell: the shared modal. Any way out saves, except a programmatic close. --------
+  let silent = false;
+  const modal = openNkdModal({
+    title: "😺 Color Warp",
+    hint: "drag a node · hold \\ for the original · ? for the shortcuts",
+    onClose: () => {
+      const json = meshJson(mesh);
+      teardown();
+      if (!silent) opts.onClose?.(json);
+    },
+  });
+  const body = modal.body;
 
-  const bar = document.createElement("div");
-  bar.style.cssText =
-    `display:flex;align-items:center;gap:10px;padding:8px 14px;background:${BAR_BG};` +
-    `border-bottom:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
-  const title = document.createElement("span");
-  title.textContent = "😺 Color Warp";
-  title.style.cssText = "font-weight:600;font-size:13px";
-  const hint = document.createElement("span");
-  hint.textContent = "hold \\ = original · drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
-  hint.style.cssText = "opacity:0.7;font-size:11px";
-  const spacer = document.createElement("span");
-  spacer.style.cssText = "flex:1 1 auto";
-
-  // Toolbar toggles (Pin) + Reset all + density + wheel mode + scope/luma/labels.
-  const pinBtn = mkToggle("Pin", false);
-  const resetBtn = mkBtn("Reset all", TEXT);
+  // The controls, as round buttons for the floats. Toggles keep their state in `.on`.
+  const pinBtn = nkdIcon("thumbtack", "Pin: move a single node instead of dragging its neighbours along", () => {});
+  const resetBtn = nkdIcon("replay", "Reset all (R)", () => {});
   // DaVinci-style grid density: spokes (radial arms) and rings, independently.
   const spokesSel = mkSelect("Spokes", [4, 6, 8, 12, 16, 24, 32], mesh.hue_segments);
   const ringsSel = mkSelect("Rings", [2, 3, 4, 6, 8, 10, 12, 16], mesh.sat_rings);
-  const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
-  const radialBtn = mkBtn(`Radial: ${RADIAL_MODES.neutral.label}`, TEXT);
-  const scopeBtn = mkToggle("3D", false);
-  const trailsBtn = mkToggle("Trails", false);
-  const lumaBtn = mkToggle("Luma", false);
-  const labelsBtn = mkToggle("Labels", false);
-  const beforeBtn = mkBtn("Before", TEXT);
-  beforeBtn.title = "Hold to see the original (\\)";
-
-  const saveBtn = mkBtn("Save & close", ACCENT);
-  const closeBtn = mkBtn("✕", TEXT);
-  closeBtn.style.padding = "4px 9px";
-  // Top head = title + hint + close; the tool controls live in a bottom bar
-  // (consistency with the VFX Tools overlays).
-  bar.append(title, hint, spacer, closeBtn);
-
-  const bottomBar = document.createElement("div");
-  bottomBar.style.cssText =
-    `display:flex;align-items:center;gap:12px;padding:8px 14px;background:${BAR_BG};` +
-    `border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
-  const barSpacer = document.createElement("span");
-  barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, beforeBtn, pinBtn, resetBtn, saveBtn);
-
-  const body = document.createElement("div");
-  body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
+  const wheelBtn = nkdIcon(WHEEL_MODES.ryb.label, "Wheel projection: click to cycle RYB, RGB, OKLCh. Only the view changes.", () => {}, true);
+  const radialBtn = nkdIcon(RADIAL_MODES.neutral.label, "Radial scale: click to cycle Neutrals (magnifies the low-chroma core), Linear, Sqrt.", () => {}, true);
+  const scopeBtn = nkdIcon("box", "3D vectorscope", () => {});
+  const trailsBtn = nkdIcon("share-alt", "Trails in the 3D vectorscope", () => {});
+  const lumaBtn = nkdIcon("chart-line", "Hue / Luma strip under the wheel", () => {});
+  const labelsBtn = nkdIcon("tag", "Node labels (A1…), for talking about nodes", () => {});
+  const beforeBtn = nkdIcon("Before", "Hold to see the original (\\)", () => {}, true);
+  beforeBtn.insertAdjacentHTML("afterbegin", '<i class="pi pi-eye"></i>');
 
   const leftPane = mkPane();
   const rightPane = mkPane();
@@ -132,7 +130,10 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
   // must be explicit or it collapses to its intrinsic size (tiny wheel).
   // Luma strip starts HIDDEN (toolbar toggle) — wheel owns the full height.
   const gridCanvas = document.createElement("canvas");
-  gridCanvas.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%";
+  // The wheel stops short of the pane's bottom: that strip is the floating bar's seat, so the
+  // bar never covers the rim nodes.
+  const BAR_SEAT = 58;
+  gridCanvas.style.cssText = `position:absolute;left:0;top:0;width:100%;height:calc(100% - ${BAR_SEAT}px)`;
   leftPane.appendChild(gridCanvas);
   const lumaCanvas = document.createElement("canvas");
   lumaCanvas.style.cssText =
@@ -182,9 +183,24 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     `padding:8px 11px;font:11px Inter,system-ui,sans-serif;color:${TEXT};` +
     `box-shadow:0 2px 10px rgba(0,0,0,0.5);min-width:120px`;
   rightPane.appendChild(readout);
+  modal.overlay.appendChild(tip);
 
-  host.append(bar, body, bottomBar, tip);
-  document.body.appendChild(host);
+  // Each control floats over the pane it acts on. Wheel: projection and scale top left, the
+  // strip and labels top right, and along the bottom what you reach for while warping.
+  nkdFloat(leftPane, "left:14px;top:14px", true, wheelBtn, radialBtn);
+  nkdFloat(leftPane, "right:14px;top:14px", true, lumaBtn, labelsBtn);
+  const BAR_AT = 14;
+  const leftBar = nkdFloat(leftPane,
+    `left:20px;right:20px;bottom:${BAR_AT}px;margin:0 auto;width:fit-content;flex-wrap:wrap;justify-content:center;border-radius:20px`,
+    false, pinBtn, nkdSep(), spokesSel.wrap, ringsSel.wrap, nkdSep(), resetBtn);
+  // Image: the scope and the shortcuts top right, Before along the bottom.
+  nkdFloat(rightPane, "right:14px;top:14px", true, scopeBtn, trailsBtn, nkdSep(),
+    nkdHelp(modal, rightPane, SHORTCUTS));
+  // Bottom RIGHT, not centred: the mini 3D scope opens from the bottom left corner.
+  nkdFloat(rightPane, "right:14px;bottom:14px", false, beforeBtn);
+  // Esc: the shortcuts sheet first (nkdHelp's), then a box-selection, then the editor.
+  const helpEsc = modal.beforeEsc;
+  modal.beforeEsc = () => !!helpEsc?.() || grid.clearSelection();
 
   // --- render engines: RYB grid (left) + WebGL LUT preview (right) ---------
   const grid = new ColorWarpGrid(gridCanvas);
@@ -261,13 +277,14 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     lumaOn = !lumaOn;
     setToggle(lumaBtn, lumaOn);
     lumaCanvas.style.display = lumaOn ? "block" : "none";
-    gridCanvas.style.height = lumaOn ? `calc(100% - ${LUMA_H}px)` : "100%";
+    gridCanvas.style.height = `calc(100% - ${BAR_SEAT + (lumaOn ? LUMA_H : 0)}px)`;
+    leftBar.style.bottom = `${BAR_AT + (lumaOn ? LUMA_H : 0)}px`;   // the bar rides above the strip
     requestAnimationFrame(render);
   };
   // Before/after: the original shows while the button or `\` is held.
   const showOriginal = (on: boolean) => {
     preview.setOriginal(on);
-    beforeBtn.style.borderColor = on ? ACCENT : BORDER;
+    beforeBtn.classList.toggle("on", on);
   };
   beforeBtn.addEventListener("pointerdown", () => showOriginal(true));
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) {
@@ -285,7 +302,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     const order: WheelModeName[] = ["ryb", "rgb", "oklch"];
     const next = order[(order.indexOf(grid.getWheelMode()) + 1) % order.length];
     grid.setWheelMode(next);
-    wheelBtn.textContent = `Wheel: ${WHEEL_MODES[next].label}`;
+    wheelBtn.textContent = WHEEL_MODES[next].label;
     luma.refresh(); // the strip's x-axis is the wheel projection
   };
   // Radial mode: the same idea on the RADIUS. Neutrals (default) magnifies the
@@ -296,7 +313,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     const next = order[(order.indexOf(grid.getRadialMode()) + 1) % order.length];
     grid.setRadialMode(next);
     scope.setRadialMode(next);
-    radialBtn.textContent = `Radial: ${RADIAL_MODES[next].label}`;
+    radialBtn.textContent = RADIAL_MODES[next].label;
   };
 
   // Preview hover → HSL readout + grid indicator dot (Phase 7.1).
@@ -369,7 +386,7 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
 
   // --- teardown ------------------------------------------------------------
   let destroyed = false;
-  function destroy() {
+  function teardown() {
     if (destroyed) return;
     destroyed = true;
     ro.disconnect();
@@ -379,31 +396,25 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
     luma.dispose();
     preview.dispose();
     scope.dispose();
-    host.remove();
     if (active && active.destroy === destroy) active = null;
   }
-  function closeWith(commit: boolean) {
-    const json = meshJson(mesh);
-    destroy();
-    if (commit) opts.onClose?.(json);
+  /** Close without saving: a second viewer opening, or the node going away. */
+  function destroy() {
+    silent = true;
+    modal.close();
   }
+  // Esc belongs to the shell (see beforeEsc above); these are the editor's own keys.
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      if (grid.clearSelection()) return; // first Esc clears a box-selection
-      closeWith(true);
-      return;
-    }
+    const a = document.activeElement as HTMLElement | null;
+    if (a && (a.isContentEditable || /^(INPUT|TEXTAREA)$/.test(a.tagName))) return;
     if (e.key === "\\") { e.stopPropagation(); showOriginal(true); return; }
     const k = e.key.toLowerCase();
-    if (k === "r") { e.stopPropagation(); grid.resetAll(); }
+    if (k === "r" && !e.ctrlKey && !e.metaKey && !e.altKey) { e.stopPropagation(); e.preventDefault(); grid.resetAll(); }
   };
   window.addEventListener("keydown", onKey, true);
   const onKeyUp = (e: KeyboardEvent) => { if (e.key === "\\") showOriginal(false); };
   window.addEventListener("keyup", onKeyUp, true);
-  host.addEventListener("pointerdown", (e) => { if (e.target === host) closeWith(true); });
-  saveBtn.onclick = () => closeWith(true);
-  closeBtn.onclick = () => closeWith(true);
+  modal.addPrimary("Save & close");
 
   active = { destroy };
 
@@ -419,30 +430,20 @@ export function openColorWarpViewer(opts: ColorWarpViewerOpts): ColorWarpViewerH
       scope.setSource(c, scatter16 ?? null);
       render();
     },
-    close() { closeWith(false); },
+    close() { destroy(); },
   };
-}
-
-function mkBtn(label: string, color: string): HTMLButtonElement {
-  const b = document.createElement("button");
-  b.textContent = label;
-  b.style.cssText =
-    `background:#252830;border:1px solid ${BORDER};color:${color};border-radius:4px;` +
-    `padding:4px 12px;cursor:pointer;font:inherit`;
-  if (color === ACCENT) { b.style.borderColor = ACCENT; b.style.fontWeight = "600"; }
-  return b;
 }
 
 // Labeled <select> for the density controls. Ensures the current value is
 // always an option (e.g. a mesh saved at a density not in the preset list).
 function mkSelect(label: string, values: number[], current: number): { wrap: HTMLElement; sel: HTMLSelectElement } {
   const wrap = document.createElement("label");
-  wrap.style.cssText = `display:flex;align-items:center;gap:6px;color:${TEXT};opacity:0.9;cursor:pointer`;
+  wrap.style.cssText = "display:inline-flex;align-items:center;gap:2px;padding-left:8px;color:#9aa1b2;cursor:pointer";
   wrap.textContent = label;
   const sel = document.createElement("select");
   sel.style.cssText =
-    `background:#252830;border:1px solid ${BORDER};color:${TEXT};border-radius:4px;` +
-    `padding:3px 6px;font:inherit;cursor:pointer`;
+    "background:transparent;border:0;color:#dcdce0;border-radius:999px;height:24px;" +
+    "padding:0 4px;font:600 11px system-ui,sans-serif;cursor:pointer";
   const vals = values.includes(current) ? values : [...values, current].sort((a, b) => a - b);
   for (const v of vals) {
     const o = document.createElement("option");
@@ -463,18 +464,8 @@ function mkSelect(label: string, values: number[], current: number): { wrap: HTM
   return { wrap, sel };
 }
 
-function mkToggle(label: string, on: boolean): HTMLButtonElement {
-  const b = mkBtn(label, TEXT);
-  (b as any)._label = label;
-  setToggle(b, on);
-  return b;
-}
-
 function setToggle(b: HTMLButtonElement, on: boolean) {
-  b.style.color = on ? "#0b0d12" : TEXT;
-  b.style.background = on ? ACCENT : "#252830";
-  b.style.borderColor = on ? ACCENT : BORDER;
-  b.style.fontWeight = on ? "600" : "400";
+  b.classList.toggle("on", on);
 }
 
 function mkPane(): HTMLElement {

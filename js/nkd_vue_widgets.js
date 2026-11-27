@@ -13888,11 +13888,31 @@ class ColorWarpScope3D {
   }
 }
 let active = null;
-const PANEL = "#111318";
+const PANEL = "#0d0f13";
 const BAR_BG = "#1a1c22";
 const ACCENT = "#4ab4ff";
 const BORDER = "#3a3d46";
 const TEXT = "#c8d0e0";
+const SHORTCUTS$1 = [
+  ["Wheel", [
+    ["Move a node", [], "drag it"],
+    ["Move one node only", [], "turn Pin on"],
+    ["Lock to hue or saturation", ["Shift"], "drag"],
+    ["Reset a node", [], "double-click it"],
+    ["Change its luma", ["Alt"], "wheel"],
+    ["See the region a cell affects", ["Alt"], "hover the wheel"],
+    ["Reset everything", ["R"]]
+  ]],
+  ["Image", [
+    ["Move the node behind a colour", [], "drag on the image"],
+    ["Change that colour's luma", ["Alt"], "wheel"],
+    ["See the original", ["\\"], "hold, or hold Before"]
+  ]],
+  ["Editor", [
+    ["Clear the selection, then close", ["Esc"]],
+    ["Shortcuts", ["?"]]
+  ]]
+];
 function meshJson(m) {
   return JSON.stringify(meshToDict(m));
 }
@@ -13922,48 +13942,47 @@ function openColorWarpViewer(opts) {
     mesh = meshIdentity(12, 6, wheelColumnHues(12));
   }
   let sourceCanvas = toCanvas(opts.image);
-  const host = document.createElement("div");
-  host.style.cssText = `position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;background:${PANEL};color:${TEXT};font:11px Inter,system-ui,sans-serif;`;
-  const bar = document.createElement("div");
-  bar.style.cssText = `display:flex;align-items:center;gap:10px;padding:8px 14px;background:${BAR_BG};border-bottom:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
-  const title = document.createElement("span");
-  title.textContent = "😺 Color Warp";
-  title.style.cssText = "font-weight:600;font-size:13px";
-  const hint = document.createElement("span");
-  hint.textContent = "hold \\ = original · drag = move node · Pin = single node · dbl-click resets · Alt = region mask · Alt+wheel = luma";
-  hint.style.cssText = "opacity:0.7;font-size:11px";
-  const spacer = document.createElement("span");
-  spacer.style.cssText = "flex:1 1 auto";
-  const pinBtn = mkToggle("Pin", false);
-  const resetBtn = mkBtn("Reset all", TEXT);
+  let silent = false;
+  const modal = openNkdModal({
+    title: "😺 Color Warp",
+    hint: "drag a node · hold \\ for the original · ? for the shortcuts",
+    onClose: () => {
+      var _a;
+      const json = meshJson(mesh);
+      teardown();
+      if (!silent) (_a = opts.onClose) == null ? void 0 : _a.call(opts, json);
+    }
+  });
+  const body = modal.body;
+  const pinBtn = nkdIcon("thumbtack", "Pin: move a single node instead of dragging its neighbours along", () => {
+  });
+  const resetBtn = nkdIcon("replay", "Reset all (R)", () => {
+  });
   const spokesSel = mkSelect("Spokes", [4, 6, 8, 12, 16, 24, 32], mesh.hue_segments);
   const ringsSel = mkSelect("Rings", [2, 3, 4, 6, 8, 10, 12, 16], mesh.sat_rings);
-  const wheelBtn = mkBtn(`Wheel: ${WHEEL_MODES.ryb.label}`, TEXT);
-  const radialBtn = mkBtn(`Radial: ${RADIAL_MODES.neutral.label}`, TEXT);
-  const scopeBtn = mkToggle("3D", false);
-  const trailsBtn = mkToggle("Trails", false);
-  const lumaBtn = mkToggle("Luma", false);
-  const labelsBtn = mkToggle("Labels", false);
-  const beforeBtn = mkBtn("Before", TEXT);
-  beforeBtn.title = "Hold to see the original (\\)";
-  const saveBtn = mkBtn("Save & close", ACCENT);
-  const closeBtn = mkBtn("✕", TEXT);
-  closeBtn.style.padding = "4px 9px";
-  bar.append(title, hint, spacer, closeBtn);
-  const bottomBar = document.createElement("div");
-  bottomBar.style.cssText = `display:flex;align-items:center;gap:12px;padding:8px 14px;background:${BAR_BG};border-top:1px solid rgba(255,255,255,0.07);flex:0 0 auto`;
-  const barSpacer = document.createElement("span");
-  barSpacer.style.cssText = "flex:1 1 auto";
-  bottomBar.append(barSpacer, wheelBtn, radialBtn, spokesSel.wrap, ringsSel.wrap, scopeBtn, trailsBtn, lumaBtn, labelsBtn, beforeBtn, pinBtn, resetBtn, saveBtn);
-  const body = document.createElement("div");
-  body.style.cssText = "flex:1 1 auto;min-height:0;display:flex";
+  const wheelBtn = nkdIcon(WHEEL_MODES.ryb.label, "Wheel projection: click to cycle RYB, RGB, OKLCh. Only the view changes.", () => {
+  }, true);
+  const radialBtn = nkdIcon(RADIAL_MODES.neutral.label, "Radial scale: click to cycle Neutrals (magnifies the low-chroma core), Linear, Sqrt.", () => {
+  }, true);
+  const scopeBtn = nkdIcon("box", "3D vectorscope", () => {
+  });
+  const trailsBtn = nkdIcon("share-alt", "Trails in the 3D vectorscope", () => {
+  });
+  const lumaBtn = nkdIcon("chart-line", "Hue / Luma strip under the wheel", () => {
+  });
+  const labelsBtn = nkdIcon("tag", "Node labels (A1…), for talking about nodes", () => {
+  });
+  const beforeBtn = nkdIcon("Before", "Hold to see the original (\\)", () => {
+  }, true);
+  beforeBtn.insertAdjacentHTML("afterbegin", '<i class="pi pi-eye"></i>');
   const leftPane = mkPane();
   const rightPane = mkPane();
   leftPane.style.borderRight = `1px solid ${BORDER}`;
   body.append(leftPane, rightPane);
   const LUMA_H = 118;
   const gridCanvas = document.createElement("canvas");
-  gridCanvas.style.cssText = "position:absolute;left:0;top:0;width:100%;height:100%";
+  const BAR_SEAT2 = 58;
+  gridCanvas.style.cssText = `position:absolute;left:0;top:0;width:100%;height:calc(100% - ${BAR_SEAT2}px)`;
   leftPane.appendChild(gridCanvas);
   const lumaCanvas = document.createElement("canvas");
   lumaCanvas.style.cssText = `position:absolute;left:0;right:0;bottom:0;height:${LUMA_H}px;width:100%;border-top:1px solid ${BORDER};display:none`;
@@ -13988,8 +14007,33 @@ function openColorWarpViewer(opts) {
   const readout = document.createElement("div");
   readout.style.cssText = `position:absolute;top:10px;left:10px;pointer-events:none;display:none;background:rgba(20,22,28,0.92);border:1px solid ${BORDER};border-radius:6px;padding:8px 11px;font:11px Inter,system-ui,sans-serif;color:${TEXT};box-shadow:0 2px 10px rgba(0,0,0,0.5);min-width:120px`;
   rightPane.appendChild(readout);
-  host.append(bar, body, bottomBar, tip);
-  document.body.appendChild(host);
+  modal.overlay.appendChild(tip);
+  nkdFloat(leftPane, "left:14px;top:14px", true, wheelBtn, radialBtn);
+  nkdFloat(leftPane, "right:14px;top:14px", true, lumaBtn, labelsBtn);
+  const BAR_AT = 14;
+  const leftBar = nkdFloat(
+    leftPane,
+    `left:20px;right:20px;bottom:${BAR_AT}px;margin:0 auto;width:fit-content;flex-wrap:wrap;justify-content:center;border-radius:20px`,
+    false,
+    pinBtn,
+    nkdSep(),
+    spokesSel.wrap,
+    ringsSel.wrap,
+    nkdSep(),
+    resetBtn
+  );
+  nkdFloat(
+    rightPane,
+    "right:14px;top:14px",
+    true,
+    scopeBtn,
+    trailsBtn,
+    nkdSep(),
+    nkdHelp(modal, rightPane, SHORTCUTS$1)
+  );
+  nkdFloat(rightPane, "right:14px;bottom:14px", false, beforeBtn);
+  const helpEsc = modal.beforeEsc;
+  modal.beforeEsc = () => !!(helpEsc == null ? void 0 : helpEsc()) || grid.clearSelection();
   const grid = new ColorWarpGrid(gridCanvas);
   const luma = new ColorWarpLumaStrip(lumaCanvas, grid);
   const preview = new ColorWarpPreview(previewCanvas);
@@ -14063,12 +14107,13 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     lumaOn = !lumaOn;
     setToggle(lumaBtn, lumaOn);
     lumaCanvas.style.display = lumaOn ? "block" : "none";
-    gridCanvas.style.height = lumaOn ? `calc(100% - ${LUMA_H}px)` : "100%";
+    gridCanvas.style.height = `calc(100% - ${BAR_SEAT2 + (lumaOn ? LUMA_H : 0)}px)`;
+    leftBar.style.bottom = `${BAR_AT + (lumaOn ? LUMA_H : 0)}px`;
     requestAnimationFrame(render);
   };
   const showOriginal = (on) => {
     preview.setOriginal(on);
-    beforeBtn.style.borderColor = on ? ACCENT : BORDER;
+    beforeBtn.classList.toggle("on", on);
   };
   beforeBtn.addEventListener("pointerdown", () => showOriginal(true));
   for (const ev of ["pointerup", "pointerleave", "pointercancel"]) {
@@ -14083,7 +14128,7 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     const order = ["ryb", "rgb", "oklch"];
     const next = order[(order.indexOf(grid.getWheelMode()) + 1) % order.length];
     grid.setWheelMode(next);
-    wheelBtn.textContent = `Wheel: ${WHEEL_MODES[next].label}`;
+    wheelBtn.textContent = WHEEL_MODES[next].label;
     luma.refresh();
   };
   radialBtn.onclick = () => {
@@ -14091,7 +14136,7 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     const next = order[(order.indexOf(grid.getRadialMode()) + 1) % order.length];
     grid.setRadialMode(next);
     scope.setRadialMode(next);
-    radialBtn.textContent = `Radial: ${RADIAL_MODES[next].label}`;
+    radialBtn.textContent = RADIAL_MODES[next].label;
   };
   previewCanvas.addEventListener("pointermove", (e) => {
     const rgb = preview.readPixel(e.clientX, e.clientY);
@@ -14158,7 +14203,7 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
   ro.observe(body);
   requestAnimationFrame(render);
   let destroyed = false;
-  function destroy() {
+  function teardown() {
     if (destroyed) return;
     destroyed = true;
     ro.disconnect();
@@ -14168,30 +14213,24 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     luma.dispose();
     preview.dispose();
     scope.dispose();
-    host.remove();
     if (active && active.destroy === destroy) active = null;
   }
-  function closeWith(commit) {
-    var _a;
-    const json = meshJson(mesh);
-    destroy();
-    if (commit) (_a = opts.onClose) == null ? void 0 : _a.call(opts, json);
+  function destroy() {
+    silent = true;
+    modal.close();
   }
   const onKey = (e) => {
-    if (e.key === "Escape") {
-      e.stopPropagation();
-      if (grid.clearSelection()) return;
-      closeWith(true);
-      return;
-    }
+    const a = document.activeElement;
+    if (a && (a.isContentEditable || /^(INPUT|TEXTAREA)$/.test(a.tagName))) return;
     if (e.key === "\\") {
       e.stopPropagation();
       showOriginal(true);
       return;
     }
     const k = e.key.toLowerCase();
-    if (k === "r") {
+    if (k === "r" && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.stopPropagation();
+      e.preventDefault();
       grid.resetAll();
     }
   };
@@ -14200,11 +14239,7 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
     if (e.key === "\\") showOriginal(false);
   };
   window.addEventListener("keyup", onKeyUp, true);
-  host.addEventListener("pointerdown", (e) => {
-    if (e.target === host) closeWith(true);
-  });
-  saveBtn.onclick = () => closeWith(true);
-  closeBtn.onclick = () => closeWith(true);
+  modal.addPrimary("Save & close");
   active = { destroy };
   return {
     setImage(src, w, h, scatter16) {
@@ -14218,26 +14253,16 @@ dh ${info.dh.toFixed(1)}  ds ${info.ds.toFixed(2)}  dl ${info.dl.toFixed(2)}`;
       render();
     },
     close() {
-      closeWith(false);
+      destroy();
     }
   };
 }
-function mkBtn(label, color) {
-  const b = document.createElement("button");
-  b.textContent = label;
-  b.style.cssText = `background:#252830;border:1px solid ${BORDER};color:${color};border-radius:4px;padding:4px 12px;cursor:pointer;font:inherit`;
-  if (color === ACCENT) {
-    b.style.borderColor = ACCENT;
-    b.style.fontWeight = "600";
-  }
-  return b;
-}
 function mkSelect(label, values, current) {
   const wrap = document.createElement("label");
-  wrap.style.cssText = `display:flex;align-items:center;gap:6px;color:${TEXT};opacity:0.9;cursor:pointer`;
+  wrap.style.cssText = "display:inline-flex;align-items:center;gap:2px;padding-left:8px;color:#9aa1b2;cursor:pointer";
   wrap.textContent = label;
   const sel = document.createElement("select");
-  sel.style.cssText = `background:#252830;border:1px solid ${BORDER};color:${TEXT};border-radius:4px;padding:3px 6px;font:inherit;cursor:pointer`;
+  sel.style.cssText = "background:transparent;border:0;color:#dcdce0;border-radius:999px;height:24px;padding:0 4px;font:600 11px system-ui,sans-serif;cursor:pointer";
   const vals = values.includes(current) ? values : [...values, current].sort((a, b) => a - b);
   for (const v of vals) {
     const o = document.createElement("option");
@@ -14256,17 +14281,8 @@ function mkSelect(label, values, current) {
   wrap.appendChild(sel);
   return { wrap, sel };
 }
-function mkToggle(label, on) {
-  const b = mkBtn(label, TEXT);
-  b._label = label;
-  setToggle(b, on);
-  return b;
-}
 function setToggle(b, on) {
-  b.style.color = on ? "#0b0d12" : TEXT;
-  b.style.background = on ? ACCENT : "#252830";
-  b.style.borderColor = on ? ACCENT : BORDER;
-  b.style.fontWeight = on ? "600" : "400";
+  b.classList.toggle("on", on);
 }
 function mkPane() {
   const p2 = document.createElement("div");
@@ -21460,7 +21476,7 @@ function setup$3(node) {
   let note = "";
   const ctx = canvas.getContext("2d");
   const listH = () => Math.max(ROW_H, rows.length * ROW_H);
-  const mkBtn2 = (label, fn) => {
+  const mkBtn = (label, fn) => {
     const b = document.createElement("button");
     b.className = "nkd-btn";
     b.textContent = label;
@@ -21474,22 +21490,22 @@ function setup$3(node) {
   const info = document.createElement("span");
   info.className = "nkd-info";
   const targets = () => selection.size ? [...selection].map((i) => rows[i]) : rows;
-  mkBtn2("All on", () => {
+  mkBtn("All on", () => {
     threshold = null;
     for (const r of targets()) r.on = true;
     commit();
   });
-  mkBtn2("All off", () => {
+  mkBtn("All off", () => {
     threshold = null;
     for (const r of targets()) r.on = false;
     commit();
   });
-  mkBtn2("Invert", () => {
+  mkBtn("Invert", () => {
     threshold = null;
     for (const r of targets()) r.on = !r.on;
     commit();
   });
-  mkBtn2("Reset", () => {
+  mkBtn("Reset", () => {
     threshold = null;
     for (const r of targets()) {
       r.on = true;
