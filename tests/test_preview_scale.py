@@ -85,6 +85,23 @@ def main() -> int:
     print(f"scaled {err_scaled:.5f}  vs  unscaled {err_naive:.5f}")
     assert err_scaled < err_naive / 4, "scaling the strength barely helped"
     print("OK - the preview tracks the node")
+
+    # Quality: a smear longer than the sample cap is drawn with gaps, which read as
+    # ghost copies of every edge. More samples must bring it closer to a dense
+    # reference, and 1.0 must be bit-for-bit what the node rendered before the
+    # option existed (it is optional: saved workflows do not carry it).
+    assert torch.equal(pb.apply_path_blur(full, paths, strength, 0.2, quality=1.0), rendered), \
+        "quality 1.0 changed the default render"
+    dense = pb.apply_path_blur(full, paths, strength, 0.2, quality=8.0)
+    better = pb.apply_path_blur(full, paths, strength, 0.2, quality=4.0)
+    worse = pb.apply_path_blur(full, paths, strength, 0.2, quality=0.25)
+    e1 = float((rendered - dense).abs().mean())
+    e4 = float((better - dense).abs().mean())
+    e025 = float((worse - dense).abs().mean())
+    print(f"vs dense: quality 0.25 {e025:.5f}  1.0 {e1:.5f}  4.0 {e4:.5f}")
+    assert e4 < e1 < e025, "quality did not order the renders by how smooth they are"
+    assert e4 < e1 / 2, "quadrupling the samples barely helped"
+    print("OK - quality trades samples for smoothness")
     return 0
 
 

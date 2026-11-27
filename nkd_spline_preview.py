@@ -105,7 +105,8 @@ def render(unique_id, kind: str, params: dict):
         out = apply_path_blur(image, params.get("paths") or "",
                               float(params.get("strength", 24.0)) * scale,
                               float(params.get("spread", 0.15)),
-                              mask=mask)
+                              mask=mask,
+                              quality=float(params.get("quality", 1.0)))
     else:
         return None
 

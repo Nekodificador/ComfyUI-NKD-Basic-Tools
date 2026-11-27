@@ -26,7 +26,7 @@ its own speed.
   information exists, so at the end of a stroke the background will smear over
   whatever is in front of it, and this is what protects it.
 
-Very high **Strength** ghosts rather than blurs. The sampling is capped, and past
+Very high **Strength** ghosts rather than blurs; raising **Quality** gives the smear more samples and smooths them out, at the cost of render time. The sampling is capped, and past
 that point you see discrete steps instead of a smear.
 
 <br clear="left">

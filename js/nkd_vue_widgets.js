@@ -6933,6 +6933,115 @@ const CSS$1 = `
 }
 .nkd-modal-status { color: #4ab4ff; font-variant-numeric: tabular-nums; }
 .nkd-modal-status.bad { color: #ff6b6b; }
+
+/* ── UI kit (nkd-ui-*): the editor look every NKD modal shares. Round borderless floats around
+   the picture, a sidebar of cards on a 4/8px grid, a pill and a status line for the node.
+   Additive: nothing above changes, an editor opts in by using these classes. The pill and the
+   line live on the NODE, outside any modal, so a widget that uses them calls
+   ensureNkdModalStyles() when it mounts. Shape language after nomadoor's Panorama Studio (MIT);
+   reference implementation: Preview3DWidget.vue. ── */
+.nkd-ui { --nkd-row: 24px; --nkd-lab: 64px; --nkd-fill: #2c2e36; --nkd-fill-hi: #3a3d48;
+  --nkd-dim: #9aa1b2; --nkd-fg: #dcdce0; --nkd-note: #6f7686; --nkd-accent: #4ab4ff; --nkd-float: rgba(26,28,34,0.86); }
+.nkd-ui, .nkd-ui *, .nkd-ui *::before, .nkd-ui *::after { box-sizing: border-box; }
+
+/* On the node: the button that opens the editor, over the picture's bottom centre… */
+.nkd-ui-pill {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 3;
+  height: 30px; padding: 0 14px 0 11px; border: 0; border-radius: 999px;
+  background: rgba(26,28,34,0.86); color: #e6eaf2; cursor: pointer; white-space: nowrap;
+  font: 600 12px/1 system-ui, sans-serif; display: inline-flex; align-items: center; gap: 7px;
+  transition: background-color 120ms;
+}
+.nkd-ui-pill:hover { background: rgba(58,62,74,0.92); color: #fff; }
+.nkd-ui-pill .pi { font-size: 12px; }
+/* …and one status line under it: what the editor holds on the left, the size on the right. */
+.nkd-ui-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 auto;
+  height: 26px; padding: 0 8px; background: #1a1c22; font: 11px/1 system-ui, sans-serif; color: #8a93a6;
+}
+.nkd-ui-line > span { display: inline-flex; align-items: center; gap: 5px; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nkd-ui-line .pi { font-size: 11px; }
+.nkd-ui-line > b { flex: none; color: #dcdce0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Floating groups: position them yourself (absolute, in the stage's margins — never on the picture). */
+.nkd-ui-float { position: absolute; z-index: 3; display: inline-flex; align-items: center; gap: 2px; padding: 5px;
+  background: var(--nkd-float, rgba(26,28,34,0.86)); border-radius: 999px; color: #c8d0e0; font: 11px/1 system-ui, sans-serif; }
+.nkd-ui-float.col { flex-direction: column; border-radius: 20px; }
+.nkd-ui-float button {
+  min-width: 30px; height: 30px; padding: 0; border: 0; border-radius: 999px; flex: 0 0 auto;
+  background: transparent; color: #c8d0e0; cursor: pointer; line-height: 1; font: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 6px; transition: background-color 120ms;
+}
+.nkd-ui-float button.txt { padding: 0 12px; font-weight: 600; }
+.nkd-ui-float button .pi { font-size: 13px; line-height: 1; color: inherit; }
+.nkd-ui-float button:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.nkd-ui-float button.on { background: #4ab4ff; color: #0c0d10; }
+.nkd-ui-float button:disabled { opacity: 0.3; cursor: not-allowed; background: transparent; color: #c8d0e0; }
+.nkd-ui-sep { width: 1px; height: 16px; margin: 0 3px; background: rgba(255,255,255,0.14); flex: 0 0 auto; }
+.nkd-ui-float.col .nkd-ui-sep { width: 16px; height: 1px; margin: 3px 0; }
+
+/* Sidebar of cards. 4px between rows and between controls in a row, 8px between blocks. */
+.nkd-ui-side { min-height: 0; overflow: hidden auto; background: #1a1c22; border-left: 1px solid #2a2d36;
+  padding: 8px; display: flex; flex-direction: column; gap: 8px; font: 11px/1.2 system-ui, sans-serif; color: var(--nkd-dim); }
+.nkd-ui-card { background: #202229; border-radius: 12px; flex: 0 0 auto; }
+.nkd-ui-card.sel { box-shadow: inset 0 0 0 1px rgba(74,180,255,0.55); }
+.nkd-ui-cardhead { display: flex; align-items: center; gap: 7px; padding: 11px 12px 0; min-height: 33px;
+  color: #fff; font: 600 13px/1 system-ui, sans-serif; }
+.nkd-ui-cardhead > .pi { color: #8a93a6; font-size: 12px; }
+.nkd-ui-cardhead > .grow { flex: 1 1 auto; min-width: 0; }
+.nkd-ui-cardbody { padding: 10px 12px 12px; display: grid; grid-template-columns: minmax(0,1fr); gap: 4px; }
+.nkd-ui-cardbody.off { opacity: 0.4; }
+/* One row: label · control · value on the SAME columns in every card, so the tracks line up. */
+.nkd-ui-row { display: grid; grid-template-columns: var(--nkd-lab) minmax(0,1fr) 38px; align-items: center;
+  column-gap: 6px; min-height: 20px; }
+.nkd-ui-row > :first-child { color: var(--nkd-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nkd-ui-row > :last-child:not(:nth-child(2)) { color: var(--nkd-fg); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nkd-ui-row.wide { grid-template-columns: var(--nkd-lab) minmax(0,1fr); min-height: var(--nkd-row); }
+.nkd-ui-sub { font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--nkd-note);
+  margin-top: 8px; display: flex; align-items: center; gap: 6px; min-height: 16px; }
+.nkd-ui-sub:first-child { margin-top: 0; }
+.nkd-ui-note { font-size: 10px; color: var(--nkd-note); line-height: 1.3; }
+/* Fields, buttons and selects: one height, one fill, no outline until edited. */
+.nkd-ui-btn, .nkd-ui-sel, .nkd-ui-field { height: var(--nkd-row); border: 1px solid transparent; border-radius: 6px;
+  background: var(--nkd-fill); color: var(--nkd-fg); font: 11px/1 system-ui, sans-serif; padding: 0 8px; min-width: 0; }
+.nkd-ui-btn, .nkd-ui-sel { cursor: pointer; }
+.nkd-ui-btn:hover, .nkd-ui-sel:hover, .nkd-ui-field:hover { background: var(--nkd-fill-hi); }
+.nkd-ui-btn.on { background: #4ab4ff; color: #0c0d10; }
+.nkd-ui-btn.round { border-radius: 999px; padding: 0 12px; height: 22px; }
+.nkd-ui-btn.icon { width: var(--nkd-row); padding: 0; flex: 0 0 auto; }
+.nkd-ui-btn .pi { font-size: 10px; }
+.nkd-ui-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.nkd-ui-field:focus, .nkd-ui-sel:focus { outline: none; border-color: #4ab4ff; }
+.nkd-ui-swatch { width: 28px; height: 20px; padding: 2px; border: 0; border-radius: 6px; background: var(--nkd-fill); cursor: pointer; flex: 0 0 auto; }
+.nkd-ui-check { display: inline-flex; align-items: center; gap: 8px; min-height: 20px; color: var(--nkd-fg); cursor: pointer; }
+.nkd-ui-check input, .nkd-ui input[type='checkbox'].nkd-ui-box { width: 14px; height: 14px; margin: 0; flex: 0 0 auto; accent-color: #4ab4ff; cursor: pointer; }
+/* Sliders: thin track, small light thumb. Set --nkd-pct (0–100%) for a filled track. */
+.nkd-ui-range { -webkit-appearance: none; appearance: none; width: 100%; height: 16px; margin: 0; background: transparent; cursor: pointer; touch-action: none; }
+.nkd-ui-range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, #7f8aa3 var(--nkd-pct, 0%), #3a3d48 var(--nkd-pct, 0%)); }
+.nkd-ui-range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -4px; border-radius: 50%; background: #c8d0e0; border: 0; }
+.nkd-ui-range:hover::-webkit-slider-thumb { background: #fff; }
+.nkd-ui-range::-moz-range-track { height: 4px; border-radius: 2px; background: #3a3d48; }
+.nkd-ui-range::-moz-range-progress { height: 4px; border-radius: 2px; background: #7f8aa3; }
+.nkd-ui-range::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: #c8d0e0; border: 0; }
+.nkd-ui-range:disabled { opacity: 0.3; cursor: default; }
+/* A slider inside a floating bar: label, track, value in a line. */
+.nkd-ui-barfield { display: inline-flex; align-items: center; gap: 8px; padding: 0 6px; color: #9aa1b2; white-space: nowrap; }
+.nkd-ui-barfield > span:last-child:not(:first-child) { color: #dcdce0; font-variant-numeric: tabular-nums; min-width: 52px; text-align: right; }
+.nkd-ui-barfield .nkd-ui-range { width: 140px; }
+
+/* Shortcuts sheet, over the stage. */
+.nkd-ui-help { position: absolute; z-index: 4; overflow: auto; background: rgba(27,28,30,0.97); border-radius: 12px;
+  padding: 16px 20px; color: #dcdce0; font: 12px/1.3 system-ui, sans-serif; }
+.nkd-ui-help-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; color: #8e8f93; }
+.nkd-ui-help-head b { color: #fff; font-size: 15px; font-weight: 600; }
+.nkd-ui-help-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px 40px; }
+.nkd-ui-help h4 { margin: 0 0 4px; font-size: 13px; font-weight: 600; color: #fff; }
+.nkd-ui-help-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 6px 0; border-top: 1px solid #2a2b2d; }
+.nkd-ui-help-row > span:last-child { display: inline-flex; align-items: center; gap: 5px; color: #8e8f93; white-space: nowrap; }
+.nkd-ui-help kbd, .nkd-ui kbd { font: 600 11px/1 system-ui, sans-serif; color: #dcdce0; background: #2c2c2e;
+  border-radius: 5px; padding: 4px 7px; min-width: 22px; text-align: center; display: inline-block; }
 `;
 function ensureNkdModalStyles() {
   if (document.getElementById(STYLE_ID)) return;
@@ -6982,9 +7091,11 @@ function openNkdModal(opts) {
     (_a = opts.onClose) == null ? void 0 : _a.call(opts, reason);
   }
   function onKey(e) {
+    var _a;
     if (e.key !== "Escape") return;
     e.stopPropagation();
     e.preventDefault();
+    if ((_a = api2.beforeEsc) == null ? void 0 : _a.call(api2)) return;
     close("dismiss");
   }
   xBtn.onclick = () => close("dismiss");
@@ -6994,7 +7105,7 @@ function openNkdModal(opts) {
       if (e.target === overlay) close("dismiss");
     });
   }
-  return {
+  const api2 = {
     overlay,
     panel,
     head,
@@ -7019,6 +7130,93 @@ function openNkdModal(opts) {
     },
     close
   };
+  return api2;
+}
+function nkdIcon(icon, title, onClick, text = false) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.title = title;
+  if (text) {
+    b.className = "txt";
+    b.textContent = icon;
+  } else {
+    const i = document.createElement("i");
+    i.className = `pi pi-${icon}`;
+    b.appendChild(i);
+  }
+  b.addEventListener("click", onClick);
+  return b;
+}
+function nkdFloat(stage, place, column, ...children) {
+  const f = div$1("nkd-ui nkd-ui-float" + (column ? " col" : ""));
+  f.style.cssText = place;
+  for (const ev of ["pointerdown", "mousedown", "wheel", "dblclick"]) f.addEventListener(ev, (e) => e.stopPropagation());
+  f.append(...children);
+  stage.appendChild(f);
+  return f;
+}
+function nkdSep() {
+  const s = document.createElement("span");
+  s.className = "nkd-ui-sep";
+  return s;
+}
+function nkdHelp(modal, stage, sections) {
+  const sheet = div$1("nkd-ui nkd-ui-help");
+  sheet.style.cssText = "inset:14px 66px 14px 14px;display:none";
+  const head = div$1("nkd-ui-help-head");
+  head.innerHTML = "<b>Shortcuts</b><span><kbd>?</kbd> or <kbd>Esc</kbd> to close</span>";
+  const cols = div$1("nkd-ui-help-cols");
+  for (const [title, rows] of sections) {
+    const sec = document.createElement("section");
+    const h = document.createElement("h4");
+    h.textContent = title;
+    sec.appendChild(h);
+    for (const [what, keys, note] of rows) {
+      const row = div$1("nkd-ui-help-row");
+      const a = document.createElement("span");
+      a.textContent = what;
+      const b = document.createElement("span");
+      keys.forEach((k, i) => {
+        if (i) b.append("+");
+        const kbd = document.createElement("kbd");
+        kbd.textContent = k;
+        b.appendChild(kbd);
+      });
+      if (note) b.append(note);
+      row.append(a, b);
+      sec.appendChild(row);
+    }
+    cols.appendChild(sec);
+  }
+  sheet.append(head, cols);
+  for (const ev of ["pointerdown", "mousedown", "wheel", "dblclick"]) sheet.addEventListener(ev, (e) => e.stopPropagation());
+  stage.appendChild(sheet);
+  let open2 = false;
+  const btn = nkdIcon("question", "Shortcuts — ?", () => set(!open2));
+  const set = (v) => {
+    open2 = v;
+    sheet.style.display = v ? "" : "none";
+    btn.classList.toggle("on", v);
+  };
+  modal.beforeEsc = () => {
+    if (!open2) return false;
+    set(false);
+    return true;
+  };
+  const onKey = (e) => {
+    if (!modal.overlay.isConnected) {
+      window.removeEventListener("keydown", onKey, true);
+      return;
+    }
+    if (e.key !== "?" || e.repeat) return;
+    const a = document.activeElement;
+    if (a && (a.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) && a.type !== "range") return;
+    e.preventDefault();
+    e.stopPropagation();
+    set(!open2);
+  };
+  window.addEventListener("keydown", onKey, true);
+  return btn;
 }
 function nkdButton(label, onClick, title) {
   const b = document.createElement("button");
@@ -7041,18 +7239,19 @@ function nkdToggle(label, initial, onChange, title) {
 const FINE_GAIN$3 = 0.1;
 function nkdSlider(label, cfg, onInput, title) {
   const wrap = document.createElement("label");
-  wrap.className = "nkd-modal-lbl";
+  const kit = !!cfg.kit;
+  wrap.className = cfg.kit === "row" ? "nkd-ui-row" : cfg.kit === "bar" ? "nkd-ui-barfield" : "nkd-modal-lbl";
   if (title) wrap.title = title;
   const rng = document.createElement("input");
   rng.type = "range";
-  rng.className = "nkd-modal-rng";
+  rng.className = kit ? "nkd-ui-range" : "nkd-modal-rng";
   rng.min = String(cfg.min);
   rng.max = String(cfg.max);
   rng.step = "any";
   rng.value = String(cfg.value);
-  if (cfg.width) rng.style.width = `${cfg.width}px`;
+  if (cfg.width && cfg.kit !== "row") rng.style.width = `${cfg.width}px`;
   const out = cfg.format ? document.createElement("span") : null;
-  if (out) out.className = "nkd-modal-num";
+  if (out && !kit) out.className = "nkd-modal-num";
   const fine = cfg.fine ?? cfg.step / 10;
   const clamp2 = (v) => Math.max(cfg.min, Math.min(cfg.max, v));
   const quantize = (v, soft) => {
@@ -7061,6 +7260,7 @@ function nkdSlider(label, cfg, onInput, title) {
   };
   const show = (v) => {
     if (out) out.textContent = cfg.format(v);
+    if (kit) rng.style.setProperty("--nkd-pct", `${(v - cfg.min) / (cfg.max - cfg.min || 1) * 100}%`);
   };
   const apply2 = (v, soft) => {
     const q = quantize(v, soft);
@@ -7100,11 +7300,6 @@ function nkdSlider(label, cfg, onInput, title) {
     rng.addEventListener("pointerup", up);
     rng.addEventListener("pointercancel", up);
   });
-  rng.addEventListener("dblclick", (e) => {
-    if (cfg.def == null || rng.disabled) return;
-    e.preventDefault();
-    apply2(cfg.def, false);
-  });
   rng.addEventListener("keydown", (e) => {
     const dir = e.key === "ArrowRight" || e.key === "ArrowUp" ? 1 : e.key === "ArrowLeft" || e.key === "ArrowDown" ? -1 : 0;
     if (!dir) return;
@@ -7112,8 +7307,13 @@ function nkdSlider(label, cfg, onInput, title) {
     const q = e.shiftKey ? fine : cfg.step;
     apply2(parseFloat(rng.value) + dir * q, e.shiftKey);
   });
+  rng.addEventListener("dblclick", (e) => {
+    if (cfg.def == null || rng.disabled) return;
+    e.preventDefault();
+    apply2(cfg.def, false);
+  });
   const txt = document.createElement("span");
-  txt.className = "nkd-modal-lbl-txt";
+  if (!kit) txt.className = "nkd-modal-lbl-txt";
   txt.textContent = label;
   wrap.append(txt, rng);
   if (out) wrap.appendChild(out);
@@ -16176,10 +16376,61 @@ const round$1 = (v) => Math.round(v * 1e5) / 1e5;
 const round2 = (v) => Math.round(v * 100) / 100;
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const num$1 = (v, d) => Number.isFinite(Number(v)) ? Number(v) : d;
-const HINTS = {
-  shape: "click to add points · click the first point or double-click empty space to close · click on the curve to insert a point · double-click a point for a corner · ctrl-drag a point to pull out a feather clone, then drag the clone to say how far the edge fades (shift-click it to remove) · shift-drag empty space to box-select · shift-click to delete · click away from a finished shape to deselect it · H hides the curves · alt-drag pans · wheel zooms",
-  path: "click to draw a stroke in the direction of movement · Enter finishes it · click on the stroke to insert a point · ctrl-drag a point for its own speed · shift-drag empty space to box-select · H hides the curves · alt-drag pans · wheel zooms",
-  pin: "click to drop a pin · drag the ring to set its blur (shift for fine) · ctrl-drag a pin to widen its reach · shift-drag empty space to box-select · shift-click to delete · H hides the pins · alt-drag pans · wheel zooms"
+const VIEW_KEYS = ["View", [
+  ["Zoom", [], "wheel"],
+  ["Pan", ["Alt"], "drag"],
+  ["Fit the view", ["F"]],
+  ["Cycle the backdrop", ["V"]],
+  ["Hide the curves", ["H"]]
+]];
+const SELECT_KEYS = [
+  ["Box-select points", ["Shift"], "drag empty space"],
+  ["Delete a point", ["Shift"], "click it"]
+];
+const SHORTCUTS = {
+  shape: [
+    ["Drawing", [
+      ["Add a point", [], "click"],
+      ["Close the shape", [], "click the first point, or double-click empty space"],
+      ["Insert a point", [], "click on the curve"],
+      ["Hard corner", [], "double-click a point"],
+      ["Finish the shape", ["Enter"]],
+      ["Deselect", [], "click away from a finished shape"]
+    ]],
+    ["Feather", [
+      ["Pull out a feather clone", ["Ctrl"], "drag a point"],
+      ["Set how far the edge fades", [], "drag the clone"],
+      ["Remove a clone", ["Shift"], "click it"],
+      ["Fine slider steps", ["Shift"], "drag"]
+    ]],
+    ["Selection", SELECT_KEYS],
+    VIEW_KEYS
+  ],
+  path: [
+    ["Drawing", [
+      ["Draw a stroke", [], "click along the movement"],
+      ["Finish the stroke", ["Enter"]],
+      ["Insert a point", [], "click on the stroke"],
+      ["Give a point its own speed", ["Ctrl"], "drag it"]
+    ]],
+    ["Selection", SELECT_KEYS],
+    VIEW_KEYS
+  ],
+  pin: [
+    ["Pins", [
+      ["Drop a pin", [], "click"],
+      ["Set its blur", [], "drag the ring"],
+      ["Fine blur", ["Shift"], "drag the ring"],
+      ["Widen its reach", ["Ctrl"], "drag the pin"]
+    ]],
+    ["Selection", SELECT_KEYS],
+    VIEW_KEYS
+  ]
+};
+const SHORT_HINT = {
+  shape: "click to add points · close on the first point · ? for the shortcuts",
+  path: "click to draw a stroke in the direction of movement · ? for the shortcuts",
+  pin: "click to drop a pin · drag the ring to set its blur · ? for the shortcuts"
 };
 function openSplineOverlay(opts) {
   var _a;
@@ -16213,11 +16464,26 @@ function openSplineOverlay(opts) {
       })
     });
   };
+  let busy = false;
+  let wanted = null;
+  let queued = false;
   function requestPreview(json) {
     if (shut || !opts.previewKind || !opts.previewKey || opts.nodeId == null) return;
-    clearTimeout(timer);
-    timer = setTimeout(async () => {
-      var _a2;
+    wanted = json;
+    if (busy || queued) return;
+    queued = true;
+    timer = setTimeout(() => {
+      queued = false;
+      void renderWanted();
+    }, 30);
+  }
+  async function renderWanted() {
+    var _a2;
+    if (shut || wanted == null) return;
+    const json = wanted;
+    wanted = null;
+    busy = true;
+    {
       const mine = ++token;
       note = "rendering…";
       refreshBar();
@@ -16254,12 +16520,14 @@ function openSplineOverlay(opts) {
         if (mine === token) note = `preview failed: ${(e == null ? void 0 : e.message) ?? e}`;
       } finally {
         if (mine === token) refreshBar();
+        busy = false;
+        if (wanted != null) void renderWanted();
       }
-    }, 160);
+    }
   }
   const modal = openNkdModal({
     title: opts.title,
-    hint: HINTS[opts.mode],
+    hint: SHORT_HINT[opts.mode],
     onClose: (reason) => {
       editor.finishShape();
       const json = editor.serialise();
@@ -16267,7 +16535,20 @@ function openSplineOverlay(opts) {
       opts.onClose(json, reason === "save");
     }
   });
-  modal.body.appendChild(editor.canvas);
+  const stage = document.createElement("div");
+  stage.style.cssText = "position:relative;flex:1 1 auto;min-width:0;min-height:0;";
+  stage.appendChild(editor.canvas);
+  modal.body.appendChild(stage);
+  const leftTools = [], rightTools = [], barTools = [];
+  const asText = (b) => {
+    b.className = "txt";
+    return b;
+  };
+  const asIcon = (b, icon) => {
+    b.classList.remove("nkd-modal-btn");
+    b.innerHTML = `<i class="pi pi-${icon}"></i>`;
+    return b;
+  };
   editor.deserialise(opts.json);
   const settings = ((_a = opts.previewParams) == null ? void 0 : _a.call(opts)) ?? {};
   if (Number.isFinite(Number(settings.max_blur))) editor.maxBlur = Number(settings.max_blur);
@@ -16278,7 +16559,6 @@ function openSplineOverlay(opts) {
   const status = document.createElement("span");
   status.className = "nkd-modal-status";
   modal.footerLeft.appendChild(status);
-  const right = modal.footerRight;
   if (opts.mode !== "pin") {
     const setType = (t) => {
       editor.newType = t;
@@ -16295,7 +16575,7 @@ function openSplineOverlay(opts) {
       () => setType("bspline"),
       "Smooth with far fewer points and no handles to wrangle — the roto standard. The points steer the curve rather than sitting on it, so it can never overshoot, however close together you put them. Double-click a point for a hard corner."
     );
-    right.append(bezier, bspline);
+    barTools.push(asText(bezier), asText(bspline));
     if (opts.mode === "shape") {
       const setOp = (o) => {
         editor.newOp = o;
@@ -16308,7 +16588,7 @@ function openSplineOverlay(opts) {
         () => setOp("sub"),
         "This shape cuts out of the shapes before it — the way to make a hole."
       );
-      right.append(add, sub);
+      barTools.push(nkdSep(), asText(add), asText(sub));
       const feather = nkdSlider(
         "Feather",
         {
@@ -16316,15 +16596,16 @@ function openSplineOverlay(opts) {
           max: 128,
           step: 0.5,
           value: 0,
-          width: 220,
+          width: 200,
           fine: 0.05,
           def: 0,
+          kit: "bar",
           format: (v) => `${v.toFixed(2)} px`
         },
         (v) => editor.setActiveProp("feather", v),
         "Soften this shape's edge evenly, before it is combined with the others. Hold Shift while dragging for fine control — the radius is continuous, so a fraction of a pixel is a real difference and not a rounding."
       );
-      right.appendChild(feather);
+      barTools.push(nkdSep(), feather);
       const fill = nkdToggle(
         "Fill",
         true,
@@ -16334,13 +16615,13 @@ function openSplineOverlay(opts) {
         },
         "Tint the inside of each shape, so you can tell them apart."
       );
-      right.appendChild(fill);
+      rightTools.push(asIcon(fill, "circle-fill"));
       const noFeather = nkdButton(
         "Clear feather",
         () => editor.clearFeather(),
         "Remove every feather clone and put all the edges back to hard. With points box-selected it only clears those."
       );
-      right.appendChild(noFeather);
+      barTools.push(asText(noFeather));
       refreshBar = () => {
         const soft = editor.featherCount;
         noFeather.textContent = soft ? `Clear feather (${soft})` : "Clear feather";
@@ -16356,21 +16637,83 @@ function openSplineOverlay(opts) {
       };
     } else {
       const speed = nkdSlider(
-        "Speed",
+        "Stroke speed",
         {
           min: 0,
           max: 2,
           step: 0.05,
           value: 1,
-          width: 180,
+          width: 150,
           def: 1,
-          format: (v) => `x${v.toFixed(2)}`
+          kit: "bar",
+          format: (v) => `x${v.toFixed(2)} = ${Math.round(v * editor.strength)} px`
         },
         (v) => editor.setActiveProp("speed", v),
-        "How fast this stroke moves, relative to the others. The node's Strength sets what full speed means in pixels."
+        "This stroke only: how fast it moves compared with the others. It multiplies Strength — x1 smears by the full Strength, x0.5 by half, x0 not at all. The number after the = is the distance that works out to."
       );
-      right.appendChild(speed);
+      barTools.push(nkdSep(), speed);
+      let spread = Number.isFinite(Number(settings.spread)) ? Number(settings.spread) : 0.15;
+      let quality = Number.isFinite(Number(settings.quality)) ? Number(settings.quality) : 1;
+      const setNumber = (name, v) => {
+        var _a2;
+        if (name === "strength") editor.strength = v;
+        else if (name === "spread") spread = v;
+        else quality = v;
+        (_a2 = opts.onSetting) == null ? void 0 : _a2.call(opts, name, v);
+        editor.draw();
+        requestPreview(editor.serialise());
+        if (name === "strength") refreshBar();
+      };
+      const strength = nkdSlider(
+        "Strength",
+        {
+          min: 0,
+          max: 256,
+          step: 1,
+          value: editor.strength,
+          width: 160,
+          def: 24,
+          kit: "bar",
+          format: (v) => `${Math.round(v)} px at x1`
+        },
+        (v) => setNumber("strength", v),
+        "Every stroke: how far a pixel travels where a stroke at speed x1 passes. It is the overall amount; each stroke's own speed scales it. Very high values break the smear into visible steps — raise Quality."
+      );
+      const spreadS = nkdSlider(
+        "Spread",
+        {
+          min: 0.02,
+          max: 1,
+          step: 0.01,
+          value: spread,
+          width: 140,
+          def: 0.15,
+          kit: "bar",
+          format: (v) => v.toFixed(2)
+        },
+        (v) => setNumber("spread", v),
+        "How far each stroke's influence reaches, as a fraction of the image. Small keeps the blur tight around the strokes; large blends them into one smooth field."
+      );
+      const qualityS = nkdSlider(
+        "Quality",
+        {
+          min: 0.25,
+          max: 8,
+          step: 0.25,
+          value: quality,
+          width: 110,
+          def: 1,
+          kit: "bar",
+          format: (v) => `x${v.toFixed(2)}`
+        },
+        (v) => setNumber("quality", v),
+        "How many samples a long smear may use. Raise it when a strong blur shows repeated ghost copies instead of a smooth streak. Slower the higher it goes."
+      );
+      barTools.push(nkdSep(), strength, spreadS, qualityS);
       refreshBar = () => {
+        strength.sync(editor.strength);
+        spreadS.sync(spread);
+        qualityS.sync(quality);
         const s = editor.activeShape;
         bezier.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bezier");
         bspline.classList.toggle("on", ((s == null ? void 0 : s.type) ?? editor.newType) === "bspline");
@@ -16379,16 +16722,10 @@ function openSplineOverlay(opts) {
         setStatus(`${editor.shapes.length} stroke${editor.shapes.length === 1 ? "" : "s"}`);
       };
     }
-    right.appendChild(nkdButton(
-      "Finish",
-      () => editor.finishShape(),
-      "Stop adding to this one; the next click starts a new one. (Enter)"
-    ));
-    right.appendChild(nkdButton(
-      "Delete",
-      () => editor.deleteActive(),
-      "Delete the selected shape. (Del)"
-    ));
+    leftTools.push(
+      nkdIcon("check", "Finish: stop adding to this one; the next click starts a new one. (Enter)", () => editor.finishShape()),
+      nkdIcon("times", "Delete the selected shape. (Del)", () => editor.deleteActive())
+    );
   } else {
     const setNumber = (name, v) => {
       var _a2;
@@ -16408,6 +16745,7 @@ function openSplineOverlay(opts) {
         value: editor.maxBlur,
         width: 180,
         def: 48,
+        kit: "bar",
         format: (v) => `${Math.round(v)} px`
       },
       (v) => setNumber("max_blur", v),
@@ -16422,12 +16760,13 @@ function openSplineOverlay(opts) {
         value: editor.falloff,
         width: 140,
         def: 2,
+        kit: "bar",
         format: (v) => v.toFixed(2)
       },
       (v) => setNumber("falloff", v),
       "How tightly each pin holds its own area. Raise it to stop a sharp pin from being dragged blurry by the ones around it."
     );
-    right.append(maxBlur, falloff);
+    barTools.push(maxBlur, nkdSep(), falloff);
     refreshBar = () => {
       maxBlur.sync(editor.maxBlur);
       falloff.sync(editor.falloff);
@@ -16447,14 +16786,31 @@ function openSplineOverlay(opts) {
     editor.refreshView();
     refreshBar();
   }, opts.mode === "shape" ? "Cycle the backdrop: the image with everything outside the mask dimmed, the mask on its own, or the untouched image. (V)" : opts.mode === "pin" ? "Cycle the backdrop: the blurred result, the blur field as a grey map — which is what shows you where the transition actually falls — or the untouched image. (V)" : "Show the rendered result or the untouched image. (V)");
-  right.appendChild(viewBtn);
   const curvesBtn = nkdToggle("Curves", true, (on) => {
     editor.showCurves = on;
     editor.draw();
   }, "Show or hide the vectors. Hidden, you get the backdrop with nothing drawn over it — the only way to judge an edge that has a control point sitting on it. Editing still works while they are hidden. (H)");
-  right.appendChild(curvesBtn);
-  right.appendChild(nkdButton("Clear", () => editor.clearAll(), "Remove everything."));
-  right.appendChild(nkdButton("Fit", () => editor.fitView(), "Reset the view. (F)"));
+  rightTools.unshift(asIcon(curvesBtn, "eye"));
+  rightTools.push(
+    asIcon(viewBtn, "images"),
+    nkdIcon("home", "Fit: reset the view. (F)", () => editor.fitView())
+  );
+  leftTools.push(nkdIcon("trash", "Clear: remove everything.", () => editor.clearAll()));
+  nkdFloat(
+    stage,
+    "left:70px;right:70px;bottom:14px;margin:0 auto;width:fit-content;flex-wrap:wrap;justify-content:center;border-radius:20px",
+    false,
+    ...barTools
+  );
+  nkdFloat(stage, "left:14px;top:50%;transform:translateY(-50%)", true, ...leftTools);
+  nkdFloat(
+    stage,
+    "right:14px;top:50%;transform:translateY(-50%)",
+    true,
+    ...rightTools,
+    nkdSep(),
+    nkdHelp(modal, stage, SHORTCUTS[opts.mode])
+  );
   window.addEventListener("keydown", onViewKey, true);
   function onViewKey(e) {
     if (!editor.canvas.isConnected) return;
@@ -16465,8 +16821,8 @@ function openSplineOverlay(opts) {
     if (e.key === "v" || e.key === "V") viewBtn.click();
   }
   function setStatus(text) {
-    viewBtn.textContent = VIEW_LABEL2[editor.view];
     viewBtn.classList.toggle("on", editor.view !== "source");
+    text = `${text} · ${VIEW_LABEL2[editor.view]}`;
     const picked = editor.selectionSize ? ` · ${editor.selectionSize} point${editor.selectionSize === 1 ? "" : "s"} selected` : "";
     const mismatch = savedAspect != null && Math.abs(savedAspect - editor.aspect) > 0.01;
     const warn = mismatch ? ` — drawn at a different aspect ratio (${savedAspect.toFixed(2)} vs ${editor.aspect.toFixed(2)}); shapes are stretched` : "";
@@ -24965,7 +25321,7 @@ registerSplineNode(
   "path",
   "😺 Path Blur",
   "Draw motion strokes",
-  { kind: "path", params: ["strength", "spread"] }
+  { kind: "path", params: ["strength", "spread", "quality"] }
 );
 registerSplineNode(
   "NKDFieldBlur",

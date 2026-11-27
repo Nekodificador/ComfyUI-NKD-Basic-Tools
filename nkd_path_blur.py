@@ -52,14 +52,20 @@ class NKDPathBlur(io.ComfyNode):
                                display_name="Strength",
                                tooltip="How far a pixel travels, in pixels, where a "
                                        "full-speed stroke passes. Very high values break "
-                                       "the smear into visible steps — the sampling is "
-                                       "capped, so past a point it ghosts rather than blurs."),
+                                       "the smear into visible steps — raise Quality to "
+                                       "smooth them out."),
                 io.Float.Input("spread", default=0.15, min=0.02, max=1.0, step=0.01,
                                display_name="Spread",
                                tooltip="How far each stroke's influence reaches, as a "
                                        "fraction of the image. Small keeps the blur tight "
                                        "around the strokes; large blends them into one "
                                        "smooth field across the whole frame."),
+                io.Float.Input("quality", default=1.0, min=0.25, max=8.0, step=0.25,
+                               display_name="Quality", optional=True,
+                               tooltip="How many samples a long smear may use. 1 is the "
+                                       "fast default; raise it when a strong blur shows "
+                                       "repeated ghost copies instead of a smooth streak. "
+                                       "Render time grows with it."),
                 io.Mask.Input("mask", optional=True,
                               tooltip="Optional. Where the mask is white the original image "
                                       "is kept — the usual way to stop a blurred background "
@@ -70,9 +76,10 @@ class NKDPathBlur(io.ComfyNode):
         )
 
     @classmethod
-    def execute(cls, image, paths, strength, spread, mask=None, unique_id=None) -> io.NodeOutput:
+    def execute(cls, image, paths, strength, spread, quality=1.0, mask=None,
+                unique_id=None) -> io.NodeOutput:
         push_source(node_id(cls, unique_id), image, mask=mask)
-        out = apply_path_blur(image, paths, strength, spread, mask)
+        out = apply_path_blur(image, paths, strength, spread, mask, quality=quality)
         return io.NodeOutput(out, ui=ui.PreviewImage(preview_frames(out), cls=cls))
 
 
@@ -90,10 +97,15 @@ NODE_CLASS_MAPPINGS = {"NKDPathBlur": NKDPathBlur}
 NODE_DISPLAY_NAME_MAPPINGS = {"NKDPathBlur": "😺NKD Path Blur"}
 
 
-def apply_path_blur(image, paths, strength, spread, mask=None):
+def apply_path_blur(image, paths, strength, spread, mask=None, quality=1.0):
     """The whole node, minus ComfyUI. Shared with the editor's preview route so
     what the editor shows is what the graph renders — the only way a preview is
-    worth trusting."""
+    worth trusting.
+
+    `quality` scales the cap on samples per pixel of travel. A smear longer than
+    the cap is drawn with gaps between samples, which read as ghost copies of
+    every edge; 1.0 keeps the cap the node always had, so saved workflows render
+    the same."""
     items = blur_core.parse_items(paths, "paths")
     if not items or strength <= 0.0:
         return image
@@ -118,7 +130,8 @@ def apply_path_blur(image, paths, strength, spread, mask=None):
         flow = direction * amount                                  # [1,2,H,W] px
 
         taps = int(float(amount.max())) | 1
-        taps = max(_MIN_TAPS, min(_MAX_TAPS, taps))
+        cap = int(round(_MAX_TAPS * max(0.25, float(quality)))) | 1
+        taps = max(_MIN_TAPS, min(cap, taps))
 
         img = image.to(device=device, dtype=torch.float32).permute(0, 3, 1, 2)
 

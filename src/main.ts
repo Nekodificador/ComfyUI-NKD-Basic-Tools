@@ -1565,7 +1565,7 @@ registerSplineNode("NKDVectorMask", "shapes", "shape",
                    "😺 Vector Mask", "Draw mask shapes");
 registerSplineNode("NKDPathBlur", "paths", "path",
                    "😺 Path Blur", "Draw motion strokes",
-                   { kind: "path", params: ["strength", "spread"] });
+                   { kind: "path", params: ["strength", "spread", "quality"] });
 registerSplineNode("NKDFieldBlur", "pins", "pin",
                    "😺 Field Blur", "Place blur pins",
                    { kind: "field", params: ["max_blur", "falloff"] });
