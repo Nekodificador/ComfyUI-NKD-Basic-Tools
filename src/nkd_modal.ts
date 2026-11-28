@@ -125,6 +125,10 @@ const CSS = `
 .nkd-modal-btn.on { border-color: #4ab4ff; color: #4ab4ff; background: rgba(74,180,255,0.12); }
 .nkd-modal-btn.primary { border-color: #4ab4ff; color: #4ab4ff; font-weight: 500; padding: 5px 14px; }
 .nkd-modal-btn.primary:hover { background: rgba(74,180,255,0.15); }
+/* The footer button that queues the node: ComfyUI's own Run colour, from the frontend's
+   variable. Same meaning as the run button of a float (.nkd-ui-float button.run). */
+.nkd-modal-btn.run { background: var(--color-brand-yellow, #f0ff41); border-color: transparent; color: #0c0d10; font-weight: 600; }
+.nkd-modal-btn.run:hover { background: color-mix(in srgb, var(--color-brand-yellow, #f0ff41) 82%, #fff); border-color: transparent; }
 .nkd-modal-lbl { color: rgba(255,255,255,0.55); display: flex; align-items: center; gap: 6px; }
 .nkd-modal-rng { width: 80px; accent-color: #4ab4ff; cursor: pointer; touch-action: none; }
 .nkd-modal-num {
